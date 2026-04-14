@@ -1,0 +1,130 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write  # OIDC 認証に必要
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
+jobs:
+  # ── Build & Push ────────────────────────────────────────────
+  build:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/vitanota-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Docker image
+        id: build
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: prod-${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  # ── Deploy to Dev ───────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to Dev
+    needs: build
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/vitanota-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to App Runner (dev)
+        run: |
+          aws apprunner update-service \
+            --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_DEV }} \
+            --source-configuration '{
+              "ImageRepository": {
+                "ImageIdentifier": "${{ needs.build.outputs.image }}",
+                "ImageRepositoryType": "ECR",
+                "ImageConfiguration": {"Port": "3000"}
+              }
+            }'
+
+      - name: Wait for deployment
+        run: |
+          aws apprunner wait service-updated \
+            --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_DEV }}
+
+      - name: Health check (dev)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://$(aws apprunner describe-service \
+              --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_DEV }} \
+              --query 'Service.ServiceUrl' --output text)/api/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed: HTTP $STATUS"
+            exit 1
+          fi
+
+  # ── Deploy to Prod（手動承認必要）────────────────────────────
+  deploy-prod:
+    name: Deploy to Prod
+    needs: [build, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: production  # GitHub Environments で手動承認を設定すること
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/vitanota-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to App Runner (prod)
+        run: |
+          aws apprunner update-service \
+            --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_PROD }} \
+            --source-configuration '{
+              "ImageRepository": {
+                "ImageIdentifier": "${{ needs.build.outputs.image }}",
+                "ImageRepositoryType": "ECR",
+                "ImageConfiguration": {"Port": "3000"}
+              }
+            }'
+
+      - name: Wait for deployment
+        run: |
+          aws apprunner wait service-updated \
+            --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_PROD }}
+
+      - name: Health check (prod)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://$(aws apprunner describe-service \
+              --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_PROD }} \
+              --query 'Service.ServiceUrl' --output text)/api/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed: HTTP $STATUS"
+            exit 1
+          fi

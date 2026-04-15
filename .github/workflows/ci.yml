@@ -115,6 +115,11 @@ jobs:
       - name: Unit tests
         run: pnpm test:coverage
 
+      # Step 18: OpenAPI 仕様が Zod スキーマと同期されているか検証
+      # zod-to-openapi で再生成し、リポジトリの openapi.yaml と差分があれば失敗
+      - name: OpenAPI schema sync check
+        run: pnpm openapi:check
+
 # ── Action の SHA 固定について ────────────────────────────────
 # 論点 L-3: GitHub Actions はタグ参照ではなくコミット SHA で固定する
 # 理由: タグは書き換え可能なため、悪意ある変更が混入するリスクがある

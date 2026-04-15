@@ -607,6 +607,8 @@ lambda:InvokeFunction
 - データポータビリティ → US-T-098 で対応
 - 文科省ガイドライン「利用目的達成後の速やかな削除」 → 30 日 grace + 物理削除バッチ
 
+**横断仕様（単一真実源）**: `aidlc-docs/construction/user-lifecycle-spec.md`
+
 **ストーリー**: `aidlc-docs/inception/user-stories/stories.md` の US-T-098/099/100, US-S-003/004 を参照
 
 **シーケンス図**: `aidlc-docs/construction/sequence-diagrams.md` の 11〜14 を参照

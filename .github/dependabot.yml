@@ -1,0 +1,45 @@
+# Dependabot 設定: 論点 L-3 / L-1 対応
+# - GitHub Actions の SHA 更新を自動 PR
+# - npm 依存パッケージのセキュリティ更新を自動 PR
+version: 2
+
+updates:
+  # ── GitHub Actions: SHA を週次で更新 ────────────────────────
+  # 論点 L-3: SHA 固定を維持しつつ、Dependabot が新しい SHA を提案する
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: 'ci'
+      include: scope
+
+  # ── npm 依存パッケージ: 週次 + セキュリティ即時 ─────────────
+  # 論点 L-1: pnpm audit と組み合わせて多層防御
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: 'deps'
+      include: scope
+    # 本番依存と dev 依存をグルーピング
+    groups:
+      production-dependencies:
+        dependency-type: production
+      development-dependencies:
+        dependency-type: development

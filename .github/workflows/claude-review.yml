@@ -1,0 +1,113 @@
+name: Claude Code Review
+
+# Phase 1 最小構成 (aidlc-docs/operations/claude-code-review-rollout.md 準拠)
+# - PR の opened/synchronize でトリガー
+# - ANTHROPIC_API_KEY 未登録時は skip して CI を止めない
+# - continue-on-error で必須 CI をブロックしない
+# - 重大リスクのみ指摘する保守的なプロンプト
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'src/**'
+      - 'pages/**'
+      - 'migrations/**'
+      - '__tests__/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+# 同一 PR の連続 push で前のレビューをキャンセル(コスト削減)
+concurrency:
+  group: claude-review-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: Claude Code Review (Phase 1)
+    runs-on: ubuntu-latest
+    # 失敗しても他の必須 CI(lint/test/secret-scan)をブロックしない
+    continue-on-error: true
+
+    steps:
+      # ── 前提チェック: API キー未登録時は skip ──────────────
+      # ANTHROPIC_API_KEY が未登録の状態でこのワークフローをマージしても
+      # CI が壊れないようにする(Step 17.5 の安全装置)
+      - name: Check ANTHROPIC_API_KEY
+        id: check-key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY が未登録のため Claude Code Review を skip します。"
+            echo "::warning::有効化手順: Settings → Secrets and variables → Actions → New repository secret"
+            echo "::warning::詳細: aidlc-docs/operations/claude-code-review-rollout.md"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.check-key.outputs.skip != 'true'
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        if: steps.check-key.outputs.skip != 'true'
+        # TODO: 初回成功確認後に SHA 固定(Dependabot が PR で SHA に置換)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          mode: review
+          direct_prompt: |
+            vitanota プロジェクト(教員向け BtoB SaaS、Next.js + Drizzle + PostgreSQL)の PR を簡潔にレビューしてください。
+
+            **以下の重大リスクのみ指摘し、それ以外はスキップしてください**:
+
+            1. **Zod バリデーションの欠如**
+               - pages/api/*.ts で req.body / req.query を直接使っている
+               - lib/schemas/ から import した既存スキーマを使っていない
+
+            2. **withTenantUser の使用忘れ**
+               - DB アクセス時に withTenant / withTenantUser でトランザクションを張っていない
+               - SET LOCAL がトランザクション境界外で呼ばれている (R1 RDS Proxy ピンニング対策)
+
+            3. **is_public=false データが /api/public/* に流れる設計**
+               - PrivateJournalRepository の戻り値が /api/public/* で返却されている
+               - PublicTimelineRepository 以外で public_journal_entries VIEW 以外を SELECT している
+
+            4. **明らかなセキュリティ脆弱性**
+               - SQL インジェクション・XSS・CSRF・認証バイパス
+               - シークレット値のハードコーディング
+
+            5. **複合 FK の破壊**
+               - journal_entry_tags の tenant_id を含めない INSERT
+               - SP-U02-04 Layer 8 への違反
+
+            **以下は指摘しない(Phase 1 では Should-check に含めない)**:
+            - 命名規則・インデント・コメントスタイル
+            - パフォーマンス最適化の提案
+            - リファクタリング提案
+            - README/md ファイルの内容
+
+            重大リスクが見つからなければ「重大な懸念は見つかりませんでした」と1行返してください。
+
+# ── Phase 1 → Phase 2 移行手順 ────────────────────────────────
+# 1. ANTHROPIC_API_KEY を Settings → Secrets で登録
+# 2. 1〜2 週間 Phase 1 で運用(誤検知率と有用性を観察)
+# 3. 問題なければ direct_prompt を Phase 2 用に拡張
+#    (aidlc-docs/operations/claude-code-review-rollout.md の Step 5 参照)
+# 4. continue-on-error: false に変更して必須化を検討
+#
+# ── 初回有効化チェックリスト ──────────────────────────────────
+# [ ] Anthropic Console で API キー作成 (sk-ant-...)
+# [ ] Anthropic Console で Monthly spend limit を $30 に設定
+# [ ] GitHub Settings → Secrets → ANTHROPIC_API_KEY を登録
+# [ ] ダミー PR でレビューが走ることを確認
+# [ ] Anthropic Console の Usage で日次トークン消費を確認

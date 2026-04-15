@@ -1,0 +1,27 @@
+#!/bin/sh
+# 論点 L-3 / P2-A-3: シークレット流出の早期検知
+# 開発者ローカルでコミット前に gitleaks を実行し、API キー等の混入を防ぐ
+#
+# セットアップ:
+#   1. gitleaks をインストール: brew install gitleaks
+#   2. このリポジトリで有効化: git config core.hooksPath .githooks
+
+set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "⚠️  gitleaks がインストールされていません。スキップします。"
+  echo "    インストール: brew install gitleaks"
+  echo "    （CI 側ではインストール済みのため必ず実行されます）"
+  exit 0
+fi
+
+echo "🔍 gitleaks: ステージングされた変更をスキャン中..."
+if ! gitleaks protect --staged --redact --verbose; then
+  echo ""
+  echo "❌ シークレットらしき文字列が検出されました。"
+  echo "   - .env や認証情報を誤って add していないか確認してください"
+  echo "   - 検出が誤検知の場合は .gitleaks.toml で除外設定を追加してください"
+  exit 1
+fi
+
+echo "✅ gitleaks: シークレット検出なし"

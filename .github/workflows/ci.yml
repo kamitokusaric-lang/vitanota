@@ -4,22 +4,101 @@ on:
   pull_request:
     branches: [main]
 
+# 同一 PR の連続 push で前のジョブをキャンセル
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 最小権限原則: PR 時はリポジトリ読み取りのみ
+permissions:
+  contents: read
+
 jobs:
+  # ── サプライチェーン: シークレットスキャン ──────────────────
+  # P2-A-3 / 論点 L-3: gitleaks で API キー・シークレットの誤コミットを検知
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        with:
+          fetch-depth: 0  # 履歴全体を gitleaks がスキャンするため
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── サプライチェーン: 依存パッケージ脆弱性スキャン ─────────
+  # 論点 L-1: OSV-Scanner で High/Critical 脆弱性を検知
+  # pnpm audit ではなく Google の OSV-Scanner を使う理由:
+  # - pnpm audit は npm registry の audit エンドポイントが retired により不安定
+  # - OSV-Scanner は Google 運営の OSV.dev データベースを直接参照
+  # - pnpm-lock.yaml をネイティブサポート
+  dependency-audit:
+    name: Dependency Audit (OSV-Scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v1.9.0/osv-scanner_linux_amd64 \
+            -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+          osv-scanner --version
+
+      - name: Scan pnpm-lock.yaml
+        run: |
+          osv-scanner --lockfile=pnpm-lock.yaml ./
+
+  # ── サプライチェーン: ロックファイル整合性 ─────────────────
+  # 論点 L-2: pnpm-lock.yaml と package.json の不整合を検知
+  lockfile-check:
+    name: Lockfile Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3.0.0
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Verify lockfile is up-to-date
+        run: |
+          pnpm install --frozen-lockfile
+          # install 後に pnpm-lock.yaml が変更されていないことを確認
+          if ! git diff --exit-code pnpm-lock.yaml; then
+            echo "::error::pnpm-lock.yaml is out of sync with package.json"
+            exit 1
+          fi
+
+  # ── 通常 CI: Lint / Type Check / Test ──────────────────────
   ci:
     name: Lint / Type Check / Test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3.0.0
         with:
           version: latest
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -35,3 +114,21 @@ jobs:
 
       - name: Unit tests
         run: pnpm test:coverage
+
+# ── Action の SHA 固定について ────────────────────────────────
+# 論点 L-3: GitHub Actions はタグ参照ではなくコミット SHA で固定する
+# 理由: タグは書き換え可能なため、悪意ある変更が混入するリスクがある
+# 更新は Dependabot or 手動で行い、PR レビューで SHA とバージョンを照合する
+#
+# 現在固定中の SHA (2026-04-15 時点・要定期更新):
+# - actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 = v4.1.1
+# - actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 = v4.0.2
+# - pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d = v3.0.0
+# - gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 = v2.3.7
+#
+# Dependabot 設定例 (.github/dependabot.yml で別途設定):
+#   updates:
+#     - package-ecosystem: github-actions
+#       directory: /
+#       schedule:
+#         interval: weekly

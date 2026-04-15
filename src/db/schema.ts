@@ -26,6 +26,7 @@ export const tenants = pgTable('tenants', {
 });
 
 // ── users ──────────────────────────────────────────────────────
+// 論点 M: deletedAt によるソフトデリート（30日 grace period → バッチで物理削除）
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   email: varchar('email', { length: 255 }).notNull().unique(),
@@ -34,6 +35,8 @@ export const users = pgTable('users', {
   emailVerified: timestamp('email_verified', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // 論点 M: 退会済みフラグ（NULL = アクティブ・タイムスタンプ = soft deleted）
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });
 
 // ── user_tenant_roles ──────────────────────────────────────────
@@ -141,6 +144,7 @@ export const verificationTokens = pgTable(
 // ── journal_entries ────────────────────────────────────────────
 // RLS: 2ポリシー（public_read + owner_all）
 // 複合 UNIQUE: (id, tenant_id) は SP-U02-04 Layer 8 複合 FK の参照先
+// 論点 M: user_id は nullable（退会・転勤時の匿名化のため SET NULL）
 export const journalEntries = pgTable(
   'journal_entries',
   {
@@ -148,9 +152,8 @@ export const journalEntries = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    // 論点 M: 退会・転勤時に SET NULL で匿名化（Q1-B / Q2-A 決定）
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     content: text('content').notNull(),
     isPublic: boolean('is_public').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -1,6 +1,6 @@
 # vitanota データベース ER 図
 
-**最終更新**: 2026-04-15（Unit-02 Step 18 完了時点・スキーマ変更なし）
+**最終更新**: 2026-04-15（論点 M ユーザーライフサイクル Phase 1・migration 0006）
 **スコープ**: Unit-01（認証・テナント基盤）+ Unit-02（日誌・感情記録コア）
 
 ## 更新ルール
@@ -56,6 +56,7 @@ erDiagram
         timestamptz email_verified
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at "論点M soft delete"
     }
 
     USERS_TENANT_ROLES {
@@ -112,7 +113,7 @@ erDiagram
     JOURNAL_ENTRIES {
         uuid id PK
         uuid tenant_id FK
-        uuid user_id FK
+        uuid user_id FK "nullable・退会/転勤時 SET NULL で匿名化"
         text content "1..200 chars"
         boolean is_public "default true"
         timestamptz created_at
@@ -197,6 +198,9 @@ erDiagram
 | `users` 削除 → `journal_entries` | CASCADE |
 | `journal_entries` 削除 → `journal_entry_tags` | CASCADE（複合 FK） |
 | `tags` 削除 → `journal_entry_tags` | CASCADE（複合 FK、エントリ本体は残る） |
+| `users` 削除 → `journal_entries.user_id` | **SET NULL（論点 M）** 公開エントリは匿名化保持 |
+| `users` 削除 → `tags.created_by` | **SET NULL（論点 M）** タグ本体は残る |
+| `users` 削除 → `invitation_tokens.invited_by` | **SET NULL（論点 M）** 招待履歴は監査証跡として残る |
 
 ---
 
@@ -231,9 +235,16 @@ erDiagram
 | 0003 | `migrations/0003_unit02_journal_core.sql` | journal_entries / tags / journal_entry_tags + 複合 UNIQUE + 複合 FK | Unit-02 |
 | 0004 | `migrations/0004_unit02_journal_rls.sql` | RLS ポリシー（SP-U02-02 2ポリシー + tags + journal_entry_tags） | Unit-02 |
 | 0005 | `migrations/0005_unit02_public_view.sql` | public_journal_entries VIEW（SP-U02-04 Layer 4） | Unit-02 |
+| 0006 | `migrations/0006_user_lifecycle.sql` | 論点 M Phase 1: FK 修正 (SET NULL)・users.deleted_at 追加 | Unit-02 + Unit-01 遡及 |
 
 ---
 
 ## 変更履歴
 
 - **2026-04-15 初版**: Unit-01 + Unit-02 Step 1-3 完了時点の DB 構造を反映
+- **2026-04-15 改訂1**: 論点 M Phase 1 反映
+  - `users.deleted_at` 追加（soft delete）
+  - `journal_entries.user_id` を nullable に変更 + FK を SET NULL に
+  - `tags.created_by` の FK を SET NULL に
+  - `invitation_tokens.invited_by` の FK を SET NULL に
+  - migration 0006 追加

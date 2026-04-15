@@ -14,7 +14,10 @@
   - Unit-02 nfr-design-patterns.md に SP-U02-04 多層防御パターン追加
   - Unit-02 infrastructure-design.md に PostgreSQL VIEW `public_journal_entries` 定義追加
   - CloudFront パスを `/api/public/*` と `/api/private/*` に名前空間分離
-- **2026-04-15 改訂5（本版）**: 運用フェーズで対応する既知項目を明文化
+- **2026-04-15 改訂6（本版）**: 論点 M（ユーザーライフサイクル）を追加
+  - 教員退会・転勤・データエクスポート・物理削除バッチの設計を確定
+  - Phase 1（スキーマ修正）を実装、Phase 2（API・Service・バッチ）は次 Unit
+- **2026-04-15 改訂5**: 運用フェーズで対応する既知項目を明文化
   - **論点 L**（サプライチェーン攻撃対策）を追加
   - **運用フェーズ項目**を新セクションとして追加（インシデント対応 Runbook・外部ペンテスト計画・セキュリティトレーニング）
 - **2026-04-15 改訂4**: 論点 H 追加ハードニング
@@ -550,6 +553,63 @@ lambda:InvokeFunction
 - 100 並列リクエストでのセッション変数漏えい検証を含む
 
 **残存リスク**: 統合テスト実装後に再評価。テスト実装は Unit-02 コード生成フェーズで対応。
+
+---
+
+### 🟡 論点 M: ユーザーライフサイクル管理（2026-04-15 改訂6 で追加）
+
+**問題発見の経緯**: Step 8 完了後のレビューで「ユーザー退会フローが未実装」かつ「現状の DB 制約だと `DELETE FROM users` が FK violation で失敗する」二重問題を発見。さらに教員の転勤を考慮すると、単純な退会ではなく以下のユースケースを区別する必要があると判明。
+
+**ユースケース**:
+1. **転勤（US-T-100）**: 教員が学校 A → 学校 B、人格は同一・テナント所属が変わる
+2. **兼務**: 1人が複数学校に同時所属（既存 user_tenant_roles で対応）
+3. **退会（US-T-099）**: vitanota 利用を完全終了
+4. **強制退会（US-S-003）**: school_admin が退職処理
+5. **データエクスポート（US-T-098）**: 任意のタイミングでマイ記録を JSON/Markdown ダウンロード
+6. **物理削除バッチ（US-S-004）**: 退会後 30 日経過分を自動削除
+
+**設計判断（2026-04-15 確定）**:
+- Q1=B: 転勤時に公開エントリの本人名を匿名化（`user_id=NULL`）
+- Q2=A: 転勤時のマイ記録は元学校に grace period 中残り、その後削除
+- Q3=B: エクスポート形式は JSON + Markdown
+- Q4=C: Phase 1 はスキーマ修正 + ストーリー追加のみ・API は次 Unit
+
+**データ帰属の原則**:
+- `users` 行（人格）: グローバル（テナント横断）
+- `user_tenant_roles`: テナント所属の管理（転勤 = 行の差し替え）
+- 公開 `journal_entries`: **テナント（学校）に帰属**・転勤後も残る・退会時は匿名化
+- 非公開 `journal_entries`（マイ記録）: テナント × ユーザー・grace period 後削除
+- `tags`: テナント単位・`created_by` は SET NULL で匿名化
+
+**Phase 1 実装内容**（migration 0006・schema.ts 更新）:
+- `tags.created_by` の FK を `ON DELETE SET NULL` に変更
+- `invitation_tokens.invited_by` の FK を `ON DELETE SET NULL` に変更
+- `journal_entries.user_id` を nullable に変更 + FK を `ON DELETE SET NULL` に変更
+- `users.deleted_at TIMESTAMPTZ` カラム追加（soft delete）
+- 部分インデックス `users_deleted_at_idx`（バッチ用）
+
+**Phase 2 で実装予定**（次 Unit）:
+- `POST /api/me/export` - マイ記録エクスポート（JSON / Markdown）
+- `POST /api/me/withdraw` - 本人退会
+- `POST /api/admin/users/[id]/remove-from-tenant` - school_admin 強制離脱
+- 認証層: session callback で `deleted_at IS NOT NULL` を 401 扱い
+- 物理削除バッチ Lambda（30 日経過分を CASCADE 削除）
+- ログイベント: `UserExported` / `UserSoftDeleted` / `UserHardDeleted` / `UserTransferredFromTenant`
+- ユニットテスト + 統合テスト Suite 9（ユーザーライフサイクル）
+
+**残存リスク（Phase 1 完了時点）**:
+- API 未実装のため、現状は手動 SQL でしか退会・転勤を処理できない
+- 物理削除バッチ未実装のため、`deleted_at` セットされた行が無期限に残る
+- いずれも Phase 2 で解消予定
+
+**法的要件への対応**:
+- 個人情報保護法第 19 条「保有個人データの削除請求権」 → US-T-099 anonymizePublic=false で対応
+- データポータビリティ → US-T-098 で対応
+- 文科省ガイドライン「利用目的達成後の速やかな削除」 → 30 日 grace + 物理削除バッチ
+
+**ストーリー**: `aidlc-docs/inception/user-stories/stories.md` の US-T-098/099/100, US-S-003/004 を参照
+
+**シーケンス図**: `aidlc-docs/construction/sequence-diagrams.md` の 11〜14 を参照
 
 ---
 

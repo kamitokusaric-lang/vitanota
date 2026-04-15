@@ -302,6 +302,86 @@
 - テナント作成後、他の既存テナントのデータに影響がないこと（隔離確認）
 - 新テナントの管理者が初回ログインできること
 
+### US-T-098: マイ記録をエクスポートする 🔴 Must
+
+**ストーリー**: 私は教員として、自分のマイ記録を JSON / Markdown 形式でダウンロードしたい。なぜなら、転勤・退会の際に自分の振り返りを手元に残したいから、また個人情報保護法のデータポータビリティ権に対応するため。
+
+**受け入れ基準**:
+- Given: 在籍中の教員が `/me/export` 画面を開いている
+- When: 「マイ記録をダウンロード」ボタンをクリックする
+- Then: 自分の全エントリ（公開・非公開両方）が JSON ファイルとしてダウンロードされる
+- Then: JSON にはエントリ ID・本文・公開フラグ・作成日時・更新日時・タグ名一覧を含む
+- Then: 他人のエントリ・他テナントのエントリは絶対に含まれない（RLS で保証）
+
+- Given: 同じ画面で「Markdown 形式」を選択する
+- When: ダウンロードボタンをクリックする
+- Then: 人間可読な Markdown ファイルがダウンロードされる
+- Then: 各エントリは見出し・本文・タグ・日付の構造で出力される
+
+- Given: 在籍中はいつでもエクスポート可能
+- When: 月次・年次など自由なタイミングで実行する
+- Then: 制限なくダウンロードできる（rate limit はあり）
+
+- Given: エクスポート操作は監査ログに記録される
+- Then: `LogEvents.UserExported` イベントが発火される
+
+**実装フェーズ**: 次 Unit（API・Service の実装）・Phase 1 はスキーマ準備のみ
+
+### US-T-099: vitanota を退会する 🔴 Must
+
+**ストーリー**: 私は教員として、vitanota の利用を終了したい。なぜなら、別サービスへの移行や教職を離れる場合に、自分の個人情報を削除する必要があるから。
+
+**受け入れ基準**:
+- Given: 教員が `/me/withdraw` 画面を開いている
+- When: 退会フォームに記入する
+- Then: 退会理由を任意で記入できる
+- Then: 退会前に「マイ記録をダウンロード」を実行できる動線がある（US-T-098 へ）
+- Then: 「公開エントリの扱い」を選択できる:
+  - A. 匿名化して残す（推奨）
+  - B. 全削除（個人情報削除請求）
+
+- When: 退会を確定する
+- Then: `users.deleted_at = NOW()` が設定される（soft delete）
+- Then: 全 `sessions` が即時 DELETE される（即時ログアウト）
+- Then: 全 `accounts` 行が DELETE される（再ログイン不可）
+- Then: 全 `user_tenant_roles` が DELETE される
+- Then: マイ記録（`is_public=false`）は grace period 中（30日）保持
+- Then: 公開エントリ（選択 A）は `user_id = NULL` に更新（匿名化）
+- Then: 公開エントリ（選択 B）は DELETE
+- Then: ブラウザは即座にログイン画面へリダイレクト
+
+- Given: 退会後 30日以内
+- When: school_admin に復旧を依頼する
+- Then: `users.deleted_at = NULL` に戻すことで復旧可能（手動 SQL Runbook）
+
+- Given: 30日経過後
+- When: 物理削除バッチが走る
+- Then: `DELETE FROM users WHERE deleted_at < NOW() - INTERVAL '30 days'`
+- Then: CASCADE で残った関連データも完全削除
+
+**実装フェーズ**: 次 Unit
+
+### US-T-100: 学校から離脱する（転勤） 🟡 Should
+
+**ストーリー**: 私は教員として、転勤や退職に伴い1つの学校テナントから外れたい。ただし vitanota 自体は別の学校で使い続ける可能性がある。
+
+**受け入れ基準**:
+- Given: 教員 X が学校 A の `user_tenant_roles` に所属している
+- When: school_admin (A) が「教員を学校から外す」操作を実行する
+- Then: `DELETE FROM user_tenant_roles WHERE user_id=X AND tenant_id=A`
+- Then: 教員 X の学校 A での認証コンテキストは消失（次のリクエストで 403）
+- Then: 教員 X が他テナントに所属していれば、そのテナントでは引き続き利用可能
+- Then: 学校 A の共有タイムラインに残っていた教員 X の公開エントリは `user_id = NULL` に更新（匿名化、Q1-B）
+- Then: 学校 A の教員 X のマイ記録は grace period 中保持・30日後に削除
+- Then: 教員 X の `users` 行は削除されない（兼務復帰の可能性を残す）
+
+- Given: 学校 A で教員 X のマイ記録をエクスポートしてから転勤する場合
+- When: 退職前に教員 X が US-T-098 を実行
+- Then: マイ記録がダウンロードされる
+- Then: 教員 X 個人がデータを保持
+
+**実装フェーズ**: 次 Unit（school_admin の管理画面と統合）
+
 ### US-S-002: テナントを停止する 🟡 Should
 
 **ストーリー**: 私はシステム管理者として、解約した学校のテナントを停止したい。なぜなら、契約終了後のアクセスを遮断したいから。
@@ -310,9 +390,66 @@
 - テナント停止後、そのテナントのユーザーはログインできなくなること
 - テナントのデータは一定期間保持されること（即時削除しない）
 
+### US-S-003: school_admin が教員を学校から外す 🔴 Must
+
+**ストーリー**: 私は school_admin として、退職・転勤した教員を自分の学校から外したい。なぜなら、退職後のアクセスを遮断し、新しい所属者リストを正しく管理するため。
+
+**受け入れ基準**:
+- Given: school_admin が教員一覧画面を開いている
+- When: 該当教員の「学校から外す」を実行する
+- Then: 確認ダイアログが表示される
+- Then: 確定すると `DELETE FROM user_tenant_roles WHERE user_id=? AND tenant_id=?`
+- Then: 該当教員の学校 A セッションは即時無効化（`DELETE FROM sessions WHERE user_id=? AND active_tenant_id=?`）
+- Then: 公開エントリは匿名化（`UPDATE journal_entries SET user_id=NULL WHERE user_id=? AND tenant_id=?`）
+- Then: マイ記録は grace period 中保持
+- Then: 監査ログに `LogEvents.UserTransferredFromTenant` を記録（誰が誰をいつ外したか）
+- Then: 教員本人の `users` 行は触らない（他テナント所属の可能性）
+
+**実装フェーズ**: 次 Unit（admin 機能）
+
+### US-S-004: 退会済みユーザーを物理削除する（30日後バッチ） 🟢 Could
+
+**ストーリー**: 私は system 管理者として、退会後 30日経過したユーザーを物理削除したい。なぜなら、個人情報保護法の保有期間最小化の原則に従うため。
+
+**受け入れ基準**:
+- Given: 日次バッチが起動
+- When: `DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL '30 days'`
+- Then: CASCADE で残った関連データも全削除（マイ記録・タグ created_by 等は SET NULL）
+- Then: 監査ログに `LogEvents.UserHardDeleted` を記録
+- Then: 削除前のメタデータ（userId・退会日時）はログにのみ残る
+
+**実装フェーズ**: 次 Unit（Lambda マイグレーター基盤を流用）
+
 ---
 
 ## ストーリー変更履歴
+
+### 2026-04-15 (改訂2): ユーザーライフサイクル設計の追加
+
+**背景**: Unit-02 Step 8 完了後のレビューで「ユーザー退会フローが未定義かつ DB 制約バグで DELETE が失敗する」問題を発見。さらに教員の転勤を考慮すると、単純な「退会」ではなく以下4つのユースケースを区別する必要があると判明。
+
+**追加ストーリー**:
+- US-T-098: マイ記録をエクスポート（データポータビリティ・GDPR/個人情報保護法対応）
+- US-T-099: vitanota を退会（soft delete + 30日 grace + 公開エントリ匿名化選択肢）
+- US-T-100: 学校から離脱（転勤・vitanota 自体は他校で継続）
+- US-S-003: school_admin が教員を学校から外す（退職処理）
+- US-S-004: 退会済みユーザーの物理削除バッチ（30日後）
+
+**設計判断**:
+- Q1=B: 転勤時に公開エントリの本人名を匿名化（`user_id=NULL`）
+- Q2=A: 転勤時のマイ記録は元学校に残る → 30日 grace 後削除
+- Q3=B: エクスポート形式は JSON + Markdown
+- Q4=C: Phase 1 はスキーマ修正 + ストーリー追加のみ・API は次 Unit
+
+**Phase 1 で実装したもの**:
+- `migrations/0006_user_lifecycle.sql`: FK 修正（SET NULL）+ `users.deleted_at` 追加
+- `src/db/schema.ts`: `journal_entries.user_id` を nullable に・`users.deletedAt` 列追加
+
+**Phase 2（次 Unit）で実装予定**:
+- 退会 / 転勤 / エクスポート の API・Service
+- 認証層の `deleted_at` チェック
+- 物理削除バッチ
+- ユニットテスト・統合テスト Suite 9
 
 ### 2026-04-15: Unit-02 機能設計フェーズでの設計詳細化を反映
 

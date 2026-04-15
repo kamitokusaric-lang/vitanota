@@ -422,6 +422,177 @@ sequenceDiagram
 
 ---
 
+## 11. マイ記録エクスポート（US-T-098・データポータビリティ）
+
+転勤・退会前に教員が自分の記録をダウンロードする。**Phase 2 で API を実装予定**。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 教員のブラウザ
+    participant App as App Runner
+    participant DB as PostgreSQL
+
+    U->>U: /me/export 画面を開く
+    U->>App: GET /api/me/export?format=json<br/>Cookie: next-auth.session-token=...
+
+    App->>App: requireAuth() → ctx
+    App->>App: withTenantUser でトランザクション開始
+    App->>DB: SELECT * FROM journal_entries<br/>WHERE user_id=? AND tenant_id=?
+    Note right of DB: RLS owner_all で<br/>自分の全エントリを取得
+    DB-->>App: entries[]
+
+    App->>DB: SELECT je.*, t.name, t.is_emotion<br/>FROM journal_entries je<br/>LEFT JOIN journal_entry_tags jet ON je.id=jet.entry_id<br/>LEFT JOIN tags t ON jet.tag_id=t.id
+    DB-->>App: entries with tags
+
+    App->>App: JSON 形式に整形<br/>(または Markdown 形式に変換)
+    App->>App: logEvent(UserExported, { userId, tenantId, count, format })
+
+    App-->>U: 200 OK<br/>Content-Type: application/json<br/>Content-Disposition: attachment; filename=vitanota-export-2026-04-15.json
+
+    Note over U: ブラウザがダウンロード開始<br/>JSON または Markdown ファイル
+```
+
+**含まれるデータ**:
+- 自分の全エントリ（公開・非公開両方）
+- エントリに紐づくタグ名（タグ ID は転勤先で意味を持たないので除外）
+- 作成日時・更新日時・公開フラグ
+
+**含まれないデータ**:
+- 他人のエントリ
+- 他テナントのエントリ
+- 監査ログ
+
+---
+
+## 12. 学校から離脱（US-T-100・転勤フロー）
+
+教員 X が学校 A から転勤する際のフロー（school_admin 操作・**Phase 2 で API 実装**）。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Admin as school_admin (A)
+    participant API as 管理画面 API<br/>(Phase 2)
+    participant DB as PostgreSQL
+    participant U as 教員 X のブラウザ
+
+    Note over U: 転勤前 - 教員 X が任意で<br/>マイ記録をエクスポート (US-T-098)
+
+    Admin->>API: POST /api/admin/users/教員X/remove-from-tenant
+    API->>API: requireAuth + roles.includes('school_admin')
+
+    API->>DB: BEGIN
+
+    API->>DB: DELETE FROM user_tenant_roles<br/>WHERE user_id='教員X' AND tenant_id='学校A'
+    Note right of DB: 学校 A の所属を削除
+
+    API->>DB: UPDATE journal_entries<br/>SET user_id=NULL<br/>WHERE user_id='教員X' AND tenant_id='学校A'<br/>AND is_public=true
+    Note right of DB: Q1-B: 公開エントリを匿名化<br/>FK SET NULL で参照は外れる<br/>本文・タグは残る
+
+    API->>DB: DELETE FROM sessions<br/>WHERE user_id='教員X' AND active_tenant_id='学校A'
+    Note right of DB: 学校 A セッションのみ無効化<br/>他テナント所属があれば<br/>そちらは生き残る
+
+    API->>DB: COMMIT
+
+    API->>API: logEvent(UserTransferredFromTenant,<br/>{ userId, tenantId, by: adminId })
+    API-->>Admin: 200 OK
+
+    Note over U: 教員 X が学校 A の<br/>マイ記録 URL にアクセス
+    U->>API: GET /api/private/journal/entries/mine<br/>(学校 A コンテキスト)
+    API->>DB: 教員 X の学校 A 所属確認<br/>→ なし
+    API-->>U: 403 FORBIDDEN
+
+    Note over Admin,U: 学校 A での教員 X の<br/>マイ記録は grace period 中<br/>残存 → 30 日後バッチ削除
+```
+
+**ポイント**:
+- `users` 行は削除しない（教員 X が他テナントで使い続ける可能性）
+- 公開エントリは匿名化保持（学校の集合知を守る）
+- マイ記録は grace period 中保持（教員本人がエクスポート漏れた場合の救済）
+
+---
+
+## 13. vitanota 退会（US-T-099・本人による退会）
+
+教員が完全に vitanota 利用を終了するフロー（**Phase 2 で API 実装**）。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 教員 X のブラウザ
+    participant API as 退会 API<br/>(Phase 2)
+    participant DB as PostgreSQL
+
+    Note over U: 退会前 - 推奨フロー<br/>1. マイ記録エクスポート (US-T-098)<br/>2. 退会画面で「公開エントリの扱い」を選択
+
+    U->>API: POST /api/me/withdraw<br/>{ reason?, anonymizePublic: true }
+    API->>API: requireAuth() → ctx (本人確認)
+
+    API->>DB: BEGIN
+
+    API->>DB: UPDATE users<br/>SET deleted_at=NOW()<br/>WHERE id='教員X'
+    Note right of DB: soft delete<br/>30 日 grace 開始
+
+    API->>DB: DELETE FROM accounts<br/>WHERE user_id='教員X'
+    Note right of DB: OAuth 連携を即時遮断<br/>再ログイン経路を消す
+
+    API->>DB: DELETE FROM sessions<br/>WHERE user_id='教員X'
+    Note right of DB: 全セッション即時失効
+
+    API->>DB: DELETE FROM user_tenant_roles<br/>WHERE user_id='教員X'
+    Note right of DB: 全テナント所属を解除
+
+    alt anonymizePublic = true (Q1-B 推奨)
+      API->>DB: UPDATE journal_entries<br/>SET user_id=NULL<br/>WHERE user_id='教員X' AND is_public=true
+    else anonymizePublic = false (削除請求)
+      API->>DB: DELETE FROM journal_entries<br/>WHERE user_id='教員X' AND is_public=true
+    end
+
+    Note right of DB: マイ記録 (is_public=false) は<br/>30 日 grace 中保持<br/>その後物理削除バッチで削除
+
+    API->>DB: COMMIT
+
+    API->>API: logEvent(UserSoftDeleted,<br/>{ userId, reason, anonymizePublic })
+    API-->>U: 200 OK + Set-Cookie: ...=; expires=過去
+    Note over U: 即時ログアウト<br/>302 → /auth/signin
+```
+
+---
+
+## 14. 物理削除バッチ（US-S-004・30 日後の hard delete）
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Sched as EventBridge Scheduler
+    participant Lambda as vitanota-user-cleanup<br/>Lambda (Phase 2)
+    participant DB as PostgreSQL
+    participant Logs as CloudWatch Logs
+
+    Note over Sched: 日次 03:00 JST トリガー
+
+    Sched->>Lambda: invoke
+    Lambda->>DB: BEGIN
+    Lambda->>DB: SELECT id FROM users<br/>WHERE deleted_at IS NOT NULL<br/>AND deleted_at < NOW() - INTERVAL '30 days'
+    DB-->>Lambda: 削除対象ユーザー一覧
+
+    loop 各ユーザー
+      Lambda->>DB: DELETE FROM users WHERE id=?
+      Note right of DB: CASCADE で連鎖削除:<br/>- 残存マイ記録<br/>- (tags.created_by は SET NULL)<br/>- (公開エントリは既に user_id=NULL で残る)
+      DB-->>Lambda: ok
+
+      Lambda->>Logs: logEvent(UserHardDeleted,<br/>{ userId, deletedAt, gracePeriodDays: 30 })
+    end
+
+    Lambda->>DB: COMMIT
+    Lambda-->>Sched: 完了 (削除件数を返却)
+
+    Note over Logs: S3 監査ログに永続保持<br/>(7 年・論点 D)
+```
+
+---
+
 ## 関連ドキュメント
 
 - **ER 図**: `aidlc-docs/construction/er-diagram.md`
@@ -437,3 +608,8 @@ sequenceDiagram
 - **2026-04-15 初版**: Unit-01 + Unit-02 Step 8 完了時点のシーケンス図を整備
   - 認証: 初回ログイン / 再ログイン / 通常リクエスト / ログアウト / 自動失効 / 強制ログアウト
   - 業務: エントリ作成 / 共有タイムライン取得 / テナント作成 + シード / クロステナント参照拒否
+- **2026-04-15 改訂1**: 論点 M ユーザーライフサイクル Phase 1 反映
+  - マイ記録エクスポート (US-T-098)
+  - 学校から離脱 / 転勤 (US-T-100)
+  - vitanota 退会 (US-T-099)
+  - 物理削除バッチ (US-S-004)

@@ -8,9 +8,12 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['__tests__/setup.ts'],
-    // 統合テスト (testcontainers 利用) は別 config で実行
-    // unit テストはここに含めない
-    exclude: ['**/node_modules/**', '__tests__/integration/**'],
+    // 統合テスト・E2E テストは別ランナーで実行するため exclude
+    exclude: [
+      '**/node_modules/**',
+      '__tests__/integration/**',
+      '__tests__/e2e/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

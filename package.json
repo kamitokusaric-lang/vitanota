@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "gen:openapi": "tsx scripts/gen-openapi.ts",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^15.0.6",
     "@testing-library/user-event": "^14.5.2",

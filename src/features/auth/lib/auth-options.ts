@@ -55,6 +55,9 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
         clientId: googleClientId,
         clientSecret: googleClientSecret,
       }),
+      // Step 16b: E2E は CredentialsProvider ではなく
+      // /api/test/_seed の createSession アクションで sessions テーブルに直接 INSERT する
+      // → database 戦略との互換性を維持しつつ、production の認証コードを変更しない
     ],
 
     session: {

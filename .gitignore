@@ -28,6 +28,11 @@ pnpm-debug.log*
 # Testing
 coverage/
 
+# Playwright E2E
+playwright-report/
+test-results/
+playwright/.cache/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

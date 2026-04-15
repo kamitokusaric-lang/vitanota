@@ -178,6 +178,85 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/vitanota_test
 
+  # ── Step 16b: E2E テスト (Playwright) ──────────────────────────
+  # 実 Next.js + 実 PostgreSQL に対するブラウザ E2E
+  # stories.md US-T-010〜014 の受け入れ基準を検証
+  e2e-test:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: vitanota_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/vitanota_test
+      NEXTAUTH_SECRET: e2e-test-secret-32-bytes-minimum-length
+      NEXTAUTH_URL: http://localhost:3000
+      E2E_TEST_MODE: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3.0.0
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U test; then
+              echo "PostgreSQL is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+        env:
+          PGPASSWORD: test
+
+      - name: Apply migrations
+        run: |
+          for f in migrations/*.sql; do
+            psql "$DATABASE_URL" -f "$f"
+          done
+
+      - name: Build Next.js
+        run: pnpm build
+
+      - name: Run E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8  # v4.3.0
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
 # ── Action の SHA 固定について ────────────────────────────────
 # 論点 L-3: GitHub Actions はタグ参照ではなくコミット SHA で固定する
 # 理由: タグは書き換え可能なため、悪意ある変更が混入するリスクがある

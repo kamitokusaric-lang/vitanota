@@ -120,6 +120,64 @@ jobs:
       - name: OpenAPI schema sync check
         run: pnpm openapi:check
 
+  # ── Step 16a: 統合テスト (実 PostgreSQL) ───────────────────────
+  # GitHub Actions の services container で PostgreSQL 16 を起動
+  # マルチテナント隔離・RLS・SP-U02-04 8 層防御の生存確認
+  integration-test:
+    name: Integration Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: vitanota_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3.0.0
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U test; then
+              echo "PostgreSQL is ready"
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready in time"
+          exit 1
+        env:
+          PGPASSWORD: test
+
+      - name: Run integration tests
+        run: pnpm test:integration
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/vitanota_test
+
 # ── Action の SHA 固定について ────────────────────────────────
 # 論点 L-3: GitHub Actions はタグ参照ではなくコミット SHA で固定する
 # 理由: タグは書き換え可能なため、悪意ある変更が混入するリスクがある

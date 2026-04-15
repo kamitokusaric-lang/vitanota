@@ -2,7 +2,7 @@
 // ビジネスロジック層：複数 Repository を跨ぐ操作を集約し、
 // トランザクション境界（withTenantUser）と監査ログを管理する。
 import { withTenantUser } from '@/shared/lib/db';
-import { logger } from '@/shared/lib/logger';
+import { LogEvents, logEvent, logWarnEvent } from '@/shared/lib/log-events';
 import {
   privateJournalRepo,
   type CreateEntryParams,
@@ -40,9 +40,9 @@ export class JournalEntryService {
         const validIds = await tagRepo.findValidTagIds(tx, params.tagIds, ctx);
         const invalidIds = params.tagIds.filter((id) => !validIds.includes(id));
         if (invalidIds.length > 0) {
-          logger.warn(
+          logWarnEvent(
+            LogEvents.JournalEntryCreateInvalidTags,
             {
-              event: 'journal_entry_create_invalid_tags',
               userId: ctx.userId,
               tenantId: ctx.tenantId,
               invalidTagIds: invalidIds,
@@ -55,8 +55,7 @@ export class JournalEntryService {
 
       const entry = await privateJournalRepo.create(tx, params, ctx);
 
-      logger.info({
-        event: 'journal_entry_created',
+      logEvent(LogEvents.JournalEntryCreated, {
         entryId: entry.id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -92,8 +91,7 @@ export class JournalEntryService {
       const entry = await privateJournalRepo.update(tx, id, params, ctx);
       if (!entry) {
         // 所有者以外 or 存在しない → 404（情報隠蔽のため両者を区別しない）
-        logger.info({
-          event: 'journal_entry_update_not_found',
+        logEvent(LogEvents.JournalEntryUpdateNotFound, {
           entryId: id,
           userId: ctx.userId,
           tenantId: ctx.tenantId,
@@ -101,8 +99,7 @@ export class JournalEntryService {
         throw new JournalNotFoundError();
       }
 
-      logger.info({
-        event: 'journal_entry_updated',
+      logEvent(LogEvents.JournalEntryUpdated, {
         entryId: entry.id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -123,8 +120,7 @@ export class JournalEntryService {
         throw new JournalNotFoundError();
       }
 
-      logger.info({
-        event: 'journal_entry_deleted',
+      logEvent(LogEvents.JournalEntryDeleted, {
         entryId: id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -145,8 +141,7 @@ export class JournalEntryService {
         throw new JournalNotFoundError();
       }
 
-      logger.info({
-        event: 'journal_entry_read',
+      logEvent(LogEvents.JournalEntryRead, {
         entryId: id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -168,8 +163,7 @@ export class JournalEntryService {
     return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
       const entries = await privateJournalRepo.findMine(tx, opts, ctx);
 
-      logger.info({
-        event: 'journal_entry_list_read',
+      logEvent(LogEvents.JournalEntryListRead, {
         userId: ctx.userId,
         tenantId: ctx.tenantId,
         endpoint: 'mine',

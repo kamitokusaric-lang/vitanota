@@ -7,7 +7,7 @@ import { withTenantUser } from '@/shared/lib/db';
 import { publicTimelineRepo } from '@/features/journal/lib/publicTimelineRepository';
 import { timelineQuerySchema } from '@/features/journal/schemas/journal';
 import { requireAuth, mapErrorToResponse } from '@/features/journal/lib/apiHelpers';
-import { logger } from '@/shared/lib/logger';
+import { LogEvents, logEvent } from '@/shared/lib/log-events';
 
 export default async function handler(
   req: NextApiRequest,
@@ -44,8 +44,7 @@ export default async function handler(
       'public, s-maxage=30, stale-while-revalidate=60'
     );
 
-    logger.info({
-      event: 'journal_entry_list_read',
+    logEvent(LogEvents.JournalEntryListRead, {
       userId: ctx.userId,
       tenantId: ctx.tenantId,
       endpoint: 'public',

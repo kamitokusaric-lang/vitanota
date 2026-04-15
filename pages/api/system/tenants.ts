@@ -3,11 +3,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { getDb, withSystemAdmin } from '@/shared/lib/db';
 import { tenants } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
+import { tagRepo } from '@/features/journal/lib/tagRepository';
 
 const createTenantSchema = z.object({
   name: z.string().min(1).max(100),
@@ -76,18 +77,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      const [newTenant] = await db
-        .insert(tenants)
-        .values({ name, slug })
-        .returning();
+      // NFR-U02-03: テナント作成と同一トランザクション内でデフォルトタグをシード
+      // これにより「テナントは作成されたがタグ 0 件」という中間状態を防ぐ
+      const { newTenant, seededTags } = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(tenants)
+          .values({ name, slug })
+          .returning();
+
+        // RLS セッション変数を設定してからタグをシード
+        // tags テーブルには RLS ポリシーが設定されているため必須
+        await tx.execute(
+          sql`SELECT set_config('app.tenant_id', ${created.id}, true)`
+        );
+        await tx.execute(
+          sql`SELECT set_config('app.user_id', ${session.user.userId}, true)`
+        );
+
+        const tags = await tagRepo.seedSystemDefaults(
+          tx as unknown as Parameters<typeof tagRepo.seedSystemDefaults>[0],
+          created.id
+        );
+
+        return { newTenant: created, seededTags: tags };
+      });
 
       logger.info({
         event: 'tenant.created',
         tenantId: newTenant.id,
         requestedBy: session.user.userId,
+        seededTagCount: seededTags.length,
       });
 
-      return res.status(201).json({ tenant: newTenant });
+      return res.status(201).json({
+        tenant: newTenant,
+        seededTagCount: seededTags.length,
+      });
     }
 
     if (req.method === 'PATCH') {

@@ -1,7 +1,7 @@
 // Unit-02 TagService
 // タグの作成・削除・一覧取得。school_admin 権限チェックを管理。
 import { withTenantUser } from '@/shared/lib/db';
-import { logger } from '@/shared/lib/logger';
+import { LogEvents, logEvent, logWarnEvent } from '@/shared/lib/log-events';
 import { tagRepo, type CreateTagParams } from './tagRepository';
 import { ForbiddenError, SystemTagDeleteError, TagNotFoundError } from './errors';
 import type { Tag } from '@/db/schema';
@@ -20,8 +20,7 @@ export class TagService {
     return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
       const tag = await tagRepo.create(tx, params, ctx);
 
-      logger.info({
-        event: 'tag_created',
+      logEvent(LogEvents.TagCreated, {
         tagId: tag.id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -40,8 +39,7 @@ export class TagService {
   async deleteTag(id: string, ctx: ServiceContext): Promise<{ affectedEntries: number }> {
     // 権限チェック: school_admin のみ
     if (!ctx.roles.includes('school_admin')) {
-      logger.warn({
-        event: 'tag_delete_forbidden',
+      logWarnEvent(LogEvents.TagDeleteForbidden, {
         tagId: id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -60,8 +58,7 @@ export class TagService {
         throw new TagNotFoundError('タグが見つからないか、削除できないタグです');
       }
 
-      logger.info({
-        event: 'tag_deleted',
+      logEvent(LogEvents.TagDeleted, {
         tagId: id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
@@ -79,8 +76,7 @@ export class TagService {
     return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
       const tags = await tagRepo.findAllByTenant(tx, ctx);
 
-      logger.info({
-        event: 'tag_list_read',
+      logEvent(LogEvents.TagListRead, {
         userId: ctx.userId,
         tenantId: ctx.tenantId,
         count: tags.length,

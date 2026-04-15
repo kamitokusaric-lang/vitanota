@@ -297,6 +297,23 @@ describe('IDOR prevention', () => {
 
 ---
 
+### Suite 7a: Tenant 作成時のデフォルトタグシード（NFR-U02-03）
+
+テナント作成 API が同一トランザクション内で 8件のデフォルトタグをシードすることを検証。
+
+```ts
+describe('Tenant creation seeds system default tags (NFR-U02-03)', () => {
+  it('creates tenant and 8 system default tags in single transaction')
+  it('seeded tags have is_system_default=true and created_by=null')
+  it('seeded tags contain 5 emotion + 3 task tags')
+  it('if tag seed fails, tenant insert is rolled back (atomicity)')
+  it('seeded tags are visible to subsequent GET /api/private/journal/tags')
+  it('system default tags cannot be deleted by school_admin')
+})
+```
+
+---
+
 ### Suite 7: Session strategy（Unit-01 SP-07 の検証）
 
 Auth.js database セッション戦略が期待通り動作することを確認する。

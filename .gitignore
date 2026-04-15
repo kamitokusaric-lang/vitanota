@@ -33,6 +33,9 @@ playwright-report/
 test-results/
 playwright/.cache/
 
+# Lambda ビルド成果物
+scripts/db-migrator/function.zip
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

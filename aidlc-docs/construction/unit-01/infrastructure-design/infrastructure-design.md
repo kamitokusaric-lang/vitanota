@@ -2,7 +2,28 @@
 
 ## 概要
 
-Unit-01（認証・テナント基盤）のインフラ設計。論理コンポーネントを AWS サービスにマッピングし、dev / prod 2環境の構成を定義する。
+Unit-01（認証・テナント基盤）のインフラ設計。論理コンポーネントを AWS サービスにマッピングする。
+
+## ⚠️ フェーズ別デプロイに関する重要な注意
+
+**本ドキュメントは Phase 2（本格稼働）を想定したフル構成**を記述している。
+MVP ローンチ時は **Phase 1（簡略構成）** を採用しており、以下の差異がある:
+
+| 項目 | Phase 1 (MVP) | Phase 2 (本格稼働・本書記載)|
+|---|---|---|
+| 環境 | 単一環境 | dev + prod 2 環境 |
+| RDS | t4g.micro 単一 AZ | t4g.small Multi-AZ（prod） |
+| RDS Proxy | **なし**（直接接続・パスワード認証） | あり・IAM 認証 |
+| App Runner | min=0（スケールゼロ） | prod は min=1 |
+| Header rotator Lambda | なし（手動ローテーション） | あり・月次自動 |
+| RDS connection monitor Lambda | なし | あり・日次実行 |
+| CloudWatch アラーム | 5 個（必須のみ） | 12+ 個 |
+| S3 監査ログ保持 | 90 日 | 7 年（Object Lock）|
+| 月額 | 約 ¥6,000-8,000 | 約 ¥23,000-26,000 |
+
+**Phase 1 / Phase 2 の詳細比較と移行計画**: `aidlc-docs/construction/deployment-phases.md`
+
+本ドキュメントを読む際は、**Phase 1 では省略されているリソースがある**ことを意識すること。
 
 ---
 

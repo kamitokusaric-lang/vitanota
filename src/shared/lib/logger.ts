@@ -13,6 +13,9 @@ export const logger = pino({
       '*.secret',
       '*.accessToken',
       '*.refreshToken',
+      '*.content',            // 日誌本文は P1-D 対応で記録対象外
+      '*.sessionToken',       // SP-07 セッショントークンを記録しない
+      '*.X-CloudFront-Secret',
       'DATABASE_URL',
     ],
     censor: '[REDACTED]',

@@ -55,6 +55,28 @@ export async function withTenant<T>(
   });
 }
 
+// withTenantUser: Unit-02 用拡張 - tenant_id と user_id 両方を設定
+// owner_all RLS ポリシーで user_id による所有者判定を行うため必須
+// SP-U02-02 RLS 2ポリシー構成・RP-U02-01 トランザクション必須化
+export async function withTenantUser<T>(
+  tenantId: string,
+  userId: string,
+  fn: (db: DrizzleDb) => Promise<T>
+): Promise<T> {
+  const db = await getDb();
+  return db.transaction(async (tx) => {
+    // set_config(name, value, is_local=true) でトランザクションスコープに限定
+    // R1 対策: SET LOCAL はトランザクション終了時に自動リセット、RDS Proxy ピン回避
+    await tx.execute(
+      sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`
+    );
+    await tx.execute(
+      sql`SELECT set_config('app.user_id', ${userId}, true)`
+    );
+    return fn(tx as unknown as DrizzleDb);
+  });
+}
+
 // system_admin 用: RLS バイパス（全テナントにアクセス可能）
 export async function withSystemAdmin<T>(
   fn: (db: DrizzleDb) => Promise<T>

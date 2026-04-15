@@ -8,9 +8,16 @@
 | セキュリティ | IAM トークン認証 | RDS Proxy 接続 |
 | セキュリティ | シークレットキャッシュ | Secrets Manager SDK |
 | セキュリティ | 多層防御 | 認証・テナント隔離・RLS |
+| セキュリティ | エッジ防御（CDN+WAF） | CloudFront + AWS WAF v2 |
+| セキュリティ | オリジン保護（署名ヘッダー） | CloudFront → App Runner |
+| セキュリティ | Database セッション戦略 | Auth.js sessions テーブル・即時失効可能 |
+| セキュリティ | Permission Boundary | IAM 境界ポリシーによる最大権限制限 |
+| セキュリティ | シークレットローテーション自動化 | CloudFront 署名ヘッダー月次ローテーション |
+| セキュリティ | シークレット流出防止 | gitleaks プリコミットフック + CI |
 | 信頼性 | フェイルセーフデフォルト | 認証エラー・DB エラー |
 | 信頼性 | ヘルスチェック | App Runner |
 | パフォーマンス | コネクション再利用 | Drizzle + RDS Proxy |
+| パフォーマンス | エッジキャッシュ | CloudFront（s-maxage, SWR） |
 | 可観測性 | 構造化ログ | pino + CloudWatch |
 | 可観測性 | メトリクス監視 | CloudWatch アラーム |
 
@@ -159,9 +166,120 @@ export async function getSecret(secretId: string): Promise<string> {
 | シークレット名 | 内容 | ローテーション |
 |---|---|---|
 | `vitanota/db-user` | DB ユーザー名 | なし（固定） |
-| `vitanota/nextauth-secret` | JWT 署名キー | 90日ごと（手動） |
+| `vitanota/nextauth-secret` | Auth.js CSRF トークン・PKCE 署名キー（database セッション戦略でも必要） | 90日ごと（手動） |
 | `vitanota/google-client-id` | Google OAuth ID | なし |
 | `vitanota/google-client-secret` | Google OAuth シークレット | 必要時 |
+
+---
+
+### SP-07: Database セッション戦略パターン（Auth.js）
+
+**目的**: JWT の「発行後失効不可」問題を解消し、教員退職時・トークン流出時に即座にログアウトを強制できるようにする。教育機関向け BtoB SaaS の信頼性要件。
+
+**戦略変更**:
+- Auth.js v4 の `session.strategy` を `"jwt"` から `"database"` に変更
+- Auth.js PostgreSQL Drizzle アダプタ（`@auth/drizzle-adapter`）を導入
+- セッションは `sessions` テーブルに保存、HttpOnly Cookie で `session_token` のみを配布
+
+**sessions テーブル設計**:
+```sql
+CREATE TABLE sessions (
+  session_token TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  expires TIMESTAMP NOT NULL,
+  last_accessed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  ip_address INET,
+  user_agent TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX sessions_user_id_idx ON sessions(user_id);
+CREATE INDEX sessions_tenant_id_idx ON sessions(tenant_id);
+CREATE INDEX sessions_expires_idx ON sessions(expires);
+```
+
+**セッションライフサイクル**:
+
+| イベント | 動作 |
+|---|---|
+| ログイン成功 | `INSERT INTO sessions (session_token, user_id, tenant_id, expires, ...)`、Cookie で配布 |
+| 毎リクエスト | `SELECT * FROM sessions WHERE session_token = ? AND expires > NOW()` |
+| アイドルタイムアウト | `last_accessed_at` から30分経過で 401、Cookie クリア |
+| 絶対最大寿命 | `expires`（作成から8時間）で 401 |
+| ログアウト | `DELETE FROM sessions WHERE session_token = ?` |
+| 管理者による強制ログアウト | `DELETE FROM sessions WHERE user_id = ?` |
+| ロール変更時 | `DELETE FROM sessions WHERE user_id = ?`（該当ユーザーの全セッション） |
+| テナント停止時 | `DELETE FROM sessions WHERE tenant_id = ?`（テナント内全ユーザー） |
+| 期限切れクリーンアップ | 日次バッチで `DELETE FROM sessions WHERE expires < NOW() - INTERVAL '7 days'` |
+
+**認証チェックフロー（毎リクエスト）**:
+```ts
+// lib/auth/getSession.ts（Auth.js が自動処理）
+const session = await db.query.sessions.findFirst({
+  where: and(
+    eq(sessions.sessionToken, cookieValue),
+    gt(sessions.expires, new Date()),
+    gt(sessions.lastAccessedAt, thirtyMinutesAgo), // アイドルタイムアウト
+  ),
+  with: { user: { with: { tenant: true } } },
+})
+if (!session) throw new UnauthorizedError()
+// last_accessed_at を更新（非同期、レスポンスをブロックしない）
+await db.update(sessions).set({ lastAccessedAt: new Date() })
+  .where(eq(sessions.sessionToken, cookieValue))
+```
+
+**レイテンシ影響**:
+- 1リクエストあたり +5〜10ms（インデックス付き PRIMARY KEY lookup）
+- RDS Proxy 接続プールで接続オーバーヘッド ~ゼロ
+- NFR P95 500ms 目標に対して影響は誤差レベル
+
+**`last_accessed_at` の非同期更新**:
+毎リクエストで UPDATE を実行すると書き込み負荷が増えるため、以下の工夫:
+- **5分以内の更新はスキップ**（直近更新から5分未満なら UPDATE しない）
+- **fire-and-forget**：レスポンスを待たずに UPDATE を発火
+- **バッチ更新**：累積した更新を定期的にまとめて適用（将来最適化）
+
+**管理画面での活用**（将来 Unit-03/04 で実装想定）:
+- `GET /api/admin/sessions` で現在アクティブなセッション一覧
+- `DELETE /api/admin/sessions/:session_token` で個別ログアウト
+- `DELETE /api/admin/users/:user_id/sessions` で該当ユーザー全セッション削除
+
+**セッション監査ログ**（OP-01 拡張）:
+```ts
+logger.info({ event: 'session_created', sessionId, userId, tenantId, ip, userAgent })
+logger.info({ event: 'session_revoked', sessionId, userId, tenantId, reason })
+logger.info({ event: 'session_expired', sessionId, userId, reason: 'idle_timeout' | 'absolute_max' })
+```
+
+**RLS ポリシー**:
+```sql
+-- sessions テーブルにも RLS 適用
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+
+-- 所有者のみ自分のセッションを参照可能（将来の「セッション一覧」UI 用）
+CREATE POLICY sessions_owner_read ON sessions
+  AS PERMISSIVE FOR SELECT
+  USING (user_id = current_setting('app.user_id', true)::uuid);
+
+-- school_admin はテナント内の全セッションを参照・削除可能
+CREATE POLICY sessions_admin_all ON sessions
+  AS PERMISSIVE FOR ALL
+  USING (
+    tenant_id = current_setting('app.tenant_id', true)::uuid
+    AND EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.id = current_setting('app.user_id', true)::uuid
+      AND u.role = 'school_admin'
+    )
+  );
+```
+
+**設計判断の根拠**:
+- JWT の失効不可は教育機関向け BtoB では商用化の障壁
+- 追加インフラ不要（既存 PostgreSQL を活用）
+- レイテンシ増は 5〜10ms で誤差レベル
+- Auth.js 公式サポートで実装コストが小さい（設定変更 + アダプタ追加）
 
 ---
 
@@ -170,11 +288,15 @@ export async function getSecret(secretId: string): Promise<string> {
 **目的**: SECURITY-11 準拠。単一の防御が突破されても次の層が防ぐ。
 
 ```
-[Layer 1] レート制限
+[Layer 0] AWS WAF v2 / Shield
+  └─ SQLi/XSS/共通攻撃・IPレピュテーション・WAFレート制限
+        ↓
+[Layer 1] アプリ内レート制限
   └─ ログインエンドポイント: IP ごと 10回/分
         ↓
-[Layer 2] Auth.js セッション検証
-  └─ JWT 署名検証・有効期限確認
+[Layer 2] Auth.js セッション検証（database 戦略）
+  └─ HttpOnly Cookie の session_token で sessions テーブル lookup
+  └─ 失効時は DB から削除済みのため 401 即時返却
         ↓
 [Layer 3] テナント状態確認
   └─ suspended → 423 Locked
@@ -185,6 +307,89 @@ export async function getSecret(secretId: string): Promise<string> {
 [Layer 5] withTenant()
   └─ PostgreSQL RLS による DB レベル隔離
 ```
+
+---
+
+### SP-05: エッジ防御パターン（CloudFront + WAF）
+
+**目的**: SECURITY-01/02/11 準拠。アプリ層に到達する前にエッジで攻撃を遮断する。
+
+**構成**:
+```
+[インターネット]
+      ↓
+[AWS Shield Standard] ← L3/L4 DDoS 保護（無料・自動）
+      ↓
+[CloudFront] ← TLS 終端・エッジキャッシュ
+      ↓
+[AWS WAF v2 Web ACL]
+  ├─ AWSManagedRulesCommonRuleSet
+  ├─ AWSManagedRulesKnownBadInputsRuleSet
+  ├─ AWSManagedRulesSQLiRuleSet
+  ├─ AWSManagedRulesAmazonIpReputationList
+  └─ カスタム: IP レート制限（5分/1000req）
+      ↓
+[App Runner] ← X-CloudFront-Secret ヘッダー検証
+```
+
+**Next.js ミドルウェアでのオリジン検証**（`middleware.ts`）:
+```ts
+export function middleware(req: NextRequest) {
+  const expected = process.env.CLOUDFRONT_SECRET_HEADER_VALUE
+  const actual = req.headers.get(process.env.CLOUDFRONT_SECRET_HEADER_NAME ?? 'X-CloudFront-Secret')
+  if (expected && actual !== expected) {
+    return new NextResponse('Forbidden', { status: 403 })
+  }
+  return NextResponse.next()
+}
+```
+
+**運用上の注意**:
+- ヘッダー値は四半期ごとにローテーション（Secrets Manager）
+- ローテーション時は「新旧両方を許容する猶予期間」を CloudFront 側で設け、無停止で切替
+
+---
+
+### SP-06: オリジン保護パターン（署名ヘッダー）
+
+**目的**: App Runner のパブリック URL への直アクセスを防ぎ、必ず CloudFront → WAF 経由でのみアクセス可能にする。
+
+**仕組み**:
+- CloudFront のオリジンカスタムヘッダー機能で `X-CloudFront-Secret: <値>` を付与
+- App Runner 側ミドルウェア（SP-05 のコード）で検証
+- ヘッダー値は Secrets Manager で管理（`vitanota/cloudfront-secret`）
+
+**代替案検討**:
+- VPC Endpoint 方式: App Runner は VPC 専用化非対応のため不採用
+- IP 制限: CloudFront の IP 範囲は頻繁に変わり非現実的
+
+---
+
+## パフォーマンスパターン（エッジ）
+
+### PP-02: エッジキャッシュパターン（CloudFront）
+
+**目的**: 読み取り頻度の高い API レスポンスをエッジでキャッシュし、オリジン（App Runner + RDS）の負荷を軽減する。
+
+**方針**:
+- CloudFront の**デフォルトはキャッシュ無効**（`CachingDisabled` ポリシー）
+- **API ハンドラ側で明示的に `Cache-Control` ヘッダーを返したエンドポイントのみキャッシュ対象**にする
+- キャッシュ対象は個別の CloudFront Cache Policy（`CacheOptimized` 派生）を作成し、パスパターンで該当エンドポイントに適用
+
+**使用例（Unit-02 NFR-U02-02）**:
+```ts
+// pages/api/journal/entries.ts
+res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60')
+```
+
+**キャッシュキー設計の注意**:
+- `Authorization` / `Cookie` ヘッダーを含むリクエストは原則キャッシュしない（個人情報漏えい防止）
+- ユーザー固有情報を返すエンドポイントは `Cache-Control: private` を付け、**必ず CloudFront キャッシュを回避**
+- テナント共有データのみキャッシュ対象
+
+**キャッシュ無効化**:
+- デプロイ時: GitHub Actions で `create-invalidation --paths "/*"`
+- 緊急時: 手動 invalidation（運用 Runbook）
 
 ---
 

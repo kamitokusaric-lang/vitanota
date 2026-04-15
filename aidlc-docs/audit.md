@@ -9,6 +9,61 @@
 
 ---
 
+## Unit-02 機能設計 - 質問回答収集
+
+**タイムスタンプ**: 2026-04-15T00:00:00Z
+**ユーザー入力（Q2）**: "感情カテゴリは、基本的なものは当初からデフォルトで用意されているが、各テナントでの運用でどんどん追加して良い"
+**AI応答**: Q2 = C（デフォルト固定 ＋ テナントで追加可）に確定。
+**コンテキスト**: Unit-02 機能設計 Step 6（回答収集）
+
+---
+
+**タイムスタンプ**: 2026-04-15T00:01:00Z
+**ユーザー入力（Q3補足）**: "なのでQ3は、教員が自分で作れるということだね"
+**AI応答**: Q3 = 教員個人が作成可能に更新。
+**コンテキスト**: Unit-02 機能設計 Step 6（回答収集）
+
+---
+
+**タイムスタンプ**: 2026-04-15T00:02:00Z
+**ユーザー入力（Q3再補足）**: "他の教員のタグも見えて良い。文章から読み取って候補タグをサジェストしたい"
+**AI応答**: Q3 = テナント共有（教員誰でも作成可）＋ キーワードマッチングによるサジェストに確定。
+**コンテキスト**: Unit-02 機能設計 Step 6（回答収集）
+
+---
+
+**タイムスタンプ**: 2026-04-15T00:03:00Z
+**ユーザー入力（Q3-追加）**: "まずは、キーワードマッチングでよい"
+**AI応答**: サジェスト方式 = A（キーワードマッチング）に確定。
+**コンテキスト**: Unit-02 機能設計 Step 6（回答収集）
+
+---
+
+**タイムスタンプ**: 2026-04-15T00:04:00Z
+**ユーザー入力（Q4・Q6・Q7）**: "タイムラインはページネーション、エントリーカードは詳細を表示、自分だけに保存はAのとおり"
+**AI応答**: Q4=A（ページネーション）・Q6=B（詳細）・Q7=A（チェックあり→非公開・なし→タイムライン表示）確定。全質問回答完了。成果物生成開始。
+**コンテキスト**: Unit-02 機能設計 Step 6（回答収集完了）→ Step 7（回答分析）→ Step 9（成果物生成）
+
+---
+
+## Unit-02 NFR要件 - 質問回答
+
+**タイムスタンプ**: 2026-04-15T01:10:00Z
+**ユーザー入力**: "Q1) B, 上限は20件 Q2) B, Q3) A"
+**AI応答**: Q1=B（タグ上限20件・フィルタ）・Q2=B（stale-while-revalidate）・Q3=A（テナント作成時APIシード）確定。NFR成果物生成開始。
+**コンテキスト**: Unit-02 NFR要件 回答収集完了
+
+---
+
+## Unit-02 機能設計 - 承認
+
+**タイムスタンプ**: 2026-04-15T01:00:00Z
+**ユーザー入力**: "うん、いいね。わたしたち、いいペアね。つぎにすすもう"
+**AI応答**: Unit-02 機能設計を完了としてマーク。NFR要件ステージへ移行。
+**コンテキスト**: Unit-02 機能設計ステージ完了。成果物: business-logic-model.md・domain-entities.md・business-rules.md・frontend-components.md
+
+---
+
 ## Unit-01 コード生成 - プラン承認
 
 **タイムスタンプ**: 2026-04-14T02:50:00Z
@@ -285,5 +340,261 @@
 **ユーザー入力**: "全ての質問に回答した"
 **AI応答**: "回答を分析。矛盾なし。機能要件の詳細が不十分と判断。フォローアップ用に requirement-verification-questions-2.md を作成。"
 **コンテキスト**: インセプション - 要件分析。第1回回答：Q1=A(Web)・Q2=A(ノート管理)・Q3=D(BtoB)・Q4=A(任意)・Q5=A(RDB)・Q6=B(ソーシャルログイン)・Q7=B(中規模)。セキュリティ=有効・PBT=無効。
+
+---
+
+## Unit-02 NFR要件 - セッション再開
+**タイムスタンプ**: 2026-04-15T00:30:00Z
+**ユーザー入力**: "おk。再開しよう"
+**AI応答**: "Unit-02 NFR要件ステージを再開。既存の nfr-requirements.md を確認、プランファイルと tech-stack-decisions.md が未作成と判明。プランを作成して質問を提示する。"
+**コンテキスト**: コンストラクション - Unit-02 NFR要件。前セッションで nfr-requirements.md ドラフトは存在するが、プラン・tech-stack-decisions は未作成。
+
+---
+
+## Unit-02 NFR要件 - PBT拡張確認
+**タイムスタンプ**: 2026-04-15T00:32:00Z
+**ユーザー入力**: "ちょっと待ってね。あなたの拡張にProperty-Based Testing 無効という表示があるけどこれはどういう意味？"
+**AI応答**: "PBT拡張の意味（性質ベーステスト・fast-check等）を説明。要件分析フェーズで C（スキップ）を選択済みであること、Unit-02 で再検討するかの選択肢（A維持/B部分適用/C全面適用）を提示。"
+**コンテキスト**: Unit-02 NFR要件。拡張設定の確認。
+
+---
+
+## Unit-02 NFR要件 - PBT維持決定
+**タイムスタンプ**: 2026-04-15T00:34:00Z
+**ユーザー入力**: "おk。今のままでいいわ"
+**AI応答**: "PBT無効のまま維持。NFR質問への回答待ちに戻る。"
+**コンテキスト**: Unit-02 NFR要件。
+
+---
+
+## Unit-02 NFR要件 - Q6/Q7 回答
+**タイムスタンプ**: 2026-04-15T00:36:00Z
+**ユーザー入力**: "文字数制限の強制箇所は、too muchではないか？モバイルは、今のところ考えなくて良い"
+**AI応答**: "Q6: 三層は過剰と同意。Zodスキーマ共有の二層（B案）を推奨。Q7: モバイル考慮不要のため 20件/ページ確定（A案）。他にモバイル考慮箇所がないか確認を提案。"
+**コンテキスト**: Unit-02 NFR要件。Q6=B・Q7=A 確定。
+
+---
+
+## Unit-02 NFR要件 - モバイル考慮箇所確認
+**タイムスタンプ**: 2026-04-15T00:38:00Z
+**ユーザー入力**: "残りは全部Aで。他にもモバイル考慮してある箇所はある？"
+**AI応答**: "Q1-Q5=A 確定。モバイル関連を全検索。requirements.md:395 でモバイルアプリはスコープ外として既に除外済み。ペルソナ記述（スマホ利用）はユーザー特性の描写のみでネイティブアプリ対応を意味しないため変更不要と報告。"
+**コンテキスト**: Unit-02 NFR要件。全Q回答確定（Q1-5=A/Q6=B/Q7=A）。
+
+---
+
+## Unit-02 NFR要件 - 成果物最終化承認
+**タイムスタンプ**: 2026-04-15T00:40:00Z
+**ユーザー入力**: "はい"
+**AI応答**: "nfr-requirements.md を Q6=B（二層バリデーション）で更新。NFR-U02-05 として追加、後続NFRを採番変更。tech-stack-decisions.md を新規作成（Unit-01継承を明示）。プランチェックボックスを全完了にマーク。"
+**コンテキスト**: Unit-02 NFR要件。成果物最終化。
+
+---
+
+## Unit-02 NFR要件 - ステージ承認
+**タイムスタンプ**: 2026-04-15T00:42:00Z
+**ユーザー入力**: "承認"
+**AI応答**: "Unit-02 NFR要件ステージを完了としてマーク。aidlc-state.md を更新し Unit-02 NFR設計ステージへ移行。"
+**コンテキスト**: Unit-02 NFR要件 → NFR設計への遷移。
+
+---
+
+## Unit-02 NFR設計 - Q1/Q2 判断基準質問
+**タイムスタンプ**: 2026-04-15T00:46:00Z
+**ユーザー入力**: "タイムラインキャッシュ実装パターンについて、判断基準を教えて欲しいなー" / "Aで。キャッシュ無効化パターンの判断基準も教えて"
+**AI応答**: "Q1（キャッシュ実装）3案の判断基準を提示、A推奨。ユーザーA選択。Q2（SWR/React Query/手動）の判断基準を提示、A推奨。"
+**コンテキスト**: Unit-02 NFR設計。
+
+---
+
+## Unit-02 NFR設計 - Vercel誤記の指摘
+**タイムスタンプ**: 2026-04-15T00:48:00Z
+**ユーザー入力**: "今回はVercelは使わないよね？"
+**AI応答**: "Unit-01 は AWS App Runner (ap-northeast-1) 確定と確認。Unit-02 tech-stack-decisions.md から Vercel 記述を除去し AWS 統一構成に修正。SWR は Vercel 製だが Vercel 依存ではないため Q2=A 推奨は変わらず。"
+**コンテキスト**: Unit-02 NFR設計。Vercel誤記の修正。
+
+---
+
+## Unit-02 NFR設計 - 運用リスク評価依頼
+**タイムスタンプ**: 2026-04-15T00:52:00Z
+**ユーザー入力**: "運用時のリスクがないか確認したい。さまざまなサービスを編み合わせることで、リスク増えないか。"
+**AI応答**: "R1-R10の運用リスクマトリクスを提示。R1（RDS Proxyピンニング）・R4（二重キャッシュ）・R5（RLSポリシー順序）が Unit-02 固有の重要リスク。二重キャッシュ懸念から CloudFront の存在確認を要請。"
+**コンテキスト**: Unit-02 NFR設計。運用リスク評価。
+
+---
+
+## Unit-02 NFR設計 - CloudFront確認とQ2承認
+**タイムスタンプ**: 2026-04-15T00:56:00Z
+**ユーザー入力**: "一旦、回答はAで良い。ただ、ここで述べたリスクは管理したい。それと、Unit-01 のインフラ設計で App Runner の前に CloudFront は置いていない。おいた方が良いということ？"
+**AI応答**: "Q2=A確定・リスク管理了解。s-maxage は CDN 専用指令のため CloudFront なしでは NFR-U02-02 が事実上無効であることを説明。CloudFront追加（WAF含む）を推奨。Unit-01 インフラ設計を確認するか提案。"
+**コンテキスト**: Unit-02 NFR設計。CloudFront/WAF考慮漏れの発見。
+
+---
+
+## Unit-02 NFR設計 - Unit-01確認
+**タイムスタンプ**: 2026-04-15T00:58:00Z
+**ユーザー入力**: "はい"
+**AI応答**: "aidlc-docs全体をgrepで確認。CloudFront/CDN/WAF/DDoS いずれも0件。Unit-01 で意図的除外ではなく考慮漏れと判明。選択肢 A（Unit-01遡及修正）/ B（Unit-02以降で追加）/ C（スコープ外）を提示し A を推奨。"
+**コンテキスト**: Unit-02 NFR設計。Unit-01 インフラ設計の考慮漏れ確認。
+
+---
+
+## Unit-02 NFR設計 - Unit-01遡及修正の承認
+**タイムスタンプ**: 2026-04-15T01:00:00Z
+**ユーザー入力**: "この方針で進めましょう"
+**AI応答**: "A方針承認。Unit-01 infrastructure-design / deployment-architecture / nfr-design-patterns に CloudFront + WAF を遡及追加、Unit-02 の運用リスクレジスタ（operational-risks.md）を作成、その後 Unit-02 NFR設計 Q3-Q8 に復帰する。"
+**コンテキスト**: Unit-02 NFR設計。Unit-01遡及修正の実施。
+
+---
+
+## Unit-02 NFR設計 - Q3-Q8 全A確定・成果物作成
+**タイムスタンプ**: 2026-04-15T01:20:00Z
+**ユーザー入力**: "はい"
+**AI応答**: "Q3-Q8 全A確定。Unit-02 nfr-design-patterns.md を作成（継承パターン + SP-U02-01〜03・PP-U02-01〜02・RP-U02-01・OP-U02-01）、logical-components.md を作成（JournalEntryRepository・TagRepository・JournalEntryService・SchemaRegistry・TagFilter・TimelineList 等）。運用リスクとの紐づけを明示。"
+**コンテキスト**: Unit-02 NFR設計。成果物作成完了。
+
+---
+
+## Unit-02 NFR設計 - Q5/Q6 判断基準とZod学習
+**タイムスタンプ**: 2026-04-15T01:26:00Z
+**ユーザー入力**: "ZodスキーマとIDOR 防止の判断基準を教えて" / "Zodスキーマについて理解が浅いわ。そもそも何をしているの？" / "次の論点に進みます"
+**AI応答**: "Q6（Zodスキーマ配置）・Q5（IDOR防止）の判断基準を提示。Zodの基本（実行時バリデーション・型自動生成・エラー構造化・二層バリデーションでの中核的役割）を詳細説明。ユーザー理解を確認。"
+**コンテキスト**: Unit-02 NFR設計。回答済み論点の事後レビュー（再設計なし）。
+
+---
+
+## Unit-02 NFR設計 - ステージ承認
+**タイムスタンプ**: 2026-04-15T01:30:00Z
+**ユーザー入力**: "はい"
+**AI応答**: "Unit-02 NFR設計ステージを完了としてマーク。aidlc-state.md を更新し Unit-02 インフラ設計ステージへ移行。"
+**コンテキスト**: Unit-02 NFR設計 → インフラ設計への遷移。
+
+---
+
+## Unit-02 インフラ設計 - tag/emotion統合漏れの指摘
+**タイムスタンプ**: 2026-04-15T01:35:00Z
+**ユーザー入力**: "DB マイグレーションの４テーブルにtagとemotionがあるけど、tagとemotionは統合したはず"
+**AI応答**: "指摘通り確認。domain-entities.md では is_emotion フラグで統合済みだが、business-logic-model.md・frontend-components.md・nfr-design/logical-components.md・nfr-design-patterns.md・infrastructure-design-plan.md に統合前モデル（categoryIds・journal_entry_emotions・emotion_categories・EmotionCategoryRepository）が残存していることを発見。修正方針A（全ファイルを統合後モデルに書き換え）を推奨。"
+**コンテキスト**: Unit-02 インフラ設計。機能設計内の内部矛盾の発見。
+
+---
+
+## Unit-02 インフラ設計 - 統合修正の実施
+**タイムスタンプ**: 2026-04-15T01:38:00Z
+**ユーザー入力**: "おねがい"
+**AI応答**: "以下を修正：(1) business-logic-model.md: BP-J-01/02/03 から categoryIds 削除・journal_entry_emotions 削除・Unit-04 節のテーブル名修正・BP-J-04a/b の JOIN を tags のみに修正、(2) frontend-components.md: EntryFormProps/バリデーション表から categoryIds 削除、(3) logical-components.md: EmotionCategoryRepository 削除・LC 番号再採番（LC-U02-03〜06）・依存グラフ修正・スキーマテーブル修正、(4) nfr-design-patterns.md: Zod 例から categoryIds 削除、(5) infrastructure-design-plan.md: 4テーブル→3テーブル。全ファイルで残存ゼロを grep で確認。"
+**コンテキスト**: Unit-02 インフラ設計。統合前モデル残存の全面修正。
+
+---
+
+## Unit-02 インフラ設計 - Q1 マイグレーション手段検討
+**タイムスタンプ**: 2026-04-15T01:45:00Z
+**ユーザー入力**: "DB マイグレーションの実行タイミングの判断基準を教えて" / "なるほどーー、なやましいな。RDSへ繋ぐCLI的なものはないの？それがあれば、初期段階は手動で対応できる" / "VPC経由なのが難しくさせているけど、セキュリティ上仕方ないね。トンネルを作るくらいなら最初からLambdaにした方がシンプルかしら" / "はい"
+**AI応答**: "Q1判断基準(A/B/C/D)を説明。踏み台EC2+SSM方式・CloudShell VPC方式を比較提示。ユーザーの『トンネルよりLambda』判断を受けて、Lambdaマイグレーター方式の詳細設計（dev/prod両環境・Node.js 20 ARM64・VPC配置・手動/自動フェーズ統一インターフェース）を提案。承認受領。"
+**コンテキスト**: Unit-02 インフラ設計。Q1=Lambda専用マイグレーター方式確定。
+
+---
+
+## Unit-02 インフラ設計 - Q2確定・Q3/Q4 判断基準
+**タイムスタンプ**: 2026-04-15T01:50:00Z
+**ユーザー入力**: "Q2はA、Q3とQ4は判断基準を教えて" / "はい。"
+**AI応答**: "Q2=A確定（グリーンフィールドで既存テナントなし）。Q3（CloudFrontキャッシュ戦略）の判断基準提示、ホワイトリスト方式Aを推奨。Q4（WAF初期モード）の判断基準提示、日誌POSTのみCountモードでの段階投入Aを推奨。全Q A確定。"
+**コンテキスト**: Unit-02 インフラ設計。全Q回答確定。
+
+---
+
+## Unit-02 インフラ設計 - 成果物作成
+**タイムスタンプ**: 2026-04-15T01:55:00Z
+**ユーザー入力**: （前の『はい。』の承認で成果物生成に進む）
+**AI応答**: "Unit-01 infrastructure-design.md に vitanota-db-migrator Lambda コンポーネントを遡及追加（ハンドラ仕様・IAMロール・ネットワーク設定・2段階運用フェーズ）。Unit-02 infrastructure-design.md を新規作成（DBスキーマ3テーブル・RLS 4ポリシー・CloudFrontホワイトリスト方式・WAFスコープダウンルール・メトリクスフィルター5個）。Unit-02 deployment-architecture.md を新規作成（Phase 1手動運用手順・Phase 2自動化・WAF Day 7切替手順・16項目リリースチェックリスト）。"
+**コンテキスト**: Unit-02 インフラ設計。成果物作成完了。
+
+---
+
+## Unit-02 インフラ設計 - セキュリティレビュー実施
+**タイムスタンプ**: 2026-04-15T02:10:00Z
+**ユーザー入力**: "ありがとう。ここまでのインフラ構成、インフラ設計を全てまとめて見せてくれる？セキュリティリスクやその他考慮事項がないか検査したい。" / "ありがとう。まずはこのレポートを全て記録して"
+**AI応答**: "Unit-01+Unit-02のインフラ構成統合サマリーを作成し、セキュリティレビュー視点で10セクションにまとめて提示（全体アーキテクチャ図・全AWSリソース一覧・多層防御マトリクス・シークレット管理・信頼境界・データフロー・既知リスク・追加検討8論点A-H・将来拡張3論点I-K・次アクション優先度付きリスト）。Critical未対応は0、🟡要検討は8論点（Hが最重要：マルチテナント隔離の検証）、P0タスクはH/E、P1はC/D/G。全内容を security-review.md として永続化。"
+**コンテキスト**: Unit-02 インフラ設計。包括セキュリティレビュー実施。
+
+---
+
+## Unit-02 インフラ設計 - is_public 漏えい多層防御の提案受領
+**タイムスタンプ**: 2026-04-15T02:20:00Z
+**ユーザー入力**: "is_public=falseが漏れることを絶対に避けたい。こんな設計はできる？過剰？エンドポイント分離 Repository分離 DB VIEW テスト強制 CloudFront分離"
+**AI応答**: "5案を評価。過剰ではなく推奨構成。1=既存・2=Repository分離推奨・3=DB VIEW強く推奨・4=テスト必須・5a=パス名前空間分離推奨・5b=サブドメイン分離却下(Auth Cookie制約)。7層防御(CloudFrontパス/エンドポイント/Repository型/VIEW/RLS/明示WHERE/テスト)を提案、実装コスト4〜5時間。"
+**コンテキスト**: Unit-02 追加ハードニング検討。
+
+---
+
+## Unit-02 インフラ設計 - JWT 失効対策の議論
+**タイムスタンプ**: 2026-04-15T02:30:00Z
+**ユーザー入力**: "これについては、提案を反映してください。もうひとつ、JWTが漏れたときに外部からアクセスを停止することができる実装にしたいです。例えばセッションDB化など。他に提案はありますか？" / "JWTの良さと、今回の変更点との比較をしたいです" / "Database セッションへの変更を行います。5層防御と合わせて仕様変更を反映し、security-review.mdにも変更を反映してください"
+**AI応答**: "JWT失効対策の4案を提示。案1(Auth.js database戦略)を推奨、案2(token_version)・案3(Redis denylist)・案4(短期TTL+refresh)を却下。追加ハードニング8項目(A-H:アイドルタイムアウト・絶対寿命・ロール変更時失効・テナント停止時失効・管理画面・不審検知・CSRF・監査ログ)を提案。JWT vs database の全観点比較(レイテンシ3-8ms増・DB負荷<1%・マイクロサービス無関係・教育機関向け必須)を提示。ユーザーがDatabase戦略を承認。"
+**コンテキスト**: Unit-02 追加ハードニング。Auth.js session戦略をJWT→databaseに変更決定。
+
+---
+
+## Unit-02 インフラ設計 - ステージ承認
+**タイムスタンプ**: 2026-04-15T03:50:00Z
+**ユーザー入力**: "インフラ設計を承認して次のステージに進みます"
+**AI応答**: "Unit-02 インフラ設計ステージを完了としてマーク。aidlc-state.md を更新し Unit-02 コード生成ステージへ移行。全ハードニング（5層防御→8層防御、Auth.js database戦略、S3監査ログ、Permission Boundary等）が設計に反映済み。"
+**コンテキスト**: Unit-02 インフラ設計 → コード生成への遷移。
+
+---
+
+## Unit-02 コード生成 Part 1 - プラン作成・承認依頼
+**タイムスタンプ**: 2026-04-15T03:55:00Z
+**ユーザー入力**: （前の承認で遷移）
+**AI応答**: "code-generation.md ルールを読み込み、既存プロジェクト構造（Next.js 14 Pages Router・src/features/・src/shared/・pages/api/）を確認。Unit-02 用の 19 ステップコード生成プランを作成（Directory 準備→スキーマ→マイグレーション→Zod→Repository型分離→Service→API Route /api/public と /api/private→Auth.js database戦略遡及→tenants シード→Frontend Components→ログ→ユニットテスト×4→統合テスト→サプライチェーン対策→ドキュメント→デプロイ成果物）。合計約45時間見積もり。unit-02-code-generation-plan.md として保存。"
+**コンテキスト**: Unit-02 コード生成 Part 1 プランニング。承認待ち。
+
+---
+
+## Unit-02 コード生成 Part 1 - プラン承認
+**タイムスタンプ**: 2026-04-15T04:00:00Z
+**ユーザー入力**: "承認します"
+**AI応答**: "Unit-02 コード生成プランを承認として記録。Part 2（生成）を開始。19 ステップを順次実行する。"
+**コンテキスト**: Unit-02 コード生成 Part 1 完了、Part 2 開始。
+
+---
+
+## Unit-02 インフラ設計 - 論点L・運用フェーズ項目追加
+**タイムスタンプ**: 2026-04-15T03:45:00Z
+**ユーザー入力**: "ありがとう。残る論点はApp RunnerがPublic（将来ECS化で解決）ということかしら" / "論点 L（サプライチェーン攻撃対策）とRunbook / ペンテスト計画を security-review.mdに追加してください"
+**AI応答**: "構造的残存は論点A(App Runner public)のみ、それ以外に実装/運用フェーズで対応する既知項目がある旨を解説。論点L(サプライチェーン攻撃対策)をsecurity-review.mdに追加(L-1: pnpm audit・L-2: ロックファイル検証・L-3: Actions SHA固定・L-4: SBOM・L-5: npm provenance・L-6: ECR Inspector)。運用フェーズセクション(8a)を新規追加(Runbook整備・外部ペンテスト計画・セキュリティトレーニング・依存監視・オンコール体制の5項目)。次アクション表に実装期日を追記、サマリー表を9項目対応+1実装+3将来+5運用に更新。"
+**コンテキスト**: Unit-02 追加ハードニング。運用フェーズで対応する既知項目の明文化完了。
+
+---
+
+## Unit-02 インフラ設計 - Layer 8 追加（複合FK）
+**タイムスタンプ**: 2026-04-15T03:30:00Z
+**ユーザー入力**: "DB側で tenant_id IS NOT NULL 制約する手もある？" / "はい"
+**AI応答**: "NOT NULL 列制約は既に設定済みと確認（journal_entries/tags の tenant_id）。より強力な『複合 FK によるクロステナント参照物理防止』を SP-U02-04 Layer 8 として追加することを提案。journal_entry_tags に tenant_id 冗長列を追加、(entry_id, tenant_id) と (tag_id, tenant_id) の複合 FK で DB エンジンレベルでクロステナント紐づけを拒否。親テーブルに (id, tenant_id) UNIQUE 制約を追加。domain-entities.md / infrastructure-design.md / nfr-design-patterns.md / integration-test-plan.md / security-review.md を更新し、7層→8層防御に拡張。マイグレーション 0005_cross_tenant_fk.sql を追加。"
+**コンテキスト**: Unit-02 追加ハードニング。論点Hに対する物理防衛線の追加。
+
+---
+
+## Unit-02 インフラ設計 - 残存P2論点A・B対応
+**タイムスタンプ**: 2026-04-15T03:15:00Z
+**ユーザー入力**: "残存論点 A・B を今のうちに対処する" / "お願いします"
+**AI応答**: "論点A(App Runner オリジン保護強化)とB(RDS Proxy IAM認証トークン管理)に対して8対策を反映。A-1月次ヘッダーローテーション自動化(Lambda header-rotator + EventBridge Scheduler + 24h猶予期間)・A-2直接アクセス検知(CloudWatch Logs Metric Filter)・A-3 gitleaks(プリコミットフック + CI)・A-4移行パス明記・B-1 CloudTrail rds-db:connect監査(想定外IAM発行 + 高頻度検知)・B-2 RDS接続元IP監視Lambda(日次 pg_stat_activity スキャン)・B-3トラストポリシー最小化四半期レビュー・B-4 IAM Permission Boundary 全ロール適用(iam:* 変更拒否・kms/cloudtrail破壊拒否)。Unit-01 infrastructure-design.md / deployment-architecture.md / nfr-design-patterns.md を更新、security-review.md に改訂3エントリ追加、論点A・Bを✅対応済みにマーク、サマリー表を8項目対応済み・残存0に更新。"
+**コンテキスト**: Unit-02 追加ハードニング。全論点(A-H)対応完了。
+
+---
+
+## Unit-02 インフラ設計 - P0/P1論点の追加対応
+**タイムスタンプ**: 2026-04-15T02:55:00Z
+**ユーザー入力**: "残りの P0/P1 論点を先に潰しておきましょうか" / "はい"
+**AI応答**: "P0-H(マルチテナント隔離検証) → integration-test-plan.md 新規作成、8 Suite 構成(Baseline・Cross-tenant・Session leakage・RLS fail-safe・is_public leak・IDOR・Session strategy・Pinning detection)、testcontainers 実 PostgreSQL。P0-E(GitHub Actions 権限) → OIDC トラストポリシーを main ブランチ+production environment に厳密化、pull_request_target 禁止・ブランチ保護強化。P1-D(監査ログ) → S3 Object Lock 7年・Kinesis Firehose 転送・CloudWatch Logs 削除権限剥奪・読み取りイベント追加(journal_entry_read 等)。P1-G(Lambda 権限分離) → execute/deploy/invoke の3ロール分離・prod invoke ホワイトリスト・CloudTrail/SNS 通知・drop/query ハードコード拒否。security-review.md を改訂2版として再生成(過去の消失を検知・全論点ステータス更新)。"
+**コンテキスト**: Unit-02 追加ハードニング。P0/P1 論点全対応。
+
+---
+
+## Unit-02 インフラ設計 - 5層防御と database 戦略の実装
+**タイムスタンプ**: 2026-04-15T02:40:00Z
+**ユーザー入力**: （前の承認で実装開始）
+**AI応答**: "7層 is_public 漏えい防止と Auth.js database セッション戦略を全関連ファイルに反映。(1) Unit-02 frontend-components.md: API パスを /api/public/* と /api/private/* に名前空間分離、(2) Unit-02 nfr-design-patterns.md: SP-U02-04 7層防御パターン追加・パス更新、(3) Unit-02 logical-components.md: JournalEntryRepository を PublicTimelineRepository + PrivateJournalRepository に分割・型ブランド化・依存グラフ更新・View 追記、(4) Unit-02 infrastructure-design.md: 0004_public_journal_view.sql マイグレーション追加・CloudFront パスパターン更新・WAF スコープダウン更新、(5) Unit-02 operational-risks.md: R4 に多層防御追記・論点F解消を記録、(6) Unit-02 deployment-architecture.md: パス更新、(7) Unit-01 nfr-design-patterns.md: SP-07 Database セッション戦略パターン追加・SP-04 多層防御 Layer 2 更新・パターン一覧に追加・シークレット説明修正、(8) Unit-01 infrastructure-design.md: sessions テーブルと主要テーブル一覧を追加、(9) security-review.md: 論点 C・F を対応済みマーク・更新履歴追加・サマリー表を6項目残に更新。"
+**コンテキスト**: Unit-02 追加ハードニング。5層防御と database 戦略の全面反映。
 
 ---

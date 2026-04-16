@@ -30,8 +30,8 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await page.goto('/journal/new');
     // 感情タグは pink 系のクラス、業務タグは gray 系
     // クラス検証は脆弱なため、両方のタグが選択可能かのみテスト
-    const emotionTag = page.locator('[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
-    const taskTag = page.locator('[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' });
+    const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
+    const taskTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' });
     await expect(emotionTag).toBeVisible();
     await expect(taskTag).toBeVisible();
   });
@@ -41,7 +41,7 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await page.getByTestId('entry-form-content-input').fill('うれしいことがあった');
 
     // タグを選択
-    const emotionTag = page.locator('[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
+    const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
     await emotionTag.click();
 
     // 選択件数カウンターが表示される
@@ -55,14 +55,14 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
   test('複数タグを選択できる', async ({ page }) => {
     await page.goto('/journal/new');
     await page.getByTestId('entry-form-content-input').fill('複数タグ');
-    await page.locator('[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' }).click();
-    await page.locator('[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' }).click();
+    await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' }).click();
+    await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' }).click();
     await expect(page.getByTestId('tag-filter-count')).toContainText('2 / 10');
   });
 
   test('タグの再クリックで選択解除される', async ({ page }) => {
     await page.goto('/journal/new');
-    const emotionTag = page.locator('[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
+    const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
     await emotionTag.click();
     await expect(page.getByTestId('tag-filter-count')).toContainText('1 / 10');
     await emotionTag.click();

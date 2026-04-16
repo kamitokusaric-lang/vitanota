@@ -1,7 +1,7 @@
 // Unit-02 TagRepository
 // タグの CRUD・システムデフォルトタグのシード・テナント内タグ一覧取得
 // is_emotion フラグで感情タグ・業務タグを統合管理
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import { tags, journalEntryTags } from '@/db/schema';
 import type * as schema from '@/db/schema';
@@ -138,7 +138,7 @@ export class TagRepository {
       .where(
         and(
           eq(tags.tenantId, ctx.tenantId),
-          sql`${tags.id} = ANY(${tagIds})`
+          inArray(tags.id, tagIds)
         )
       );
     return rows.map((r) => r.id);

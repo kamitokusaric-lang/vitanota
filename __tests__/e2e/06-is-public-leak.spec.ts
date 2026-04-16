@@ -34,7 +34,7 @@ test.describe('SP-U02-04 is_public 漏えい防止 (E2E)', () => {
     await loginAs(context, seed, user, tenant.id);
 
     // /api/public/journal/entries の生レスポンスを検証
-    const res = await context.request.get('/api/public/journal/entries?page=1&perPage=200');
+    const res = await context.request.get('/api/public/journal/entries?page=1&perPage=50');
     expect(res.status()).toBe(200);
     const body = (await res.json()) as { entries: Array<Record<string, unknown>> };
 

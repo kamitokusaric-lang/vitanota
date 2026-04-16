@@ -69,6 +69,9 @@
 - [x] Phase 1/2 デプロイメントフェーズ設計 (MVP / 本格稼働の 2 段階)
 - [x] ローカル開発環境 (Docker Compose + PostgreSQL + Adminer + seed スクリプト)
 
+**追加完了 Step (Unit-02 コード生成 — セキュリティ修正)**:
+- [x] RLS 4ロール体制 + 非特権DBロール + middleware (クロステナント漏洩修正)
+
 **未着手 Step (Unit-02 コード生成)**:
 - [ ] Step 20: AWS CDK Phase 1 実装 (9 スタック・約 1,400 LOC)
 
@@ -90,38 +93,36 @@
 ## 📝 再開ポイント (2026-04-16)
 
 ### 現在の状態
-- ローカル Docker 環境構築完了 (Docker Compose + PostgreSQL + Adminer + seed)
-- `pnpm db:local:up` + `pnpm db:local:seed` + `pnpm dev` で起動成功
-- `localhost:3000` にアクセスすると 500 エラー発生中
-  - 原因: AWS Secrets Manager 呼び出し失敗 (ローカルに AWS クレデンシャルなし)
-  - 対処: `.env.local` に以下を追加して再起動
-    ```
-    GOOGLE_CLIENT_ID=dummy-client-id
-    GOOGLE_CLIENT_SECRET=dummy-client-secret
-    ```
+- ローカル Docker 環境構築完了・動作確認済み
+- **クロステナント漏洩を検出・修正完了** (RLS 4ロール体制)
+- アプリは非特権ロール `vitanota_app` (NOSUPERUSER NOBYPASSRLS) で DB 接続
+- E2E: 21 passed / 5 failed (残り5件はタグUI + perPageバリデーション齟齬、セキュリティ問題なし)
+- ユニットテスト: 142 件 GREEN
+- `pnpm dev` + cookie 注入で /journal 表示確認済み
 
-### 再開時の推奨フロー
-1. ダミー OAuth 値追加 + `pnpm dev` 再起動で 500 解消
-2. test seed API でセッション作成してブラウザで動作確認
-3. ローカルで全機能 (作成・編集・削除・タイムライン・タグ) を手動テスト
-4. 発見したバグを修正してコミット
-5. 動作確認 OK なら Step 20 (CDK Phase 1 実装) に着手
+### セキュリティ修正の概要 (本セッション実施)
+- migrations: 0007 (FORCE RLS) + 0008 (vitanota_app ロール) + 0009 (CASE ポリシー + bootstrap)
+- 4ロール: teacher / school_admin / system_admin / bootstrap
+- RLS DSL: `pnpm rls:generate` / `pnpm rls:check` (CI 統合済み)
+- middleware.ts + withAuthSSR / withAuthApi 導入
+- 詳細: `aidlc-docs/construction/security/role-definitions.md`
+
+### 次のステップ
+1. Step 20: AWS CDK Phase 1 実装 (9 スタック・約 1,400 LOC)
+2. → Unit-02 完了承認
+3. → Unit-03 機能設計
 
 ### ローカルコミット数
-11 コミット (未 push)・main から ahead
+17 コミット (未 push)・main から ahead
 
 ### 全テスト
-- ユニットテスト: 142 件 GREEN (ローカル実行可能)
-- 統合テスト: 44 件 (CI で初実行予定・ローカル実行は DATABASE_URL 設定で可能)
-- E2E テスト: 26 件 (ローカル or CI で実行可能)
+- ユニットテスト: 142 件 GREEN
+- 統合テスト: 44 件 (CI で初実行予定)
+- E2E テスト: 21/26 passed (残り5件は非セキュリティ)
 - 合計: 212 tests
 
-### 重要な設計判断 (全て deployment-phases.md に記録済み)
-- Phase 1 (MVP): 単一環境・RDS 単一 AZ・Proxy なし・App Runner min=0・月 ¥6,000-8,000
-- Phase 2 (本格稼働): dev+prod・Multi-AZ・Proxy+IAM・月 ¥23,000-26,000
-- 2 週間で Phase 1 ローンチ予定
-
 ### 主要ドキュメント (ナビゲーション)
+- `aidlc-docs/construction/security/role-definitions.md` - RLS 4ロール設計
 - `aidlc-docs/construction/deployment-phases.md` - Phase 1/2 構成図
 - `aidlc-docs/construction/er-diagram.md` - DB 構造
 - `aidlc-docs/construction/sequence-diagrams.md` - 14 ユースケースのフロー

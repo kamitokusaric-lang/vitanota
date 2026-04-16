@@ -33,6 +33,10 @@ export function middleware(req: NextRequest) {
     req.cookies.has('__Secure-next-auth.session-token');
 
   if (!hasSession) {
+    // API ルートはリダイレクトせずパスさせる（API ハンドラが 401 を返す）
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.next();
+    }
     const url = req.nextUrl.clone();
     url.pathname = '/auth/signin';
     url.searchParams.set('callbackUrl', pathname);

@@ -181,6 +181,7 @@ export default async function handler(
       }
     }
   } catch (err) {
+    console.error('[seed] error:', err instanceof Error ? err.message : err);
     return res.status(500).json({
       error: 'INTERNAL_ERROR',
       message: err instanceof Error ? err.message : 'unknown',

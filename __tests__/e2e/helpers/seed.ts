@@ -36,7 +36,10 @@ export class SeedClient {
     const res = await this.request.post('/api/test/_seed', {
       data: { action: 'reset' },
     });
-    if (!res.ok()) throw new Error(`reset failed: ${res.status()}`);
+    if (!res.ok()) {
+      const body = await res.text().catch(() => 'no body');
+      throw new Error(`reset failed: ${res.status()} - ${body}`);
+    }
   }
 
   async createTenant(name = 'テスト学校'): Promise<SeedTenant> {

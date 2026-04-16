@@ -51,7 +51,7 @@
 - [x] NFR要件 — 完了（2026-04-15T00:40:00Z）
 - [x] NFR設計 — 完了（2026-04-15T01:30:00Z）
 - [x] インフラ設計 — 完了（2026-04-15T03:50:00Z）
-- [~] コード生成 — Step 1-19 完了・Step 20 (CDK) 未着手
+- [x] コード生成 — 全 Step 完了（Step 1-20 + RLS セキュリティ修正）
 
 **完了済み Step (Unit-02 コード生成)**:
 - [x] Step 1-7: Backend 基盤・API 実装
@@ -72,8 +72,8 @@
 **追加完了 Step (Unit-02 コード生成 — セキュリティ修正)**:
 - [x] RLS 4ロール体制 + 非特権DBロール + middleware (クロステナント漏洩修正)
 
-**未着手 Step (Unit-02 コード生成)**:
-- [ ] Step 20: AWS CDK Phase 1 実装 (9 スタック・約 1,400 LOC)
+**完了 Step (Unit-02 コード生成 — CDK)**:
+- [x] Step 20: AWS CDK Phase 1 実装 (5 スタック・903 LOC)
 
 #### Unit-03〜04（予定）
 - [ ] 機能設計〜コード生成 — 実行予定
@@ -108,12 +108,12 @@
 - 詳細: `aidlc-docs/construction/security/role-definitions.md`
 
 ### 次のステップ
-1. Step 20: AWS CDK Phase 1 実装 (9 スタック・約 1,400 LOC)
-2. → Unit-02 完了承認
-3. → Unit-03 機能設計
+1. push → CI GREEN 確認
+2. Unit-02 完了承認
+3. Unit-03 機能設計
 
 ### ローカルコミット数
-17 コミット (未 push)・main から ahead
+20 コミット (未 push)・main から ahead
 
 ### 全テスト
 - ユニットテスト: 142 件 GREEN

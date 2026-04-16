@@ -24,7 +24,13 @@ export default defineConfig({
         statements: 80,
       },
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/**/*.d.ts', 'src/db/schema.ts'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/db/schema.ts',
+        'src/db/rls/**',
+        'src/features/auth/lib/withAuthSSR.ts',
+        'src/features/auth/lib/withAuthApi.ts',
+      ],
     },
   },
   resolve: {

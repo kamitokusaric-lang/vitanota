@@ -7,6 +7,7 @@ import {
   startTestDb,
   stopTestDb,
   truncateAll,
+  withSystemAdminContext,
   type TestDb,
 } from './helpers/testDb';
 import { seedTenant, seedUser } from './helpers/seed';
@@ -155,13 +156,13 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
-    const seeded = await db
-      .select()
-      .from(tags)
-      .where(eq(tags.tenantId, tenant.id));
+    const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
+      return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
+    });
     expect(seeded).toHaveLength(8);
   });
 
@@ -170,6 +171,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
@@ -185,6 +187,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
@@ -200,6 +203,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
@@ -217,6 +221,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tx.insert(tags).values({
         tenantId: tenant.id,
         name: 'うれしい',
@@ -233,7 +238,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
         const [t] = await tx.insert(tenants).values({ name: '失敗', slug: `fail-${Date.now()}` }).returning();
         await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
         await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
-        // 既存 tenantA に対して seed → 既存 "うれしい" と衝突
+        await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
         await tagRepo.seedSystemDefaults(tx as never, tenant.id);
       });
     } catch {
@@ -255,13 +260,14 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', ${adminUser.id}, true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
-    // 別のトランザクションで RLS 経由で読み取り
     const rows = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', ${adminUser.id}, true)`);
+      await tx.execute(sql`SELECT set_config('app.role', 'school_admin', true)`);
       return tx.select().from(tags);
     });
     expect(rows).toHaveLength(8);

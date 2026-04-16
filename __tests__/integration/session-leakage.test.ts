@@ -141,25 +141,23 @@ describe('Suite 4: RLS fail-safe', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('within tx, setting app.tenant_id without app.user_id still allows public_read', async () => {
-    // public_read ポリシーは tenant_id のみで判定 (user_id は不要)
+  it('within tx, setting app.tenant_id without app.role returns zero rows (CASE fail-safe)', async () => {
+    // CASE 式で app_role() IS NULL → false。app.role 未設定は全拒否
     const rows = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenantA.id}, true)`);
-      // app.user_id を意図的に設定しない
       return tx.select().from(publicJournalEntries);
     });
-    // is_public=true のもののみ
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.every((r) => r.tenantId === tenantA.id)).toBe(true);
+    expect(rows).toHaveLength(0);
   });
 
-  it('within tx, setting only app.tenant_id (no user_id) cannot access non-public via owner_all', async () => {
-    // owner_all ポリシーは user_id の比較が必要なので、未設定だと non-public は取れない
+  it('within tx, setting app.tenant_id + app.role but no user_id allows public_read only', async () => {
+    // teacher ロールで tenant_id のみ設定。public_read ポリシーは tenant_id のみ必要
     const rows = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenantA.id}, true)`);
-      return tx.select().from(journalEntries);
+      await tx.execute(sql`SELECT set_config('app.role', 'teacher', true)`);
+      return tx.select().from(publicJournalEntries);
     });
-    // public_read のみマッチ → is_public=true のみ
-    expect(rows.every((r) => r.isPublic === true)).toBe(true);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.tenantId === tenantA.id)).toBe(true);
   });
 });

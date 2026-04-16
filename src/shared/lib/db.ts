@@ -25,7 +25,7 @@ async function getPool(): Promise<Pool> {
     user: process.env.DB_USER,
     password,
     database: process.env.DB_NAME,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : false,
     max: 10,              // RDS Proxy がプール管理するためアプリ側は小さく
     idleTimeoutMillis: 30_000,
   });

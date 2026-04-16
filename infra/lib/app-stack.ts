@@ -84,6 +84,7 @@ export class AppStack extends cdk.Stack {
               { name: 'DB_USER', value: 'vitanota_app' },
               { name: 'DB_NAME', value: props.dbName },
               { name: 'E2E_TEST_MODE', value: 'false' },
+              { name: 'DB_SSL', value: 'true' },
             ],
           },
         },

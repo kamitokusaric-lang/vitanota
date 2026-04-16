@@ -1,8 +1,11 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # 同一 PR の連続 push で前のジョブをキャンセル
 concurrency:

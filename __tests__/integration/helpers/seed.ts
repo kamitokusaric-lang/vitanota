@@ -9,6 +9,7 @@ import {
   journalEntryTags,
 } from '@/db/schema';
 import type { TestDb } from './testDb';
+import { rawQueryAsSuperuser } from './testDb';
 
 export interface SeededTenant {
   id: string;
@@ -49,11 +50,15 @@ export async function seedTenant(
   name = `テスト学校`
 ): Promise<SeededTenant> {
   const slug = `test-${counter + 1}-${Date.now()}`;
-  const [t] = await db
-    .insert(tenants)
-    .values({ name, slug, status: 'active' })
-    .returning();
-  return { id: t.id, name: t.name, slug: t.slug };
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
+    await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+    const [t] = await tx
+      .insert(tenants)
+      .values({ name, slug, status: 'active' })
+      .returning();
+    return { id: t.id, name: t.name, slug: t.slug };
+  });
 }
 
 export async function seedUser(
@@ -64,16 +69,21 @@ export async function seedUser(
 ): Promise<SeededUser> {
   counter++;
   const email = emailOverride ?? `teacher-${counter}-${Date.now()}@test.example.com`;
-  const [u] = await db
-    .insert(users)
-    .values({ email, name: `教員 ${counter}` })
-    .returning();
-  await db.insert(userTenantRoles).values({
-    userId: u.id,
-    tenantId,
-    role,
+  const name = `教員 ${counter}`;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
+    await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
+    const [u] = await tx
+      .insert(users)
+      .values({ email, name })
+      .returning();
+    await tx.insert(userTenantRoles).values({
+      userId: u.id,
+      tenantId,
+      role,
+    });
+    return { id: u.id, email: u.email, name: u.name ?? '' };
   });
-  return { id: u.id, email: u.email, name: u.name ?? '' };
 }
 
 export async function seedEntry(

@@ -11,7 +11,8 @@ import * as schema from '@/db/schema';
 
 export type TestDb = NodePgDatabase<typeof schema>;
 
-let pool: Pool | null = null;
+let migrationPool: Pool | null = null;
+let appPool: Pool | null = null;
 let db: TestDb | null = null;
 let migrationApplied = false;
 
@@ -29,20 +30,26 @@ function getDatabaseUrl(): string {
   return url;
 }
 
+function getAppDatabaseUrl(): string {
+  const base = getDatabaseUrl();
+  const url = new URL(base);
+  url.username = 'vitanota_app';
+  url.password = 'vitanota_app_local';
+  return url.toString();
+}
+
 /**
  * 既存の PostgreSQL に接続し、初回呼び出し時にマイグレーションを適用する
- * 各テストファイルの beforeAll で呼ぶ
+ * マイグレーションはスーパーユーザー（DATABASE_URL）で実行し、
+ * テスト用クエリは非特権ロール（vitanota_app）で実行する
  */
 export async function startTestDb(): Promise<TestDb> {
-  if (db && pool) return db;
+  if (db && appPool) return db;
 
-  pool = new Pool({
-    connectionString: getDatabaseUrl(),
-    max: 5,
-  });
+  // マイグレーション用（スーパーユーザー）
+  migrationPool = new Pool({ connectionString: getDatabaseUrl(), max: 2 });
 
-  // 接続疎通確認 + 初回マイグレーション適用
-  const client = await pool.connect();
+  const client = await migrationPool.connect();
   try {
     await client.query('SELECT 1');
 
@@ -83,7 +90,9 @@ export async function startTestDb(): Promise<TestDb> {
     client.release();
   }
 
-  db = drizzle(pool, { schema });
+  // テスト用（非特権ロール vitanota_app — RLS が適用される）
+  appPool = new Pool({ connectionString: getAppDatabaseUrl(), max: 5 });
+  db = drizzle(appPool, { schema });
   return db;
 }
 
@@ -91,19 +100,24 @@ export async function startTestDb(): Promise<TestDb> {
  * 接続を閉じる (各テストファイルの afterAll で呼ぶ)
  */
 export async function stopTestDb(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    pool = null;
+  if (appPool) {
+    await appPool.end();
+    appPool = null;
+  }
+  if (migrationPool) {
+    await migrationPool.end();
+    migrationPool = null;
   }
   db = null;
 }
 
 /**
  * 全テーブルを TRUNCATE してテスト間の状態をリセット
- * 各 beforeEach で呼ぶ
+ * スーパーユーザー接続で実行（vitanota_app でも TRUNCATE 権限ありだが確実を期す）
  */
-export async function truncateAll(database: TestDb): Promise<void> {
-  await database.execute(sql`
+export async function truncateAll(_database: TestDb): Promise<void> {
+  if (!migrationPool) throw new Error('Test DB not started');
+  await migrationPool.query(`
     TRUNCATE TABLE
       journal_entry_tags,
       journal_entries,
@@ -156,7 +170,16 @@ export async function rawQuery<T = unknown>(
   query: string,
   params: unknown[] = []
 ): Promise<T[]> {
-  if (!pool) throw new Error('Test DB not started. Call startTestDb() first.');
-  const result = await pool.query(query, params);
+  if (!appPool) throw new Error('Test DB not started. Call startTestDb() first.');
+  const result = await appPool.query(query, params);
+  return result.rows as T[];
+}
+
+export async function rawQueryAsSuperuser<T = unknown>(
+  query: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  if (!migrationPool) throw new Error('Test DB not started. Call startTestDb() first.');
+  const result = await migrationPool.query(query, params);
   return result.rows as T[];
 }

@@ -88,6 +88,7 @@ export async function seedEntry(
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('app.tenant_id', ${params.tenantId}, true)`);
     await tx.execute(sql`SELECT set_config('app.user_id', ${params.userId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.role', 'teacher', true)`);
     const [e] = await tx
       .insert(journalEntries)
       .values({
@@ -119,6 +120,7 @@ export async function seedTag(
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('app.tenant_id', ${params.tenantId}, true)`);
     await tx.execute(sql`SELECT set_config('app.user_id', ${params.userId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.role', 'teacher', true)`);
     const [t] = await tx
       .insert(tags)
       .values({
@@ -146,6 +148,7 @@ export async function attachTag(
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('app.tenant_id', ${params.tenantId}, true)`);
     await tx.execute(sql`SELECT set_config('app.user_id', ${params.userId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.role', 'teacher', true)`);
     await tx.insert(journalEntryTags).values({
       tenantId: params.tenantId,
       entryId: params.entryId,

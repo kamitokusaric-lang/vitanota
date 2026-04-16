@@ -47,13 +47,31 @@ export async function startTestDb(): Promise<TestDb> {
     await client.query('SELECT 1');
 
     if (!migrationApplied) {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS _migrations (
+          id SERIAL PRIMARY KEY,
+          filename VARCHAR(255) NOT NULL UNIQUE,
+          applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
       const files = readdirSync(MIGRATIONS_DIR)
         .filter((f) => f.endsWith('.sql'))
         .sort();
       for (const file of files) {
+        const { rows } = await client.query(
+          'SELECT 1 FROM _migrations WHERE filename = $1',
+          [file]
+        );
+        if (rows.length > 0) continue;
+
         const sqlContent = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
         try {
           await client.query(sqlContent);
+          await client.query(
+            'INSERT INTO _migrations (filename) VALUES ($1)',
+            [file]
+          );
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           throw new Error(`Migration ${file} failed: ${message}`);
@@ -108,11 +126,25 @@ export async function withTenantContext<T>(
   database: TestDb,
   tenantId: string,
   userId: string,
-  fn: (tx: TestDb) => Promise<T>
+  fn: (tx: TestDb) => Promise<T>,
+  role = 'teacher'
 ): Promise<T> {
   return database.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`);
     await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.role', ${role}, true)`);
+    return fn(tx as unknown as TestDb);
+  });
+}
+
+export async function withSystemAdminContext<T>(
+  database: TestDb,
+  userId: string,
+  fn: (tx: TestDb) => Promise<T>
+): Promise<T> {
+  return database.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
     return fn(tx as unknown as TestDb);
   });
 }

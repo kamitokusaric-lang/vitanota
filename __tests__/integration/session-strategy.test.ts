@@ -191,7 +191,9 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
-    const seeded = await db.select().from(tags).where(eq(tags.tenantId, tenant.id));
+    const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
+      return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
+    });
     const emotions = seeded.filter((t) => t.isEmotion);
     const tasks = seeded.filter((t) => !t.isEmotion);
     expect(emotions).toHaveLength(5);
@@ -207,7 +209,9 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
-    const seeded = await db.select().from(tags).where(eq(tags.tenantId, tenant.id));
+    const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
+      return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
+    });
     const names = seeded.map((t) => t.name).sort();
     const expected = SYSTEM_DEFAULT_TAGS.map((t) => t.name).sort();
     expect(names).toEqual(expected);

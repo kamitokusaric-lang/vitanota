@@ -2,7 +2,7 @@
 // 実 PostgreSQL (testcontainers) で RLS と複合 FK の挙動を検証
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
-import { startTestDb, stopTestDb, truncateAll, withTenantContext, type TestDb } from './helpers/testDb';
+import { startTestDb, stopTestDb, truncateAll, withTenantContext, rawQuery, type TestDb } from './helpers/testDb';
 import { seedTenant, seedUser, seedEntry, seedTag, attachTag } from './helpers/seed';
 import { journalEntries, tags, journalEntryTags, publicJournalEntries } from '@/db/schema';
 
@@ -170,12 +170,11 @@ describe('Suite 2: Cross-tenant protection', () => {
 
   // SP-U02-04 Layer 8: 複合 FK によるクロステナント参照物理防止
   it('INSERT into journal_entry_tags with cross-tenant entry_id and tag_id fails at DB level', async () => {
-    // tenantA のエントリ + tenantB のタグを生 SQL で挿入試行
     await expect(
-      db.execute({
-        sql: `INSERT INTO journal_entry_tags (tenant_id, entry_id, tag_id) VALUES ($1, $2, $3)`,
-        args: [tenantA.id, entryA_public.id, tagB.id],
-      } as never)
+      rawQuery(
+        `INSERT INTO journal_entry_tags (tenant_id, entry_id, tag_id) VALUES ($1, $2, $3)`,
+        [tenantA.id, entryA_public.id, tagB.id]
+      )
     ).rejects.toThrow();
   });
 

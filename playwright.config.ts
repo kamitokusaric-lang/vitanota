@@ -46,12 +46,19 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
+      ...process.env,
       NODE_ENV: 'test',
-      // E2E 用 DB (CI では service container、ローカルでは別途)
       DATABASE_URL: process.env.DATABASE_URL ?? 'postgresql://test:test@localhost:5432/vitanota_test',
+      RDS_PROXY_ENDPOINT: process.env.RDS_PROXY_ENDPOINT ?? 'localhost',
+      DB_USER: process.env.DB_USER ?? 'vitanota_app',
+      DB_NAME: process.env.DB_NAME ?? 'vitanota_test',
+      DB_PASSWORD: process.env.DB_PASSWORD ?? 'vitanota_app_local',
       NEXTAUTH_SECRET: 'e2e-test-secret-32-bytes-minimum-length',
       NEXTAUTH_URL: BASE_URL,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? 'e2e-dummy',
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? 'e2e-dummy',
       E2E_TEST_MODE: 'true',
+      SKIP_SECRETS_MANAGER: 'true',
     },
   },
 });

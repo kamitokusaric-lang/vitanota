@@ -49,7 +49,8 @@ describe('Suite 3: Session variable leakage (論点 H・R1)', () => {
     const setting = await rawQuery<{ setting: string | null }>(
       `SELECT current_setting('app.tenant_id', true) as setting`
     );
-    expect(setting[0].setting).toBeNull();
+    // current_setting with missing_ok=true returns null or '' depending on PG version/state
+    expect(setting[0].setting === null || setting[0].setting === '').toBe(true);
   });
 
   it('raw query without SET LOCAL returns zero rows from public_journal_entries (fail-safe)', async () => {

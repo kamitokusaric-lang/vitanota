@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Layout } from '@/shared/components/Layout';
 import type { VitanotaSession } from '@/shared/types/auth';

@@ -11,7 +11,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
-import { getDb } from '@/shared/lib/db';
+import { getDb, withSystemAdmin } from '@/shared/lib/db';
 import {
   tenants,
   users,
@@ -79,11 +79,14 @@ export default async function handler(
     });
   }
 
-  const db = await getDb();
+  // E2E テスト用シード: 全操作を system_admin ロールで実行
+  // seed API 自体が E2E_TEST_MODE=true でのみ有効なため、権限昇格のリスクはない
+  const SEED_ADMIN_ID = '00000000-0000-0000-0000-000000000000';
 
   try {
     switch (parsed.data.action) {
       case 'reset': {
+        const db = await getDb();
         await db.execute(sql`
           TRUNCATE TABLE
             journal_entry_tags,
@@ -101,73 +104,73 @@ export default async function handler(
         return res.status(200).json({ ok: true });
       }
       case 'tenant': {
-        const [t] = await db
-          .insert(tenants)
-          .values({ name: parsed.data.name, slug: parsed.data.slug, status: 'active' })
-          .returning();
+        const { name, slug } = parsed.data;
+        const t = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
+          const [created] = await tx
+            .insert(tenants)
+            .values({ name, slug, status: 'active' })
+            .returning();
+          return created;
+        });
         return res.status(201).json({ tenant: t });
       }
       case 'user': {
-        const [u] = await db
-          .insert(users)
-          .values({ email: parsed.data.email, name: parsed.data.name })
-          .returning();
-        await db.insert(userTenantRoles).values({
-          userId: u.id,
-          tenantId: parsed.data.tenantId,
-          role: parsed.data.role,
+        const { email, name, tenantId, role } = parsed.data;
+        const u = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
+          const [created] = await tx
+            .insert(users)
+            .values({ email, name })
+            .returning();
+          await tx.insert(userTenantRoles).values({
+            userId: created.id,
+            tenantId,
+            role,
+          });
+          return created;
         });
         return res.status(201).json({ user: u });
       }
       case 'entry': {
-        await db.execute(
-          sql`SELECT set_config('app.tenant_id', ${parsed.data.tenantId}, true)`
-        );
-        await db.execute(
-          sql`SELECT set_config('app.user_id', ${parsed.data.userId}, true)`
-        );
-        const [e] = await db
-          .insert(journalEntries)
-          .values({
-            tenantId: parsed.data.tenantId,
-            userId: parsed.data.userId,
-            content: parsed.data.content,
-            isPublic: parsed.data.isPublic,
-          })
-          .returning();
+        const { tenantId, userId, content, isPublic } = parsed.data;
+        const e = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
+          const [created] = await tx
+            .insert(journalEntries)
+            .values({ tenantId, userId, content, isPublic })
+            .returning();
+          return created;
+        });
         return res.status(201).json({ entry: e });
       }
       case 'tag': {
-        await db.execute(
-          sql`SELECT set_config('app.tenant_id', ${parsed.data.tenantId}, true)`
-        );
-        await db.execute(
-          sql`SELECT set_config('app.user_id', ${parsed.data.userId}, true)`
-        );
-        const [t] = await db
-          .insert(tags)
-          .values({
-            tenantId: parsed.data.tenantId,
-            name: parsed.data.name,
-            isEmotion: parsed.data.isEmotion,
-            isSystemDefault: false,
-            sortOrder: 0,
-            createdBy: parsed.data.userId,
-          })
-          .returning();
+        const { tenantId, userId, name, isEmotion } = parsed.data;
+        const t = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
+          const [created] = await tx
+            .insert(tags)
+            .values({
+              tenantId,
+              name,
+              isEmotion,
+              isSystemDefault: false,
+              sortOrder: 0,
+              createdBy: userId,
+            })
+            .returning();
+          return created;
+        });
         return res.status(201).json({ tag: t });
       }
       case 'createSession': {
-        // Step 16b: E2E 用に database セッション戦略の sessions 行を直接 INSERT
-        // 通常の auth フロー (Google OAuth) を経由せずに認証済み状態を作る
+        const { userId, expiresInSec } = parsed.data;
+        const cssTenantId = parsed.data.tenantId ?? null;
         const sessionToken = randomBytes(32).toString('hex');
-        const expires = new Date(Date.now() + parsed.data.expiresInSec * 1000);
+        const expires = new Date(Date.now() + expiresInSec * 1000);
+        const db = await getDb();
         const [s] = await db
           .insert(sessions)
           .values({
             sessionToken,
-            userId: parsed.data.userId,
-            activeTenantId: parsed.data.tenantId ?? null,
+            userId,
+            activeTenantId: cssTenantId,
             expires,
           })
           .returning();

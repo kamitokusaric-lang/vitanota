@@ -14,13 +14,16 @@ let pool: Pool | null = null;
 async function getPool(): Promise<Pool> {
   if (pool) return pool;
 
-  const token = await getDbAuthToken();
+  // ローカル開発時は静的パスワードを使用（AWS 認証情報不要）
+  const password = process.env.DB_PASSWORD
+    ? process.env.DB_PASSWORD
+    : await getDbAuthToken();
 
   pool = new Pool({
     host: process.env.RDS_PROXY_ENDPOINT,
     port: 5432,
     user: process.env.DB_USER,
-    password: token,
+    password,
     database: process.env.DB_NAME,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
     max: 10,              // RDS Proxy がプール管理するためアプリ側は小さく
@@ -41,50 +44,62 @@ export async function getDb(): Promise<DrizzleDb> {
   return drizzle(p, { schema });
 }
 
-// withTenant: PostgreSQL RLS でテナント隔離を行うラッパー（SP-04 Layer 5）
-export async function withTenant<T>(
-  tenantId: string,
-  fn: (db: DrizzleDb) => Promise<T>
-): Promise<T> {
-  const db = await getDb();
-  return db.transaction(async (tx) => {
-    await tx.execute(
-      sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`
-    );
-    return fn(tx as unknown as DrizzleDb);
-  });
-}
-
-// withTenantUser: Unit-02 用拡張 - tenant_id と user_id 両方を設定
-// owner_all RLS ポリシーで user_id による所有者判定を行うため必須
-// SP-U02-02 RLS 2ポリシー構成・RP-U02-01 トランザクション必須化
+// テナントユーザー用: RLS の 3 変数を設定してトランザクション内で fn を実行
 export async function withTenantUser<T>(
   tenantId: string,
   userId: string,
+  role: string,
   fn: (db: DrizzleDb) => Promise<T>
 ): Promise<T> {
+  if (!tenantId) throw new Error('withTenantUser: tenantId is required');
+  if (!userId) throw new Error('withTenantUser: userId is required');
+  if (!role) throw new Error('withTenantUser: role is required');
+
   const db = await getDb();
   return db.transaction(async (tx) => {
-    // set_config(name, value, is_local=true) でトランザクションスコープに限定
-    // R1 対策: SET LOCAL はトランザクション終了時に自動リセット、RDS Proxy ピン回避
+    await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`SELECT set_config('app.role', ${role}, true)`);
+    return fn(tx as unknown as DrizzleDb);
+  });
+}
+
+// system_admin 用: 全テナントにアクセス可能
+// app.tenant_id は設定しない（system_admin にテナントは不要。CASE で先に判定される）
+export async function withSystemAdmin<T>(
+  adminUserId: string,
+  fn: (db: DrizzleDb) => Promise<T>
+): Promise<T> {
+  if (!adminUserId) throw new Error('withSystemAdmin: adminUserId is required');
+
+  const db = await getDb();
+  return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`
+      sql`SELECT set_config('app.user_id', ${adminUserId}, true)`
     );
     await tx.execute(
-      sql`SELECT set_config('app.user_id', ${userId}, true)`
+      sql`SELECT set_config('app.role', 'system_admin', true)`
     );
     return fn(tx as unknown as DrizzleDb);
   });
 }
 
-// system_admin 用: RLS バイパス（全テナントにアクセス可能）
-export async function withSystemAdmin<T>(
+// セッション解決専用: ログイン直後に自分の user_tenant_roles を読むためだけのロール
+// user_tenant_roles の bootstrap ポリシーでのみ許可（user_id = 自分の行の SELECT のみ）
+// 他テーブルへのアクセスは CASE の ELSE false で拒否される
+export async function withSessionBootstrap<T>(
+  userId: string,
   fn: (db: DrizzleDb) => Promise<T>
 ): Promise<T> {
+  if (!userId) throw new Error('withSessionBootstrap: userId is required');
+
   const db = await getDb();
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`SELECT set_config('app.tenant_id', 'system_admin', true)`
+      sql`SELECT set_config('app.user_id', ${userId}, true)`
+    );
+    await tx.execute(
+      sql`SELECT set_config('app.role', 'bootstrap', true)`
     );
     return fn(tx as unknown as DrizzleDb);
   });

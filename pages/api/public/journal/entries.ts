@@ -6,7 +6,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withTenantUser } from '@/shared/lib/db';
 import { publicTimelineRepo } from '@/features/journal/lib/publicTimelineRepository';
 import { timelineQuerySchema } from '@/features/journal/schemas/journal';
-import { requireAuth, mapErrorToResponse } from '@/features/journal/lib/apiHelpers';
+import { requireAuth, pickDbRole, mapErrorToResponse } from '@/features/journal/lib/apiHelpers';
 import { LogEvents, logEvent } from '@/shared/lib/log-events';
 
 export default async function handler(
@@ -33,7 +33,7 @@ export default async function handler(
   const offset = (page - 1) * perPage;
 
   try {
-    const entries = await withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
+    const entries = await withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return publicTimelineRepo.findTimeline(tx, { limit: perPage, offset });
     });
 

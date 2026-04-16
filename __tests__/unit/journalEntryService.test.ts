@@ -21,7 +21,7 @@ const { mockPrivateRepo, mockTagRepo, mockLogger } = vi.hoisted(() => ({
 
 vi.mock('@/shared/lib/db', () => ({
   withTenantUser: vi.fn(
-    async (_tenantId: string, _userId: string, fn: (tx: never) => unknown) =>
+    async (_tenantId: string, _userId: string, _role: string, fn: (tx: never) => unknown) =>
       fn({} as never)
   ),
 }));
@@ -44,7 +44,7 @@ import {
   InvalidTagReferenceError,
 } from '@/features/journal/lib/errors';
 
-const ctx = { userId: 'user-1', tenantId: 'tenant-1' };
+const ctx = { userId: 'user-1', tenantId: 'tenant-1', roles: ['teacher'] };
 
 describe('JournalEntryService.createEntry', () => {
   beforeEach(() => {

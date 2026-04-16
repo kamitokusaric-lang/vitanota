@@ -2,9 +2,7 @@
 import { useRouter } from 'next/router';
 import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
-import type { GetServerSideProps } from 'next';
-import { getServerSession } from 'next-auth';
-import { getAuthOptions } from '@/features/auth/lib/auth-options';
+import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
@@ -122,18 +120,13 @@ export default function EditJournalPage({
   );
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const authOptions = await getAuthOptions();
-  const session = await getServerSession(context.req, context.res, authOptions);
-
-  if (!session) {
-    return { redirect: { destination: '/auth/signin', permanent: false } };
-  }
-
-  const id = context.params?.id;
-  if (typeof id !== 'string') {
-    return { notFound: true };
-  }
-
-  return { props: { session, entryId: id } };
-};
+export const getServerSideProps = withAuthSSR<{ entryId: string }>({
+  requireRole: 'teacher',
+  inner: async (ctx) => {
+    const id = ctx.params?.id;
+    if (typeof id !== 'string') {
+      return { notFound: true as const };
+    }
+    return { props: { entryId: id } };
+  },
+});

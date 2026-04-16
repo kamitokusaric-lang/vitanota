@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import type { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
+// system_admin は tenantId を持たないため withAuthSSR（tenantId 必須チェックあり）は使わない
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Button } from '@/shared/components/Button';

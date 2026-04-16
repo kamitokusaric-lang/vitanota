@@ -112,6 +112,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: RLS policy sync check
+        run: pnpm rls:check
+
       - name: Unit tests
         run: pnpm test:coverage
 
@@ -200,9 +203,17 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/vitanota_test
+      # アプリは非特権ロール vitanota_app で接続（0008 マイグレーションで作成）
+      RDS_PROXY_ENDPOINT: localhost
+      DB_USER: vitanota_app
+      DB_NAME: vitanota_test
+      DB_PASSWORD: vitanota_app_local
       NEXTAUTH_SECRET: e2e-test-secret-32-bytes-minimum-length
       NEXTAUTH_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: ci-dummy
+      GOOGLE_CLIENT_SECRET: ci-dummy
       E2E_TEST_MODE: 'true'
+      SKIP_SECRETS_MANAGER: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1

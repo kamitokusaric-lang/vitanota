@@ -2,6 +2,7 @@
 // ビジネスロジック層：複数 Repository を跨ぐ操作を集約し、
 // トランザクション境界（withTenantUser）と監査ログを管理する。
 import { withTenantUser } from '@/shared/lib/db';
+import { pickDbRole } from './apiHelpers';
 import { LogEvents, logEvent, logWarnEvent } from '@/shared/lib/log-events';
 import {
   privateJournalRepo,
@@ -19,6 +20,7 @@ import type { JournalEntry } from '@/db/schema';
 export interface ServiceContext {
   userId: string;
   tenantId: string;
+  roles: string[];
 }
 
 export class JournalEntryService {
@@ -33,7 +35,7 @@ export class JournalEntryService {
     params: CreateEntryParams,
     ctx: ServiceContext
   ): Promise<JournalEntry> {
-    return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       // タグ検証（クロステナント防止・アプリ層チェック）
       // SP-U02-04 Layer 8 の複合 FK でも同じエラーになるが、より明示的なエラーを返す
       if (params.tagIds.length > 0) {
@@ -78,7 +80,7 @@ export class JournalEntryService {
     params: UpdateEntryParams,
     ctx: ServiceContext
   ): Promise<JournalEntry> {
-    return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       // タグ更新時の検証
       if (params.tagIds !== undefined && params.tagIds.length > 0) {
         const validIds = await tagRepo.findValidTagIds(tx, params.tagIds, ctx);
@@ -114,7 +116,7 @@ export class JournalEntryService {
    * 所有者検証は二重化、journal_entry_tags は複合 FK の CASCADE で自動削除
    */
   async deleteEntry(id: string, ctx: ServiceContext): Promise<void> {
-    return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const deleted = await privateJournalRepo.delete(tx, id, ctx);
       if (!deleted) {
         throw new JournalNotFoundError();
@@ -135,7 +137,7 @@ export class JournalEntryService {
     id: string,
     ctx: ServiceContext
   ): Promise<JournalEntry> {
-    return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const entry = await privateJournalRepo.findById(tx, id, ctx);
       if (!entry) {
         throw new JournalNotFoundError();
@@ -160,7 +162,7 @@ export class JournalEntryService {
     ctx: ServiceContext,
     opts: { limit: number; offset: number }
   ): Promise<JournalEntry[]> {
-    return withTenantUser(ctx.tenantId, ctx.userId, async (tx) => {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const entries = await privateJournalRepo.findMine(tx, opts, ctx);
 
       logEvent(LogEvents.JournalEntryListRead, {

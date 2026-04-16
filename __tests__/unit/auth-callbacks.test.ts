@@ -3,8 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // DB モジュールをモック（Auth コールバックのビジネスロジックのみテスト）
 vi.mock('@/shared/lib/db', () => ({
   getDb: vi.fn(),
-  withTenant: vi.fn(),
+  withTenantUser: vi.fn(),
   withSystemAdmin: vi.fn(),
+  withSessionBootstrap: vi.fn(
+    async (_userId: string, fn: (tx: never) => unknown) => fn({} as never)
+  ),
 }));
 
 vi.mock('@/shared/lib/secrets', () => ({

@@ -18,6 +18,14 @@ export interface AuthContext {
   roles: string[];
 }
 
+// RLS の app.role に設定するロールを ctx.roles から選択する
+// school_admin > teacher の優先順（より広い権限を持つロールを優先）
+export function pickDbRole(ctx: AuthContext): string {
+  if (ctx.roles.includes('school_admin')) return 'school_admin';
+  if (ctx.roles.includes('teacher')) return 'teacher';
+  return ctx.roles[0] ?? 'teacher';
+}
+
 /**
  * セッションから認証コンテキストを取得する
  * - セッションなし → 401

@@ -15,7 +15,7 @@ const { mockTagRepo, mockLogger } = vi.hoisted(() => ({
 
 vi.mock('@/shared/lib/db', () => ({
   withTenantUser: vi.fn(
-    async (_tenantId: string, _userId: string, fn: (tx: never) => unknown) =>
+    async (_tenantId: string, _userId: string, _role: string, fn: (tx: never) => unknown) =>
       fn({} as never)
   ),
 }));

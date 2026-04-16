@@ -1,9 +1,7 @@
 // /journal/new - 新規エントリ作成ページ（US-T-010）
 import { useRouter } from 'next/router';
 import { useSWRConfig } from 'swr';
-import type { GetServerSideProps } from 'next';
-import { getServerSession } from 'next-auth';
-import { getAuthOptions } from '@/features/auth/lib/auth-options';
+import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
@@ -58,13 +56,4 @@ export default function NewJournalPage({ session }: NewJournalPageProps) {
   );
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const authOptions = await getAuthOptions();
-  const session = await getServerSession(context.req, context.res, authOptions);
-
-  if (!session) {
-    return { redirect: { destination: '/auth/signin', permanent: false } };
-  }
-
-  return { props: { session } };
-};
+export const getServerSideProps = withAuthSSR({ requireRole: 'teacher' });

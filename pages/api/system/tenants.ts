@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
-import { getDb, withSystemAdmin } from '@/shared/lib/db';
+import { getDb, withSystemAdmin, withTenantUser } from '@/shared/lib/db';
 import { tenants } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
 import { tagRepo } from '@/features/journal/lib/tagRepository';
@@ -79,19 +79,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // NFR-U02-03: テナント作成と同一トランザクション内でデフォルトタグをシード
       // これにより「テナントは作成されたがタグ 0 件」という中間状態を防ぐ
-      const { newTenant, seededTags } = await db.transaction(async (tx) => {
+      // system_admin 権限でテナント作成 → タグシードを一括実行
+      const { newTenant, seededTags } = await withSystemAdmin(session.user.userId, async (tx) => {
         const [created] = await tx
           .insert(tenants)
           .values({ name, slug })
           .returning();
 
-        // RLS セッション変数を設定してからタグをシード
-        // tags テーブルには RLS ポリシーが設定されているため必須
+        // タグシードは新テナントのスコープで実行
+        // system_admin は全テーブルアクセス可能なのでここで tenant_id を設定
         await tx.execute(
           sql`SELECT set_config('app.tenant_id', ${created.id}, true)`
-        );
-        await tx.execute(
-          sql`SELECT set_config('app.user_id', ${session.user.userId}, true)`
         );
 
         const tags = await tagRepo.seedSystemDefaults(

@@ -5,7 +5,7 @@ import type { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { eq } from 'drizzle-orm';
-import { getDb } from '@/shared/lib/db';
+import { getDb, withSessionBootstrap } from '@/shared/lib/db';
 import {
   users,
   userTenantRoles,
@@ -114,14 +114,16 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
           // ここでは expires のみで十分（maxAge 8h で絶対最大寿命を制御）
           // より厳密なアイドルタイムアウトは Step 後続で middleware に実装
 
-          // ロールとテナント情報を取得
-          const roleRows = await db
-            .select({
-              tenantId: userTenantRoles.tenantId,
-              role: userTenantRoles.role,
-            })
-            .from(userTenantRoles)
-            .where(eq(userTenantRoles.userId, user.id));
+          // ロールとテナント情報を取得（bootstrap ロールで自分の行だけ読む）
+          const roleRows = await withSessionBootstrap(user.id, async (tx) => {
+            return tx
+              .select({
+                tenantId: userTenantRoles.tenantId,
+                role: userTenantRoles.role,
+              })
+              .from(userTenantRoles)
+              .where(eq(userTenantRoles.userId, user.id));
+          });
 
           const roles = roleRows.map((r) => r.role as Role);
           const tenantId = roleRows.find((r) => r.tenantId !== null)?.tenantId ?? null;

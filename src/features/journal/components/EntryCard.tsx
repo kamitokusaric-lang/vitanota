@@ -10,7 +10,7 @@ export interface EntryCardData {
   createdAt: string | Date;
   isPublic?: boolean;  // マイ記録では必要、共有タイムラインでは undefined
   authorName?: string;  // JOIN 済みの投稿者名
-  tags?: Array<Pick<Tag, 'id' | 'name' | 'isEmotion'>>;
+  tags?: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
 }
 
 interface EntryCardProps {
@@ -79,7 +79,7 @@ export function EntryCard({
               key={tag.id}
               className={[
                 'rounded-full px-2 py-0.5 text-[10px]',
-                tag.isEmotion
+                tag.type === 'emotion'
                   ? 'bg-pink-50 text-pink-700'
                   : 'bg-gray-100 text-gray-700',
               ].join(' ')}

@@ -194,10 +194,10 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
       return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
     });
-    const emotions = seeded.filter((t) => t.isEmotion);
-    const tasks = seeded.filter((t) => !t.isEmotion);
-    expect(emotions).toHaveLength(5);
-    expect(tasks).toHaveLength(3);
+    const emotions = seeded.filter((t) => t.type === 'emotion');
+    const tasks = seeded.filter((t) => t.type === 'context');
+    expect(emotions).toHaveLength(15);
+    expect(tasks).toHaveLength(8);
   });
 
   it('seeded tag names match SYSTEM_DEFAULT_TAGS constant', async () => {
@@ -229,7 +229,8 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tx.insert(tags).values({
         tenantId: tenant.id,
         name: 'うれしい',
-        isEmotion: true,
+        type: 'emotion',
+        category: 'positive',
         isSystemDefault: false,
         sortOrder: 0,
       });

@@ -1,5 +1,6 @@
 // LoginPage: Google OAuth ログインのエントリポイント
 import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { signIn, getSession } from 'next-auth/react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
@@ -13,9 +14,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 interface SignInPageProps {
   error?: string;
+  isDev?: boolean;
 }
 
-export default function SignInPage({ error }: SignInPageProps) {
+export default function SignInPage({ error, isDev }: SignInPageProps) {
   const errorMessage = error
     ? (ERROR_MESSAGES[error] ?? 'ログインに失敗しました。再度お試しください')
     : null;
@@ -47,6 +49,15 @@ export default function SignInPage({ error }: SignInPageProps) {
         >
           Google でログイン
         </Button>
+
+        {isDev && (
+          <Link
+            href="/auth/dev-login"
+            className="mt-4 block text-center text-sm text-gray-400 hover:text-blue-600"
+          >
+            Dev Login (開発環境専用)
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -59,5 +70,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   const error = (context.query.error as string | undefined) ?? null;
-  return { props: { ...(error ? { error } : {}) } };
+  const isDev = process.env.NODE_ENV === 'development';
+  return { props: { ...(error ? { error } : {}), ...(isDev ? { isDev } : {}) } };
 };

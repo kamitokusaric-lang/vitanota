@@ -78,13 +78,13 @@ describe('createEntrySchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('11件の tagIds を拒否する', () => {
+    it('tagIds の上限がない（11件以上も受け入れる）', () => {
       const result = createEntrySchema.safeParse({
         content: 'test',
         tagIds: Array.from({ length: 11 }, () => validUuid),
         isPublic: true,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('不正なUUIDの tagIds を拒否する', () => {
@@ -153,11 +153,11 @@ describe('updateEntrySchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('update でも 11件の tagIds を拒否する', () => {
+  it('update でも tagIds の上限がない', () => {
     const result = updateEntrySchema.safeParse({
       tagIds: Array.from({ length: 11 }, () => validUuid2),
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 

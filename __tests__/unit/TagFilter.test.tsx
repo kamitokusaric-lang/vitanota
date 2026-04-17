@@ -8,7 +8,8 @@ function makeTag(overrides: Partial<Tag> = {}): Tag {
     id: overrides.id ?? 'tag-1',
     tenantId: 'tenant-1',
     name: overrides.name ?? 'default',
-    isEmotion: overrides.isEmotion ?? false,
+    type: overrides.type ?? 'context',
+    category: overrides.category ?? null,
     isSystemDefault: false,
     sortOrder: overrides.sortOrder ?? 0,
     createdBy: null,
@@ -32,51 +33,25 @@ describe('TagFilter', () => {
     ]);
   });
 
-  it('20件以下ならフィルタ入力は表示しない', () => {
-    const tags = Array.from({ length: 15 }, (_, i) =>
+  it('全タグが表示される（上限なし）', () => {
+    const tags = Array.from({ length: 30 }, (_, i) =>
+      makeTag({ id: `t${i}`, name: `tag${i}`, sortOrder: i })
+    );
+    render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(30);
+  });
+
+  it('検索テキストボックスは表示されない', () => {
+    const tags = Array.from({ length: 30 }, (_, i) =>
       makeTag({ id: `t${i}`, name: `tag${i}` })
     );
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
     expect(screen.queryByTestId('tag-filter-input')).toBeNull();
   });
 
-  it('20件超ならフィルタ入力が表示される', () => {
-    const tags = Array.from({ length: 25 }, (_, i) =>
-      makeTag({ id: `t${i}`, name: `tag${i}` })
-    );
-    render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
-    expect(screen.getByTestId('tag-filter-input')).toBeTruthy();
-  });
-
-  it('初期表示は最大20件', () => {
-    const tags = Array.from({ length: 30 }, (_, i) =>
-      makeTag({ id: `t${i}`, name: `tag${i}`, sortOrder: i })
-    );
-    render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
-    const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(20);
-  });
-
-  it('フィルタ入力時は includes で絞り込み（20件制限なし）', () => {
-    const tags = Array.from({ length: 30 }, (_, i) =>
-      makeTag({ id: `t${i}`, name: `abc${i}`, sortOrder: i })
-    );
-    render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
-    const input = screen.getByTestId('tag-filter-input');
-    fireEvent.change(input, { target: { value: 'abc2' } });
-    // abc2, abc20..abc29 の 11 件
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(11);
-  });
-
-  it('該当なしの場合は「該当するタグがありません」', () => {
-    const tags = Array.from({ length: 25 }, (_, i) =>
-      makeTag({ id: `t${i}`, name: `abc${i}` })
-    );
-    render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
-    fireEvent.change(screen.getByTestId('tag-filter-input'), {
-      target: { value: 'xyz' },
-    });
+  it('タグが0件の場合は「該当するタグがありません」', () => {
+    render(<TagFilter tags={[]} selectedTagIds={[]} onChange={vi.fn()} />);
     expect(screen.getByText('該当するタグがありません')).toBeTruthy();
   });
 
@@ -101,17 +76,17 @@ describe('TagFilter', () => {
     expect(onChange).toHaveBeenCalledWith(['t2']);
   });
 
-  it('10件選択済みの状態で11件目を選択しても onChange は呼ばれない', () => {
+  it('タグ選択に上限がない', () => {
     const onChange = vi.fn();
-    const selected = Array.from({ length: 10 }, (_, i) => `t${i}`);
-    const tags = Array.from({ length: 15 }, (_, i) =>
+    const selected = Array.from({ length: 15 }, (_, i) => `t${i}`);
+    const tags = Array.from({ length: 20 }, (_, i) =>
       makeTag({ id: `t${i}`, name: `tag${i}` })
     );
     render(
       <TagFilter tags={tags} selectedTagIds={selected} onChange={onChange} />
     );
-    fireEvent.click(screen.getByTestId('tag-filter-t10'));
-    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('tag-filter-t15'));
+    expect(onChange).toHaveBeenCalledWith([...selected, 't15']);
   });
 
   it('選択件数カウンターが表示される', () => {
@@ -123,7 +98,18 @@ describe('TagFilter', () => {
       <TagFilter tags={tags} selectedTagIds={['t1', 't2']} onChange={vi.fn()} />
     );
     expect(screen.getByTestId('tag-filter-count').textContent).toContain(
-      '2 / 10'
+      '2 件選択中'
     );
+  });
+
+  it('感情タグとコンテキストタグがグループ分けされる', () => {
+    const tags = [
+      makeTag({ id: 't1', name: '喜び', type: 'emotion', category: 'positive', sortOrder: 1 }),
+      makeTag({ id: 't2', name: '不安', type: 'emotion', category: 'negative', sortOrder: 2 }),
+      makeTag({ id: 't3', name: '授業', type: 'context', sortOrder: 3 }),
+    ];
+    render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
+    expect(screen.getByTestId('entry-form-emotion-tags')).toBeTruthy();
+    expect(screen.getByTestId('entry-form-context-tags')).toBeTruthy();
   });
 });

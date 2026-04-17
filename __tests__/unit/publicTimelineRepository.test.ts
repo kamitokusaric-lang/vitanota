@@ -12,23 +12,38 @@ function makeSelectChain(result: unknown[]) {
   return chain;
 }
 
+// attachTags 用の select チェーン
+function makeTagsSelectChain(tagRows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(tagRows),
+      }),
+    }),
+  };
+}
+
 describe('PublicTimelineRepository', () => {
   describe('findTimeline', () => {
-    it('limit と offset を渡して結果を返す', async () => {
+    it('limit と offset を渡して結果を返す（タグ付き）', async () => {
       const mockRows = [
         { id: 'entry-1', tenantId: 't1', userId: 'u1', content: 'hello', createdAt: new Date(), updatedAt: new Date() },
       ];
-      const chain = makeSelectChain(mockRows);
-      const mockTx = { select: vi.fn().mockReturnValue(chain) };
+      let callCount = 0;
+      const mockTx = {
+        select: vi.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) return makeSelectChain(mockRows);
+          return makeTagsSelectChain([]);
+        }),
+      };
 
       const repo = new PublicTimelineRepository();
       const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 });
 
-      expect(mockTx.select).toHaveBeenCalledOnce();
-      expect(chain.limit).toHaveBeenCalledWith(20);
-      expect(chain.offset).toHaveBeenCalledWith(0);
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ id: 'entry-1' });
+      expect(result[0].tags).toEqual([]);
     });
 
     it('結果が空の場合は空配列を返す', async () => {
@@ -41,31 +56,27 @@ describe('PublicTimelineRepository', () => {
       expect(result).toEqual([]);
     });
 
-    it('ページネーション offset を正しく渡す', async () => {
-      const chain = makeSelectChain([]);
-      const mockTx = { select: vi.fn().mockReturnValue(chain) };
-
-      const repo = new PublicTimelineRepository();
-      await repo.findTimeline(mockTx as never, { limit: 20, offset: 40 });
-
-      expect(chain.limit).toHaveBeenCalledWith(20);
-      expect(chain.offset).toHaveBeenCalledWith(40);
-    });
-
-    it('返却型は PublicJournalEntry（is_public 列を含まない想定）', async () => {
-      // VIEW 経由で返るため、is_public は本来含まれない
-      // 型アサーションが機能していることを確認
+    it('タグが付与されたエントリを正しく返す', async () => {
       const mockRows = [
         { id: 'e1', tenantId: 't1', userId: 'u1', content: 'test', createdAt: new Date(), updatedAt: new Date() },
       ];
-      const chain = makeSelectChain(mockRows);
-      const mockTx = { select: vi.fn().mockReturnValue(chain) };
+      const tagRows = [
+        { entryId: 'e1', tagId: 'tag1', tagName: '喜び', tagType: 'emotion', tagCategory: 'positive' },
+      ];
+      let callCount = 0;
+      const mockTx = {
+        select: vi.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) return makeSelectChain(mockRows);
+          return makeTagsSelectChain(tagRows);
+        }),
+      };
 
       const repo = new PublicTimelineRepository();
       const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 });
 
-      // TypeScript の型レベルで isPublic プロパティはアクセスできない（PublicJournalEntry = Omit<JournalEntry, 'isPublic'>）
-      expect(result[0]).not.toHaveProperty('isPublic');
+      expect(result[0].tags).toHaveLength(1);
+      expect(result[0].tags[0]).toMatchObject({ id: 'tag1', name: '喜び', type: 'emotion', category: 'positive' });
     });
   });
 

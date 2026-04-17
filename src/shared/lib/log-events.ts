@@ -33,7 +33,7 @@ export const LogEvents = {
   // Unit-02: バリデーション/セキュリティ警告
   JournalEntryCreateInvalidTags: 'journal_entry_create_invalid_tags',
   JournalEntryUpdateNotFound: 'journal_entry_update_not_found',
-  TagDeleteForbidden: 'tag_delete_forbidden',
+  TagForbidden: 'tag_forbidden',
 
   // Unit-01/02: Session 系（SP-07）
   SessionCreated: 'session_created',
@@ -85,7 +85,8 @@ interface JournalEntryListReadPayload extends BaseEventFields {
 interface TagCreatedPayload extends BaseEventFields {
   tagId: string;
   name: string;
-  isEmotion: boolean;
+  type: 'emotion' | 'context';
+  category: 'positive' | 'negative' | 'neutral' | null;
 }
 
 interface TagDeletedPayload extends BaseEventFields {
@@ -105,8 +106,9 @@ interface JournalEntryUpdateNotFoundPayload extends BaseEventFields {
   entryId: string;
 }
 
-interface TagDeleteForbiddenPayload extends BaseEventFields {
-  tagId: string;
+interface TagForbiddenPayload extends BaseEventFields {
+  tagId?: string;
+  action: 'create' | 'delete';
   roles: string[];
 }
 
@@ -141,7 +143,7 @@ export interface LogEventPayloads {
   [LogEvents.TagListRead]: TagListReadPayload;
   [LogEvents.JournalEntryCreateInvalidTags]: JournalEntryCreateInvalidTagsPayload;
   [LogEvents.JournalEntryUpdateNotFound]: JournalEntryUpdateNotFoundPayload;
-  [LogEvents.TagDeleteForbidden]: TagDeleteForbiddenPayload;
+  [LogEvents.TagForbidden]: TagForbiddenPayload;
   [LogEvents.SessionCreated]: SessionCreatedPayload;
   [LogEvents.SessionRevoked]: SessionRevokedPayload;
   [LogEvents.SessionExpired]: SessionExpiredPayload;

@@ -229,17 +229,36 @@ describe('PrivateJournalRepository.findById', () => {
 });
 
 describe('PrivateJournalRepository.findMine', () => {
-  it('ページネーション付きで自分のエントリを取得する', async () => {
+  it('ページネーション付きで自分のエントリを取得する（タグ付き）', async () => {
     const rows = [
       { id: 'e1', userId: 'user-1', tenantId: 'tenant-1', content: 'a', isPublic: false, createdAt: new Date(), updatedAt: new Date() },
       { id: 'e2', userId: 'user-1', tenantId: 'tenant-1', content: 'b', isPublic: true, createdAt: new Date(), updatedAt: new Date() },
     ];
-    const mockTx = { select: vi.fn().mockReturnValue(makeSelectListChain(rows)) };
+    // findMine の select チェーン + attachTags の select チェーン
+    let callCount = 0;
+    const mockTx = {
+      select: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // findMine 本体
+          return makeSelectListChain(rows);
+        }
+        // attachTags: タグ JOIN クエリ（空配列を返す）
+        return {
+          from: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        };
+      }),
+    };
 
     const repo = new PrivateJournalRepository();
     const result = await repo.findMine(mockTx as never, { limit: 20, offset: 0 }, ctx);
 
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe('e1');
+    expect(result[0].tags).toEqual([]);
   });
 });

@@ -4,34 +4,36 @@ import { createTagSchema, tagIdParamSchema } from '@/features/journal/schemas/ta
 describe('createTagSchema', () => {
   describe('正常系', () => {
     it('最小1文字のタグ名を受け入れる', () => {
-      const result = createTagSchema.safeParse({ name: 'a', isEmotion: false });
+      const result = createTagSchema.safeParse({ name: 'a', type: 'context' });
       expect(result.success).toBe(true);
     });
 
     it('最大50文字のタグ名を受け入れる', () => {
       const result = createTagSchema.safeParse({
         name: 'x'.repeat(50),
-        isEmotion: false,
+        type: 'context',
       });
       expect(result.success).toBe(true);
     });
 
-    it('isEmotion のデフォルト値は false', () => {
+    it('type のデフォルト値は context', () => {
       const result = createTagSchema.safeParse({ name: 'test' });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.isEmotion).toBe(false);
+        expect(result.data.type).toBe('context');
       }
     });
 
-    it('isEmotion=true を受け入れる', () => {
+    it('type=emotion + category を受け入れる', () => {
       const result = createTagSchema.safeParse({
         name: 'うれしい',
-        isEmotion: true,
+        type: 'emotion',
+        category: 'positive',
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.isEmotion).toBe(true);
+        expect(result.data.type).toBe('emotion');
+        expect(result.data.category).toBe('positive');
       }
     });
 

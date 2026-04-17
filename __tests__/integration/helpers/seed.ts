@@ -35,7 +35,8 @@ export interface SeededTag {
   id: string;
   tenantId: string;
   name: string;
-  isEmotion: boolean;
+  type: 'emotion' | 'context';
+  category: 'positive' | 'negative' | 'neutral' | null;
 }
 
 let counter = 0;
@@ -124,7 +125,8 @@ export async function seedTag(
     tenantId: string;
     userId: string;
     name?: string;
-    isEmotion?: boolean;
+    type?: 'emotion' | 'context';
+    category?: 'positive' | 'negative' | 'neutral' | null;
   }
 ): Promise<SeededTag> {
   return db.transaction(async (tx) => {
@@ -136,7 +138,8 @@ export async function seedTag(
       .values({
         tenantId: params.tenantId,
         name: params.name ?? nextId('tag'),
-        isEmotion: params.isEmotion ?? false,
+        type: params.type ?? 'context',
+        category: params.category ?? null,
         isSystemDefault: false,
         sortOrder: 0,
         createdBy: params.userId,
@@ -146,7 +149,8 @@ export async function seedTag(
       id: t.id,
       tenantId: t.tenantId,
       name: t.name,
-      isEmotion: t.isEmotion,
+      type: t.type,
+      category: t.category,
     };
   });
 }

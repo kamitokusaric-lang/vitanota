@@ -13,9 +13,20 @@ export const createTagSchema = z
       .trim()
       .min(1, 'タグ名を入力してください')
       .max(50, 'タグ名は50文字以内で入力してください')
-      .openapi({ example: 'うれしい' }),
-    isEmotion: z.boolean().default(false).openapi({ example: true }),
+      .openapi({ example: '喜び' }),
+    type: z.enum(['emotion', 'context']).default('context').openapi({ example: 'emotion' }),
+    category: z
+      .enum(['positive', 'negative', 'neutral'])
+      .nullable()
+      .optional()
+      .openapi({ example: 'positive' }),
   })
+  .refine(
+    (data) =>
+      (data.type === 'emotion' && data.category != null) ||
+      (data.type === 'context' && (data.category == null || data.category === undefined)),
+    { message: '感情タグにはカテゴリが必須です。コンテキストタグにはカテゴリを指定できません。' }
+  )
   .openapi('CreateTagInput');
 
 export type CreateTagInput = z.infer<typeof createTagSchema>;

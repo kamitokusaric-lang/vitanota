@@ -54,13 +54,16 @@ describe('Layout', () => {
     expect(screen.getByTestId('nav-admin-link')).toBeInTheDocument();
   });
 
-  it('hides view switcher for single role user', () => {
+  it('shows teacher nav links for single teacher role', () => {
     render(
       <Layout session={baseSession}>
         <div />
       </Layout>
     );
-    expect(screen.queryByTestId('nav-teacher-link')).not.toBeInTheDocument();
+    // Unit-03: 教員は常に「タイムライン」「感情傾向」リンクが表示される
+    expect(screen.getByTestId('nav-journal-link')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-teacher-link')).toBeInTheDocument();
+    // 管理者リンクは非表示
     expect(screen.queryByTestId('nav-admin-link')).not.toBeInTheDocument();
   });
 });

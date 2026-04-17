@@ -39,14 +39,23 @@ describe('TagService.createTag', () => {
     vi.clearAllMocks();
   });
 
-  it('teacher ロールでもタグを作成できる', async () => {
-    const expected = { id: 'tag-new', name: 'カスタム', isEmotion: false };
+  it('teacher ロールではタグ作成が拒否される', async () => {
+    const service = new TagService();
+    await expect(
+      service.createTag({ name: 'カスタム', type: 'context' }, teacherCtx)
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(mockTagRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('school_admin ロールでタグを作成できる', async () => {
+    const expected = { id: 'tag-new', name: 'カスタム', type: 'context', category: null };
     mockTagRepo.create.mockResolvedValue(expected);
 
     const service = new TagService();
     const result = await service.createTag(
-      { name: 'カスタム', isEmotion: false },
-      teacherCtx
+      { name: 'カスタム', type: 'context' },
+      adminCtx
     );
 
     expect(result).toEqual(expected);
@@ -89,7 +98,8 @@ describe('TagService.deleteTag', () => {
     expect(mockTagRepo.delete).not.toHaveBeenCalled();
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: 'tag_delete_forbidden',
+        event: 'tag_forbidden',
+        action: 'delete',
         roles: ['teacher'],
       })
     );

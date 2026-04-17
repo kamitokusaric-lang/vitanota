@@ -7,7 +7,8 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 extendZodWithOpenApi(z);
 
 // エントリ作成入力
-// NFR-U02-05: content 200文字・tagIds max10
+// NFR-U02-05: content 200文字
+// Unit-03: tagIds の上限撤廃（タグはシステム定義 23個 + 管理者追加分）
 export const createEntrySchema = z
   .object({
     content: z
@@ -18,7 +19,6 @@ export const createEntrySchema = z
       .openapi({ example: '今日の授業の振り返り' }),
     tagIds: z
       .array(z.string().uuid('不正なタグIDです'))
-      .max(10, 'タグは10件まで選択できます')
       .openapi({ example: [] }),
     isPublic: z.boolean().openapi({ example: true }),
   })

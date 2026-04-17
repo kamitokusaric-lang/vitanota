@@ -2,10 +2,11 @@
 // このクラスは public_journal_entries VIEW のみを SELECT し、
 // 型ブランド PublicJournalEntry を返却する。
 // create/update/delete/findById/findMine は意図的に存在しない。
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { publicJournalEntries } from '@/db/schema';
+import { publicJournalEntries, journalEntryTags, tags } from '@/db/schema';
 import type * as schema from '@/db/schema';
+import type { Tag } from '@/db/schema';
 import type { PublicJournalEntry } from '@/shared/types/brand';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
@@ -15,8 +16,12 @@ export interface TimelineOptions {
   offset: number;
 }
 
+export type PublicEntryWithTags = PublicJournalEntry & {
+  tags: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
+};
+
 export interface TimelineResult {
-  entries: PublicJournalEntry[];
+  entries: PublicEntryWithTags[];
   total: number;
 }
 
@@ -29,16 +34,39 @@ export class PublicTimelineRepository {
   async findTimeline(
     tx: DrizzleDb,
     opts: TimelineOptions
-  ): Promise<PublicJournalEntry[]> {
+  ): Promise<PublicEntryWithTags[]> {
     const rows = await tx
       .select()
       .from(publicJournalEntries)
       .orderBy(desc(publicJournalEntries.createdAt))
       .limit(opts.limit)
       .offset(opts.offset);
-    // VIEW 経由で is_public 列が存在しない
-    // 型アサーションで PublicJournalEntry ブランドを付与
-    return rows as unknown as PublicJournalEntry[];
+
+    const entries = rows as unknown as PublicJournalEntry[];
+    if (entries.length === 0) return [];
+
+    // タグを別クエリで取得して付与
+    const entryIds = entries.map((e) => e.id);
+    const tagRows = await tx
+      .select({
+        entryId: journalEntryTags.entryId,
+        tagId: tags.id,
+        tagName: tags.name,
+        tagType: tags.type,
+        tagCategory: tags.category,
+      })
+      .from(journalEntryTags)
+      .innerJoin(tags, eq(tags.id, journalEntryTags.tagId))
+      .where(inArray(journalEntryTags.entryId, entryIds));
+
+    const tagMap = new Map<string, Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>>();
+    for (const row of tagRows) {
+      const list = tagMap.get(row.entryId) ?? [];
+      list.push({ id: row.tagId, name: row.tagName, type: row.tagType, category: row.tagCategory });
+      tagMap.set(row.entryId, list);
+    }
+
+    return entries.map((e) => ({ ...e, tags: tagMap.get(e.id) ?? [] }));
   }
 
   /**

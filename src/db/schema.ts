@@ -1,6 +1,7 @@
 import {
   pgTable,
   pgView,
+  pgEnum,
   uuid,
   varchar,
   text,
@@ -14,6 +15,10 @@ import {
   inet,
 } from 'drizzle-orm/pg-core';
 import { sql, eq } from 'drizzle-orm';
+
+// ── enums（Unit-03） ─────────────────────────────────────────
+export const tagTypeEnum = pgEnum('tag_type', ['emotion', 'context']);
+export const emotionCategoryEnum = pgEnum('emotion_category', ['positive', 'negative', 'neutral']);
 
 // ── tenants ────────────────────────────────────────────────────
 export const tenants = pgTable('tenants', {
@@ -177,7 +182,8 @@ export const journalEntries = pgTable(
 );
 
 // ── tags ───────────────────────────────────────────────────────
-// 感情タグ・業務タグを is_emotion フラグで統合
+// 感情タグ (type='emotion') とコンテキストタグ (type='context') を type enum で分類
+// 感情タグには category (positive/negative/neutral) を付与
 export const tags = pgTable(
   'tags',
   {
@@ -186,7 +192,8 @@ export const tags = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 50 }).notNull(),
-    isEmotion: boolean('is_emotion').notNull().default(false),
+    type: tagTypeEnum('type').notNull().default('context'),
+    category: emotionCategoryEnum('category'),
     isSystemDefault: boolean('is_system_default').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     createdBy: uuid('created_by').references(() => users.id),
@@ -197,9 +204,9 @@ export const tags = pgTable(
     idTenantUnique: unique('tags_id_tenant_unique').on(table.id, table.tenantId),
     // テナント内でタグ名は一意（case-insensitive は migration で対応）
     tenantNameUnique: unique('tags_tenant_name_unique').on(table.tenantId, table.name),
-    tenantEmotionIdx: index('tags_tenant_emotion_idx').on(
+    tenantTypeIdx: index('tags_tenant_type_idx').on(
       table.tenantId,
-      table.isEmotion
+      table.type
     ),
   })
 );

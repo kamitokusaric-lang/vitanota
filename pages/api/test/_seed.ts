@@ -6,7 +6,7 @@
 //   POST /api/test/_seed { action: 'tenant', name }              テナント作成
 //   POST /api/test/_seed { action: 'user', tenantId, role, email, name }  ユーザー作成
 //   POST /api/test/_seed { action: 'entry', tenantId, userId, content, isPublic }  エントリ作成
-//   POST /api/test/_seed { action: 'tag', tenantId, userId, name, isEmotion }  タグ作成
+//   POST /api/test/_seed { action: 'tag', tenantId, userId, name, type, category }  タグ作成
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
@@ -47,7 +47,8 @@ const actionSchema = z.discriminatedUnion('action', [
     tenantId: z.string().uuid(),
     userId: z.string().uuid(),
     name: z.string(),
-    isEmotion: z.boolean(),
+    type: z.enum(['emotion', 'context']),
+    category: z.enum(['positive', 'negative', 'neutral']).nullable().optional(),
   }),
   z.object({
     action: z.literal('createSession'),
@@ -142,14 +143,15 @@ export default async function handler(
         return res.status(201).json({ entry: e });
       }
       case 'tag': {
-        const { tenantId, userId, name, isEmotion } = parsed.data;
+        const { tenantId, userId, name, type, category } = parsed.data;
         const t = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
           const [created] = await tx
             .insert(tags)
             .values({
               tenantId,
               name,
-              isEmotion,
+              type,
+              category: category ?? null,
               isSystemDefault: false,
               sortOrder: 0,
               createdBy: userId,

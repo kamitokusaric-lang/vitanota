@@ -4,11 +4,11 @@
 //
 // SP-U02-03: 所有者検証は API 層の明示 WHERE 句 + RLS の WITH CHECK で二重防御
 // R1 対策: 全メソッドがトランザクションを第一引数で受け取り、withTenantUser 内で呼ばれる前提
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { journalEntries, journalEntryTags } from '@/db/schema';
+import { journalEntries, journalEntryTags, tags } from '@/db/schema';
 import type * as schema from '@/db/schema';
-import type { JournalEntry } from '@/db/schema';
+import type { JournalEntry, Tag } from '@/db/schema';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -32,6 +32,39 @@ export interface UpdateEntryParams {
 export interface PaginationOptions {
   limit: number;
   offset: number;
+}
+
+export type EntryWithTags = JournalEntry & {
+  tags: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
+};
+
+async function attachTags(
+  tx: DrizzleDb,
+  entries: JournalEntry[]
+): Promise<EntryWithTags[]> {
+  if (entries.length === 0) return [];
+
+  const entryIds = entries.map((e) => e.id);
+  const rows = await tx
+    .select({
+      entryId: journalEntryTags.entryId,
+      tagId: tags.id,
+      tagName: tags.name,
+      tagType: tags.type,
+      tagCategory: tags.category,
+    })
+    .from(journalEntryTags)
+    .innerJoin(tags, eq(tags.id, journalEntryTags.tagId))
+    .where(inArray(journalEntryTags.entryId, entryIds));
+
+  const tagMap = new Map<string, Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>>();
+  for (const row of rows) {
+    const list = tagMap.get(row.entryId) ?? [];
+    list.push({ id: row.tagId, name: row.tagName, type: row.tagType, category: row.tagCategory });
+    tagMap.set(row.entryId, list);
+  }
+
+  return entries.map((e) => ({ ...e, tags: tagMap.get(e.id) ?? [] }));
 }
 
 export class PrivateJournalRepository {
@@ -171,7 +204,7 @@ export class PrivateJournalRepository {
     tx: DrizzleDb,
     opts: PaginationOptions,
     ctx: Context
-  ): Promise<JournalEntry[]> {
+  ): Promise<EntryWithTags[]> {
     const rows = await tx
       .select()
       .from(journalEntries)
@@ -185,7 +218,7 @@ export class PrivateJournalRepository {
       .limit(opts.limit)
       .offset(opts.offset);
 
-    return rows;
+    return attachTags(tx, rows);
   }
 }
 

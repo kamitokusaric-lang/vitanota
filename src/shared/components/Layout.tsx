@@ -29,16 +29,27 @@ export function Layout({ children, session }: LayoutProps) {
             vitanota
           </Link>
 
-          {/* 中央: ビュー切り替え（複数ロールの場合のみ） */}
-          {hasMultipleViews && (
-            <div className="flex gap-4 text-sm">
-              <Link
-                href="/dashboard/teacher"
-                className="text-gray-600 hover:text-blue-600"
-                data-testid="nav-teacher-link"
-              >
-                教員ビュー
-              </Link>
+          {/* 中央: ナビゲーションリンク */}
+          <div className="flex gap-4 text-sm">
+            {isTeacher && (
+              <>
+                <Link
+                  href="/journal"
+                  className="text-gray-600 hover:text-blue-600"
+                  data-testid="nav-journal-link"
+                >
+                  タイムライン
+                </Link>
+                <Link
+                  href="/dashboard/teacher"
+                  className="text-gray-600 hover:text-blue-600"
+                  data-testid="nav-teacher-link"
+                >
+                  感情傾向
+                </Link>
+              </>
+            )}
+            {hasMultipleViews && (
               <Link
                 href="/dashboard/admin"
                 className="text-gray-600 hover:text-blue-600"
@@ -46,8 +57,8 @@ export function Layout({ children, session }: LayoutProps) {
               >
                 管理者ビュー
               </Link>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* 右: ユーザー名 + ログアウト */}
           <div className="flex items-center gap-3 text-sm">

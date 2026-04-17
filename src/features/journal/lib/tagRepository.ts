@@ -1,6 +1,6 @@
-// Unit-02 TagRepository
+// Unit-02 TagRepository (Unit-03 で更新: type/category enum 対応)
 // タグの CRUD・システムデフォルトタグのシード・テナント内タグ一覧取得
-// is_emotion フラグで感情タグ・業務タグを統合管理
+// type enum (emotion/context) + category enum (positive/negative/neutral) で分類
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import { tags, journalEntryTags } from '@/db/schema';
@@ -16,19 +16,39 @@ export interface Context {
 
 export interface CreateTagParams {
   name: string;
-  isEmotion: boolean;
+  type: 'emotion' | 'context';
+  category?: 'positive' | 'negative' | 'neutral' | null;
 }
 
-// NFR-U02-03: テナント作成時にシードするシステムデフォルトタグ
+// NFR-U02-03 + Unit-03: テナント作成時にシードするシステムデフォルトタグ
 export const SYSTEM_DEFAULT_TAGS = [
-  { name: 'うれしい', isEmotion: true, sortOrder: 1 },
-  { name: 'つかれた', isEmotion: true, sortOrder: 2 },
-  { name: 'やってみた', isEmotion: true, sortOrder: 3 },
-  { name: '行き詰まり', isEmotion: true, sortOrder: 4 },
-  { name: '相談したい', isEmotion: true, sortOrder: 5 },
-  { name: '授業準備', isEmotion: false, sortOrder: 6 },
-  { name: '保護者対応', isEmotion: false, sortOrder: 7 },
-  { name: '行事準備', isEmotion: false, sortOrder: 8 },
+  // 感情タグ: positive
+  { name: '喜び', type: 'emotion' as const, category: 'positive' as const, sortOrder: 1 },
+  { name: '達成感', type: 'emotion' as const, category: 'positive' as const, sortOrder: 2 },
+  { name: '充実', type: 'emotion' as const, category: 'positive' as const, sortOrder: 3 },
+  { name: '安心', type: 'emotion' as const, category: 'positive' as const, sortOrder: 4 },
+  { name: '感謝', type: 'emotion' as const, category: 'positive' as const, sortOrder: 5 },
+  // 感情タグ: negative
+  { name: '不安', type: 'emotion' as const, category: 'negative' as const, sortOrder: 6 },
+  { name: 'ストレス', type: 'emotion' as const, category: 'negative' as const, sortOrder: 7 },
+  { name: '疲労', type: 'emotion' as const, category: 'negative' as const, sortOrder: 8 },
+  { name: '焦り', type: 'emotion' as const, category: 'negative' as const, sortOrder: 9 },
+  { name: '不満', type: 'emotion' as const, category: 'negative' as const, sortOrder: 10 },
+  // 感情タグ: neutral
+  { name: '忙しい', type: 'emotion' as const, category: 'neutral' as const, sortOrder: 11 },
+  { name: '混乱', type: 'emotion' as const, category: 'neutral' as const, sortOrder: 12 },
+  { name: '気づき', type: 'emotion' as const, category: 'neutral' as const, sortOrder: 13 },
+  { name: '無力感', type: 'emotion' as const, category: 'neutral' as const, sortOrder: 14 },
+  { name: 'もやもや', type: 'emotion' as const, category: 'neutral' as const, sortOrder: 15 },
+  // コンテキストタグ
+  { name: '授業', type: 'context' as const, category: null, sortOrder: 16 },
+  { name: '生徒対応', type: 'context' as const, category: null, sortOrder: 17 },
+  { name: '保護者対応', type: 'context' as const, category: null, sortOrder: 18 },
+  { name: '校務', type: 'context' as const, category: null, sortOrder: 19 },
+  { name: '会議', type: 'context' as const, category: null, sortOrder: 20 },
+  { name: '部活動', type: 'context' as const, category: null, sortOrder: 21 },
+  { name: '事務作業', type: 'context' as const, category: null, sortOrder: 22 },
+  { name: 'その他', type: 'context' as const, category: null, sortOrder: 23 },
 ] as const;
 
 export class TagRepository {
@@ -43,7 +63,8 @@ export class TagRepository {
         SYSTEM_DEFAULT_TAGS.map((t) => ({
           tenantId,
           name: t.name,
-          isEmotion: t.isEmotion,
+          type: t.type,
+          category: t.category,
           isSystemDefault: true,
           sortOrder: t.sortOrder,
           createdBy: null,
@@ -67,7 +88,8 @@ export class TagRepository {
       .values({
         tenantId: ctx.tenantId,
         name: params.name,
-        isEmotion: params.isEmotion,
+        type: params.type,
+        category: params.type === 'emotion' ? params.category : null,
         isSystemDefault: false,
         sortOrder: 0,
         createdBy: ctx.userId,

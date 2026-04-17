@@ -84,8 +84,8 @@ describe('EntryCard', () => {
       <EntryCard
         entry={makeEntry({
           tags: [
-            { id: 't1', name: 'うれしい', isEmotion: true },
-            { id: 't2', name: '授業準備', isEmotion: false },
+            { id: 't1', name: 'うれしい', type: 'emotion' as const, category: 'positive' as const },
+            { id: 't2', name: '授業準備', type: 'context' as const, category: null },
           ],
         })}
       />

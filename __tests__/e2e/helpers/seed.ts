@@ -26,7 +26,8 @@ export interface SeedTag {
   id: string;
   tenantId: string;
   name: string;
-  isEmotion: boolean;
+  type: 'emotion' | 'context';
+  category: 'positive' | 'negative' | 'neutral' | null;
 }
 
 export class SeedClient {
@@ -85,13 +86,15 @@ export class SeedClient {
     tenantId: string;
     userId: string;
     name: string;
-    isEmotion?: boolean;
+    type?: 'emotion' | 'context';
+    category?: 'positive' | 'negative' | 'neutral' | null;
   }): Promise<SeedTag> {
     const res = await this.request.post('/api/test/_seed', {
       data: {
         action: 'tag',
         ...params,
-        isEmotion: params.isEmotion ?? false,
+        type: params.type ?? 'context',
+        category: params.category ?? null,
       },
     });
     if (!res.ok()) throw new Error(`createTag failed: ${res.status()}`);

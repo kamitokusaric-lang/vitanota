@@ -11,9 +11,9 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     const user = await seed.createUser(tenant.id, 'teacher');
 
     // テナント内に複数のタグを準備（感情 + 業務）
-    await seed.createTag({ tenantId: tenant.id, userId: user.id, name: 'うれしい', isEmotion: true });
-    await seed.createTag({ tenantId: tenant.id, userId: user.id, name: 'つかれた', isEmotion: true });
-    await seed.createTag({ tenantId: tenant.id, userId: user.id, name: '授業準備', isEmotion: false });
+    await seed.createTag({ tenantId: tenant.id, userId: user.id, name: 'うれしい', type: 'emotion', category: 'positive' });
+    await seed.createTag({ tenantId: tenant.id, userId: user.id, name: 'つかれた', type: 'emotion', category: 'negative' });
+    await seed.createTag({ tenantId: tenant.id, userId: user.id, name: '授業準備', type: 'context' });
 
     await loginAs(context, seed, user, tenant.id);
   });

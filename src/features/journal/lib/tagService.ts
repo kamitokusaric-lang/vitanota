@@ -15,9 +15,20 @@ export interface ServiceContext {
 
 export class TagService {
   /**
-   * タグ作成（teacher 以上のロールで可能）
+   * タグ作成（school_admin / system_admin のみ）
+   * Unit-03: 教員のカスタムタグ作成を廃止
    */
   async createTag(params: CreateTagParams, ctx: ServiceContext): Promise<Tag> {
+    if (!ctx.roles.includes('school_admin') && !ctx.roles.includes('system_admin')) {
+      logWarnEvent(LogEvents.TagForbidden, {
+        userId: ctx.userId,
+        tenantId: ctx.tenantId,
+        action: 'create',
+        roles: ctx.roles,
+      });
+      throw new ForbiddenError('タグの作成は管理者のみ可能です');
+    }
+
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const tag = await tagRepo.create(tx, params, ctx);
 
@@ -26,7 +37,8 @@ export class TagService {
         userId: ctx.userId,
         tenantId: ctx.tenantId,
         name: tag.name,
-        isEmotion: tag.isEmotion,
+        type: tag.type,
+        category: tag.category,
       });
 
       return tag;
@@ -40,10 +52,11 @@ export class TagService {
   async deleteTag(id: string, ctx: ServiceContext): Promise<{ affectedEntries: number }> {
     // 権限チェック: school_admin のみ
     if (!ctx.roles.includes('school_admin')) {
-      logWarnEvent(LogEvents.TagDeleteForbidden, {
+      logWarnEvent(LogEvents.TagForbidden, {
         tagId: id,
         userId: ctx.userId,
         tenantId: ctx.tenantId,
+        action: 'delete',
         roles: ctx.roles,
       });
       throw new ForbiddenError('タグの削除は管理者のみ可能です');

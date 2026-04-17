@@ -69,7 +69,8 @@ describe('logEvent', () => {
         userId: 'u1',
         tenantId: 't1',
         name: 'test',
-        isEmotion: false,
+        type: 'context',
+        category: null,
       },
       mockLogger as never
     );
@@ -89,11 +90,12 @@ describe('logWarnEvent', () => {
 
   it('message なしで呼ぶと obj のみ warn に渡される', () => {
     logWarnEvent(
-      LogEvents.TagDeleteForbidden,
+      LogEvents.TagForbidden,
       {
         tagId: 'tag1',
         userId: 'u1',
         tenantId: 't1',
+        action: 'delete',
         roles: ['teacher'],
       },
       undefined,
@@ -102,7 +104,8 @@ describe('logWarnEvent', () => {
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: 'tag_delete_forbidden',
+        event: 'tag_forbidden',
+        action: 'delete',
         roles: ['teacher'],
       })
     );

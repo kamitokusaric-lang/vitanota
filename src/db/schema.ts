@@ -255,6 +255,38 @@ export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
     .where(eq(journalEntries.isPublic, true))
 );
 
+// ─────────────────────────────────────────────────────────────
+// Unit-04: 管理者ダッシュボード・アラート
+// ─────────────────────────────────────────────────────────────
+
+export const alertTypeEnum = pgEnum('alert_type', ['negative_trend', 'recording_gap']);
+export const alertStatusEnum = pgEnum('alert_status', ['open', 'closed']);
+
+// ── alerts ────────────────────────────────────────────────────
+// RLS: school_admin は自テナント、system_admin は全テナント、teacher はアクセス不可
+export const alerts = pgTable(
+  'alerts',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    teacherUserId: uuid('teacher_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: alertTypeEnum('type').notNull(),
+    status: alertStatusEnum('status').notNull().default('open'),
+    detectionContext: text('detection_context').notNull().default('{}'),
+    closedBy: uuid('closed_by').references(() => users.id),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantStatusIdx: index('alerts_tenant_status_idx').on(table.tenantId, table.status),
+    teacherIdx: index('alerts_teacher_idx').on(table.teacherUserId),
+  })
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -262,3 +294,5 @@ export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
 export type JournalEntryTag = typeof journalEntryTags.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
+export type Alert = typeof alerts.$inferSelect;
+export type NewAlert = typeof alerts.$inferInsert;

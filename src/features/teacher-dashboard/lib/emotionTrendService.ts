@@ -110,3 +110,18 @@ export async function getEmotionTrend(
     totalEntries: Number(countResult[0]?.count ?? 0),
   };
 }
+
+/**
+ * Unit-04: 管理者が指定した教員の感情傾向を取得
+ * school_admin ロールの withTenantUser で実行するため、RLS は tenant_id のみでフィルタ。
+ * targetUserId は WHERE で明示的にフィルタ。
+ */
+export async function getEmotionTrendForTeacher(
+  db: DrizzleDb,
+  tenantId: string,
+  targetUserId: string,
+  period: 'week' | 'month' | 'quarter'
+): Promise<EmotionTrendResponse> {
+  // 内部的には getEmotionTrend と同じロジック（userId を指定するだけ）
+  return getEmotionTrend(db, tenantId, targetUserId, period);
+}

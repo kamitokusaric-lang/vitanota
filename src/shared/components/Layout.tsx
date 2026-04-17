@@ -49,14 +49,23 @@ export function Layout({ children, session }: LayoutProps) {
                 </Link>
               </>
             )}
-            {hasMultipleViews && (
-              <Link
-                href="/dashboard/admin"
-                className="text-gray-600 hover:text-blue-600"
-                data-testid="nav-admin-link"
-              >
-                管理者ビュー
-              </Link>
+            {isSchoolAdmin && (
+              <>
+                <Link
+                  href="/dashboard/admin"
+                  className="text-gray-600 hover:text-blue-600"
+                  data-testid="nav-admin-link"
+                >
+                  管理者ビュー
+                </Link>
+                <Link
+                  href="/dashboard/admin/alerts"
+                  className="text-gray-600 hover:text-blue-600"
+                  data-testid="nav-alerts-link"
+                >
+                  アラート
+                </Link>
+              </>
             )}
           </div>
 

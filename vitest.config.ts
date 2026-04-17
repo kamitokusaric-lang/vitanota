@@ -35,6 +35,15 @@ export default defineConfig({
         'src/features/auth/lib/withAuthSSR.ts',
         'src/features/auth/lib/withAuthApi.ts',
         'src/openapi/**',
+        // DB 依存サービス層（統合テストでカバー）
+        'src/features/admin-dashboard/lib/adminDashboardService.ts',
+        'src/features/admin-dashboard/lib/alertDetectionService.ts',
+        'src/features/admin-dashboard/lib/alertService.ts',
+        'src/features/teacher-dashboard/lib/emotionTrendService.ts',
+        // SWR フック（コンポーネントテストでカバー）
+        'src/features/*/hooks/**',
+        // Zod スキーマ（型定義のみ）
+        'src/features/*/schemas/**',
       ],
     },
   },

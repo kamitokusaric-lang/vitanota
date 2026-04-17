@@ -56,19 +56,30 @@ export default async function handler(
   const sessionToken = randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
 
+  let redirectTo = '/';
+
   await withSystemAdmin('dev-login', async (db) => {
-    // テナント ID を取得
-    const [role] = await db
-      .select({ tenantId: userTenantRoles.tenantId })
+    // テナント ID とロールを取得
+    const roles = await db
+      .select({ tenantId: userTenantRoles.tenantId, role: userTenantRoles.role })
       .from(userTenantRoles)
-      .where(eq(userTenantRoles.userId, userId))
-      .limit(1);
+      .where(eq(userTenantRoles.userId, userId));
+
+    const tenantId = roles.find((r) => r.tenantId !== null)?.tenantId ?? null;
+    const roleNames = roles.map((r) => r.role);
+
+    // ロールに応じたリダイレクト先
+    if (roleNames.includes('school_admin')) {
+      redirectTo = '/dashboard/admin';
+    } else if (roleNames.includes('teacher')) {
+      redirectTo = '/journal';
+    }
 
     // セッション作成
     await db.insert(sessions).values({
       sessionToken,
       userId,
-      activeTenantId: role?.tenantId ?? null,
+      activeTenantId: tenantId,
       expires,
     });
   });
@@ -79,5 +90,5 @@ export default async function handler(
     `next-auth.session-token=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires.toUTCString()}`
   );
 
-  return res.status(200).json({ ok: true, redirectTo: '/journal' });
+  return res.status(200).json({ ok: true, redirectTo });
 }

@@ -122,6 +122,68 @@ export async function getEmotionTrendForTeacher(
   targetUserId: string,
   period: 'week' | 'month' | 'quarter'
 ): Promise<EmotionTrendResponse> {
-  // 内部的には getEmotionTrend と同じロジック（userId を指定するだけ）
   return getEmotionTrend(db, tenantId, targetUserId, period);
+}
+
+/**
+ * テナント全体の感情傾向を取得（全教員の集約）
+ * school_admin が学校全体のトレンドを把握するために使用。
+ * userId フィルタを外し、テナント内全エントリを集計する。
+ */
+export async function getSchoolEmotionTrend(
+  db: DrizzleDb,
+  tenantId: string,
+  period: 'week' | 'month' | 'quarter'
+): Promise<EmotionTrendResponse> {
+  const { startDate, endDate } = getDateRange(period);
+
+  const rows = await db
+    .select({
+      date: sql<string>`DATE(${journalEntries.createdAt} AT TIME ZONE 'Asia/Tokyo')`.as('date'),
+      positive: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'positive')`.as('positive'),
+      negative: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'negative')`.as('negative'),
+      neutral: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'neutral')`.as('neutral'),
+    })
+    .from(journalEntries)
+    .innerJoin(journalEntryTags, eq(journalEntryTags.entryId, journalEntries.id))
+    .innerJoin(
+      tags,
+      and(eq(tags.id, journalEntryTags.tagId), eq(tags.type, 'emotion'))
+    )
+    .where(
+      and(
+        eq(journalEntries.tenantId, tenantId),
+        gte(journalEntries.createdAt, startDate),
+        lt(journalEntries.createdAt, endDate)
+      )
+    )
+    .groupBy(sql`DATE(${journalEntries.createdAt} AT TIME ZONE 'Asia/Tokyo')`)
+    .orderBy(sql`date ASC`);
+
+  const data: EmotionTrendDataPoint[] = rows.map((r) => ({
+    date: r.date,
+    positive: Number(r.positive),
+    negative: Number(r.negative),
+    neutral: Number(r.neutral),
+    total: Number(r.positive) + Number(r.negative) + Number(r.neutral),
+  }));
+
+  const countResult = await db
+    .select({
+      count: sql<number>`COUNT(DISTINCT ${journalEntries.id})`.as('count'),
+    })
+    .from(journalEntries)
+    .where(
+      and(
+        eq(journalEntries.tenantId, tenantId),
+        gte(journalEntries.createdAt, startDate),
+        lt(journalEntries.createdAt, endDate)
+      )
+    );
+
+  return {
+    period,
+    data,
+    totalEntries: Number(countResult[0]?.count ?? 0),
+  };
 }

@@ -95,7 +95,8 @@ jobs:
   # ── Deploy to Prod（手動承認必要）────────────────────────────
   deploy-prod:
     name: Deploy to Prod
-    needs: [build, deploy-dev]
+    # deploy-dev は Phase 1 で skip される前提のため依存から外す
+    needs: [build]
     runs-on: ubuntu-latest
     environment: production  # GitHub Environments で手動承認を設定すること
     # ブートストラップ時（AppRunner 未作成）は skip

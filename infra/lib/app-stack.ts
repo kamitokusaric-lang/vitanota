@@ -86,6 +86,11 @@ export class AppStack extends cdk.Stack {
               { name: 'DB_NAME', value: props.dbName },
               { name: 'E2E_TEST_MODE', value: 'false' },
               { name: 'DB_SSL', value: 'true' },
+              // Next.js standalone が listen する hostname を 0.0.0.0 に強制。
+              // AppRunner ランタイムがコンテナ起動時に HOSTNAME をコンテナの
+              // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、
+              // runtimeEnvironmentVariables 経由で明示的に 0.0.0.0 に再上書きする必要がある。
+              { name: 'HOSTNAME', value: '0.0.0.0' },
             ],
           },
         },

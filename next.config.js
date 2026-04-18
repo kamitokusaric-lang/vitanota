@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // Docker デプロイ向け standalone 出力モード（server.js 単体で起動可能）
+  output: 'standalone',
+
   // BR-SEC-02: HTTP セキュリティヘッダー
   async headers() {
     const isDev = process.env.NODE_ENV !== 'production';

@@ -55,6 +55,7 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   dbName: dataCore.dbName,
   secrets: dataShared.secrets,
   ecrRepository: dataShared.ecrRepository,
+  githubActionsRole: foundation.githubActionsRole,
   alertEmail,
 });
 

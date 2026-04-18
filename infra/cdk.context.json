@@ -1,0 +1,11 @@
+{
+  "availability-zones:account=107094297297:region=ap-northeast-1": [
+    "ap-northeast-1a",
+    "ap-northeast-1c",
+    "ap-northeast-1d"
+  ],
+  "hosted-zone:account=107094297297:domainName=vitanota.io:region=us-east-1": {
+    "Id": "/hostedzone/Z07518311ZMREXV3WSASV",
+    "Name": "vitanota.io."
+  }
+}

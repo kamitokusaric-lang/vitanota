@@ -2,6 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
@@ -22,10 +24,15 @@ export class EdgeStack extends cdk.Stack {
 
     const prefix = `${props.projectName}-${props.envName}`;
 
-    // ── ACM 証明書 (us-east-1 必須) ──
+    // ── Route53 ホストゾーン (既存をルックアップ) ──
+    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+      domainName: props.domainName,
+    });
+
+    // ── ACM 証明書 (us-east-1 必須・DNS バリデーションは Route53 に自動投入) ──
     const certificate = new acm.Certificate(this, 'Certificate', {
       domainName: props.domainName,
-      validation: acm.CertificateValidation.fromDns(),
+      validation: acm.CertificateValidation.fromDns(hostedZone),
     });
 
     // ── WAF v2 Web ACL ──
@@ -150,6 +157,21 @@ export class EdgeStack extends cdk.Stack {
     });
 
     this.distributionDomainName = distribution.distributionDomainName;
+
+    // ── Route53 Alias レコード (apex: vitanota.io → CloudFront) ──
+    const aliasTarget = route53.RecordTarget.fromAlias(
+      new targets.CloudFrontTarget(distribution),
+    );
+    new route53.ARecord(this, 'AliasRecord', {
+      zone: hostedZone,
+      recordName: props.domainName,
+      target: aliasTarget,
+    });
+    new route53.AaaaRecord(this, 'AliasRecordIpv6', {
+      zone: hostedZone,
+      recordName: props.domainName,
+      target: aliasTarget,
+    });
 
     // ── 出力 ──
     new cdk.CfnOutput(this, 'DistributionDomainName', {

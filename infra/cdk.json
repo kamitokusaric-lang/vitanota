@@ -4,7 +4,7 @@
     "projectName": "vitanota",
     "env": "prod",
     "region": "ap-northeast-1",
-    "domainName": "vitanota.example.com",
+    "domainName": "vitanota.io",
     "githubOrg": "kamitokusari",
     "githubRepo": "vitanota",
     "alertEmail": "kamitokusari.c@cozi73.com",

@@ -15,6 +15,7 @@ export class FoundationStack extends cdk.Stack {
   public readonly vpc: ec2.IVpc;
   public readonly appSecurityGroup: ec2.ISecurityGroup;
   public readonly rdsSecurityGroup: ec2.ISecurityGroup;
+  public readonly githubActionsRole: iam.Role;
 
   constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
@@ -82,6 +83,30 @@ export class FoundationStack extends cdk.Stack {
         'sts:AssumeRoleWithWebIdentity'
       ),
     });
+    this.githubActionsRole = ghActionsRole;
+
+    // GitHub Actions: ECR 認証トークン取得（リソースは * 固定が AWS 仕様）
+    ghActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'EcrAuthToken',
+      actions: ['ecr:GetAuthorizationToken'],
+      resources: ['*'],
+    }));
+
+    // GitHub Actions: ECR push/pull（vitanota/app リポジトリに限定）
+    ghActionsRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'EcrPush',
+      actions: [
+        'ecr:BatchCheckLayerAvailability',
+        'ecr:InitiateLayerUpload',
+        'ecr:UploadLayerPart',
+        'ecr:CompleteLayerUpload',
+        'ecr:PutImage',
+        'ecr:BatchGetImage',
+      ],
+      resources: [
+        `arn:aws:ecr:${this.region}:${this.account}:repository/${props.projectName}/app`,
+      ],
+    }));
 
     // Permission Boundary（最小版）
     const boundary = new iam.ManagedPolicy(this, 'PermissionBoundary', {

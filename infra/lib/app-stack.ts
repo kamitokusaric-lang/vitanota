@@ -21,6 +21,7 @@ export interface AppStackProps extends cdk.StackProps {
   dbName: string;
   secrets: Secrets;
   ecrRepository: ecr.IRepository;
+  githubActionsRole: iam.Role;
   alertEmail: string;
 }
 
@@ -122,6 +123,19 @@ export class AppStack extends cdk.Stack {
     });
 
     this.appRunnerUrl = `https://${service.attrServiceUrl}`;
+
+    // GitHub Actions に AppRunner デプロイ権限を付与（サービス ARN 限定）
+    // Policy リソースを AppStack 側に配置することで Foundation→App の循環参照を回避
+    new iam.Policy(this, 'GhActionsAppRunnerPolicy', {
+      roles: [props.githubActionsRole],
+      statements: [
+        new iam.PolicyStatement({
+          sid: 'AppRunnerUpdate',
+          actions: ['apprunner:UpdateService', 'apprunner:DescribeService'],
+          resources: [service.attrServiceArn],
+        }),
+      ],
+    });
 
     // ── Lambda db-migrator ──
     const migratorRole = new iam.Role(this, 'MigratorRole', {

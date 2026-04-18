@@ -291,6 +291,185 @@ NAT Instance 動作不良を解決するには 2 択:
 - **A. NAT Gateway に切替**: 確実・+$27/月（総額 ¥14,000 程度）
 - **B. NAT Instance デバッグ**: SSM 権限追加 + userData 調査 + 再デプロイ（30-40 分）
 
+### As-Built シーケンス図
+
+ここから 4 つの主要フローの現状動作を記録する。アプリケーションレベルの業務フローは `aidlc-docs/construction/sequence-diagrams.md` 側にある。本節はインフラ視点の「どこを通るか／どこで詰まるか」の記録。
+
+#### シーケンス 1: 認証済みユーザーのアプリアクセス（正常系 ✅）
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Browser
+    participant R53 as Route 53
+    participant CF as CloudFront + WAF
+    participant AR as App Runner
+    participant VPC as VPC Connector<br/>(PRIVATE_WITH_EGRESS)
+    participant SM as Secrets Manager<br/>(VPC Endpoint)
+    participant RDS as RDS PostgreSQL
+
+    U->>R53: DNS 問い合わせ vitanota.io
+    R53-->>U: CloudFront の IPv4/IPv6
+    U->>CF: HTTPS GET /journal (session cookie)
+    CF->>CF: WAF 検査 (managed rules + rate limit)
+    CF->>AR: Origin HTTPS<br/>(Host ヘッダー除外・AppRunner Service URL)
+    AR->>VPC: 外向き通信(Secrets Manager)
+    VPC->>SM: GetSecretValue (nextauth-secret)
+    SM-->>VPC: 値
+    VPC-->>AR: 値
+    AR->>VPC: DB 接続 (5432)
+    VPC->>RDS: SELECT (RLS でテナント境界制御)
+    RDS-->>AR: 結果
+    AR-->>CF: 200 OK + HTML
+    CF-->>U: 200 OK (cache control + security headers)
+```
+
+状態: **全ステップ稼働中** (2026-04-19)
+
+#### シーケンス 2: Google OAuth ログイン（🔴 ⑦ で詰まる）
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Browser
+    participant CF as CloudFront
+    participant AR as App Runner
+    participant VPC as VPC Connector
+    participant NAT as NAT Instance<br/>(t4g.nano)
+    participant IGW as Internet Gateway
+    participant G as Google<br/>(oauth2.googleapis.com)
+
+    U->>CF: GET /api/auth/signin/google
+    CF->>AR: GET /api/auth/signin/google
+    AR-->>CF: 302 Location: accounts.google.com/o/oauth2/v2/auth?...
+    CF-->>U: 302 (Google へ)
+    U->>G: 認可画面 (Google 側で操作)
+    G-->>U: 302 Location: vitanota.io/api/auth/callback/google?code=XYZ
+    U->>CF: GET /api/auth/callback/google?code=XYZ
+    CF->>AR: GET /api/auth/callback/google?code=XYZ
+
+    Note over AR: ここから AppRunner → Google 直接通信が必要
+    AR->>VPC: POST oauth2.googleapis.com/token (コード→トークン交換)
+    VPC->>NAT: default route 0.0.0.0/0 → NAT
+    Note over NAT: 🔴 iptables MASQUERADE 動作不明<br/>(AL2023 userData 疑義)
+    NAT--xIGW: パケット転送失敗?
+    Note over AR,G: TCP 接続が張れず ETIMEDOUT
+
+    AR-->>CF: 302 /auth/signin?error=OAuthCallback
+    CF-->>U: "ログインに失敗しました"
+```
+
+**ログで確認されたエラー**:
+```
+[next-auth][error][SIGNIN_OAUTH_ERROR]
+  error: AggregateError [ETIMEDOUT]
+  providerId: 'google'
+```
+
+**他に解決済み周辺問題** (⑧ の JWKS 検証も同じ経路だが ⑦ で先に失敗するため到達せず):
+- ⑤ で CloudFront が Host ヘッダーを転送していたが `ALL_VIEWER_EXCEPT_HOST_HEADER` に変更済み
+- コールバック後に AppRunner が自分の `/api/auth/session` を fetch する問題は `NEXTAUTH_URL_INTERNAL=http://localhost:3000` で解決済み
+
+#### シーケンス 3: CI/CD デプロイ（正常系 ✅）
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as 開発者
+    participant GH as GitHub
+    participant Act as GitHub Actions
+    participant OIDC as AWS IAM OIDC
+    participant ECR as ECR
+    participant ARS as App Runner Service
+
+    Dev->>GH: git push origin main
+    GH->>Act: Deploy ワークフロー発火
+    Act->>OIDC: STS AssumeRoleWithWebIdentity
+    Note over OIDC: trust policy:<br/>repo:kamitokusaric-lang/vitanota:ref:refs/heads/main
+    OIDC-->>Act: 一時認証情報
+    Act->>ECR: ecr GetAuthorizationToken
+    ECR-->>Act: Docker login token
+    Act->>Act: docker build (Dockerfile multi-stage)
+    Act->>ECR: docker push :prod-{sha} + :latest
+    ECR-->>Act: 成功
+    Act->>ARS: aws apprunner update-service<br/>(Image URI: :prod-{sha})
+    ARS-->>Act: operation id
+    loop 10 秒間隔で最大 10 分
+        Act->>ARS: describe-service (Status)
+        ARS-->>Act: OPERATION_IN_PROGRESS
+    end
+    Act->>ARS: describe-service
+    ARS-->>Act: RUNNING
+    Act->>ARS: curl /api/health
+    ARS-->>Act: 200 OK
+    Note over Act: Deploy 成功
+```
+
+状態: **全ステップ稼働中** (2 回以上連続成功確認済)
+
+#### シーケンス 4: DB マイグレーション（正常系 ✅）
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Op as 運用者<br/>(aws lambda invoke)
+    participant LM as db-migrator Lambda<br/>(PRIVATE_ISOLATED)
+    participant SME as Secrets Manager<br/>VPC Endpoint
+    participant SM as Secrets Manager
+    participant RDS as RDS PostgreSQL
+
+    Op->>LM: invoke payload={"command":"migrate"}
+    LM->>SME: GetSecretValue (vitanota-prod/rds-master-password)
+    SME->>SM: 内部プライベート経由
+    SM-->>SME: SecretString (JSON with username/password)
+    SME-->>LM: 復号値
+    LM->>RDS: connect pg (5432, TLS)
+    RDS-->>LM: accepted
+    LM->>RDS: ensure table _migrations
+    LM->>RDS: SELECT applied filenames
+    RDS-->>LM: 既適用リスト
+    loop 未適用ファイルごと
+        LM->>RDS: BEGIN
+        LM->>RDS: 実行 (0001〜0012.sql の内容)
+        LM->>RDS: INSERT _migrations
+        LM->>RDS: COMMIT
+    end
+    LM-->>Op: {"applied":[...12 件], "skipped":[]}
+```
+
+状態: **0001-0012 全適用済** (2026-04-18 実行)
+
+#### シーケンス 5: 日次 RDS Snapshot（正常系 ✅）
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant EB as EventBridge Rule<br/>(cron 0 18 * * ? *)
+    participant SL as snapshot-manager<br/>Lambda (VPC 外)
+    participant RA as RDS API<br/>(public endpoint)
+    participant RDS as RDS Instance
+
+    Note over EB: 毎日 JST 03:00 (UTC 18:00) 起動
+    EB->>SL: Lambda 呼び出し
+    SL->>RA: CreateDBSnapshot<br/>Id=vitanota-prod-manual-YYYYMMDD
+    alt 同日中の重複実行
+        RA-->>SL: DBSnapshotAlreadyExistsFault
+        Note over SL: skip_exists として処理
+    else 新規作成
+        RA->>RDS: snapshot 取得開始
+        RA-->>SL: ok
+    end
+    SL->>RA: DescribeDBSnapshots (manual, DBInstanceIdentifier filter)
+    RA-->>SL: 既存 manual snapshot 一覧
+    loop 7 日以上古い + 命名プレフィックス一致
+        SL->>RA: DeleteDBSnapshot
+        RA-->>SL: ok
+    end
+    SL-->>EB: 成功ログ (構造化 JSON)
+```
+
+状態: **EventBridge 有効・手動 invoke で冪等性確認済** (2026-04-18)
+
 ---
 
 ## Phase 2: 本格稼働インフラ構成

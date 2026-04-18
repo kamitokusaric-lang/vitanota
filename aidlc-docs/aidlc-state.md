@@ -138,10 +138,17 @@
 
 ## 現在のステータス
 - **ライフサイクルフェーズ**: オペレーションズ - Phase 1 MVP デプロイ
-- **現在のステージ**: Step 2（GitHub variables 設定）
-- **次のステージ**: Step 3 - CI deploy.yml 改修
-- **ステータス**: 2026-04-18・Step 1 完了（VPC + RDS + ECR + Secrets + OIDC Role + SnapshotManager）
+- **現在のステージ**: **Google OAuth ブロッカー解消中**（NAT Instance 動作疑義）
+- **次の判断**: NAT Gateway 切替 vs NAT Instance デバッグ（SSM 権限追加）
+- **最新進捗**: 2026-04-19
+  - Step 1-6, 8 完了（foundation/data-core/data-shared/app/edge 全デプロイ + DB マイグレーション 0001-0012 + Google OAuth 認証情報投入）
+  - Step 3, 5, 10 完了（CI/CD full pipeline 動作確認済）
+  - NAT Instance 追加済（subnet 構成変更・AppRunner を PRIVATE_WITH_EGRESS に移動）
+  - 🔴 NAT Instance 内部の iptables/ip_forward 動作が未確認
 - **ユーザー運用開始予定**: 5 日以内（2026-04-23 頃）
+
+## 重要な参照ドキュメント（Phase 1 As-Built）
+- `aidlc-docs/construction/deployment-phases.md` の「現状デプロイ状況（As-Built 2026-04-19）」セクションに、設計からの 8 項目の変更差分、稼働状況、既知課題、月額コスト実態（~¥10,000/月）を記載
 
 ## Phase 1 デプロイ済みリソース（参照用）
 

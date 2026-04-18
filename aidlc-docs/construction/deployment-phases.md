@@ -165,6 +165,134 @@ AWS アカウント作成から 12 ヶ月は Free Tier 制約下で、RDS 自動
 
 ---
 
+## 現状デプロイ状況（As-Built 2026-04-19）
+
+Phase 1 の設計を基礎としつつ、デプロイ過程で発見された課題への対処によって実態は設計から以下の点で乖離している。この節は**実際にデプロイされているリソース一覧と稼働状態の記録**。
+
+### 設計から変更された点
+
+| # | 項目 | 設計 | 実態 | 理由 |
+|---|---|---|---|---|
+| 1 | AppRunner `minSize` | 0（scale to zero） | 1 | AppRunner 仕様制約（`minSize >= 1` 必須） |
+| 2 | VPC subnet 構成 | PRIVATE_ISOLATED のみ（NAT なし） | PRIVATE_ISOLATED + PRIVATE_WITH_EGRESS + PUBLIC | Google OAuth のトークン交換で AppRunner → `oauth2.googleapis.com` 外向き通信が必要と判明 |
+| 3 | NAT | なし | NAT Instance（t4g.nano ARM64・1 AZ） | 上記対応・NAT Gateway（+$32/月）ではなく NAT Instance（+$5/月）で予算圧迫を抑制 |
+| 4 | Secrets Manager VPC Endpoint | なし | 追加（2 AZ・+$20/月） | db-migrator Lambda が PRIVATE_ISOLATED で Secrets Manager 到達のため |
+| 5 | Route53 | EdgeStack の手動登録想定 | CDK で HostedZone.fromLookup + ARecord 自動登録 | 初期デプロイで漏れ防止 |
+| 6 | AppRunner Host ヘッダー処理 | 未定義 | CloudFront `ALL_VIEWER_EXCEPT_HOST_HEADER` に変更 | AppRunner は Host が Service URL と一致しないと 404 を返す仕様を確認 |
+| 7 | NextAuth URL 環境変数 | 未明示 | `NEXTAUTH_URL=https://vitanota.io` + `NEXTAUTH_URL_INTERNAL=http://localhost:3000` | サーバサイド自己 fetch の VPC 外向きループを回避 |
+| 8 | AppRunner HOSTNAME | Dockerfile ENV で 0.0.0.0 指定 | AppRunner runtimeEnvironmentVariables で 0.0.0.0 上書き | AppRunner ランタイムがコンテナ起動時に HOSTNAME をコンテナ内部ホスト名で上書きするため |
+
+### As-Built アーキテクチャ図
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  エッジ層 (Global / us-east-1)                                          │
+│                                                                        │
+│   Route 53 Hosted Zone (vitanota.io) ─ A/AAAA Alias ─┐                │
+│   ACM Certificate (vitanota.io)                      │                 │
+│   WAF v2 Web ACL (managed + rate limit)              ▼                 │
+│                                                 CloudFront              │
+│                                 origin request: ALL_VIEWER_EXCEPT_HOST │
+│                                 origin: AppRunner URL (HTTPS)          │
+└──────────────────────────────────────┬─────────────────────────────────┘
+                                       │ HTTPS
+                                       ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  ap-northeast-1                                                        │
+│                                                                        │
+│   App Runner  vitanota-prod-app                                        │
+│     VPC Connector: vpc-connector-egress (NEW)                          │
+│     配置: PRIVATE_WITH_EGRESS × 2 AZ, SG=appEgressSecurityGroup         │
+│              │                                                         │
+│              ▼ (全ての外向き通信)                                       │
+│                                                                        │
+│   VPC 10.0.0.0/16 · 2 AZ                                               │
+│   ├─ PUBLIC        × 2: NAT Instance (1 台のみ・AZ-a), IGW             │
+│   ├─ PRIVATE_WITH_EGRESS × 2: AppRunner Connector ENI                  │
+│   │     default route → NAT Instance                                   │
+│   └─ PRIVATE_ISOLATED × 2: RDS PostgreSQL 16, db-migrator Lambda,      │
+│                             Secrets Manager VPC Endpoint               │
+│                                                                        │
+│   🔴 NAT Instance 内部: iptables MASQUERADE 動作不明（SSM 到達不可）   │
+│                                                                        │
+│   RDS: vitanota-prod-db (db.t4g.micro 単一 AZ)                         │
+│     credentials: Secrets Manager vitanota-prod/rds-master-password     │
+│     backup: 自動 1 日 + snapshot-manager Lambda で manual × 7 日       │
+│     マイグレーション: 0001〜0012 全適用済                              │
+└────────────────────────────────────────────────────────────────────────┘
+
+外部サービス:
+  Google OAuth (accounts.google.com / oauth2.googleapis.com)
+  → AppRunner → NAT → IGW で到達するはずだが 🔴 ETIMEDOUT
+
+補助リソース (VPC 外・AWS マネージド):
+  ECR: vitanota/app (30 image lifecycle)
+  Secrets Manager × 5 (nextauth-secret / google-client-id /
+                       google-client-secret / cloudfront-secret ⚠️未反映 /
+                       rds-master-password)
+  S3: vitanota-prod-audit-logs (Object Lock 90 日, KMS 暗号化)
+  SNS: vitanota-prod-alerts → kamitokusaric.c@cozi73.com
+  Lambda: snapshot-manager (VPC 外・EventBridge cron 0 18 * * ? * で日次実行)
+  CloudWatch Alarms × 4 (Http5xx / RdsCpu / Memory / WafBlocked)
+
+CI/CD:
+  GitHub kamitokusaric-lang/vitanota
+    → Actions deploy.yml (OIDC + ECR push :latest + update-service + poll)
+  Variables: ECR_REPOSITORY, AWS_ACCOUNT_ID, APPRUNNER_SERVICE_ARN_PROD
+
+IAM (7 ロール):
+  vitanota-prod-github-actions-role (OIDC, ECR + AppRunner 権限)
+  vitanota-prod-apprunner-instance-role
+  vitanota-prod-apprunner-access-role
+  vitanota-prod-db-migrator-execute-role
+  SnapshotManager role
+  NAT Instance role
+  Permission Boundary (iam:* 変更拒否)
+```
+
+### As-Built 月額コスト（推定）
+
+| 項目 | 月額 |
+|---|---|
+| App Runner（min=1・provisioned 分） | ~$7 |
+| RDS t4g.micro 単一 AZ + 20GB gp3 | ~$15 |
+| CloudFront (PriceClass_200) | ~$3-8 |
+| WAF Web ACL + ルール | ~$10 |
+| Route 53 Hosted Zone | $0.50 |
+| S3 + KMS + 監査ログ | ~$3 |
+| Secrets Manager × 5 | ~$2 |
+| ECR ストレージ | ~$1 |
+| Lambda (db-migrator + snapshot-manager) | ~$0 |
+| **NAT Instance (t4g.nano + EBS)** | **~$5** |
+| **Secrets Manager VPC Endpoint (2 AZ)** | **~$20** |
+| **合計** | **~$67 / 月 ≈ ¥10,000** |
+
+当初予算 ¥6,000-8,000/月に対して **+¥2,000-4,000 超過**。主因は Secrets Manager VPC Endpoint（$20/月）。
+
+### 稼働状況サマリ
+
+| フロー | 状態 |
+|---|---|
+| ヘルスチェック (`https://vitanota.io/api/health`) | ✅ HTTP 200 |
+| DB マイグレーション (Lambda invoke) | ✅ 0001-0012 適用済 |
+| RDS 日次手動 snapshot | ✅ EventBridge 動作中 |
+| CI/CD (git push → ECR → AppRunner update) | ✅ Full pipeline 動作 |
+| **Google OAuth ログイン** | **🔴 トークン交換 ⑦ で ETIMEDOUT** |
+
+### 既知の未解決課題
+
+1. **NAT Instance の iptables/ip_forward 動作確認が未完了** — AL2023 AMI + CDK 標準 userData が AL2 前提に見えるため、実際にパケット転送しているかを SSM で確認できず（SSM 権限未付与）
+2. **旧 VPC Connector (vpc-connector) が DELETE_FAILED のまま残存** — CloudFormation スタックからは除外されたが AWS 上には残っている（AppRunner サービス削除時に自動削除される想定）
+3. **CloudFront X-CloudFront-Secret が `PLACEHOLDER_REPLACE_AFTER_DEPLOY`** — Secrets Manager `cloudfront-secret` 値への置換が未実施。現状 AppRunner 側で検証していないためセキュリティ影響なし
+
+### 次の判断点
+
+NAT Instance 動作不良を解決するには 2 択:
+- **A. NAT Gateway に切替**: 確実・+$27/月（総額 ¥14,000 程度）
+- **B. NAT Instance デバッグ**: SSM 権限追加 + userData 調査 + 再デプロイ（30-40 分）
+
+---
+
 ## Phase 2: 本格稼働インフラ構成
 
 ### アーキテクチャ図

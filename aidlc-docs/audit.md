@@ -962,3 +962,67 @@
 **コンテキスト**: セキュリティ判断の明文化。
 
 ---
+
+## Google OAuth 試行・VPC 外向き通信の欠如判明
+**タイムスタンプ**: 2026-04-18T10:00:00Z
+**ユーザー入力**: 「ログインに失敗しました。再度お試しください」（ブラウザで Google ログイン試行）
+**AI応答**: CloudWatch Logs で `SIGNIN_OAUTH_ERROR: AggregateError [ETIMEDOUT]` を確認。原因は AppRunner が PRIVATE_ISOLATED サブネットに配置されており、Google OAuth のトークン交換エンドポイント `oauth2.googleapis.com` への外向き HTTPS ルートが存在しないため。VPC Endpoint は AWS 専用で Google API には使えない。加えて `CLIENT_FETCH_ERROR` も発生（アプリが自身の public URL を server-side fetch しようとして失敗）。
+**コンテキスト**: Phase 1 当初設計の「NAT なし」前提が Google OAuth フローと非互換であることを発見。
+
+---
+
+## 認証を VPC 外に寄せる案の検討と棄却
+**タイムスタンプ**: 2026-04-18T11:00:00Z
+**ユーザー入力**:
+- "Google Auth をフロント側で完結させ、バックエンドは Google へ直接通信しない方法は使えますか？"
+- "cogitoのコストも教えてください"
+- "cognitoのS3 Lambda 方式を詳しく教えてください"
+- "EventBridge スケジュール（1 時間ごと JWKS 取得）は、なぜ必要ですか？"
+- "OKです。Cognitoでいきましょう"
+**AI応答**: 3 案（ε フロント完結 GIS / η Firebase Auth / δ Cognito + S3 Lambda）を比較。変更コスト・月額・セキュリティの 3 軸で評価。Cognito + S3 Lambda を推奨（実装 0.5-1 日の見積もり）。ただし実装詳細検討中に重要な設計衝突を発見: NextAuth Credentials Provider は database session 戦略を公式サポートしておらず、SP-07 論点 C で明示的に選択した database 戦略と非互換。手動 session 作成のボイラープレートで実装工数が 2-3 日に膨らむことが判明。EventBridge 1 時間スケジュールは Cognito の低頻度ローテートには過剰であり、パターン A（デプロイ時のみ取得）+ パターン B（kid not found 時の再取得）で十分と訂正。
+**ユーザー最終入力**: "C. NAT Instance で進める"
+**コンテキスト**: 認証を VPC 外に寄せる 3 案をすべて詳細検討した結果、database session 戦略を壊さない NAT Instance 案を採択。データ主権・監査・SDK 品質の比較、Cognito 料金詳細（Lite $0.0055/MAU・10k MAU 無料）、VPC Endpoint 実費 $20/月（当初 $7.30/月と誤案内を訂正）を整理。
+
+---
+
+## NAT Instance 導入・デプロイ
+**タイムスタンプ**: 2026-04-18T21:40:00Z
+**実装**:
+- foundation-stack.ts: VPC subnet 構成を PRIVATE_ISOLATED のみから PRIVATE_ISOLATED + PRIVATE_WITH_EGRESS + PUBLIC の 3 種 × 2 AZ に変更（既存 PRIVATE_ISOLATED はそのまま保持）、`NatProvider.instanceV2(t4g.nano ARM64)` で NAT Instance を 1 台配置（月額 ~$5）
+- foundation-stack.ts: 新 SG `appEgressSecurityGroup` を追加（AppRunner は同一 SG 組み合わせで 2 つの VPC Connector を作れないため分離）
+- app-stack.ts: AppRunner VPC Connector を PRIVATE_WITH_EGRESS + appEgressSG に移動、`vpc-connector-egress` 命名、`NEXTAUTH_URL_INTERNAL=http://localhost:3000` を runtimeEnvironmentVariables に追加（サーバサイド自己 fetch をコンテナ内 localhost に向ける）
+- cdk diff で既存 PRIVATE_ISOLATED サブネットに変更が無いことを確認してから本番適用
+**デプロイ結果**:
+- foundation スタック更新成功（subnet + NAT Instance + appEgressSG + IGW + NAT SG 追加）
+- app スタック更新成功（新 VPC Connector 作成・AppRunner は新 Connector で RUNNING）
+- 旧 VPC Connector は DELETE_FAILED のまま残存（AWS 内部参照が残っているため・機能影響なし）
+**コミット**: `cc6940a feat(infra): NAT Instance 追加で AppRunner の外向き HTTPS を有効化`
+
+---
+
+## NAT Instance 動作疑義の発覚
+**タイムスタンプ**: 2026-04-19T00:30:00Z
+**ユーザー入力**: 「ログインに失敗しました。再度お試しください」
+**AI応答**: 再度 ETIMEDOUT 継続を確認。診断実施:
+- NAT Instance (i-05a89c46ca4878612) は `State: running`・`SourceDestCheck: false`・Public IP `52.197.42.68` を保有
+- NAT Security Group の **Ingress ルールが空** だったため CLI で手動追加（VPC CIDR `10.0.0.0/16` 全プロトコル許可）
+- Route table は正常設定を確認（PRIVATE_WITH_EGRESS → NAT Instance ENI、PUBLIC → IGW）
+- NAT Instance userData を確認: AL2 前提のスクリプト（`yum install iptables-services`）が AL2023 AMI 上で動作しているか不明
+- SSM Session Manager で内部検証しようとしたが IAM 権限不足で `TargetNotConnected`
+**コンテキスト**: iptables MASQUERADE が実際に動作しているかの確証が取れず、NAT Gateway 切替 or SSM 権限追加デバッグの判断が必要。
+
+---
+
+## 現状インフラ構成の記録
+**タイムスタンプ**: 2026-04-19T01:00:00Z
+**ユーザー入力**: 「はい、まずはこの構成を記録して。」
+**AI応答**: `aidlc-docs/construction/deployment-phases.md` に新規セクション「現状デプロイ状況（As-Built 2026-04-19）」を追加。以下を含む:
+- 設計から変更された 8 項目の差分表（minSize 仕様制約・subnet 構成変更・NAT Instance 追加・Secrets Manager VPC Endpoint 追加・Route53 CDK 化・CloudFront Host ヘッダー処理・NEXTAUTH_URL 環境変数・HOSTNAME 上書き）
+- As-Built アーキテクチャ図（ASCII ダイアグラム）
+- As-Built 月額コスト推定（~$67/月 = ¥10,000/月・当初予算超過）
+- 稼働状況サマリ（ヘルス/DB マイグレーション/CI/CD ✅・Google OAuth 🔴）
+- 既知の未解決課題 3 件（NAT Instance 動作疑義・旧 VPC Connector 残存・CloudFront Secret 未反映）
+- 次の判断点（NAT Gateway 切替 vs NAT Instance デバッグ）
+**コンテキスト**: 設計ドキュメントに as-built を明記し、ブロッカー解消前の構成把握を確実にする。
+
+---

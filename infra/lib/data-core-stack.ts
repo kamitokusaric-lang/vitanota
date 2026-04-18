@@ -6,6 +6,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
 
 export interface DataCoreStackProps extends cdk.StackProps {
@@ -19,6 +20,7 @@ export class DataCoreStack extends cdk.Stack {
   public readonly rdsEndpoint: string;
   public readonly rdsPort: string;
   public readonly dbName: string;
+  public readonly rdsSecret: secretsmanager.ISecret;
 
   constructor(scope: Construct, id: string, props: DataCoreStackProps) {
     super(scope, id, props);
@@ -60,6 +62,11 @@ export class DataCoreStack extends cdk.Stack {
 
     this.rdsEndpoint = instance.dbInstanceEndpointAddress;
     this.rdsPort = instance.dbInstanceEndpointPort;
+    // RDS 自動生成 secret を公開（db-migrator Lambda が Secrets Manager 経由で参照）
+    if (!instance.secret) {
+      throw new Error('RDS secret was not generated');
+    }
+    this.rdsSecret = instance.secret;
 
     // ── Snapshot Manager Lambda ──
     // 日次で manual snapshot を作成し、7 日以上古いものを削除する

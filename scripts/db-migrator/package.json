@@ -2,14 +2,10 @@
   "name": "vitanota-db-migrator",
   "version": "0.1.0",
   "private": true,
-  "description": "Lambda function for running Drizzle migrations against RDS Proxy via IAM auth",
-  "main": "dist/handler.js",
-  "scripts": {
-    "build": "tsc",
-    "package": "pnpm build && cd dist && zip -r ../function.zip . && cd .. && zip -ru function.zip migrations node_modules"
-  },
+  "description": "Lambda function for running SQL migrations against RDS via Secrets Manager password auth (Phase 1)",
+  "main": "handler.ts",
   "dependencies": {
-    "@aws-sdk/rds-signer": "^3.574.0",
+    "@aws-sdk/client-secrets-manager": "^3.574.0",
     "pg": "^8.11.5"
   },
   "devDependencies": {

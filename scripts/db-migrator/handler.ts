@@ -1,23 +1,14 @@
-// Lambda マイグレーター参考実装 (Step 19)
-// Unit-01 infrastructure-design.md の vitanota-db-migrator Lambda
-//
-// 参照: aidlc-docs/construction/unit-01/infrastructure-design/infrastructure-design.md
-//       「DB マイグレーション: AWS Lambda (vitanota-db-migrator)」セクション
-//
-// デプロイ:
-//   1. このディレクトリで pnpm install + tsc でビルド
-//   2. dist/ + node_modules を zip
-//   3. aws lambda update-function-code --function-name vitanota-db-migrator-{env}
+// DB マイグレーション Lambda (Phase 1: RDS 直接接続 + Secrets Manager パスワード認証)
 //
 // 呼び出し:
 //   aws lambda invoke \
-//     --function-name vitanota-db-migrator-dev \
+//     --function-name vitanota-prod-db-migrator \
 //     --payload '{"command":"migrate"}' \
 //     --cli-binary-format raw-in-base64-out response.json
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { Client } from 'pg';
-import { Signer } from '@aws-sdk/rds-signer';
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 interface MigrateEvent {
   command: 'migrate' | 'status' | 'drop';
@@ -33,41 +24,44 @@ const RDS_HOST = process.env.RDS_PROXY_ENDPOINT!;
 const RDS_PORT = Number(process.env.RDS_PROXY_PORT ?? '5432');
 const RDS_USER = process.env.DB_USER!;
 const RDS_DATABASE = process.env.DB_NAME!;
-const AWS_REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
+const AWS_REGION = process.env.AWS_REGION_OVERRIDE ?? process.env.AWS_REGION ?? 'ap-northeast-1';
+const DB_PASSWORD_SECRET_ARN = process.env.DB_PASSWORD_SECRET_ARN!;
 const ENV = process.env.ENV ?? 'dev';
-const MIGRATIONS_DIR = resolve(__dirname, '../migrations');
+
+// Lambda 環境では task ディレクトリ直下に migrations がバンドルされる
+const MIGRATIONS_DIR = resolve(process.env.LAMBDA_TASK_ROOT ?? __dirname, 'migrations');
+
+const secretsClient = new SecretsManagerClient({ region: AWS_REGION });
 
 /**
- * RDS Proxy への IAM 認証トークンを生成
- * トークン有効期限は 15 分
+ * Secrets Manager から RDS マスターパスワードを取得
  */
-async function buildAuthToken(): Promise<string> {
-  const signer = new Signer({
-    region: AWS_REGION,
-    hostname: RDS_HOST,
-    port: RDS_PORT,
-    username: RDS_USER,
-  });
-  return signer.getAuthToken();
+async function getMasterPassword(): Promise<string> {
+  const response = await secretsClient.send(
+    new GetSecretValueCommand({ SecretId: DB_PASSWORD_SECRET_ARN })
+  );
+  if (!response.SecretString) {
+    throw new Error('Secret value is empty');
+  }
+  // RDS 自動生成シークレットは {"username":"...","password":"..."} 形式
+  const parsed = JSON.parse(response.SecretString) as { username: string; password: string };
+  return parsed.password;
 }
 
 async function connect(): Promise<Client> {
-  const password = await buildAuthToken();
+  const password = await getMasterPassword();
   const client = new Client({
     host: RDS_HOST,
     port: RDS_PORT,
     user: RDS_USER,
     database: RDS_DATABASE,
     password,
-    ssl: { rejectUnauthorized: true },
+    ssl: { rejectUnauthorized: false }, // RDS 自己署名証明書を許可
   });
   await client.connect();
   return client;
 }
 
-/**
- * マイグレーション履歴テーブルを初期化
- */
 async function ensureMigrationsTable(client: Client): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -78,9 +72,6 @@ async function ensureMigrationsTable(client: Client): Promise<void> {
   `);
 }
 
-/**
- * 適用済みマイグレーション一覧を取得
- */
 async function getAppliedMigrations(client: Client): Promise<Set<string>> {
   const result = await client.query<MigrationRow>(
     'SELECT filename FROM _migrations ORDER BY id'
@@ -88,22 +79,13 @@ async function getAppliedMigrations(client: Client): Promise<Set<string>> {
   return new Set(result.rows.map((r) => r.filename));
 }
 
-/**
- * migrations/ ディレクトリの全 SQL ファイルをソートして返す
- */
 function listMigrationFiles(): string[] {
   return readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith('.sql'))
     .sort();
 }
 
-/**
- * command: migrate - 未適用マイグレーションを順次実行
- */
-async function runMigrate(): Promise<{
-  applied: string[];
-  skipped: string[];
-}> {
+async function runMigrate(): Promise<{ applied: string[]; skipped: string[] }> {
   const client = await connect();
   try {
     await ensureMigrationsTable(client);
@@ -118,17 +100,11 @@ async function runMigrate(): Promise<{
         skipped.push(file);
         continue;
       }
-
       const sqlContent = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
-
-      // 各マイグレーションは独立したトランザクション
       await client.query('BEGIN');
       try {
         await client.query(sqlContent);
-        await client.query(
-          'INSERT INTO _migrations (filename) VALUES ($1)',
-          [file]
-        );
+        await client.query('INSERT INTO _migrations (filename) VALUES ($1)', [file]);
         await client.query('COMMIT');
         newlyApplied.push(file);
         console.log(`✅ Applied: ${file}`);
@@ -138,26 +114,18 @@ async function runMigrate(): Promise<{
         throw new Error(`Migration ${file} failed: ${message}`);
       }
     }
-
     return { applied: newlyApplied, skipped };
   } finally {
     await client.end();
   }
 }
 
-/**
- * command: status - 適用済み・未適用一覧を返す
- */
-async function runStatus(): Promise<{
-  applied: string[];
-  pending: string[];
-}> {
+async function runStatus(): Promise<{ applied: string[]; pending: string[] }> {
   const client = await connect();
   try {
     await ensureMigrationsTable(client);
     const appliedSet = await getAppliedMigrations(client);
     const files = listMigrationFiles();
-
     const applied: string[] = [];
     const pending: string[] = [];
     for (const f of files) {
@@ -169,10 +137,6 @@ async function runStatus(): Promise<{
   }
 }
 
-/**
- * command: drop - 全テーブル削除 (dev 環境のみ)
- * SECURITY: prod では絶対に実行しない
- */
 async function runDrop(): Promise<{ dropped: boolean }> {
   if (ENV === 'prod') {
     throw new Error('drop is disabled on prod environment');
@@ -187,49 +151,31 @@ async function runDrop(): Promise<{ dropped: boolean }> {
   }
 }
 
-/**
- * Lambda エントリポイント
- */
 export const handler = async (event: MigrateEvent) => {
   console.log(`vitanota-db-migrator invoked: ${event.command} (env=${ENV})`);
-
   try {
     switch (event.command) {
       case 'migrate': {
         const result = await runMigrate();
-        return {
-          statusCode: 200,
-          body: JSON.stringify(result),
-        };
+        return { statusCode: 200, body: JSON.stringify(result) };
       }
       case 'status': {
         const result = await runStatus();
-        return {
-          statusCode: 200,
-          body: JSON.stringify(result),
-        };
+        return { statusCode: 200, body: JSON.stringify(result) };
       }
       case 'drop': {
         const result = await runDrop();
-        return {
-          statusCode: 200,
-          body: JSON.stringify(result),
-        };
+        return { statusCode: 200, body: JSON.stringify(result) };
       }
       default:
         return {
           statusCode: 400,
-          body: JSON.stringify({
-            error: `Unknown command: ${(event as { command: string }).command}`,
-          }),
+          body: JSON.stringify({ error: `Unknown command: ${(event as { command: string }).command}` }),
         };
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('Migration error:', message);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: message }) };
   }
 };

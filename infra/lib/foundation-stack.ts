@@ -55,8 +55,19 @@ export class FoundationStack extends cdk.Stack {
     });
     rdsSg.addIngressRule(this.appSecurityGroup, ec2.Port.tcp(5432), 'From App Runner');
     this.appSecurityGroup.addEgressRule(rdsSg, ec2.Port.tcp(5432), 'To RDS');
-    this.appSecurityGroup.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'To AWS APIs');
+    this.appSecurityGroup.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'To AWS APIs (incl. VPC Endpoints)');
+    // VPC Endpoint 経由の HTTPS Ingress を許可（Lambda から Secrets Manager への応答）
+    this.appSecurityGroup.addIngressRule(this.appSecurityGroup, ec2.Port.tcp(443), 'From self for VPC Endpoint');
     this.rdsSecurityGroup = rdsSg;
+
+    // VPC Interface Endpoint: Secrets Manager
+    // PRIVATE_ISOLATED Lambda（db-migrator）から Secrets Manager API に到達するため必須
+    vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      securityGroups: [this.appSecurityGroup],
+      privateDnsEnabled: true,
+    });
 
     // GitHub Actions OIDC プロバイダー
     const oidcProvider = new iam.OpenIdConnectProvider(this, 'GitHubOidc', {

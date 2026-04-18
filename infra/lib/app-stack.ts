@@ -3,11 +3,14 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as apprunner from 'aws-cdk-lib/aws-apprunner';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as path from 'node:path';
 import type { Construct } from 'constructs';
 import type { Secrets } from './data-shared-stack';
 
@@ -19,6 +22,7 @@ export interface AppStackProps extends cdk.StackProps {
   rdsEndpoint: string;
   rdsPort: string;
   dbName: string;
+  rdsSecret: secretsmanager.ISecret;
   secrets: Secrets;
   ecrRepository: ecr.IRepository;
   githubActionsRole: iam.Role;
@@ -152,22 +156,49 @@ export class AppStack extends cdk.Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaVPCAccessExecutionRole'),
       ],
     });
+    // RDS master password を Secrets Manager から取得する権限
+    props.rdsSecret.grantRead(migratorRole);
 
-    new lambda.Function(this, 'DbMigrator', {
+    const migratorEntry = path.join(__dirname, '../../scripts/db-migrator/handler.ts');
+    const migratorProjectRoot = path.join(__dirname, '../../scripts/db-migrator');
+    new lambdaNodejs.NodejsFunction(this, 'DbMigrator', {
       functionName: `${prefix}-db-migrator`,
       runtime: lambda.Runtime.NODEJS_20_X,
       architecture: lambda.Architecture.ARM_64,
-      handler: 'handler.handler',
-      code: lambda.Code.fromAsset('../scripts/db-migrator'),
+      entry: migratorEntry,
+      projectRoot: migratorProjectRoot,
+      depsLockFilePath: path.join(migratorProjectRoot, 'pnpm-lock.yaml'),
+      handler: 'handler',
       memorySize: 512,
       timeout: cdk.Duration.minutes(5),
       vpc: props.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      // AppRunner と同じ SG を共有することで RDS SG の既存 Ingress 設定を再利用
+      securityGroups: [props.appSecurityGroup as ec2.ISecurityGroup],
       role: migratorRole,
+      bundling: {
+        // pg は純 JS なので esbuild でバンドル可能
+        // migrations/*.sql を Lambda バンドルにコピー
+        commandHooks: {
+          beforeBundling(_inputDir: string, _outputDir: string): string[] {
+            return [];
+          },
+          afterBundling(_inputDir: string, outputDir: string): string[] {
+            // CDK ワークスペースルートから migrations をコピー（inputDir は projectRoot=scripts/db-migrator/）
+            const migrationsSrc = path.join(__dirname, '../../migrations');
+            return [`mkdir -p "${outputDir}/migrations" && cp "${migrationsSrc}/"*.sql "${outputDir}/migrations/"`];
+          },
+          beforeInstall(_inputDir: string, _outputDir: string): string[] {
+            return [];
+          },
+        },
+      },
       environment: {
         RDS_PROXY_ENDPOINT: props.rdsEndpoint,
+        RDS_PROXY_PORT: props.rdsPort,
         DB_USER: 'vitanota',
         DB_NAME: props.dbName,
+        DB_PASSWORD_SECRET_ARN: props.rdsSecret.secretArn,
         AWS_REGION_OVERRIDE: props.env?.region ?? 'ap-northeast-1',
         ENV: props.envName,
       },

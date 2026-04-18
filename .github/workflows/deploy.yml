@@ -43,6 +43,9 @@ jobs:
         run: |
           docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          # :latest も push する (CDK AppStack が AppRunner 作成時に参照するため)
+          docker tag  $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $REGISTRY/$ECR_REPOSITORY:latest
+          docker push $REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
   # ── Deploy to Dev ───────────────────────────────────────────
@@ -51,6 +54,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: development
+    # ブートストラップ時（AppRunner 未作成）は skip
+    if: vars.APPRUNNER_SERVICE_ARN_DEV != ''
 
     steps:
       - name: Configure AWS credentials (OIDC)
@@ -93,6 +98,8 @@ jobs:
     needs: [build, deploy-dev]
     runs-on: ubuntu-latest
     environment: production  # GitHub Environments で手動承認を設定すること
+    # ブートストラップ時（AppRunner 未作成）は skip
+    if: vars.APPRUNNER_SERVICE_ARN_PROD != ''
 
     steps:
       - name: Configure AWS credentials (OIDC)

@@ -78,8 +78,20 @@ jobs:
 
       - name: Wait for deployment
         run: |
-          aws apprunner wait service-updated \
-            --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_DEV }}
+          # AppRunner は aws-cli に waiter が無いので polling で代替
+          ARN="${{ vars.APPRUNNER_SERVICE_ARN_DEV }}"
+          for i in $(seq 1 60); do
+            STATUS=$(aws apprunner describe-service --service-arn "$ARN" --query 'Service.Status' --output text)
+            echo "[$i] Status: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then exit 0; fi
+            if [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ]; then
+              echo "::error::Service ended in failure state: $STATUS"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "::error::Timeout waiting for RUNNING status"
+          exit 1
 
       - name: Health check (dev)
         run: |
@@ -123,8 +135,20 @@ jobs:
 
       - name: Wait for deployment
         run: |
-          aws apprunner wait service-updated \
-            --service-arn ${{ vars.APPRUNNER_SERVICE_ARN_PROD }}
+          # AppRunner は aws-cli に waiter が無いので polling で代替
+          ARN="${{ vars.APPRUNNER_SERVICE_ARN_PROD }}"
+          for i in $(seq 1 60); do
+            STATUS=$(aws apprunner describe-service --service-arn "$ARN" --query 'Service.Status' --output text)
+            echo "[$i] Status: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then exit 0; fi
+            if [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ]; then
+              echo "::error::Service ended in failure state: $STATUS"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "::error::Timeout waiting for RUNNING status"
+          exit 1
 
       - name: Health check (prod)
         run: |

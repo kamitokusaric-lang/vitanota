@@ -815,3 +815,150 @@
 **コンテキスト**: コンストラクションフェーズ全完了。MVP Ready。
 
 ---
+
+## Phase 1 デプロイセッション再開
+**タイムスタンプ**: 2026-04-18T07:00:00Z
+**ユーザー入力**: "NSに反映されたので、次のステップに進みたい"
+**AI応答**: 引き継ぎ 5 項目（NS 反映確認・CDK デプロイ・本番 DB マイグレーション・Google OAuth 設定・CI/CD 動作確認）が前セッションの記憶のみで memory に保存されていないことを発見。memory に `project_deployment_checklist.md` および `project_domain_and_infra.md` を保存し、MEMORY.md のインデックスを更新。
+**コンテキスト**: MVP 初回 Phase 1 デプロイの開始。ドメイン vitanota.io。AWS アカウント 107094297297（作成日 2026-04-07・Free Tier 期間内）。
+
+---
+
+## NS 反映確認
+**タイムスタンプ**: 2026-04-18T07:05:00Z
+**検証コマンド**: `dig vitanota.io NS +short` / `dig @8.8.8.8 vitanota.io NS +short`
+**結果**: Route53 委譲完了（ns-1094.awsdns-08.org / ns-1672.awsdns-17.co.uk / ns-376.awsdns-47.com / ns-757.awsdns-30.net）。Google DNS 経由でも同じ応答で伝播完了。
+**コンテキスト**: 引き継ぎ項目 1/5 完了。
+
+---
+
+## インフラ不整合検出・方針 B 採択
+**タイムスタンプ**: 2026-04-18T07:15:00Z
+**ユーザー入力**: "B"（EdgeStack に Route53 連携を CDK で完結させる案）
+**AI応答**: 以下の不整合を検出してユーザーに 3 択提示:
+- `infra/cdk.json` の `domainName: "vitanota.example.com"` が実ドメイン `vitanota.io` と不一致 → ACM DNS バリデーションが永遠に PENDING になる
+- `infra/lib/edge-stack.ts` に Route53 hosted zone lookup が未実装 → ACM 検証 CNAME と CloudFront Alias が手動作業になる
+
+ユーザーは B（CDK 正攻法）を選択。
+**コンテキスト**: EdgeStack に `HostedZone.fromLookup` + `CertificateValidation.fromDns(zone)` + `ARecord/AaaaRecord` を追加する方針確定。
+
+---
+
+## GitHub OIDC ロール権限未付与を検出
+**タイムスタンプ**: 2026-04-18T07:30:00Z
+**ユーザー入力**: "はい"（修正プラン承認）
+**AI応答**: `infra/lib/foundation-stack.ts` の `ghActionsRole` に Policy が一切アタッチされていないことを検出。このままだと CI が AccessDenied で失敗する。修正プラン:
+1. FoundationStack で `public readonly githubActionsRole: iam.Role` として公開
+2. ECR 権限（`GetAuthorizationToken` / `BatchCheckLayerAvailability` / `InitiateLayerUpload` / `UploadLayerPart` / `CompleteLayerUpload` / `PutImage` / `BatchGetImage`）を付与
+3. AppRunner 権限（`UpdateService` / `DescribeService`）は AppStack で付与（サービス ARN 限定）
+
+ユーザーから CDK 設計上の指摘:
+- `iam.IRole` で受けると `Role.fromRoleArn` で取得した immutable role も代入可能になり将来の silent breakage リスクがある → **`iam.Role` 具象型で受ける**
+- CFN Export/ImportValue を連想させる「export して」という表現は避け、**同一 CDK アプリ内の construct 参照**として扱う旨を明示する
+- 複数スタックが同じ imported role に grant する場合、`defaultPolicyName` を明示しないと最後にデプロイされた inline policy が他を上書きする仕様
+
+これらの指摘を受けて方針を再整理後、ユーザー承認を得て実装に着手。
+**コンテキスト**: CDK 横断のセキュリティ・型設計の品質担保。
+
+---
+
+## 循環参照の回避
+**タイムスタンプ**: 2026-04-18T07:40:00Z
+**問題**: AppStack で `props.githubActionsRole.addToPolicy(...)` を使うと、Role の default policy に AppStack 由来の ARN（`service.attrServiceArn`）が混入し、FoundationStack → AppStack の循環参照が発生。
+**AI応答**: AppStack 側に独立した `iam.Policy` リソースを作成して `roles: [props.githubActionsRole]` で付与する方式に変更。Policy resource 自体が AppStack 側に立つため、FoundationStack は AppStack を参照しない。
+**コンテキスト**: `cdk synth` で DependencyCycle エラーから復帰。
+
+---
+
+## インフラ修正コミット
+**タイムスタンプ**: 2026-04-18T07:50:00Z
+**コミット**: `d87b73b feat(infra): Route53 連携と GitHub OIDC 権限スコープ設定`
+**変更ファイル**:
+- `infra/cdk.json` — domainName を vitanota.io に修正
+- `infra/lib/edge-stack.ts` — Route53 HostedZone lookup / fromDns(zone) / apex A + AAAA Alias レコード
+- `infra/lib/foundation-stack.ts` — ghActionsRole を public readonly iam.Role として公開 + ECR 権限付与
+- `infra/lib/app-stack.ts` — githubActionsRole prop 追加 + iam.Policy で AppRunner 権限付与
+- `infra/bin/vitanota.ts` — foundation.githubActionsRole を AppStack に props で渡す
+- `infra/.gitignore` — cdk.out/・*.js・*.d.ts を除外
+- `infra/cdk.context.json` — Route53 hosted zone lookup 結果をキャッシュ（commit する CDK 規約通り）
+**コンテキスト**: Phase 1 デプロイ準備整備完了。
+
+---
+
+## Step 1 デプロイ初回 - 部分成功
+**タイムスタンプ**: 2026-04-18T08:00:00Z
+**実行コマンド**: `cdk deploy vitanota-prod-foundation vitanota-prod-data-core vitanota-prod-data-shared --require-approval never`
+**結果**:
+- ✅ `vitanota-prod-data-shared` CREATE_COMPLETE（約 46 秒・KMS/Secrets × 4/S3/ECR）
+- ✅ `vitanota-prod-foundation` CREATE_COMPLETE（約 90 秒・VPC/SG × 2/OIDC Provider/Role + ECR Policy/Permission Boundary）
+- ❌ `vitanota-prod-data-core` CREATE_FAILED → ROLLBACK_COMPLETE
+**失敗原因**: `AWS::RDS::DBInstance` が "The specified backup retention period exceeds the maximum available to free tier customers" で拒否。アカウント作成 11 日目で Free Tier 期間内（〜2027-04-07）のため、`backupRetention: 7 日` が 20 GB バックアップ枠上限を超過する判定。
+**コンテキスト**: Free Tier 制約を想定外で踏んだ。
+
+---
+
+## Free Tier 制約の方針選択
+**タイムスタンプ**: 2026-04-18T08:15:00Z
+**ユーザー入力**:
+- "もう5日以内にはユーザーが使い始める状況です。その場合、選択肢は絞られますよね？データの保持がいちばんのネックですね？"
+- "Bで進めます"
+**AI応答**: 5 日制約下で除外されるのは以下:
+- Free Tier 期間明け（2027 年）まで待つ
+- AWS Support での Service Limit 引き上げ申請（承認まで 1 週間不確実）
+- 別 AWS アカウント作成（Free Tier 制限は per-account で同じ）
+- 別 DB サービス（既存コードの改修コスト）
+
+現実的選択肢:
+- **A**: `backupRetention: 1` のみ（1 日分の復旧ウィンドウ）
+- **B**: A + SnapshotManager Lambda（日次 manual snapshot 7 日保持）← **β 校の児童感情データ保護のため採択**
+
+採択した B 案の構成:
+1. `backupRetention: 7 → 1` に変更（自動バックアップは 24 時間の PITR のみ）
+2. `vitanota-prod-snapshot-manager` Lambda を追加（Node.js 20 ARM64・inline code・256 MB・5 分タイムアウト）
+3. EventBridge Rule `vitanota-prod-snapshot-daily`（cron 0 18 * * ? * = JST 03:00 daily）
+4. IAM: `CreateDBSnapshot` / `DeleteDBSnapshot` / `AddTagsToResource` は RDS インスタンス ARN + manual snapshot ARN（`vitanota-prod-manual-*`）に限定、`DescribeDBSnapshots` のみ resource `*`（AWS 仕様）
+5. CloudWatch Logs 30 日保持（`/aws/lambda/vitanota-prod-snapshot-manager`）
+6. 命名規則: `vitanota-prod-manual-YYYYMMDD`（冪等性を日付単位で確保）
+
+**Free Tier 卒業後の移行計画** (2027-04-07 以降): `backupRetention: 7` に戻して snapshot-manager を停止 or 長期保持（90 日等）に役割変更。
+**コンテキスト**: データ保持が 5 日制約下の唯一の本質リスクであるという判断を共有。
+
+---
+
+## バックアップ戦略コミット・リトライ
+**タイムスタンプ**: 2026-04-18T08:25:00Z
+**コミット**: `603bbc1 feat(infra): RDS バックアップ戦略を Free Tier 対応に変更`
+**変更ファイル**:
+- `infra/lib/data-core-stack.ts` — backupRetention 1 日 + SnapshotManager Lambda + EventBridge Rule + IAM 最小権限
+- `aidlc-docs/construction/deployment-phases.md` — Phase 1 構成表に「自動バックアップ 1 日 + 手動 snapshot 7 日」記載、RDS バックアップ戦略セクションを新設
+**前処理**: `aws cloudformation delete-stack --stack-name vitanota-prod-data-core` で ROLLBACK_COMPLETE 状態のスタックを削除（CloudFormation 仕様で初回失敗スタックは削除しないと再作成不可）
+**再デプロイ結果**: `cdk deploy vitanota-prod-data-core` 成功（約 7 分）
+**Outputs**:
+- `RdsEndpoint`: vitanota-prod-db.cdcegkgsqgbs.ap-northeast-1.rds.amazonaws.com
+- `RdsPort`: 5432
+- `SnapshotManagerArn`: arn:aws:lambda:ap-northeast-1:107094297297:function:vitanota-prod-snapshot-manager
+**コンテキスト**: Step 1（Foundation / DataShared / DataCore）全デプロイ完了。
+
+---
+
+## SnapshotManager 動作確認
+**タイムスタンプ**: 2026-04-18T08:40:00Z
+**ユーザー入力**: "Bから"（Step 2 に進む前に SnapshotManager 動作確認を優先）
+**検証結果**:
+- 1 回目 invoke: `{"created":"vitanota-prod-manual-20260418","deleted":[]}` status ok
+- 2 回目 invoke（冪等性）: 同 snapshotId で `skip_exists` 分岐動作（同日中の重複作成なし）
+- RDS Snapshot 実体: `vitanota-prod-manual-20260418` が creating 状態で開始
+- EventBridge Rule: `state: ENABLED`・`schedule: cron(0 18 * * ? *)` 確認
+- CloudWatch Logs: JSON 形式で `action=create/delete` 構造化ログ確認
+- IAM: CreateDBSnapshot / DescribeDBSnapshots いずれも AccessDenied なし
+**コンテキスト**: バックアップ戦略の信頼担保完了。次は Step 2（GitHub variables 設定）に進行。
+
+---
+
+## セキュリティ整理: RDS snapshot API の public endpoint 利用
+**タイムスタンプ**: 2026-04-18T08:42:00Z
+**ユーザー入力**: "RDS snapshot API は public endpointでも問題ないですか？"
+**AI応答**: SnapshotManager Lambda は VPC 外で実行しているが、呼び出しているのはすべて RDS コントロールプレーン API（`CreateDBSnapshot` / `DescribeDBSnapshots` / `DeleteDBSnapshot`）で、DB のデータプレーンには一切アクセスしない。通信は TLS 1.2+ 暗号化・SigV4 署名・IAM scoped policy で保護されており、`aws rds create-db-snapshot` コマンドをローカル CLI から叩くのと同じセキュリティレベル。対照的に db-migrator Lambda は PostgreSQL プロトコルで直接 DB に接続するため VPC 必須。MVP β 段階では VPC Endpoint（約 $10/月/AZ）は不要。Phase 2 以降でコンプライアンス要件が出た場合に検討。
+**コンテキスト**: セキュリティ判断の明文化。
+
+---

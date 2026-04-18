@@ -97,14 +97,14 @@ graph TD
 | 要素 | 設定 |
 |---|---|
 | 環境 | **単一環境**（dev / prod を分離しない） |
-| RDS | **t4g.micro 単一 AZ**・削除保護有効・自動バックアップ 7 日 |
+| RDS | **t4g.micro 単一 AZ**・削除保護有効・自動バックアップ 1 日 + 手動 snapshot 7 日（※下記） |
 | RDS Proxy | **なし**（App Runner から直接接続、パスワード認証） |
 | App Runner | **min=0 max=3**（スケールゼロで idle 時コスト削減） |
 | CloudFront | 1 ディストリビューション + WAF Web ACL |
 | WAF | Managed Rules（Common/SQLi/KnownBadInputs/IpReputation）+ RateLimit |
 | Shield | Standard（無料・自動） |
 | Secrets Manager | **db-password** を含む 4-5 件 |
-| Lambda | **db-migrator のみ**（header-rotator・rds-monitor は省略） |
+| Lambda | **db-migrator** + **snapshot-manager**（header-rotator・rds-monitor は省略） |
 | CloudWatch アラーム | **5 個**（必須のみ） |
 | S3 監査ログ | Object Lock **90 日**（後で 7 年に拡張可能） |
 | Permission Boundary | 最小版（`iam:*` 変更拒否のみ） |
@@ -124,6 +124,18 @@ graph TD
 | ECR | $1 |
 | Lambda | ~$0 |
 | **合計** | **約 $40-55/月（¥6,000-8,000）** |
+
+### RDS バックアップ戦略（Free Tier 対応）
+
+AWS アカウント作成から 12 ヶ月は Free Tier 制約下で、RDS 自動バックアップの合計ストレージが 20 GB 上限。`backupRetention: 7 日` では割当量超過エラーで RDS 作成が失敗するため、以下の 2 層構成で実効的な 7 日復旧ウィンドウを確保する。
+
+- **L1: 自動バックアップ（retention = 1 日）** — AWS マネージド PITR。24 時間以内の事故復旧用
+- **L2: 手動 snapshot（7 日保持）** — `vitanota-prod-snapshot-manager` Lambda が EventBridge cron（JST 03:00 毎日）で作成、7 日以上古い snapshot を自動削除
+  - snapshot 命名: `vitanota-prod-manual-YYYYMMDD`
+  - CloudWatch Logs: `/aws/lambda/vitanota-prod-snapshot-manager`（保持 30 日）
+  - IAM: `CreateDBSnapshot` / `DeleteDBSnapshot` は RDS インスタンス ARN + manual snapshot ARN に限定、`DescribeDBSnapshots` のみ `*`（AWS 仕様）
+
+**Free Tier 卒業後（2027-04-07 以降）の移行**：`backupRetention: 7` に戻して snapshot-manager を停止（または保持期間延長に役割変更）する。migration は `cdk deploy` 1 回で完了。
 
 ### Phase 1 で達成するもの
 

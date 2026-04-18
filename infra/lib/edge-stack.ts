@@ -145,7 +145,9 @@ export class EdgeStack extends cdk.Stack {
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+        // AppRunner は Host ヘッダーがサービス URL と一致しないと 404 を返すため
+        // client の Host (vitanota.io) を転送せず、origin デフォルトの hostname を使う
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
       },

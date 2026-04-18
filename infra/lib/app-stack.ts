@@ -90,6 +90,8 @@ export class AppStack extends cdk.Stack {
               { name: 'DB_NAME', value: props.dbName },
               { name: 'E2E_TEST_MODE', value: 'false' },
               { name: 'DB_SSL', value: 'true' },
+              // NextAuth.js: OAuth callback URL 生成に必須（本番ドメイン）
+              { name: 'NEXTAUTH_URL', value: 'https://vitanota.io' },
               // Next.js standalone が listen する hostname を 0.0.0.0 に強制。
               // AppRunner ランタイムがコンテナ起動時に HOSTNAME をコンテナの
               // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、

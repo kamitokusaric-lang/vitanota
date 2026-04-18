@@ -23,13 +23,13 @@ export default function SignInPage({ error, isDev }: SignInPageProps) {
     : null;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-vn-bg px-4">
+      <div className="w-full max-w-sm rounded-vn border border-vn-border bg-white p-8">
         {/* ロゴ */}
-        <h1 className="mb-2 text-center text-2xl font-bold text-blue-600" data-testid="signin-logo">
-          vitanota
+        <h1 className="mb-2 text-center text-2xl font-bold" data-testid="signin-logo">
+          vita<span className="text-vn-accent">nota</span><span className="text-vn-accent">.</span>
         </h1>
-        <p className="mb-8 text-center text-sm text-gray-500">
+        <p className="mb-8 text-center text-sm text-vn-muted">
           教員のウェルネスをサポートするツール
         </p>
 
@@ -41,19 +41,18 @@ export default function SignInPage({ error, isDev }: SignInPageProps) {
         )}
 
         {/* Google ログインボタン */}
-        <Button
-          variant="primary"
-          className="w-full"
+        <button
           onClick={() => signIn('google', { callbackUrl: '/' })}
           data-testid="signin-google-button"
+          className="w-full rounded-[10px] bg-vn-header py-[15px] text-[15px] font-semibold text-white transition-opacity hover:opacity-85"
         >
           Google でログイン
-        </Button>
+        </button>
 
         {isDev && (
           <Link
             href="/auth/dev-login"
-            className="mt-4 block text-center text-sm text-gray-400 hover:text-blue-600"
+            className="mt-4 block text-center text-sm text-vn-muted hover:text-vn-accent"
           >
             Dev Login (開発環境専用)
           </Link>

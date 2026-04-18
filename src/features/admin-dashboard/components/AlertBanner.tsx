@@ -9,15 +9,15 @@ export function AlertBanner({ openCount }: AlertBannerProps) {
 
   return (
     <div
-      className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+      className="mb-4 flex items-center justify-between rounded-vn border border-vn-border bg-vn-red-bg px-5 py-3"
       data-testid="alert-banner"
     >
-      <span className="text-sm font-medium text-red-800">
+      <span className="text-sm font-medium text-vn-red">
         {openCount} 件のアラートがあります
       </span>
       <Link
         href="/dashboard/admin/alerts"
-        className="text-sm text-red-600 hover:text-red-800 hover:underline"
+        className="text-sm text-vn-red hover:underline"
         data-testid="alert-banner-link"
       >
         アラート一覧を見る

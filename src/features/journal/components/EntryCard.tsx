@@ -41,7 +41,7 @@ export function EntryCard({
 
   return (
     <article
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+      className="rounded-vn border border-vn-border bg-white p-4"
       data-testid={`entry-card-${entry.id}`}
     >
       <header className="mb-2 flex items-center justify-between text-xs text-gray-500">

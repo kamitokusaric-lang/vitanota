@@ -6,10 +6,10 @@ import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
-import { TeacherStatusGrid } from '@/features/admin-dashboard/components/TeacherStatusGrid';
+import { TeacherStatusTable } from '@/features/admin-dashboard/components/TeacherStatusTable';
 import { AlertBanner } from '@/features/admin-dashboard/components/AlertBanner';
 import { PeriodSelector } from '@/features/teacher-dashboard/components/PeriodSelector';
-import { EmotionTrendChart } from '@/features/teacher-dashboard/components/EmotionTrendChart';
+import { SchoolTrendBarChart } from '@/features/admin-dashboard/components/SchoolTrendBarChart';
 import { EmptyStateGuide } from '@/features/teacher-dashboard/components/EmptyStateGuide';
 import { useTeacherStatuses } from '@/features/admin-dashboard/hooks/useTeacherStatuses';
 import { useAdminAlerts } from '@/features/admin-dashboard/hooks/useAdminAlerts';
@@ -52,10 +52,10 @@ export default function AdminDashboard({ session }: AdminDashboardProps) {
 
             <AlertBanner openCount={openAlertCount} />
 
-            {/* 学校全体の感情傾向グラフ */}
-            <section className="mb-8">
-              <h2 className="mb-3 text-lg font-semibold text-gray-800">学校全体の感情傾向</h2>
-              <div className="mb-3">
+            {/* 学校全体の元気度グラフ */}
+            <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div /> {/* SchoolTrendBarChart 内でヘッダー表示 */}
                 <PeriodSelector value={period} onChange={setPeriod} />
               </div>
               {trendError && <ErrorMessage message="感情傾向データの取得に失敗しました" />}
@@ -67,13 +67,13 @@ export default function AdminDashboard({ session }: AdminDashboardProps) {
                   {schoolTrend.totalEntries < MIN_ENTRIES ? (
                     <EmptyStateGuide currentCount={schoolTrend.totalEntries} minRequired={MIN_ENTRIES} />
                   ) : (
-                    <EmotionTrendChart data={schoolTrend.data} periodDays={PERIOD_DAYS[period]} />
+                    <SchoolTrendBarChart data={schoolTrend.data} periodDays={PERIOD_DAYS[period]} />
                   )}
                 </>
               )}
             </section>
 
-            {/* 教員ステータス一覧 */}
+            {/* 教員ステータステーブル */}
             <section>
               <h2 className="mb-3 text-lg font-semibold text-gray-800">教員ステータス</h2>
 
@@ -85,7 +85,7 @@ export default function AdminDashboard({ session }: AdminDashboardProps) {
               )}
 
               {!teachersLoading && !teachersError && teachers && (
-                <TeacherStatusGrid
+                <TeacherStatusTable
                   teachers={teachers}
                   onTeacherClick={(userId) => router.push(`/dashboard/admin/teacher/${userId}`)}
                 />

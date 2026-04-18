@@ -39,7 +39,7 @@ export function EmotionSummaryCard({
 
   return (
     <div
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+      className="rounded-vn border border-vn-border bg-white p-4"
       data-testid="emotion-summary-card"
     >
       <div className="flex items-center justify-between">

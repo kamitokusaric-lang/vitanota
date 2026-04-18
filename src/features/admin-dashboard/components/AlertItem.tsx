@@ -24,7 +24,7 @@ function formatDate(iso: string): string {
 export function AlertItem({ alert, onClose, isClosing }: AlertItemProps) {
   return (
     <div
-      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
+      className="flex items-center justify-between rounded-vn border border-vn-border bg-white px-5 py-4"
       data-testid={`alert-item-${alert.id}`}
     >
       <div>
@@ -32,7 +32,7 @@ export function AlertItem({ alert, onClose, isClosing }: AlertItemProps) {
           <span
             className={[
               'inline-block h-2 w-2 rounded-full',
-              alert.type === 'negative_trend' ? 'bg-red-500' : 'bg-yellow-500',
+              alert.type === 'negative_trend' ? 'bg-vn-red' : 'bg-vn-gold',
             ].join(' ')}
           />
           <span className="font-medium text-gray-900">{alert.teacherName}</span>

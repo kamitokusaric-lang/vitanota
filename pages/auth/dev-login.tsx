@@ -43,10 +43,10 @@ export default function DevLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
-        <h1 className="mb-2 text-2xl font-bold text-gray-900">Dev Login</h1>
-        <p className="mb-6 text-sm text-gray-500">
+    <div className="flex min-h-screen items-center justify-center bg-vn-bg">
+      <div className="w-full max-w-md rounded-vn border border-vn-border bg-white p-8">
+        <h1 className="mb-2 text-2xl font-bold">Dev Login</h1>
+        <p className="mb-6 text-sm text-vn-muted">
           開発環境専用ログイン（本番では表示されません）
         </p>
 
@@ -68,10 +68,10 @@ export default function DevLoginPage() {
                 onClick={() => handleLogin(user.userId)}
                 disabled={loggingIn !== null}
                 className={[
-                  'w-full rounded-lg border px-4 py-3 text-left transition-colors',
+                  'w-full rounded-[12px] border px-[18px] py-[14px] text-left transition-all',
                   loggingIn === user.userId
-                    ? 'border-blue-300 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50',
+                    ? 'border-vn-accent bg-vn-gold-bg'
+                    : 'border-vn-border hover:border-vn-accent hover:bg-vn-gold-bg',
                   'disabled:opacity-50',
                 ].join(' ')}
               >
@@ -80,11 +80,11 @@ export default function DevLoginPage() {
                 </div>
                 <div className="mt-1 flex gap-2 text-xs text-gray-500">
                   <span>{user.email}</span>
-                  <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono">
+                  <span className="rounded-full bg-vn-bg px-2 py-0.5 font-mono text-vn-muted">
                     {user.role}
                   </span>
                   {user.tenantName && (
-                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">
+                    <span className="rounded-full bg-vn-gold-bg px-2 py-0.5 text-vn-gold-text">
                       {user.tenantName}
                     </span>
                   )}

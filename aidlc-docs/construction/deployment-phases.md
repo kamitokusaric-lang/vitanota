@@ -48,7 +48,7 @@ graph TD
         ECR[ECR<br/>vitanota/app]
 
         subgraph AppTier[アプリ層]
-            AppRunner[App Runner<br/>0.25 vCPU / 0.5 GB<br/><b>min=0 max=3</b>]
+            AppRunner[App Runner<br/>0.25 vCPU / 0.5 GB<br/><b>min=1 max=3</b>]
         end
 
         subgraph VPC[VPC プライベートサブネット<br/>単一 AZ]
@@ -99,7 +99,7 @@ graph TD
 | 環境 | **単一環境**（dev / prod を分離しない） |
 | RDS | **t4g.micro 単一 AZ**・削除保護有効・自動バックアップ 1 日 + 手動 snapshot 7 日（※下記） |
 | RDS Proxy | **なし**（App Runner から直接接続、パスワード認証） |
-| App Runner | **min=0 max=3**（スケールゼロで idle 時コスト削減） |
+| App Runner | **min=1 max=3**（AppRunner 仕様で min>=1 必須・idle 時はアクティブ 0 でプロビジョニング分のみ課金） |
 | CloudFront | 1 ディストリビューション + WAF Web ACL |
 | WAF | Managed Rules（Common/SQLi/KnownBadInputs/IpReputation）+ RateLimit |
 | Shield | Standard（無料・自動） |

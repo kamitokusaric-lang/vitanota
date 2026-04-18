@@ -115,7 +115,9 @@ export class AppStack extends cdk.Stack {
         'AutoScaling',
         {
           autoScalingConfigurationName: `${prefix}-autoscaling`,
-          minSize: 0,
+          // AppRunner は minSize >= 1 必須（プロビジョニング済みインスタンス数）。
+          // idle 時はアクティブインスタンスが 0 になりプロビジョニング分のみ課金される。
+          minSize: 1,
           maxSize: 3,
           maxConcurrency: 100,
         }

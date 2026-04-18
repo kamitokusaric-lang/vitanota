@@ -19,6 +19,7 @@ export interface AppStackProps extends cdk.StackProps {
   envName: string;
   vpc: ec2.IVpc;
   appSecurityGroup: ec2.ISecurityGroup;
+  appEgressSecurityGroup: ec2.ISecurityGroup;
   rdsEndpoint: string;
   rdsPort: string;
   dbName: string;
@@ -47,10 +48,13 @@ export class AppStack extends cdk.Stack {
     );
 
     // ── App Runner VPC コネクター ──
+    // PRIVATE_WITH_EGRESS に配置：NAT Instance 経由で Google OAuth 等の外向き HTTPS に到達可能
+    // 新 SG (appEgressSecurityGroup) を使用：AppRunner は同一 SG 組み合わせで
+    // 2 つの VPC Connector を作れないため、旧 Connector と SG を分ける必要がある
     const vpcConnector = new apprunner.CfnVpcConnector(this, 'VpcConnector', {
-      vpcConnectorName: `${prefix}-vpc-connector`,
-      subnets: props.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_ISOLATED }).subnetIds,
-      securityGroups: [props.appSecurityGroup.securityGroupId],
+      vpcConnectorName: `${prefix}-vpc-connector-egress`,
+      subnets: props.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds,
+      securityGroups: [props.appEgressSecurityGroup.securityGroupId],
     });
 
     // ── App Runner インスタンスロール ──
@@ -92,6 +96,9 @@ export class AppStack extends cdk.Stack {
               { name: 'DB_SSL', value: 'true' },
               // NextAuth.js: OAuth callback URL 生成に必須（本番ドメイン）
               { name: 'NEXTAUTH_URL', value: 'https://vitanota.io' },
+              // NextAuth.js サーバサイド内部 fetch をコンテナ内 localhost に向ける
+              // （public URL 経由の自己 fetch が VPC 外向きになる問題を回避）
+              { name: 'NEXTAUTH_URL_INTERNAL', value: 'http://localhost:3000' },
               // Next.js standalone が listen する hostname を 0.0.0.0 に強制。
               // AppRunner ランタイムがコンテナ起動時に HOSTNAME をコンテナの
               // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、

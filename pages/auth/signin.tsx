@@ -77,6 +77,14 @@ export default function SignInPage({
     sessionStorage.setItem('google_oauth_verifier', verifier);
     sessionStorage.setItem('google_oauth_state', state);
 
+    // ─── DEBUG LOG (仮説検証用・後で削除) ───
+    console.log('[signin] sessionStorage set', {
+      verifierLen: verifier.length,
+      stateLen: state.length,
+      checkVerifier: !!sessionStorage.getItem('google_oauth_verifier'),
+      checkState: !!sessionStorage.getItem('google_oauth_state'),
+    });
+
     const params = new URLSearchParams({
       client_id: googleClientId,
       response_type: 'code',  // ★ Authorization Code Flow

@@ -21,6 +21,17 @@ export default function GoogleCallbackPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
   useEffect(() => {
+    // ─── DEBUG LOG (仮説検証用・後で削除) ───
+    // useEffect が 2 回以上発火しているか・各発火時に何が残っているかを確認する
+    // 本番の URL と cookie は出さない・booleans と短縮値のみ
+    console.log('[callback] useEffect fired', {
+      hasSearch: !!window.location.search,
+      searchLen: window.location.search.length,
+      hasState: !!sessionStorage.getItem('google_oauth_state'),
+      hasVerifier: !!sessionStorage.getItem('google_oauth_verifier'),
+      timestamp: Date.now(),
+    });
+
     let cancelled = false;
 
     async function run() {
@@ -39,7 +50,22 @@ export default function GoogleCallbackPage() {
       const storedState = sessionStorage.getItem('google_oauth_state');
       const verifier = sessionStorage.getItem('google_oauth_verifier');
 
+      // ─── DEBUG LOG (仮説検証用・後で削除) ───
+      console.log('[callback] run() entered', {
+        hasCode: !!code,
+        hasStateInUrl: !!state,
+        hasStoredState: !!storedState,
+        stateMatches: state === storedState,
+        hasVerifier: !!verifier,
+      });
+
       if (!code || !state || state !== storedState || !verifier) {
+        console.log('[callback] → INVALID_RESPONSE branch taken', {
+          reason: !code ? 'no_code'
+               : !state ? 'no_state_in_url'
+               : state !== storedState ? 'state_mismatch'
+               : 'no_verifier',
+        });
         setErrorCode('INVALID_RESPONSE');
         return;
       }

@@ -12,30 +12,24 @@
 // 6. セッション cookie を受け取ってホームへ遷移
 //
 // 設計詳細: aidlc-docs/construction/auth-externalization.md
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // React StrictMode や Next.js router の再生成で useEffect が複数回発火しても
+  // OAuth 処理は一度だけ実行する (2 回目で sessionStorage 空 → INVALID_RESPONSE 回避)
+  const executedRef = useRef(false);
 
   useEffect(() => {
-    // ─── DEBUG LOG (仮説検証用・後で削除) ───
-    // useEffect が 2 回以上発火しているか・各発火時に何が残っているかを確認する
-    // 本番の URL と cookie は出さない・booleans と短縮値のみ
-    console.log('[callback] useEffect fired', {
-      hasSearch: !!window.location.search,
-      searchLen: window.location.search.length,
-      hasState: !!sessionStorage.getItem('google_oauth_state'),
-      hasVerifier: !!sessionStorage.getItem('google_oauth_verifier'),
-      timestamp: Date.now(),
-    });
+    if (executedRef.current) return;
+    executedRef.current = true;
 
     let cancelled = false;
 
     async function run() {
-      // query からパラメータを取り出す (?code=...&state=...)
       const params = new URLSearchParams(window.location.search);
 
       const googleError = params.get('error');
@@ -50,22 +44,7 @@ export default function GoogleCallbackPage() {
       const storedState = sessionStorage.getItem('google_oauth_state');
       const verifier = sessionStorage.getItem('google_oauth_verifier');
 
-      // ─── DEBUG LOG (仮説検証用・後で削除) ───
-      console.log('[callback] run() entered', {
-        hasCode: !!code,
-        hasStateInUrl: !!state,
-        hasStoredState: !!storedState,
-        stateMatches: state === storedState,
-        hasVerifier: !!verifier,
-      });
-
       if (!code || !state || state !== storedState || !verifier) {
-        console.log('[callback] → INVALID_RESPONSE branch taken', {
-          reason: !code ? 'no_code'
-               : !state ? 'no_state_in_url'
-               : state !== storedState ? 'state_mismatch'
-               : 'no_verifier',
-        });
         setErrorCode('INVALID_RESPONSE');
         return;
       }
@@ -73,9 +52,6 @@ export default function GoogleCallbackPage() {
       // sessionStorage からは即座に削除 (再利用防止)
       sessionStorage.removeItem('google_oauth_state');
       sessionStorage.removeItem('google_oauth_verifier');
-
-      // URL からも code を除去 (履歴に残さない)
-      window.history.replaceState(null, '', window.location.pathname);
 
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       if (!clientId) {
@@ -123,6 +99,8 @@ export default function GoogleCallbackPage() {
         });
 
         if (res.ok) {
+          // URL から code を除去 (履歴に残さない)・成功時のみ実施
+          window.history.replaceState(null, '', window.location.pathname);
           if (!cancelled) await router.push('/');
           return;
         }

@@ -34,7 +34,6 @@
     "@aws-sdk/client-secrets-manager": "^3.574.0",
     "@aws-sdk/rds-signer": "^3.574.0",
     "@hookform/resolvers": "^5.2.2",
-    "@react-oauth/google": "^0.13.5",
     "drizzle-orm": "^0.30.10",
     "jose": "^6.2.2",
     "next": "^14.2.0",

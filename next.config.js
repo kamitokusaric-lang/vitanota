@@ -17,7 +17,9 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;`,
+            // connect-src: Authorization Code Flow + PKCE でブラウザから
+            //   Google /token エンドポイントへの POST を許可するために追加
+            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://oauth2.googleapis.com;`,
           },
           {
             key: 'Strict-Transport-Security',

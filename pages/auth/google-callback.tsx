@@ -1,8 +1,15 @@
-// GoogleCallback: Google 認可後のコールバック
+// GoogleCallback: Google 認可後のコールバック (Authorization Code Flow + PKCE)
 //
-// Google は response_type=id_token で URL fragment (#id_token=...) に
-// ID Token を付けて遷移してくる。fragment はサーバに送信されないため、
-// クライアントサイド JS で取り出して /api/auth/google-signin に POST する。
+// Google は response_type=code で ?code=xxx&state=yyy を query string で返す。
+// (fragment ではないため Next.js の URL 警告を踏まない)
+//
+// フロー:
+// 1. query から code / state を取り出す
+// 2. state を sessionStorage と照合 (CSRF 対策)
+// 3. sessionStorage から PKCE code_verifier を取り出す
+// 4. ブラウザから https://oauth2.googleapis.com/token に POST (code + verifier)
+// 5. 受け取った id_token を /api/auth/google-signin に POST
+// 6. セッション cookie を受け取ってホームへ遷移
 //
 // 設計詳細: aidlc-docs/construction/auth-externalization.md
 import { useEffect, useState } from 'react';
@@ -17,38 +24,69 @@ export default function GoogleCallbackPage() {
     let cancelled = false;
 
     async function run() {
-      // fragment からパラメータを取り出す (#id_token=...&state=...)
-      const hash = window.location.hash.startsWith('#')
-        ? window.location.hash.substring(1)
-        : '';
-      const params = new URLSearchParams(hash);
+      // query からパラメータを取り出す (?code=...&state=...)
+      const params = new URLSearchParams(window.location.search);
 
-      // Google からのエラー応答
       const googleError = params.get('error');
       if (googleError) {
         setErrorCode(googleError);
         return;
       }
 
-      const idToken = params.get('id_token');
+      const code = params.get('code');
       const state = params.get('state');
 
-      // state 検証 (CSRF 対策)
       const storedState = sessionStorage.getItem('google_oauth_state');
-      if (!idToken || !state || state !== storedState) {
+      const verifier = sessionStorage.getItem('google_oauth_verifier');
+
+      if (!code || !state || state !== storedState || !verifier) {
         setErrorCode('INVALID_RESPONSE');
         return;
       }
 
+      // sessionStorage からは即座に削除 (再利用防止)
       sessionStorage.removeItem('google_oauth_state');
-      sessionStorage.removeItem('google_oauth_nonce');
+      sessionStorage.removeItem('google_oauth_verifier');
 
-      // fragment は履歴に残さないよう即座にクリア
-      window.history.replaceState(
-        null,
-        '',
-        window.location.pathname + window.location.search,
-      );
+      // URL からも code を除去 (履歴に残さない)
+      window.history.replaceState(null, '', window.location.pathname);
+
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        if (!cancelled) setErrorCode('SERVER_CONFIG_ERROR');
+        return;
+      }
+
+      // Google の /token エンドポイントに POST (ブラウザ → Google 直接)
+      let idToken: string | undefined;
+      try {
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: clientId,
+            code,
+            code_verifier: verifier,
+            redirect_uri: `${window.location.origin}/auth/google-callback`,
+          }).toString(),
+        });
+
+        if (!tokenRes.ok) {
+          if (!cancelled) setErrorCode('TOKEN_EXCHANGE_FAILED');
+          return;
+        }
+
+        const tokenData: { id_token?: string } = await tokenRes.json();
+        idToken = tokenData.id_token;
+        if (!idToken) {
+          if (!cancelled) setErrorCode('TOKEN_EXCHANGE_FAILED');
+          return;
+        }
+      } catch {
+        if (!cancelled) setErrorCode('TOKEN_EXCHANGE_FAILED');
+        return;
+      }
 
       // バックエンドにセッション発行依頼
       try {
@@ -59,9 +97,7 @@ export default function GoogleCallbackPage() {
         });
 
         if (res.ok) {
-          if (!cancelled) {
-            await router.push('/');
-          }
+          if (!cancelled) await router.push('/');
           return;
         }
 

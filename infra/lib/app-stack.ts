@@ -99,6 +99,13 @@ export class AppStack extends cdk.Stack {
               // NextAuth.js サーバサイド内部 fetch をコンテナ内 localhost に向ける
               // （public URL 経由の自己 fetch が VPC 外向きになる問題を回避）
               { name: 'NEXTAUTH_URL_INTERNAL', value: 'http://localhost:3000' },
+              // 認証外部化: signin ページの SSR で Google Client ID を埋め込む
+              // (Client ID 自体は公開情報・任意のユーザーが取得可能)
+              { name: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
+                value: '624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com' },
+              // 認証外部化: /api/auth/google-signin で ID Token の aud を検証
+              { name: 'GOOGLE_CLIENT_ID',
+                value: '624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com' },
               // Next.js standalone が listen する hostname を 0.0.0.0 に強制。
               // AppRunner ランタイムがコンテナ起動時に HOSTNAME をコンテナの
               // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、

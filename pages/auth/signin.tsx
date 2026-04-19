@@ -1,8 +1,17 @@
 // LoginPage: Google OAuth ログインのエントリポイント
+//
+// 認証外部化設計: ブラウザが Google と直接通信して ID Token を取得し、
+// /api/auth/google-signin に POST してセッション発行を受ける。
+// バックエンドは Google と通信しない。
+//
+// 設計詳細: aidlc-docs/construction/auth-externalization.md
+import { useState } from 'react';
 import type { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { signIn, getSession } from 'next-auth/react';
-import { Button } from '@/shared/components/Button';
+import { getSession } from 'next-auth/react';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import type { CredentialResponse } from '@react-oauth/google';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -10,24 +19,75 @@ const ERROR_MESSAGES: Record<string, string> = {
     'このメールアドレスは別のログイン方式で登録されています',
   AccessDenied:
     'アカウントが見つかりません。招待リンクからサインアップしてください',
+  NOT_INVITED:
+    'アカウントが見つかりません。招待リンクからサインアップしてください',
+  INVALID_TOKEN:
+    'Google からのトークンが無効です。時計のずれやブラウザ拡張機能が原因の可能性があります。',
+  SERVER_CONFIG_ERROR:
+    'サーバ設定エラーです。管理者にお問い合わせください。',
+  VALIDATION_ERROR: 'リクエストが不正です。もう一度お試しください。',
+  UNKNOWN: 'ログインに失敗しました。再度お試しください。',
 };
 
 interface SignInPageProps {
   error?: string;
   isDev?: boolean;
+  googleClientId: string;
 }
 
-export default function SignInPage({ error, isDev }: SignInPageProps) {
-  const errorMessage = error
-    ? (ERROR_MESSAGES[error] ?? 'ログインに失敗しました。再度お試しください')
+export default function SignInPage({
+  error: initialError,
+  isDev,
+  googleClientId,
+}: SignInPageProps) {
+  const router = useRouter();
+  const [errorCode, setErrorCode] = useState<string | undefined>(initialError);
+  const [loading, setLoading] = useState(false);
+
+  const errorMessage = errorCode
+    ? (ERROR_MESSAGES[errorCode] ?? ERROR_MESSAGES.UNKNOWN)
     : null;
+
+  async function handleGoogleSuccess(response: CredentialResponse) {
+    if (!response.credential) {
+      setErrorCode('INVALID_TOKEN');
+      return;
+    }
+    setLoading(true);
+    setErrorCode(undefined);
+    try {
+      const res = await fetch('/api/auth/google-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: response.credential }),
+      });
+
+      if (res.ok) {
+        // セッション cookie がサーバから発行済み。ホームへ遷移
+        await router.push('/');
+        return;
+      }
+
+      const data: { error?: string } = await res.json().catch(() => ({}));
+      setErrorCode(data.error ?? 'UNKNOWN');
+    } catch (err) {
+      setErrorCode('UNKNOWN');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleGoogleError() {
+    setErrorCode('INVALID_TOKEN');
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-vn-bg px-4">
       <div className="w-full max-w-sm rounded-vn border border-vn-border bg-white p-8">
         {/* ロゴ */}
         <h1 className="mb-2 text-center text-2xl font-bold" data-testid="signin-logo">
-          vita<span className="text-vn-accent">nota</span><span className="text-vn-accent">.</span>
+          vita<span className="text-vn-accent">nota</span>
+          <span className="text-vn-accent">.</span>
         </h1>
         <p className="mb-8 text-center text-sm text-vn-muted">
           教員のウェルネスをサポートするツール
@@ -41,13 +101,27 @@ export default function SignInPage({ error, isDev }: SignInPageProps) {
         )}
 
         {/* Google ログインボタン */}
-        <button
-          onClick={() => signIn('google', { callbackUrl: '/' })}
+        <div
+          className="flex justify-center"
           data-testid="signin-google-button"
-          className="w-full rounded-[10px] bg-vn-header py-[15px] text-[15px] font-semibold text-white transition-opacity hover:opacity-85"
+          aria-busy={loading}
         >
-          Google でログイン
-        </button>
+          <GoogleOAuthProvider clientId={googleClientId}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap={false}
+              text="signin_with"
+              shape="rectangular"
+            />
+          </GoogleOAuthProvider>
+        </div>
+
+        {loading && (
+          <p className="mt-4 text-center text-sm text-vn-muted">
+            ログイン処理中…
+          </p>
+        )}
 
         {isDev && (
           <Link
@@ -68,7 +142,19 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     return { redirect: { destination: '/', permanent: false } };
   }
 
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  if (!googleClientId) {
+    throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID env var is not set');
+  }
+
   const error = (context.query.error as string | undefined) ?? null;
   const isDev = process.env.NODE_ENV === 'development';
-  return { props: { ...(error ? { error } : {}), ...(isDev ? { isDev } : {}) } };
+
+  return {
+    props: {
+      ...(error ? { error } : {}),
+      ...(isDev ? { isDev } : {}),
+      googleClientId,
+    },
+  };
 };

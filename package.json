@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "fetch-jwks": "curl -sSL https://www.googleapis.com/oauth2/v3/certs -o src/features/auth/lib/google-jwks.json",
+    "predev": "test -f src/features/auth/lib/google-jwks.json || pnpm fetch-jwks",
+    "prebuild": "test -f src/features/auth/lib/google-jwks.json || pnpm fetch-jwks",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

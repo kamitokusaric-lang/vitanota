@@ -20,6 +20,13 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Google ID Token ローカル検証用 JWKS を焼き込む（ビルド時 fetch・再デプロイで更新）
+# 鍵ローテへの追従は週次以上のデプロイで確保。詳細: aidlc-docs/construction/auth-externalization.md
+RUN apk add --no-cache curl \
+ && curl -sSL https://www.googleapis.com/oauth2/v3/certs \
+    -o src/features/auth/lib/google-jwks.json \
+ && echo "JWKS fetched: $(wc -c < src/features/auth/lib/google-jwks.json) bytes"
+
 RUN pnpm run build
 
 # ── Stage 3: runner ────────────────────────────────────────────

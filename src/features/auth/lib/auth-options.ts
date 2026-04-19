@@ -1,8 +1,12 @@
 // SP-07 論点C対応: Auth.js を JWT 戦略 → database 戦略に変更
 // セッションを sessions テーブルに保存し、即時失効を可能にする
-// BP-01 ログインフロー / BR-AUTH-01〜04 を維持
+//
+// 2026-04-19 変更: 認証外部化設計により Google Provider を削除。
+// ID Token 検証とセッション発行は /api/auth/google-signin が担当。
+// 本ファイルは NextAuth の「セッション読取 / signOut / signOut 後の cookie 削除」
+// のためだけに残置。providers は空。
+// 設計詳細: aidlc-docs/construction/auth-externalization.md
 import type { NextAuthOptions } from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { eq } from 'drizzle-orm';
 import { getDb, withSessionBootstrap } from '@/shared/lib/db';
@@ -27,10 +31,6 @@ const SESSION_UPDATE_INTERVAL_SEC = 5 * 60; // last_accessed_at の更新間隔
 export async function buildAuthOptions(): Promise<NextAuthOptions> {
   const nextAuthSecret =
     process.env.NEXTAUTH_SECRET ?? (await getSecret('vitanota/nextauth-secret'));
-  const googleClientId =
-    process.env.GOOGLE_CLIENT_ID ?? (await getSecret('vitanota/google-client-id'));
-  const googleClientSecret =
-    process.env.GOOGLE_CLIENT_SECRET ?? (await getSecret('vitanota/google-client-secret'));
 
   const db = await getDb();
 
@@ -50,15 +50,10 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
       } as never
     ),
 
-    providers: [
-      GoogleProvider({
-        clientId: googleClientId,
-        clientSecret: googleClientSecret,
-      }),
-      // Step 16b: E2E は CredentialsProvider ではなく
-      // /api/test/_seed の createSession アクションで sessions テーブルに直接 INSERT する
-      // → database 戦略との互換性を維持しつつ、production の認証コードを変更しない
-    ],
+    // ID Token 検証とセッション発行は /api/auth/google-signin で行う。
+    // NextAuth の /api/auth/signin ルートは使わないため providers は空。
+    // /api/auth/signout (NextAuth 標準) と getServerSession は引き続き動作する。
+    providers: [],
 
     session: {
       strategy: 'database',
@@ -74,33 +69,8 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
     },
 
     callbacks: {
-      // BR-AUTH-01: 招待なし登録禁止
-      // users テーブルに存在しない場合はログイン拒否
-      async signIn({ user }) {
-        if (!user.email) return false;
-
-        try {
-          const [existingUser] = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.email, user.email))
-            .limit(1);
-
-          if (!existingUser) {
-            logger.warn({
-              event: 'auth.login.failed',
-              reason: 'user_not_found',
-            });
-            return false;
-          }
-
-          logger.info({ event: 'auth.login.success' });
-          return true;
-        } catch (err) {
-          logger.error({ event: 'auth.login.error', err }, 'signIn callback error');
-          return false;
-        }
-      },
+      // BR-AUTH-01 招待制のチェックは /api/auth/google-signin 側で実施
+      // (NextAuth の OAuth フローを使わないため signIn callback は呼ばれない)
 
       // database 戦略では session() コールバックが (session, user) 形式で呼ばれる
       // user は sessions テーブルから JOIN された users 行

@@ -140,6 +140,9 @@ export class EdgeStack extends cdk.Stack {
         origin: new origins.HttpOrigin(appRunnerOriginDomain, {
           protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
           customHeaders: {
+            // TODO (Phase 2): Secrets Manager replicaRegions で us-east-1 にレプリカ配置し、
+            // CFN dynamic reference で実値を埋め込む。現状はクロスリージョン制約で placeholder のまま。
+            // β 段階のセキュリティは TLS + WAF + 認証必須で確保。
             'X-CloudFront-Secret': 'PLACEHOLDER_REPLACE_AFTER_DEPLOY',
           },
         }),

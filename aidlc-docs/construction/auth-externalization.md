@@ -79,6 +79,72 @@
 
 ---
 
+## JWKS と GOOGLE_CLIENT_ID の役割分担（実装時の混同に注意）
+
+### JWKS は Google 全体の公開鍵セット（vitanota 専用ではない）
+
+```
+Google 秘密鍵 (非公開・全 OAuth クライアント共通で署名に使用)
+     │
+     ▼ 公開鍵として配布
+https://www.googleapis.com/oauth2/v3/certs
+ = 全世界に公開されている Google の公開鍵セット (JWKS)
+     │
+     └─→ vitanota / 他の数万個のアプリ / Google 公式アプリ
+         すべてが同じ JWKS を使って Google 発行の署名を検証する
+```
+
+**JWKS は秘密情報ではない**。バンドルする理由は「バックエンドから Google への実行時ネットワークアクセスを避ける」ため（=VPC 外向き通信不要にしたい）であって、セキュリティ強化のためではない。
+
+### 「vitanota 専用」を担保するのは ID Token の `aud` クレーム
+
+Google ID Token のペイロード例:
+
+```json
+{
+  "iss": "https://accounts.google.com",
+  "sub": "103548129...",
+  "aud": "624139713607-el3sq55ninu8...apps.googleusercontent.com",
+  "email": "teacher@school.jp",
+  "email_verified": true,
+  "iat": 1745020800,
+  "exp": 1745024400,
+  "nonce": "random-string-from-frontend"
+}
+```
+
+- `aud` = この Token が発行された際の OAuth クライアントの ID
+- フロントが OAuth リクエストで `client_id=<vitanota の GOOGLE_CLIENT_ID>` を指定
+- Google は vitanota 向け Token だと認識し、`aud` に vitanota の CLIENT_ID を書き込む
+- **他アプリで発行された Token は `aud` が違うため、`aud` 検証で弾く**
+
+### たとえ話
+
+| 概念 | たとえ |
+|---|---|
+| **Google ID Token** | Google が発行する身分証明書 |
+| **JWKS（Google 公開鍵）** | 「この身分証明書は偽物じゃない」を全世界が検証できる共通の透かし |
+| **vitanota の GOOGLE_CLIENT_ID** | 「この身分証明書は vitanota 宛に発行されました」と書かれた宛先欄（`aud`） |
+
+チェックの対応関係:
+
+| 防御層 | 何を検証 | 使うもの |
+|---|---|---|
+| 偽造防止 | 透かしが Google 公式か | JWKS（共通） |
+| 誤配防止 | 宛先欄が vitanota か | `aud` 検証（専用） |
+| 本人確認 | 名前欄が招待済み教員か | users テーブル照合（専用） |
+
+### 実装時によくある誤解
+
+| 誤解 | 正解 |
+|---|---|
+| "JWKS を vitanota 用に発行してもらう必要がある" | 不要。JWKS は Google の全体公開情報 |
+| "GOOGLE_CLIENT_SECRET を使って署名検証する" | 不要。ID Token の署名は Google の秘密鍵で、CLIENT_SECRET は使わない |
+| "JWKS を厳格に秘匿管理する必要がある" | 不要。公開情報なので誰でも取得できる |
+| "aud チェックをしなくても JWKS 検証すれば安全" | 危険。他アプリ発行 Token が通ってしまう |
+
+---
+
 ## セキュリティ境界と招待制
 
 ### どこで「招待済み Google アカウントか」を判定するか

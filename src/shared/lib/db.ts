@@ -25,7 +25,10 @@ async function getPool(): Promise<Pool> {
     user: process.env.DB_USER,
     password,
     database: process.env.DB_NAME,
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : false,
+    // MVP β: AWS RDS の CA チェーン（デフォルトで Node.js に信頼されていない）
+    // を検証せず接続する。通信は VPC 内で閉じており MITM リスクは実質ゼロ。
+    // Phase 2 で RDS CA bundle を Docker に同梱して rejectUnauthorized: true に戻す。
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     max: 10,              // RDS Proxy がプール管理するためアプリ側は小さく
     idleTimeoutMillis: 30_000,
   });

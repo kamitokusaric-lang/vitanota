@@ -81,55 +81,56 @@
 
 ## シーケンス 1: ログイン
 
+フロントエンド JavaScript はブラウザ内で動くため、Browser と Frontend を同一アクターとして扱う（OAuth RP パターンの慣例）。
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as Browser
-    participant F as Next.js Frontend<br/>(/auth/signin)
-    participant G as Google<br/>(accounts.google.com)
-    participant B as Next.js Backend<br/>(/api/auth/google-signin)
-    participant DB as RDS
+    participant U as Browser<br/>(Next.js フロント JS)
+    participant G as Google<br/>accounts.google.com
+    participant B as Next.js Backend<br/>/api/auth/google-signin
+    participant DB as RDS sessions / users
 
-    U->>F: /auth/signin にアクセス
-    F-->>U: 「Google でログイン」ボタン表示<br/>(@react-oauth/google SDK 初期化)
+    Note over U: /auth/signin にアクセス・@react-oauth/google SDK 初期化
+    Note over U: ユーザーが「Google でログイン」クリック
 
-    U->>F: ボタンクリック
-    F->>G: OAuth Authorization Request<br/>(client_id, response_type=id_token, scope=openid email profile, nonce)
-    Note over F,G: ポップアップ or リダイレクトで Google の認可画面を表示
-    G-->>U: Google ログイン・同意画面
-    U->>G: 認証・同意操作
-    G-->>F: ID Token (JWT) を返す<br/>(Browser JavaScript で受信)
+    U->>G: Authorization Request<br/>client_id, response_type=id_token,<br/>scope=openid email profile, nonce
+    Note over U,G: ポップアップまたはリダイレクト
+    G-->>U: ログイン・同意画面
+    Note over U,G: ユーザーが Google アカウントで認証・同意
+    G-->>U: ID Token (JWT)
 
-    F->>B: POST /api/auth/google-signin<br/>Body: { idToken }
+    U->>B: POST with idToken
     B->>B: バンドル済み JWKS 読込 (google-jwks.json)
-    B->>B: jose.jwtVerify で署名検証<br/>- iss: accounts.google.com<br/>- aud: GOOGLE_CLIENT_ID<br/>- exp: 未失効<br/>- nonce: 検証 (リプレイ対策)
+    B->>B: jose.jwtVerify で署名検証<br/>iss / aud / exp / nonce を検証
+
     alt 検証失敗
-        B-->>F: 401 Unauthorized
-        F-->>U: エラー表示
+        B-->>U: 401 Unauthorized
+        Note over U: エラー表示
     else 検証成功
-        B->>DB: SELECT * FROM users<br/>WHERE email = payload.email<br/>AND deleted_at IS NULL
-        alt ユーザー未招待 (BR-AUTH-01)
-            DB-->>B: row not found
-            B-->>F: 403 Forbidden<br/>{ error: 'not_invited' }
-            F-->>U: "アカウントが見つかりません..."
-        else 招待済みユーザー
+        B->>DB: SELECT users WHERE email = ?<br/>AND deleted_at IS NULL
+
+        alt 未招待 (BR-AUTH-01)
+            DB-->>B: not found
+            B-->>U: 403 Forbidden { error: not_invited }
+            Note over U: "アカウントが見つかりません"
+        else 招待済み
             DB-->>B: user (id, email, name)
             B->>B: sessionToken = uuidv4()
-            B->>DB: INSERT INTO sessions<br/>(session_token, user_id, expires)<br/>VALUES (sessionToken, user.id, now+8h)
+            B->>DB: INSERT sessions<br/>(session_token, user_id, expires=now+8h)
             DB-->>B: ok
-            B-->>F: 200 OK<br/>Set-Cookie: next-auth.session-token=<sessionToken>;<br/>HttpOnly; Secure; SameSite=Lax; Max-Age=28800
+            B-->>U: 200 OK<br/>Set-Cookie: next-auth.session-token<br/>(HttpOnly / Secure / SameSite=Lax / 8h)
+            Note over U: Redirect to /
         end
     end
-
-    F->>U: Redirect to /
 ```
 
 ### ポイント
 
-- **③〜⑤**: Browser と Google の直接通信（バックエンドは関与しない）
-- **⑦**: バンドル済み JWKS でローカル検証（外部通信なし）
-- **⑪**: BR-AUTH-01（招待なし登録禁止）を維持
-- **⑬〜⑭**: 既存 sessions テーブルに NextAuth と同じ形式で書き込み・Cookie も同名
+- **①〜④**: Browser と Google の直接通信（バックエンドは関与しない）
+- **⑤〜⑥**: バンドル済み JWKS でローカル検証（Google への外部通信なし）
+- **⑧**: BR-AUTH-01（招待なし登録禁止）を維持
+- **⑩〜⑪**: 既存 sessions テーブルに NextAuth 互換形式で書き込み・Cookie 名も同じ
 
 ---
 

@@ -7,11 +7,14 @@
 // 1. query から code / state を取り出す
 // 2. state を sessionStorage と照合 (CSRF 対策)
 // 3. sessionStorage から PKCE code_verifier を取り出す
-// 4. ブラウザから https://oauth2.googleapis.com/token に POST (code + verifier)
+// 4. Google Token Proxy Lambda (VPC 外) に {code, codeVerifier} を JSON POST
+//    - Proxy が Secrets Manager から client_secret を取得し Google /token を中継
+//    - Google の Web application クライアントが PKCE でも client_secret 必須なため
 // 5. 受け取った id_token を /api/auth/google-signin に POST
 // 6. セッション cookie を受け取ってホームへ遷移
 //
 // 設計詳細: aidlc-docs/construction/auth-externalization.md
+// Lambda 実装: infra/lib/data-shared-stack.ts GoogleTokenProxy
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -53,25 +56,19 @@ export default function GoogleCallbackPage() {
       sessionStorage.removeItem('google_oauth_state');
       sessionStorage.removeItem('google_oauth_verifier');
 
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      if (!clientId) {
+      const proxyUrl = process.env.NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL;
+      if (!proxyUrl) {
         if (!cancelled) setErrorCode('SERVER_CONFIG_ERROR');
         return;
       }
 
-      // Google の /token エンドポイントに POST (ブラウザ → Google 直接)
+      // Lambda Proxy 経由でトークン交換 (client_secret は Proxy 側 Secrets Manager に格納)
       let idToken: string | undefined;
       try {
-        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        const tokenRes = await fetch(proxyUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            client_id: clientId,
-            code,
-            code_verifier: verifier,
-            redirect_uri: `${window.location.origin}/auth/google-callback`,
-          }).toString(),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, codeVerifier: verifier }),
         });
 
         if (!tokenRes.ok) {

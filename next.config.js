@@ -17,9 +17,9 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            // connect-src: Authorization Code Flow + PKCE でブラウザから
-            //   Google /token エンドポイントへの POST を許可するために追加
-            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://oauth2.googleapis.com;`,
+            // connect-src: Google Token Proxy Lambda (Function URL) への POST を許可
+            //   Google /token への直接通信は行わず Lambda 経由で中継する
+            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://uwcw4vkloeh6yfbc462txfjhyu0qjyzx.lambda-url.ap-northeast-1.on.aws;`,
           },
           {
             key: 'Strict-Transport-Security',

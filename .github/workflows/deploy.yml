@@ -43,6 +43,7 @@ jobs:
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}" \
+            --build-arg NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL="${{ vars.NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL }}" \
             -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           # :latest も push する (CDK AppStack が AppRunner 作成時に参照するため)

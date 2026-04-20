@@ -1137,3 +1137,47 @@
 **コンテキスト**: 試行錯誤で状態が複雑化したため、セッション跨ぎに耐える統合ドキュメントを整備する。
 
 ---
+
+## セッション再開 / Lambda Proxy 実装着手
+**タイムスタンプ**: 2026-04-22T00:00:00Z
+**ユーザー入力**: "hello. what should I start?" → (選択肢 A/B/C 提示後) "A"
+**AI応答**: `aidlc-docs/operations/session-handoff-20260420.md` の「Lambda Proxy 実装タスクの詳細」を確認し、`infra/lib/data-shared-stack.ts` の現状を読み込み（`googleClientSecret` が Secret 名 `vitanota/google-client-secret` で既存）。実装プランをチェックボックス形式で提示し、承認待ち段階へ。
+**コンテキスト**: インセプション・ワークフロープランニングは既存ハンドオフ文書で完了済み。コンストラクションフェーズ「コード生成 / パート 1 - プランニング」に相当。
+
+---
+
+## data-shared スタック deploy 着手（Google Token Proxy Lambda）
+**タイムスタンプ**: 2026-04-21T00:00:00Z
+**ユーザー入力**: 「cdk deploy vitanota-prod-data-sharedの実行から作業を開始してください」
+**AI応答**: `infra/lib/data-shared-stack.ts` の未コミット差分を確認（Lambda GoogleTokenProxy + Function URL + Secrets Manager read grant の追加、純粋な追加変更のみ）。`npx cdk diff vitanota-prod-data-shared` で以下の追加リソースを確認：
+- AWS::Lambda::Function `GoogleTokenProxy`（Node.js 20.x, 128MB, 10s timeout, inline code）
+- AWS::Lambda::Url（auth NONE + CORS allowlist `https://vitanota.io`）
+- AWS::IAM::Role Lambda ServiceRole + DefaultPolicy（Secrets `vitanota/google-client-secret` への GetSecretValue/DescribeSecret 付与）
+- AWS::Lambda::Permission × 2（Function URL invoke）
+- CfnOutput `GoogleTokenProxyUrl`
+
+破壊的変更・既存リソース置換なし。deploy を実行。
+**コンテキスト**: Lambda Proxy 実装タスクの CDK 適用フェーズ。Google OAuth の `client_secret` 必須制約を回避するため VPC 外 Lambda で /token を中継する。
+
+---
+
+## data-shared deploy 完了 + Lambda スモークテスト成功
+**タイムスタンプ**: 2026-04-21T00:05:00Z
+**ユーザー入力**: （deploy 実行継続）
+**AI応答**: `npx cdk deploy vitanota-prod-data-shared --require-approval never --outputs-file deploy-outputs-data-shared.json` を実行。
+
+**デプロイ結果**（70.18s）:
+- Stack UPDATE_COMPLETE (`vitanota-prod-data-shared`)
+- 新規リソース 6 件すべて CREATE_COMPLETE（Role / Policy / Function / Url / Permission × 2）
+- **Function URL**: `https://uwcw4vkloeh6yfbc462txfjhyu0qjyzx.lambda-url.ap-northeast-1.on.aws/`
+- Outputs 一式を `infra/deploy-outputs-data-shared.json` に記録
+
+**スモークテスト**:
+1. `OPTIONS` preflight (`Origin: https://vitanota.io`) → 200 OK, `Access-Control-Allow-Origin: https://vitanota.io` / `Allow-Methods: POST` / `Max-Age: 3600` 正常返却
+2. `POST` with `{}` → 400 `{"error":"missing_params"}`（Lambda 起動成功 + JSON パース + バリデーション通過を確認）
+
+Secrets Manager 読み取り / Google /token 実コールは、実際の認可コード + code_verifier を入手できない環境では確認不可。これはフロントエンド側の統合で確認する。
+
+**コンテキスト**: セッションハンドオフ計画のうち CDK 適用フェーズが完了。次タスクはアプリ（Next.js）側で `/auth/google-callback` 経由のトークン交換先を Lambda Proxy URL に切り替え、CSP の `connect-src` に Function URL を追加、deploy.yml の GitHub variable `NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL` を登録する 3 点セット。
+
+---

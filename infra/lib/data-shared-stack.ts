@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as kms from 'aws-cdk-lib/aws-kms';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
@@ -112,8 +113,129 @@ export class DataSharedStack extends cdk.Stack {
       ],
     });
 
+    // ── Google Token Exchange Proxy (Lambda, VPC 外) ──
+    // Browser は client_secret を保持できないため、Lambda 経由で Google /token を叩く。
+    const googleTokenProxy = new lambda.Function(this, 'GoogleTokenProxy', {
+      functionName: `${prefix}-google-token-proxy`,
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 128,
+      timeout: cdk.Duration.seconds(10),
+      handler: 'index.handler',
+      code: lambda.Code.fromInline(`
+const https = require('https');
+const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+
+const sm = new SecretsManagerClient({});
+let cachedSecret = null;
+
+async function getClientSecret() {
+  if (cachedSecret) return cachedSecret;
+  const res = await sm.send(new GetSecretValueCommand({ SecretId: process.env.SECRET_ARN }));
+  cachedSecret = res.SecretString;
+  return cachedSecret;
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': 'https://vitanota.io',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '3600',
+  };
+}
+
+function resp(statusCode, body) {
+  return {
+    statusCode,
+    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  };
+}
+
+function fetchToken(body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      'https://oauth2.googleapis.com/token',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            resolve({ statusCode: res.statusCode, body: JSON.parse(data) });
+          } catch (e) {
+            resolve({ statusCode: 502, body: { error: 'invalid_google_response', raw: data } });
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+exports.handler = async (event) => {
+  if (event.requestContext?.http?.method === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(), body: '' };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return resp(400, { error: 'invalid_json' });
+  }
+
+  const { code, codeVerifier } = parsed;
+  if (!code || !codeVerifier) {
+    return resp(400, { error: 'missing_params' });
+  }
+
+  const clientSecret = await getClientSecret();
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: clientSecret,
+    code,
+    code_verifier: codeVerifier,
+    redirect_uri: process.env.REDIRECT_URI,
+  });
+
+  const googleRes = await fetchToken(params.toString());
+  return resp(googleRes.statusCode, googleRes.body);
+};
+      `),
+      environment: {
+        SECRET_ARN: googleClientSecret.secretArn,
+        GOOGLE_CLIENT_ID: '624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com',
+        REDIRECT_URI: 'https://vitanota.io/auth/google-callback',
+      },
+    });
+    googleClientSecret.grantRead(googleTokenProxy);
+
+    const googleTokenProxyUrl = googleTokenProxy.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['https://vitanota.io'],
+        allowedMethods: [lambda.HttpMethod.POST],
+        allowedHeaders: ['Content-Type'],
+        maxAge: cdk.Duration.hours(1),
+      },
+    });
+
     // ── 出力 ──
     new cdk.CfnOutput(this, 'AuditBucketName', { value: this.auditBucket.bucketName });
     new cdk.CfnOutput(this, 'EcrRepositoryUri', { value: this.ecrRepository.repositoryUri });
+    new cdk.CfnOutput(this, 'GoogleTokenProxyUrl', {
+      value: googleTokenProxyUrl.url,
+      description: 'Function URL for Google OAuth token exchange proxy',
+    });
   }
 }

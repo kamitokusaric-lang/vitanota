@@ -18,6 +18,12 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+# Next.js は NEXT_PUBLIC_* を BUILD 時に client JS へリテラル置換する仕様のため
+# build-arg 経由で値を注入する必要がある。
+# (AppRunner runtime env var はサーバサイド SSR では使えるが client JS では undefined になる)
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Google ID Token ローカル検証用 JWKS を焼き込む（ビルド時 fetch・再デプロイで更新）

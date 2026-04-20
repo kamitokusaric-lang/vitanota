@@ -27,10 +27,14 @@ export default function GoogleCallbackPage() {
   const executedRef = useRef(false);
 
   useEffect(() => {
+    // StrictMode では effect が mount→cleanup→mount と 2 回呼ばれるため、
+    // `let cancelled` + cleanup で cancelled=true にすると、
+    // 1 回目の in-flight な非同期処理（executedRef によりそのまま完走する）が
+    // すべてガードで握り潰されて無限ローディングになる。
+    // React 18 では unmount 後 setState は黙って無視される & router.push も安全に呼べるため、
+    // cancel フラグを持たず executedRef 一本で「1 度だけ実行」を担保する。
     if (executedRef.current) return;
     executedRef.current = true;
-
-    let cancelled = false;
 
     async function run() {
       const params = new URLSearchParams(window.location.search);
@@ -58,7 +62,7 @@ export default function GoogleCallbackPage() {
 
       const proxyUrl = process.env.NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL;
       if (!proxyUrl) {
-        if (!cancelled) setErrorCode('SERVER_CONFIG_ERROR');
+        setErrorCode('SERVER_CONFIG_ERROR');
         return;
       }
 
@@ -72,18 +76,18 @@ export default function GoogleCallbackPage() {
         });
 
         if (!tokenRes.ok) {
-          if (!cancelled) setErrorCode('TOKEN_EXCHANGE_FAILED');
+          setErrorCode('TOKEN_EXCHANGE_FAILED');
           return;
         }
 
         const tokenData: { id_token?: string } = await tokenRes.json();
         idToken = tokenData.id_token;
         if (!idToken) {
-          if (!cancelled) setErrorCode('TOKEN_EXCHANGE_FAILED');
+          setErrorCode('TOKEN_EXCHANGE_FAILED');
           return;
         }
       } catch {
-        if (!cancelled) setErrorCode('TOKEN_EXCHANGE_FAILED');
+        setErrorCode('TOKEN_EXCHANGE_FAILED');
         return;
       }
 
@@ -98,21 +102,18 @@ export default function GoogleCallbackPage() {
         if (res.ok) {
           // URL から code を除去 (履歴に残さない)・成功時のみ実施
           window.history.replaceState(null, '', window.location.pathname);
-          if (!cancelled) await router.push('/');
+          await router.push('/');
           return;
         }
 
         const data: { error?: string } = await res.json().catch(() => ({}));
-        if (!cancelled) setErrorCode(data.error ?? 'UNKNOWN');
+        setErrorCode(data.error ?? 'UNKNOWN');
       } catch {
-        if (!cancelled) setErrorCode('UNKNOWN');
+        setErrorCode('UNKNOWN');
       }
     }
 
     run();
-    return () => {
-      cancelled = true;
-    };
   }, [router]);
 
   if (errorCode) {

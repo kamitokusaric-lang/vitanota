@@ -1026,3 +1026,114 @@
 **コンテキスト**: 設計ドキュメントに as-built を明記し、ブロッカー解消前の構成把握を確実にする。
 
 ---
+
+## AppRunner 提供終了通知と ECS 移行決定
+**タイムスタンプ**: 2026-04-19T05:00:00Z
+**ユーザー入力**: 「バッドニュースがあるよ。…AWSからメールが来て、App Runner のサービス提供を終了するから、ワークロードを Amazon ECS Express Modeに移行してとのこと。」
+**AI応答**: AWS 公式ドキュメント確認（2026-04-30 は新規受付停止で、既存サービスは当面継続利用可・完全停止日未発表）。β ローンチは AppRunner のまま可能と判断。ECS Express Mode 移行計画書 `migration-apprunner-to-ecs-express.md` を作成し、決定事項（NAT Gateway 切替・一発切替・CloudFront Secret 実値化）を記録。ユーザーと移行タイミングを協議した結果 β 前実施で合意。
+**コンテキスト**: App Runner 終了通知で移行が必須化。ただし β ローンチ優先で段取りを再整理。
+
+---
+
+## 認証外部化への方針転換
+**タイムスタンプ**: 2026-04-19T06:30:00Z
+**ユーザー入力**:
+- 「根本的なことなんだけど、そもそもGoogleAuth認証のために外とやり取りをする設計を変えれないかな。認証は外に任せる。セッションの管理は中でやる。」
+- 「認証外部化で進めましょう。今って、cognitoを使ってましたっけ？」
+- 「はい、お願いします。」
+**AI応答**: OpenID Connect Relying Party パターンで「ブラウザが Google と直接通信し ID Token を取得、バックエンドはバンドル JWKS でローカル検証」する設計を提案。NAT 完全不要化と AppRunner 延命が同時に実現できる。`auth-externalization.md` 設計書を作成（4 シーケンス図・3 層防御・JWKS ローテ対応・2 層トークン構造）。Cognito は採用せず、NextAuth Google Provider を削除して自前の `/api/auth/google-signin` エンドポイントで ID Token を受け取る方式で実装開始。EXT-AUTH-0〜10 の 11 タスクを起票。
+**コンテキスト**: NAT 問題の根本解決として認証フロー自体を再設計する転換点。
+
+---
+
+## 認証外部化の初回実装と Implicit Flow 失敗
+**タイムスタンプ**: 2026-04-19T07:30:00Z
+**実装内容**:
+- `@react-oauth/google` + `jose` 導入・Dockerfile に JWKS バンドル処理追加
+- `verifyGoogleIdToken.ts` 新規（jose でローカル検証）
+- `/api/auth/google-signin.ts` 新規（3 層防御 + sessions INSERT）
+- NextAuth `auth-options.ts` から GoogleProvider 削除・providers [] 化
+- signin.tsx を `<GoogleLogin>` コンポーネントに書き換え
+**問題発生**:
+- ボタンが表示されない (CSP で Google script-src 拒否)
+- 対処: GIS 依存を捨てて自前ボタン + response_type=id_token (Implicit Flow) + window.location リダイレクトに変更
+**再発問題**:
+- ログイン試行で INVALID_RESPONSE
+- 原因: Google の fragment に含まれる `iss=https://...` の `//` で Next.js router が Invalid href 警告を出し URL を破棄
+**コンテキスト**: @react-oauth/google + CSP と Implicit Flow + Next.js の両方の壁に遭遇。
+
+---
+
+## PKCE Authorization Code Flow への切替
+**タイムスタンプ**: 2026-04-19T09:00:00Z
+**ユーザー入力**:
+- 「なぜ、今回の仕様変更で表示されなくなったのですか？」
+- 「JWTは、vitanotaアプリ専用の公開鍵、ということだよね？」（技術的誤解を質問）
+- 「Aにした場合の、インフラ影響はありますか？」
+- 「お願いします」
+**AI応答**: Implicit Flow を捨て Authorization Code Flow + PKCE に切替。fragment を使わず query string で応答するため Next.js URL 問題を根本的に回避。設計ドキュメントに以下を追記:
+- JWKS と GOOGLE_CLIENT_ID の役割分担（JWKS は Google グローバル公開鍵・vitanota 専用性は aud クレームで担保）
+- CSP 変更は `connect-src 'self' https://oauth2.googleapis.com` 1 行のみ
+- バックエンド無変更
+実装: `signin.tsx` で PKCE verifier/challenge 生成、`google-callback.tsx` でブラウザから Google /token に POST、`next.config.js` CSP 更新。PKCE-1〜4 タスク起票。
+**コンテキスト**: フロー方式の根本変更。PKCE は Google 推奨の現代的フロー。
+
+---
+
+## useEffect 二重実行発覚とデバッグログ戦略
+**タイムスタンプ**: 2026-04-19T12:00:00Z
+**ユーザー入力**:
+- 「ログインに失敗しました（INVALID_RESPONSE）。」
+- 「google_oauth_verifier とgoogle_oauth_stateが一瞬表示されますが、すぐに消えます」
+- 「useEffect の二重実行しているのはコードのどの部分ですか」
+- 「Aでやりましょう」（console.log で仮説検証）
+**AI応答**: sessionStorage キーが一瞬で消える現象から、useEffect が二重実行されて 1 回目が sessionStorage 削除後に 2 回目が走る仮説を提示。デバッグログで検証するアプローチを提案（`[signin]` / `[callback] useEffect fired` / `[callback] run() entered` / `[callback] → INVALID_RESPONSE branch taken` の 4 種）。
+検証結果: 8ms 差で useEffect が 2 回発火し 2 回目で `state_mismatch` が発生することが確定。
+修正: `useRef` で executedRef ガードを追加し、`window.history.replaceState` を fetch 成功後に移動。
+**コンテキスト**: Next.js router の hydration で依存配列 [router] が変化して再実行される Next.js 特有の問題。
+
+---
+
+## NEXT_PUBLIC_GOOGLE_CLIENT_ID のビルド時注入
+**タイムスタンプ**: 2026-04-19T15:00:00Z
+**ユーザー入力**:
+- 「ログインに失敗しました（SERVER_CONFIG_ERROR）。」
+- 「NEXT_PUBLIC_GOOGLE_CLIENT_IDの役割を教えて。今回の修正でどちらもランタイム参照になるということ？」
+- 「将来的なことを考えると、Bかな」（Docker build-arg 方式）
+**AI応答**: Next.js の `NEXT_PUBLIC_*` は BUILD 時に client JS にリテラル置換される仕様を説明。CI の Docker build で build-arg を渡していなかったため client JS で undefined になっていた。3 案比較（A: SSR props 経由にして NEXT_PUBLIC 形骸化・B: Dockerfile ARG + CI build-arg・C: ハードコード）提示。ユーザー選択 B を実装。
+実装: Dockerfile に ARG + ENV 追加・deploy.yml に --build-arg 追加・GitHub variable `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 登録。
+**コンテキスト**: Next.js の環境変数挙動（ビルド時埋め込み vs ランタイム読み取り）を正しく理解した修正。
+
+---
+
+## Google client_secret 必須問題と Lambda Proxy 採択
+**タイムスタンプ**: 2026-04-20T01:00:00Z
+**ユーザー入力**:
+- 「ログインに失敗しました」（/token が 400）
+- Response body: `{"error": "invalid_request", "error_description": "client_secret is missing."}`
+- 「client_secretはenvに設定していないんだっけ？」
+- 「Lambda (VPC 外)は、今も動いてる？LambdaはVPC内でDBマイグレーションのためだけに使ってるわけではない？」
+- 「Lambda Proxyにしよう。でもその前に、また修正が多くてごちゃごちゃしてきたから、一旦セッションを切っても大丈夫なように、状況整理して記録しよう。」
+**AI応答**: Google の "Web application" クライアントは PKCE 併用でも client_secret 必須という仕様制約を説明。選択肢 5 案（A: ブラウザ埋め込み / B: Lambda Proxy / C: GIS SDK / D: Implicit + hack / E: NAT 復活）を比較し B を推奨。既に snapshot-manager Lambda が VPC 外で稼働している実績があり Lambda Proxy は既存アーキテクチャと整合する、と説明。
+ユーザー判断: B (Lambda Proxy) で確定。ただし実装前にセッション引き継ぎドキュメントを作成。
+**コンテキスト**: Google OAuth の仕様制約で PKCE-only フローは不可能と判明。Lambda Proxy パターンで client_secret を server 側に閉じ込めつつ NAT を避ける方針。
+
+---
+
+## セッション引き継ぎドキュメント作成
+**タイムスタンプ**: 2026-04-20T02:00:00Z
+**ユーザー入力**: 「Lambda Proxyにしよう。でもその前に、また修正が多くてごちゃごちゃしてきたから、一旦セッションを切っても大丈夫なように、状況整理して記録しよう。」
+**AI応答**: `aidlc-docs/operations/session-handoff-20260420.md` を作成。以下を含む:
+- 現在地 One-Liner
+- 動作確認済み / 詰まり箇所 / orphan リソース一覧
+- 決定事項の時系列（8 項目）
+- アーキテクチャ現状 → 目標の比較図
+- Lambda Proxy 実装タスクの詳細（CDK / アプリ / CSP / deploy.yml 変更内容・順序・見積工数）
+- 重要リソース参照（AWS・GitHub・Google Cloud Console）
+- 未解決課題リスト（Phase 2 予定 6 件 + β ローンチ直前必須 4 件）
+- ロールバック情報
+- 次回セッション再開時の最短手順
+併せて audit.md に時系列追記、MEMORY.md に主要プロジェクト知識を更新予定。
+**コンテキスト**: 試行錯誤で状態が複雑化したため、セッション跨ぎに耐える統合ドキュメントを整備する。
+
+---

@@ -81,14 +81,6 @@
 
 出典: `aidlc-docs/operations/infrastructure-audit-20260419.md`
 
-### 🔴 高: 旧 VPC Connector `vitanota-prod-vpc-connector` 削除
-- **現状**: egress 化で新 Connector に切替後、旧 Connector が orphan で残存
-- **対策**: AppRunner から参照されていないことを確認し `aws apprunner delete-vpc-connector`
-
-### 🔴 高: 未使用 Secret `vitanota/google-client-secret` 削除
-- **現状**: Lambda Proxy 版の `vitanota-prod/google-client-secret` に移行済だが旧 Secret が残存
-- **対策**: 参照されていないことを確認して `aws secretsmanager delete-secret --force-delete-without-recovery`
-
 ### 🟡 中: AppRunner を PRIVATE_ISOLATED に戻し NAT Instance を削除
 - **現状**: Lambda Proxy 導入で AppRunner から Google への直接通信が不要になった
 - **影響**: `-$5.40/月` のコスト削減、attack surface 低減

@@ -88,7 +88,7 @@
 | vitanota-prod/rds-master-password | RDS マスターパスワード | db-migrator Lambda |
 | vitanota/nextauth-secret | NextAuth cookie 署名 | AppRunner (runtime fetch) |
 | vitanota/google-client-id | aud 検証用 (env 優先) | AppRunner (fallback only) |
-| vitanota/google-client-secret | ⚠️ **未使用** | (旧 Auth Code Flow 用・削除可) |
+| vitanota/google-client-secret | ⚠️ **未使用** | (旧 Auth Code Flow 用・削除可) ← **2026-04-22 訂正: Lambda Proxy 実装 (4/21) で現役化。削除判定は撤回済** |
 | vitanota/cloudfront-secret | ⚠️ **現状 idle** | Phase 2 で使用予定 |
 
 ### 1.10 VPC Endpoints (1)
@@ -150,8 +150,8 @@
 
 | # | リソース | 削除方法 | リスク | 所要 |
 |---|---|---|---|---|
-| A-1 | AppRunner VPC Connector `vitanota-prod-vpc-connector` (legacy) | AWS CLI 直接削除 | 低（既に誰も参照していない） | 1 分 |
-| A-2 | Secrets Manager `vitanota/google-client-secret` | AWS CLI (30 日 recovery 付き) | 低（コード内参照なし） | 1 分 |
+| A-1 | AppRunner VPC Connector `vitanota-prod-vpc-connector` (legacy) | AWS CLI 直接削除 | 低（既に誰も参照していない） | 1 分 | ✅ 2026-04-22 完了 |
+| A-2 | ~~Secrets Manager `vitanota/google-client-secret`~~ | ~~AWS CLI (30 日 recovery 付き)~~ | ~~低（コード内参照なし）~~ | ~~1 分~~ | ❌ **撤回 (2026-04-22)**: Lambda Proxy で現役使用中 |
 
 ### 🟡 認証外部化で不要になった（CDK で計画的削除）
 
@@ -192,15 +192,9 @@ aws apprunner delete-vpc-connector --region ap-northeast-1 \
 
 ロールバック: 削除後の復元は不可。ただし CDK 管理外の orphan なので、仮に間違えて削除しても本番に影響なし。
 
-**A-2. google-client-secret 削除**
+**A-2. google-client-secret 削除** — ❌ **撤回 (2026-04-22)**
 
-```bash
-aws secretsmanager delete-secret --region ap-northeast-1 \
-  --secret-id vitanota/google-client-secret \
-  --recovery-window-in-days 30
-```
-
-ロールバック: 30 日以内なら `aws secretsmanager restore-secret` で復元可能。
+Lambda Proxy (`vitanota-prod-google-token-proxy`) が SECRET_ARN で参照するため削除不可。当時の判定は Lambda Proxy 実装前のスナップショット。
 
 ### Phase B: CDK による構成整理（30-45 分）
 

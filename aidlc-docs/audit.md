@@ -1161,6 +1161,32 @@
 
 ---
 
+## Lambda Proxy フロントエンド統合 + CI/CD 本番反映
+**タイムスタンプ**: 2026-04-21T00:30:00Z
+**ユーザー入力**: 「推奨通りでお願いします」（1→2→3 を 1 コミットにまとめて push → CI で build+deploy → 本番 OAuth 完走テスト）
+**AI応答**: 3 点セット + 1 コミット + push を実行。
+
+**変更 (commit `cfa0071`)**:
+- `pages/auth/google-callback.tsx`: Google /token 直叩きを Lambda Proxy 経由 (`NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL` 向けに JSON `{code, codeVerifier}` POST) に切替。client_id の参照を削除 (Lambda 側で保持)。
+- `next.config.js`: CSP `connect-src` を `https://oauth2.googleapis.com` から `https://uwcw4vkloeh6yfbc462txfjhyu0qjyzx.lambda-url.ap-northeast-1.on.aws` に差し替え。
+- `Dockerfile`: `NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL` 用の ARG + ENV 追加 (既存 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` と同パターン)。
+- `.github/workflows/deploy.yml`: `--build-arg NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL` 追加。
+- GitHub Actions variable `NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL = https://uwcw4vkloeh6yfbc462txfjhyu0qjyzx.lambda-url.ap-northeast-1.on.aws/` 登録。
+
+**事前検証**: `pnpm type-check` GREEN。
+
+**CI/CD 結果** (run 24695790538 / Deploy):
+- Build & Push to ECR: 1m21s ✓
+- Deploy to Prod: 4m18s ✓（AppRunner `update-service` → RUNNING 到達 → `/api/health` 200）
+
+**並行 CI 失敗** (run 24695790549): integration test の RLS テストデータリーク (tenant tag SELECT が 8 期待で 23 件、テスト isolation 問題) と OSV-Scanner の既存 CVE (next 14.2.35 / drizzle-orm 0.30.10 / esbuild / glob / vite — いずれも今回変更以前から存在)。**本 commit と無関係の pre-existing 失敗**。前 commit `eb7fa29` も同様に CI failure。
+
+**次アクション**: ユーザー側でブラウザから `https://vitanota.io/auth/signin` → Google でログイン → /auth/google-callback → Lambda Proxy → id_token 受領 → /api/auth/google-signin → セッション発行 → / へ遷移、の完走確認。失敗時は Lambda CloudWatch Logs `/aws/lambda/vitanota-prod-google-token-proxy` を確認。
+
+**コンテキスト**: Lambda Proxy 実装タスクの最終フェーズ完了。これで `session-handoff-20260420.md` の Lambda Proxy 実装タスクリストは完了。残る MVP ローンチ直前タスクは、本番 OAuth 完走確認 + 必要に応じて CI の pre-existing 失敗対応。
+
+---
+
 ## data-shared deploy 完了 + Lambda スモークテスト成功
 **タイムスタンプ**: 2026-04-21T00:05:00Z
 **ユーザー入力**: （deploy 実行継続）

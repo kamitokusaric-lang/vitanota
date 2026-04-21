@@ -27,12 +27,6 @@ export default function GoogleCallbackPage() {
   const executedRef = useRef(false);
 
   useEffect(() => {
-    // StrictMode では effect が mount→cleanup→mount と 2 回呼ばれるため、
-    // `let cancelled` + cleanup で cancelled=true にすると、
-    // 1 回目の in-flight な非同期処理（executedRef によりそのまま完走する）が
-    // すべてガードで握り潰されて無限ローディングになる。
-    // React 18 では unmount 後 setState は黙って無視される & router.push も安全に呼べるため、
-    // cancel フラグを持たず executedRef 一本で「1 度だけ実行」を担保する。
     if (executedRef.current) return;
     executedRef.current = true;
 

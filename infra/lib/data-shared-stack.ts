@@ -135,9 +135,6 @@ async function getClientSecret() {
   return cachedSecret;
 }
 
-// CORS ヘッダは Function URL の cors 設定 (CDK addFunctionUrl) で AWS 側が付与するため、
-// Lambda では付けない (手動付与すると Access-Control-Allow-Origin が 2 重になり
-// Chrome/Firefox が CORS 違反として拒否し "Failed to fetch" を投げる)。
 function resp(statusCode, body) {
   return {
     statusCode,

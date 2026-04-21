@@ -4,10 +4,11 @@
 // 1. ブラウザで code_verifier / code_challenge を生成
 // 2. Google 認可エンドポイントへリダイレクト (response_type=code)
 // 3. Google が /auth/google-callback?code=... に戻す (query string)
-// 4. callback ページがブラウザから Google /token に直接 POST (PKCE verifier 送付)
+// 4. callback ページが Google Token Proxy Lambda (VPC 外) に {code, codeVerifier} を POST
+//    (Proxy が Secrets Manager の client_secret で Google /token を中継)
 // 5. 受け取った ID Token を /api/auth/google-signin に POST してセッション発行
 //
-// バックエンドは Google とは通信しない。
+// App Runner は Google と直接通信しない (Lambda Proxy が代行)。
 // 設計詳細: aidlc-docs/construction/auth-externalization.md
 import type { GetServerSideProps } from 'next';
 import Link from 'next/link';

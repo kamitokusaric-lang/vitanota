@@ -11,7 +11,9 @@ import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 interface MigrateEvent {
-  command: 'migrate' | 'status' | 'drop';
+  command: 'migrate' | 'status' | 'drop' | 'bootstrap-admin';
+  email?: string;
+  name?: string;
 }
 
 interface MigrationRow {
@@ -151,6 +153,65 @@ async function runDrop(): Promise<{ dropped: boolean }> {
   }
 }
 
+async function runBootstrapAdmin(
+  email: string,
+  name: string | null
+): Promise<{ userId: string; userCreated: boolean; roleCreated: boolean }> {
+  const client = await connect();
+  try {
+    await client.query('BEGIN');
+
+    // users に INSERT（冪等: email UNIQUE 制約で既存を検出）
+    const userInsert = await client.query<{ id: string }>(
+      `INSERT INTO users (email, name, email_verified)
+       VALUES ($1, $2, now())
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id`,
+      [email, name]
+    );
+
+    let userId: string;
+    let userCreated: boolean;
+    if (userInsert.rows.length > 0) {
+      userId = userInsert.rows[0].id;
+      userCreated = true;
+    } else {
+      const existing = await client.query<{ id: string }>(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+      userId = existing.rows[0].id;
+      userCreated = false;
+    }
+
+    // user_tenant_roles に system_admin 権限を付与（tenant_id IS NULL のため
+    // UNIQUE 制約が効かず、WHERE NOT EXISTS で手動冪等化）
+    const roleInsert = await client.query<{ id: string }>(
+      `INSERT INTO user_tenant_roles (user_id, tenant_id, role)
+       SELECT $1, NULL, 'system_admin'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM user_tenant_roles
+         WHERE user_id = $1 AND tenant_id IS NULL AND role = 'system_admin'
+       )
+       RETURNING id`,
+      [userId]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      userId,
+      userCreated,
+      roleCreated: roleInsert.rows.length > 0,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    await client.end();
+  }
+}
+
 export const handler = async (event: MigrateEvent) => {
   console.log(`vitanota-db-migrator invoked: ${event.command} (env=${ENV})`);
   try {
@@ -165,6 +226,13 @@ export const handler = async (event: MigrateEvent) => {
       }
       case 'drop': {
         const result = await runDrop();
+        return { statusCode: 200, body: JSON.stringify(result) };
+      }
+      case 'bootstrap-admin': {
+        if (!event.email) {
+          return { statusCode: 400, body: JSON.stringify({ error: 'email is required' }) };
+        }
+        const result = await runBootstrapAdmin(event.email, event.name ?? null);
         return { statusCode: 200, body: JSON.stringify(result) };
       }
       default:

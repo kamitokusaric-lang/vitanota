@@ -52,6 +52,10 @@ Thumbs.db
 
 # AWS
 .aws-sam/
+infra/deploy-outputs.json
+
+# Claude Code セッションディレクトリ
+.claude/
 
 # Google JWKS (Docker build 時に fetch・ローカルは pnpm fetch-jwks で取得)
 src/features/auth/lib/google-jwks.json

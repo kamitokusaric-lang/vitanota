@@ -135,19 +135,13 @@ async function getClientSecret() {
   return cachedSecret;
 }
 
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': 'https://vitanota.io',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '3600',
-  };
-}
-
+// CORS ヘッダは Function URL の cors 設定 (CDK addFunctionUrl) で AWS 側が付与するため、
+// Lambda では付けない (手動付与すると Access-Control-Allow-Origin が 2 重になり
+// Chrome/Firefox が CORS 違反として拒否し "Failed to fetch" を投げる)。
 function resp(statusCode, body) {
   return {
     statusCode,
-    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   };
 }
@@ -182,10 +176,7 @@ function fetchToken(body) {
 }
 
 exports.handler = async (event) => {
-  if (event.requestContext?.http?.method === 'OPTIONS') {
-    return { statusCode: 204, headers: corsHeaders(), body: '' };
-  }
-
+  // OPTIONS preflight は Function URL service が自動応答するため Lambda は呼ばれない。
   let parsed;
   try {
     parsed = JSON.parse(event.body || '{}');
@@ -209,6 +200,17 @@ exports.handler = async (event) => {
   });
 
   const googleRes = await fetchToken(params.toString());
+  // 失敗時のみ Google 応答を CloudWatch に残す (成功時は id_token が含まれるため記録しない)
+  if (googleRes.statusCode !== 200) {
+    console.error('google_token_exchange_failed', {
+      status: googleRes.statusCode,
+      error: googleRes.body?.error,
+      error_description: googleRes.body?.error_description,
+      codeLen: code.length,
+      verifierLen: codeVerifier.length,
+      redirectUri: process.env.REDIRECT_URI,
+    });
+  }
   return resp(googleRes.statusCode, googleRes.body);
 };
       `),

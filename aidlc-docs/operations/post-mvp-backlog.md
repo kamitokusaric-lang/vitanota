@@ -77,6 +77,99 @@
 
 ---
 
+## インフラクリーンアップ (β ローンチ後すぐ)
+
+出典: `aidlc-docs/operations/infrastructure-audit-20260419.md`
+
+### 🔴 高: 旧 VPC Connector `vitanota-prod-vpc-connector` 削除
+- **現状**: egress 化で新 Connector に切替後、旧 Connector が orphan で残存
+- **対策**: AppRunner から参照されていないことを確認し `aws apprunner delete-vpc-connector`
+
+### 🔴 高: 未使用 Secret `vitanota/google-client-secret` 削除
+- **現状**: Lambda Proxy 版の `vitanota-prod/google-client-secret` に移行済だが旧 Secret が残存
+- **対策**: 参照されていないことを確認して `aws secretsmanager delete-secret --force-delete-without-recovery`
+
+### 🟡 中: AppRunner を PRIVATE_ISOLATED に戻し NAT Instance を削除
+- **現状**: Lambda Proxy 導入で AppRunner から Google への直接通信が不要になった
+- **影響**: `-$5.40/月` のコスト削減、attack surface 低減
+- **対策**: VPC Connector を PRIVATE_ISOLATED サブネット版に戻し、NAT Instance と egress サブネットを削除
+
+---
+
+## Phase 2 インフラ強化
+
+出典: `aidlc-docs/construction/deployment-phases.md` Phase 2
+
+### 🟡 中: RDS Multi-AZ 化
+- **現状**: 単一 AZ (コスト優先の MVP 構成)
+- **対策**: スタンバイ AZ を追加し自動フェイルオーバー有効化
+- **工数**: CDK 1 行変更 + RDS 停止を伴う切替 (約 10 分)
+
+### 🟡 中: RDS Proxy 追加
+- **現状**: アプリが直接 RDS に接続。環境変数名 `RDS_PROXY_ENDPOINT` だが Proxy 実体は無い
+- **対策**: RDS Proxy を追加し、IAM 認証経由で App Runner / db-migrator から Proxy 経由の接続に切替
+- **効果**: connection 枯渇耐性 + token キャッシュを Proxy 側に任せられる
+
+### 🟡 中: dev / prod 環境分離
+- **現状**: prod 環境のみ。dev 環境は未構築 (`APPRUNNER_SERVICE_ARN_DEV` 未設定で GHA deploy-dev が skip)
+- **対策**: 別アカウント or 別 VPC で dev 構築、CDK stage 分離
+
+### 🟢 低: 監視 Lambda 追加 (header-rotator / rds-connection-monitor)
+- **現状**: CloudWatch アラーム 5 個のみ
+- **対策**: `deployment-phases.md` Phase 2 に列挙された Lambda を実装
+
+### 🟢 低: S3 監査ログ Object Lock 延長
+- **現状**: 90 日
+- **対策**: compliance 要件確認後、7 年に延長 (`deployment-phases.md` Phase 2)
+
+### 🟢 低: CloudWatch アラーム拡充 (12+ 個)
+- **現状**: 5 個 (5xx / RDS CPU / memory / WAF / 認証エラーは未実装)
+- **対策**: Log Insights クエリベースアラームで認証失敗・DB 接続失敗等を追加
+
+---
+
+## ユーザーライフサイクル
+
+出典: `aidlc-docs/construction/unit-02/nfr-design/operational-risks.md` R13〜R15
+
+### 🟡 中: ユーザー退会 API の実装 (R13)
+- **現状**: 手動 SQL のみ (`user-lifecycle-spec.md` 論点 M Phase 2)
+- **対策**: `DELETE /api/system/users/:id` で `deleted_at` セット + セッション無効化
+
+### 🟢 低: 物理削除バッチ (R14)
+- **現状**: `deleted_at IS NOT NULL` の users が無期限残存 (30 日 grace period 未実装)
+- **対策**: EventBridge + Lambda で日次実行、30 日経過後の行を物理削除
+
+### 🟡 中: 退会者の公開エントリ匿名化処理 (R15)
+- **現状**: 手動 SQL で `user_id = NULL` 更新。スキーマは対応済だが自動化なし
+- **対策**: 退会 API 内で同一トランザクションで更新 or バッチ化
+
+---
+
+## 観測性
+
+### 🟢 低: APM / 分散トレーシング導入 (R9)
+- **現状**: pino 構造化ログのみ。トレース ID なし
+- **対策**: 本番運用データ蓄積後、X-Ray or OpenTelemetry を検討
+
+---
+
+## 戦略的検討事項
+
+### ECS Express Mode への移行検討
+- **出典**: `aidlc-docs/construction/migration-apprunner-to-ecs-express.md`
+- **現状**: App Runner で安定稼働中。当時 App Runner 終了通知 (後に撤回) と外向き通信の NAT 要件で移行検討されたが、認証外部化 (Lambda Proxy) により後者は解決済
+- **判断保留**: 現状 AppRunner の実運用コスト・制約を継続観測。明確な必要性が生じるまで **塩漬け**
+- **着手条件**: App Runner の再価格改定・スケーリング上限 hit・未知の障害が頻発する等
+
+### Claude Code Review の段階導入
+- **出典**: `aidlc-docs/operations/claude-code-review-rollout.md`
+- **現状**: Phase 1 (最小構成) 未着手
+- **判断**: 運用フェーズが落ち着いてから Week 1-2 で導入
+- **コスト見込**: $15〜30/月
+
+---
+
 ## ドキュメント整理
 
 ### 🟢 低: `aidlc-docs/construction/auth-externalization.md` の正本化
@@ -97,3 +190,8 @@
 - 認証外部化設計: `aidlc-docs/construction/auth-externalization.md`
 - セッション引き継ぎスナップショット: `aidlc-docs/operations/session-handoff-20260420.md`
 - デプロイフェーズ: `aidlc-docs/construction/deployment-phases.md`
+- インフラ監査: `aidlc-docs/operations/infrastructure-audit-20260419.md`
+- ECS 移行計画: `aidlc-docs/construction/migration-apprunner-to-ecs-express.md`
+- Code Review ロールアウト: `aidlc-docs/operations/claude-code-review-rollout.md`
+- ユーザーライフサイクル仕様: `aidlc-docs/construction/user-lifecycle-spec.md`
+- 運用リスク台帳: `aidlc-docs/construction/unit-02/nfr-design/operational-risks.md`

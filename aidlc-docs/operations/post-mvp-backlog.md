@@ -182,6 +182,19 @@
 - **現状**: 当時のセッション記録。役目を終えたが git 履歴として残している
 - **対策**: 本バックログに移植し終えたので、将来的に `aidlc-docs/operations/history/` サブディレクトリに退避 or 削除
 
+### 🟡 中: stale ドキュメントの順次統合
+- **発見日**: 2026-04-21
+- **現状**: `docs-index.md` で [LEGACY] / [HISTORY] タグを付けた docs が複数ある
+  - `construction/auth-externalization.md` (旧 Auth 設計)
+  - `construction/migration-apprunner-to-ecs-express.md` (塩漬け)
+  - `operations/session-handoff-20260420.md` (スナップショット)
+  - `aidlc-docs/0421_tmp.md` (当日メモ)
+- **対策**: 以下の順で整理
+  1. auth-externalization.md → user-onboarding-flow.md に内容統合 (実装確定後)
+  2. 0421_tmp.md と session-handoff → `operations/history/` サブディレクトリに移動
+  3. migration-apprunner-to-ecs-express.md → AppRunner 継続が確定したら削除 or 「検討経緯」として縮約
+- **着手判断**: Auth 実装が 1 ヶ月以上安定稼働し、ECS 移行判断が固まったら
+
 ---
 
 ## 関連リファレンス

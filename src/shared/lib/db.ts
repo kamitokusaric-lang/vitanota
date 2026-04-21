@@ -11,13 +11,16 @@ type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
 let pool: Pool | null = null;
 
-async function getPool(): Promise<Pool> {
+function getPool(): Pool {
   if (pool) return pool;
 
-  // ローカル開発時は静的パスワードを使用（AWS 認証情報不要）
-  const password = process.env.DB_PASSWORD
+  // IAM トークンは 15 分で expire するため、Pool 側で保持すると
+  // 新規 backend connection 時に古い token で PAM 認証失敗する。
+  // pg は password に関数を渡すと新規 Client 毎に評価する仕様なので、
+  // getDbAuthToken (12 分 TTL キャッシュ) を毎回呼ばせて fresh token を使わせる。
+  const password: string | (() => Promise<string>) = process.env.DB_PASSWORD
     ? process.env.DB_PASSWORD
-    : await getDbAuthToken();
+    : () => getDbAuthToken();
 
   pool = new Pool({
     host: process.env.RDS_PROXY_ENDPOINT,

@@ -145,7 +145,7 @@
   - Step 3, 5, 10 完了（CI/CD full pipeline 動作確認済）
   - NAT Instance 追加済（subnet 構成変更・AppRunner を PRIVATE_WITH_EGRESS に移動）
   - 🔴 NAT Instance 内部の iptables/ip_forward 動作が未確認
-- **ユーザー運用開始予定**: 5 日以内（2026-04-23 頃）
+- **ユーザー運用開始予定**: 2026-04-26（2026-04-22 に 4/23 → 4/26 へ延長）
 
 ## 重要な参照ドキュメント（Phase 1 As-Built）
 - `aidlc-docs/construction/deployment-phases.md` の「現状デプロイ状況（As-Built 2026-04-19）」セクションに、設計からの 8 項目の変更差分、稼働状況、既知課題、月額コスト実態（~¥10,000/月）を記載

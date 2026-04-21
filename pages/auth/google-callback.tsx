@@ -75,19 +75,26 @@ export default function GoogleCallbackPage() {
           body: JSON.stringify({ code, codeVerifier: verifier }),
         });
 
+        const tokenData: {
+          id_token?: string;
+          error?: string;
+          error_description?: string;
+        } = await tokenRes.json().catch(() => ({}));
+
         if (!tokenRes.ok) {
-          setErrorCode('TOKEN_EXCHANGE_FAILED');
+          const detail = tokenData.error ?? `HTTP_${tokenRes.status}`;
+          setErrorCode(`TOKEN_EXCHANGE_FAILED:${detail}`);
           return;
         }
 
-        const tokenData: { id_token?: string } = await tokenRes.json();
         idToken = tokenData.id_token;
         if (!idToken) {
-          setErrorCode('TOKEN_EXCHANGE_FAILED');
+          setErrorCode('TOKEN_EXCHANGE_FAILED:no_id_token');
           return;
         }
-      } catch {
-        setErrorCode('TOKEN_EXCHANGE_FAILED');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'fetch_error';
+        setErrorCode(`TOKEN_EXCHANGE_FAILED:${msg}`);
         return;
       }
 

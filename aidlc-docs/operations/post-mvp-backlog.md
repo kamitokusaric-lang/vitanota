@@ -34,10 +34,11 @@
 - **現状**: `pages/api/auth/google-signin.ts` 等で CSP connect-src に Lambda URL を直書き
 - **対策**: CDK `GoogleTokenProxyUrl` output を GitHub Actions で読み取り、ビルド時 env var で注入
 
-### 🟡 中: ログアウト API の実装確認・必要なら実装
-- **発見日**: 2026-04-21
-- **現状**: `pages/api/auth/` に明示的な signout ハンドラなし。NextAuth v4 デフォルトの `/api/auth/signout` 経路の動作未確認
-- **対策**: 自前 session テーブル運用なので専用 DELETE エンドポイントが必要。実装有無を調査 → 未実装なら `POST /api/auth/signout` を追加（session token 削除 + cookie 無効化）
+### 🟢 低: ログアウト動作の E2E カバレッジ
+- **発見日**: 2026-04-21 / 2026-04-22 に静的解析で設計完備を確認
+- **現状**: `pages/api/auth/[...nextauth].ts` が NextAuth catch-all で `/api/auth/signout` を処理。DrizzleAdapter + database strategy で sessions 行削除 + cookie 無効化が自動で走る。`vitanota_app` に DELETE 権限あり (`0008_app_role_nosuper.sql:24`)、sessions は RLS 無効 (`0009_rls_role_separation.sql:168`、鶏卵問題回避のため意図的)。`events.signOut` で `LogEvents.SessionRevoked` を構造化ログに記録
+- **ギャップ**: 実フローの integration / E2E テストなし (`TenantGuard.test.tsx` で mock のみ)
+- **対策**: Playwright で `tests/e2e/signout.spec.ts` を追加 (ログイン → ログアウト → /auth/signin → 再アクセス拒否)。MVP 手動検証後に着手
 
 ---
 

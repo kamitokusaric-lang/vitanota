@@ -1,5 +1,9 @@
 # 認証外部化設計 (Google ID Token + 自前セッション)
 
+> **⚠️ 2026-04-21 追記**: 実装は本書記載の「ブラウザから Google /token に直接 POST」ではなく、
+> **Lambda Proxy (VPC 外) 経由で client_secret 付き交換** に変更された。
+> 最新フローは `aidlc-docs/operations/session-handoff-20260420.md` を参照。
+
 **作成日**: 2026-04-19
 **背景**: App Runner の終了通知 + Google OAuth のバックエンド外向き通信（NAT 要求）を根本的に解消するため、認証フローを「認証は外・セッションは中」パターンに変更。
 **関連ドキュメント**:

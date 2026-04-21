@@ -177,10 +177,11 @@
 - **現状**: 先頭に「Lambda Proxy に変更」注記のみ付けた暫定対応
 - **対策**: 本文自体を新フロー前提に書き直す。誤情報リスクが低い程度に Auth 実装が枯れてから
 
-### 🟢 低: `aidlc-docs/0421_tmp.md` と `aidlc-docs/operations/session-handoff-20260420.md` の扱い
+### 🟢 低: `aidlc-docs/operations/session-handoff-20260420.md` の扱い
 - **発見日**: 2026-04-21
-- **現状**: 当時のセッション記録。役目を終えたが git 履歴として残している
-- **対策**: 本バックログに移植し終えたので、将来的に `aidlc-docs/operations/history/` サブディレクトリに退避 or 削除
+- **現状**: Auth 修正時のセッション記録。docs-index.md で [HISTORY] として残存
+- **対策**: 将来的に `aidlc-docs/operations/history/` サブディレクトリに退避
+- **メモ (2026-04-22)**: `0421_tmp.md` は本バックログへ移植完了を確認後、削除済 (commit 予定)
 
 ### 🟡 中: stale ドキュメントの順次統合
 - **発見日**: 2026-04-21
@@ -188,10 +189,9 @@
   - `construction/auth-externalization.md` (旧 Auth 設計)
   - `construction/migration-apprunner-to-ecs-express.md` (塩漬け)
   - `operations/session-handoff-20260420.md` (スナップショット)
-  - `aidlc-docs/0421_tmp.md` (当日メモ)
 - **対策**: 以下の順で整理
   1. auth-externalization.md → user-onboarding-flow.md に内容統合 (実装確定後)
-  2. 0421_tmp.md と session-handoff → `operations/history/` サブディレクトリに移動
+  2. session-handoff-20260420.md → `operations/history/` サブディレクトリに移動
   3. migration-apprunner-to-ecs-express.md → AppRunner 継続が確定したら削除 or 「検討経緯」として縮約
 - **着手判断**: Auth 実装が 1 ヶ月以上安定稼働し、ECS 移行判断が固まったら
 

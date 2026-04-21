@@ -147,7 +147,6 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 
 | 状態 | ファイル | 役割 |
 |---|---|---|
-| [HISTORY] | [`0421_tmp.md`](0421_tmp.md) | 2026-04-21 セッションの作業メモ。継続タスクは post-mvp-backlog.md に移植済 |
 | [HISTORY] | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) | Auth 修正セッションのスナップショット |
 
 ---

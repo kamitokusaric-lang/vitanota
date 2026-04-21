@@ -22,6 +22,7 @@ export interface AppStackProps extends cdk.StackProps {
   appEgressSecurityGroup: ec2.ISecurityGroup;
   rdsEndpoint: string;
   rdsPort: string;
+  rdsResourceId: string;
   dbName: string;
   rdsSecret: secretsmanager.ISecret;
   secrets: Secrets;
@@ -66,6 +67,17 @@ export class AppStack extends cdk.Stack {
     props.secrets.googleClientId.grantRead(instanceRole);
     props.secrets.googleClientSecret.grantRead(instanceRole);
     props.secrets.cloudfrontSecret.grantRead(instanceRole);
+
+    // RDS IAM 認証: vitanota_app ユーザーとしての接続のみ許可
+    instanceRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'RdsIamConnect',
+        actions: ['rds-db:connect'],
+        resources: [
+          `arn:aws:rds-db:${this.region}:${this.account}:dbuser:${props.rdsResourceId}/vitanota_app`,
+        ],
+      })
+    );
 
     // ── App Runner アクセスロール（ECR pull 用） ──
     const accessRole = new iam.Role(this, 'AppRunnerAccessRole', {

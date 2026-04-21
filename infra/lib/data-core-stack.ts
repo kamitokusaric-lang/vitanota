@@ -21,6 +21,7 @@ export class DataCoreStack extends cdk.Stack {
   public readonly rdsPort: string;
   public readonly dbName: string;
   public readonly rdsSecret: secretsmanager.ISecret;
+  public readonly rdsResourceId: string;
 
   constructor(scope: Construct, id: string, props: DataCoreStackProps) {
     super(scope, id, props);
@@ -45,6 +46,7 @@ export class DataCoreStack extends cdk.Stack {
       credentials: rds.Credentials.fromGeneratedSecret('vitanota', {
         secretName: `${prefix}/rds-master-password`,
       }),
+      iamAuthentication: true,
       multiAz: false,
       allocatedStorage: 20,
       storageType: rds.StorageType.GP3,
@@ -62,6 +64,10 @@ export class DataCoreStack extends cdk.Stack {
 
     this.rdsEndpoint = instance.dbInstanceEndpointAddress;
     this.rdsPort = instance.dbInstanceEndpointPort;
+    if (!instance.instanceResourceId) {
+      throw new Error('RDS instanceResourceId is not available');
+    }
+    this.rdsResourceId = instance.instanceResourceId;
     // RDS 自動生成 secret を公開（db-migrator Lambda が Secrets Manager 経由で参照）
     if (!instance.secret) {
       throw new Error('RDS secret was not generated');

@@ -53,6 +53,7 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   appEgressSecurityGroup: foundation.appEgressSecurityGroup,
   rdsEndpoint: dataCore.rdsEndpoint,
   rdsPort: dataCore.rdsPort,
+  rdsResourceId: dataCore.rdsResourceId,
   dbName: dataCore.dbName,
   rdsSecret: dataCore.rdsSecret,
   secrets: dataShared.secrets,

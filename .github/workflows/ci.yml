@@ -110,6 +110,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Fetch Google JWKS (bundled at build time, .gitignore により CI で取得)
+        run: pnpm fetch-jwks
+
       - name: Type check
         run: pnpm type-check
 

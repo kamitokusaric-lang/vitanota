@@ -150,7 +150,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await truncateAll(db);
   });
 
-  it('seedSystemDefaults inserts exactly 8 tags', async () => {
+  it('seedSystemDefaults inserts exactly 23 tags', async () => {
     const tenant = await seedTenant(db, '新規学校');
 
     await db.transaction(async (tx) => {
@@ -163,7 +163,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
       return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
     });
-    expect(seeded).toHaveLength(8);
+    expect(seeded).toHaveLength(23);
   });
 
   it('seeded tags have isSystemDefault=true and createdBy=null', async () => {
@@ -182,7 +182,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     });
   });
 
-  it('seeded tags have 5 emotion + 3 task split', async () => {
+  it('seeded tags have 15 emotion + 8 context split', async () => {
     const tenant = await seedTenant(db, '学校');
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
@@ -221,14 +221,15 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     // 意図的に失敗を発生させる: 既存タグ名と同じ名前で重複作成
     const tenant = await seedTenant(db, '学校');
 
-    // 先に "うれしい" を手動で挿入しておく → seed が UNIQUE 制約違反でエラー
+    // 先に "喜び" を手動で挿入しておく → seed が UNIQUE 制約違反でエラー
+    // (v2 default tags に存在する名前を使うこと。v1 の "うれしい" は刷新で消えた)
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
       await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
       await tx.insert(tags).values({
         tenantId: tenant.id,
-        name: 'うれしい',
+        name: '喜び',
         type: 'emotion',
         category: 'positive',
         isSystemDefault: false,
@@ -275,6 +276,6 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tx.execute(sql`SELECT set_config('app.role', 'school_admin', true)`);
       return tx.select().from(tags);
     });
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(23);
   });
 });

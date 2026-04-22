@@ -7,11 +7,12 @@
 //     --cli-binary-format raw-in-base64-out response.json
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 interface MigrateEvent {
-  command: 'migrate' | 'status' | 'drop' | 'bootstrap-admin';
+  command: 'migrate' | 'status' | 'drop' | 'bootstrap-admin' | 'inspect' | 'demo-setup';
   email?: string;
   name?: string;
 }
@@ -212,6 +213,197 @@ async function runBootstrapAdmin(
   }
 }
 
+async function runInspect(): Promise<{
+  tenants: unknown[];
+  users: unknown[];
+  userTenantRoles: unknown[];
+  invitationTokens: unknown[];
+}> {
+  const client = await connect();
+  try {
+    const tenants = await client.query(
+      `SELECT id, name, slug, status, created_at FROM tenants ORDER BY created_at`
+    );
+    const users = await client.query(
+      `SELECT id, email, name, email_verified, deleted_at, created_at
+       FROM users ORDER BY created_at`
+    );
+    const userTenantRoles = await client.query(
+      `SELECT utr.user_id, u.email, utr.tenant_id, t.slug AS tenant_slug, utr.role, utr.created_at
+       FROM user_tenant_roles utr
+       JOIN users u ON u.id = utr.user_id
+       LEFT JOIN tenants t ON t.id = utr.tenant_id
+       ORDER BY utr.created_at`
+    );
+    const invitationTokens = await client.query(
+      `SELECT id, tenant_id, email, role, invited_by, expires_at, used_at, created_at
+       FROM invitation_tokens ORDER BY created_at`
+    );
+    return {
+      tenants: tenants.rows,
+      users: users.rows,
+      userTenantRoles: userTenantRoles.rows,
+      invitationTokens: invitationTokens.rows,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+const DEMO_TENANT_SLUG = 'mito';
+const DEMO_INVITE_EXPIRES_DAYS = 90;
+const DEMO_INVITE_BASE_URL = 'https://vitanota.io';
+const DEMO_INVITATIONS: { email: string; role: 'school_admin' | 'teacher' }[] = [
+  { email: 'chimo@cozi73.com', role: 'school_admin' },
+  { email: 'zenikami@cozi73.com', role: 'teacher' },
+];
+const DEMO_TEST_USERS: { email: string; name: string }[] = [
+  { email: 'testuser_1@example.com', name: 'テストユーザー1' },
+  { email: 'testuser_2@example.com', name: 'テストユーザー2' },
+  { email: 'testuser_3@example.com', name: 'テストユーザー3' },
+];
+
+interface DemoInviteResult {
+  email: string;
+  role: string;
+  token: string;
+  url: string;
+  expiresAt: string;
+  reused: boolean;
+}
+
+interface DemoTestUserResult {
+  email: string;
+  userId: string;
+  userCreated: boolean;
+  roleCreated: boolean;
+}
+
+async function runDemoSetup(): Promise<{
+  tenantId: string;
+  invitedBy: string;
+  invites: DemoInviteResult[];
+  testUsers: DemoTestUserResult[];
+}> {
+  const client = await connect();
+  try {
+    // demo テナント (slug = 'mito') を特定
+    const tenantRow = await client.query<{ id: string }>(
+      `SELECT id FROM tenants WHERE slug = $1`,
+      [DEMO_TENANT_SLUG]
+    );
+    if (tenantRow.rows.length === 0) {
+      throw new Error(`demo tenant not found (slug='${DEMO_TENANT_SLUG}')`);
+    }
+    const tenantId = tenantRow.rows[0].id;
+
+    // invited_by に使う system_admin を特定 (複数いる場合は最初の1人)
+    const adminRow = await client.query<{ user_id: string }>(
+      `SELECT user_id FROM user_tenant_roles
+       WHERE role = 'system_admin' AND tenant_id IS NULL
+       ORDER BY created_at LIMIT 1`
+    );
+    if (adminRow.rows.length === 0) {
+      throw new Error('no system_admin found; run bootstrap-admin first');
+    }
+    const invitedBy = adminRow.rows[0].user_id;
+
+    // ── 招待トークン × 2 ───────────────────────────────────
+    const invites: DemoInviteResult[] = [];
+    for (const inv of DEMO_INVITATIONS) {
+      // 既存の未使用かつ有効な招待があれば再利用 (重複 INSERT 回避)
+      const existing = await client.query<{ token: string; expires_at: Date }>(
+        `SELECT token, expires_at FROM invitation_tokens
+         WHERE email = $1 AND tenant_id = $2 AND role = $3
+           AND used_at IS NULL AND expires_at > NOW()
+         ORDER BY created_at DESC LIMIT 1`,
+        [inv.email, tenantId, inv.role]
+      );
+      if (existing.rows.length > 0) {
+        const row = existing.rows[0];
+        invites.push({
+          email: inv.email,
+          role: inv.role,
+          token: row.token,
+          url: `${DEMO_INVITE_BASE_URL}/auth/invite?token=${row.token}`,
+          expiresAt: row.expires_at.toISOString(),
+          reused: true,
+        });
+        continue;
+      }
+
+      const token = randomBytes(32).toString('hex');
+      const inserted = await client.query<{ expires_at: Date }>(
+        `INSERT INTO invitation_tokens (tenant_id, email, role, token, invited_by, expires_at)
+         VALUES ($1, $2, $3, $4, $5, NOW() + ($6 || ' days')::interval)
+         RETURNING expires_at`,
+        [tenantId, inv.email, inv.role, token, invitedBy, String(DEMO_INVITE_EXPIRES_DAYS)]
+      );
+      invites.push({
+        email: inv.email,
+        role: inv.role,
+        token,
+        url: `${DEMO_INVITE_BASE_URL}/auth/invite?token=${token}`,
+        expiresAt: inserted.rows[0].expires_at.toISOString(),
+        reused: false,
+      });
+    }
+
+    // ── testuser × 3 流し込み ─────────────────────────────
+    const testUsers: DemoTestUserResult[] = [];
+    for (const tu of DEMO_TEST_USERS) {
+      await client.query('BEGIN');
+      try {
+        const userInsert = await client.query<{ id: string }>(
+          `INSERT INTO users (email, name, email_verified)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (email) DO NOTHING
+           RETURNING id`,
+          [tu.email, tu.name]
+        );
+        let userId: string;
+        let userCreated: boolean;
+        if (userInsert.rows.length > 0) {
+          userId = userInsert.rows[0].id;
+          userCreated = true;
+        } else {
+          const existingUser = await client.query<{ id: string }>(
+            `SELECT id FROM users WHERE email = $1`,
+            [tu.email]
+          );
+          userId = existingUser.rows[0].id;
+          userCreated = false;
+        }
+
+        // user_tenant_roles に teacher 権限を付与 (UNIQUE 制約で冪等)
+        const roleInsert = await client.query<{ id: string }>(
+          `INSERT INTO user_tenant_roles (user_id, tenant_id, role)
+           VALUES ($1, $2, 'teacher')
+           ON CONFLICT (user_id, tenant_id, role) DO NOTHING
+           RETURNING id`,
+          [userId, tenantId]
+        );
+
+        await client.query('COMMIT');
+
+        testUsers.push({
+          email: tu.email,
+          userId,
+          userCreated,
+          roleCreated: roleInsert.rows.length > 0,
+        });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { tenantId, invitedBy, invites, testUsers };
+  } finally {
+    await client.end();
+  }
+}
+
 export const handler = async (event: MigrateEvent) => {
   console.log(`vitanota-db-migrator invoked: ${event.command} (env=${ENV})`);
   try {
@@ -233,6 +425,14 @@ export const handler = async (event: MigrateEvent) => {
           return { statusCode: 400, body: JSON.stringify({ error: 'email is required' }) };
         }
         const result = await runBootstrapAdmin(event.email, event.name ?? null);
+        return { statusCode: 200, body: JSON.stringify(result) };
+      }
+      case 'inspect': {
+        const result = await runInspect();
+        return { statusCode: 200, body: JSON.stringify(result) };
+      }
+      case 'demo-setup': {
+        const result = await runDemoSetup();
         return { statusCode: 200, body: JSON.stringify(result) };
       }
       default:

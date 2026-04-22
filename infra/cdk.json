@@ -8,6 +8,7 @@
     "githubOrg": "kamitokusaric-lang",
     "githubRepo": "vitanota",
     "alertEmail": "kamitokusari.c@cozi73.com",
-    "vpcCidr": "10.0.0.0/16"
+    "vpcCidr": "10.0.0.0/16",
+    "googleClientId": "624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com"
   }
 }

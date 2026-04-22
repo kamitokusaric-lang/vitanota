@@ -17,6 +17,10 @@ const domainName = app.node.tryGetContext('domainName') as string;
 const githubOrg = app.node.tryGetContext('githubOrg') as string;
 const githubRepo = app.node.tryGetContext('githubRepo') as string;
 const vpcCidr = app.node.tryGetContext('vpcCidr') as string;
+// Google OAuth Client ID は公開値。cdk.json で一元管理し App Runner / Lambda Proxy 両方へ注入。
+// rotate 時は cdk.json の値を更新 → CDK deploy 先行 → GHA variable も同値に更新 → フロント再 build の順。
+// 詳細手順: aidlc-docs/construction/auth-error-catalog.md 「文言の統一ルール」隣接セクション
+const googleClientId = app.node.tryGetContext('googleClientId') as string;
 
 const prefix = `${projectName}-${envName}`;
 const env: cdk.Environment = { region, account: process.env.CDK_DEFAULT_ACCOUNT };
@@ -42,6 +46,7 @@ const dataShared = new DataSharedStack(app, `${prefix}-data-shared`, {
   env,
   projectName,
   envName,
+  googleClientId,
 });
 
 const appStack = new AppStack(app, `${prefix}-app`, {
@@ -60,6 +65,7 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   ecrRepository: dataShared.ecrRepository,
   githubActionsRole: foundation.githubActionsRole,
   alertEmail,
+  googleClientId,
 });
 
 new EdgeStack(app, `${prefix}-edge`, {

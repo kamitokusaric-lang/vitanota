@@ -29,6 +29,8 @@ export interface AppStackProps extends cdk.StackProps {
   ecrRepository: ecr.IRepository;
   githubActionsRole: iam.Role;
   alertEmail: string;
+  /** Google OAuth Client ID (public 値・cdk.json で一元管理) */
+  googleClientId: string;
 }
 
 export class AppStack extends cdk.Stack {
@@ -113,11 +115,10 @@ export class AppStack extends cdk.Stack {
               { name: 'NEXTAUTH_URL_INTERNAL', value: 'http://localhost:3000' },
               // 認証外部化: signin ページの SSR で Google Client ID を埋め込む
               // (Client ID 自体は公開情報・任意のユーザーが取得可能)
-              { name: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
-                value: '624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com' },
+              // 値は cdk.json で一元管理 (3 重ハードコード解消、2026-04-22)
+              { name: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID', value: props.googleClientId },
               // 認証外部化: /api/auth/google-signin で ID Token の aud を検証
-              { name: 'GOOGLE_CLIENT_ID',
-                value: '624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com' },
+              { name: 'GOOGLE_CLIENT_ID', value: props.googleClientId },
               // Next.js standalone が listen する hostname を 0.0.0.0 に強制。
               // AppRunner ランタイムがコンテナ起動時に HOSTNAME をコンテナの
               // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、

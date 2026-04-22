@@ -11,12 +11,6 @@
 
 ## Auth / OAuth
 
-### 🟡 中: Google Client ID の 3 重ハードコード解消
-- **発見日**: 2026-04-21
-- **現状**: `infra/lib/app-stack.ts:104,108` で 2 箇所 + GitHub variable の計 3 箇所に同値ハードコード
-- **理由**: Secret ローテ時の変更漏れリスク、変更箇所が散らばる
-- **対策**: Secrets Manager `vitanota/google-client-id` に一元化し、環境変数は `runtimeEnvironmentSecrets` で注入
-
 ### 🟢 低: Lambda inline code を一貫して別ファイル化 (3 Lambda)
 - **発見日**: 2026-04-21 / 2026-04-22 に範囲拡張
 - **現状**: 以下 3 Lambda すべて `lambda.Code.fromInline` を使っており inline 文字列リテラル

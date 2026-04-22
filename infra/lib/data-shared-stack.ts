@@ -16,6 +16,8 @@ export interface Secrets {
 export interface DataSharedStackProps extends cdk.StackProps {
   projectName: string;
   envName: string;
+  /** Google OAuth Client ID (public 値・cdk.json で一元管理) */
+  googleClientId: string;
 }
 
 export class DataSharedStack extends cdk.Stack {
@@ -213,7 +215,7 @@ exports.handler = async (event) => {
       `),
       environment: {
         SECRET_ARN: googleClientSecret.secretArn,
-        GOOGLE_CLIENT_ID: '624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com',
+        GOOGLE_CLIENT_ID: props.googleClientId,
         REDIRECT_URI: 'https://vitanota.io/auth/google-callback',
       },
     });

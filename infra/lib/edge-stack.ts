@@ -13,7 +13,6 @@ export interface EdgeStackProps extends cdk.StackProps {
   envName: string;
   domainName: string;
   appRunnerUrl: string;
-  cloudfrontSecretHeaderValue: secretsmanager.ISecret;
 }
 
 export class EdgeStack extends cdk.Stack {
@@ -28,6 +27,20 @@ export class EdgeStack extends cdk.Stack {
     const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
       domainName: props.domainName,
     });
+
+    // CloudFront secret replica (us-east-1)。data-shared-stack の replicaRegions で
+    // ap-northeast-1 primary から us-east-1 にレプリケートされたもの。
+    // この edge-stack は us-east-1 にデプロイされるので same-region 参照として
+    // CFN dynamic reference `{{resolve:secretsmanager:...}}` が解決する。
+    //
+    // ARN suffix (-i7ognX) は Secret 初期作成時に決まり、replica も同一 suffix を継承。
+    // fromSecretNameV2 では CFN が name ベースで lookup する際に replica propagation 直後
+    // だと ResourceNotFoundException が出るため、fromSecretCompleteArn で明示指定する。
+    const cloudfrontSecretReplica = secretsmanager.Secret.fromSecretCompleteArn(
+      this,
+      'CloudFrontSecretReplica',
+      `arn:aws:secretsmanager:us-east-1:${cdk.Aws.ACCOUNT_ID}:secret:${props.projectName}/cloudfront-secret-i7ognX`,
+    );
 
     // ── ACM 証明書 (us-east-1 必須・DNS バリデーションは Route53 に自動投入) ──
     const certificate = new acm.Certificate(this, 'Certificate', {
@@ -140,10 +153,10 @@ export class EdgeStack extends cdk.Stack {
         origin: new origins.HttpOrigin(appRunnerOriginDomain, {
           protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
           customHeaders: {
-            // TODO (Phase 2): Secrets Manager replicaRegions で us-east-1 にレプリカ配置し、
-            // CFN dynamic reference で実値を埋め込む。現状はクロスリージョン制約で placeholder のまま。
-            // β 段階のセキュリティは TLS + WAF + 認証必須で確保。
-            'X-CloudFront-Secret': 'PLACEHOLDER_REPLACE_AFTER_DEPLOY',
+            // us-east-1 にある Secret レプリカを CFN dynamic reference で埋め込む。
+            // ApRunner 側 middleware が process.env.CLOUDFRONT_SECRET と照合し、
+            // 不一致 / 欠損なら 403 で拒否する (CloudFront 迂回攻撃の防御)。
+            'X-CloudFront-Secret': cloudfrontSecretReplica.secretValue.unsafeUnwrap(),
           },
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

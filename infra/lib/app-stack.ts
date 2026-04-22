@@ -124,9 +124,13 @@ export class AppStack extends cdk.Stack {
               // runtimeEnvironmentVariables 経由で明示的に 0.0.0.0 に再上書きする必要がある。
               { name: 'HOSTNAME', value: '0.0.0.0' },
             ],
-            // TODO (Phase 2): CloudFront secret enforcement を有効化する際に
-            // runtimeEnvironmentSecrets で CLOUDFRONT_SECRET を注入する。
-            // クロスリージョン（CloudFront=us-east-1 / Secret=ap-northeast-1）問題解決後。
+            // CloudFront 迂回攻撃防御: middleware が X-CloudFront-Secret header を
+            // CLOUDFRONT_SECRET env と照合し、不一致なら 403 返却。
+            // CloudFront 側 (edge-stack) で同 secret の us-east-1 replica を dynamic ref で
+            // 埋め込んでいるため、正しい CloudFront 経由リクエストは 200 で通過する。
+            runtimeEnvironmentSecrets: [
+              { name: 'CLOUDFRONT_SECRET', value: props.secrets.cloudfrontSecret.secretArn },
+            ],
           },
         },
         autoDeploymentsEnabled: false,

@@ -53,11 +53,6 @@
 - **対策**: RDS CA bundle を Docker イメージに同梱し true に切替
 - **判断メモ (2026-04-22)**: MVP 前に skip で chimo と合意。理由: (1) VPC private isolated + SG 制限で MITM 経路が実質存在しない (2) 本番 DB 接続を MVP 直前に触るリスクが defense in depth の得られる価値を上回る (3) 誤設定時はローカル検証不能 + 本番一発勝負。Phase 2 で慎重に導入 (推奨方式: `DB_SSL_STRICT=true` の OR 条件で段階導入し fallback 可能に)
 
-### 🟢 低: CloudFront CLOUDFRONT_SECRET 強制化
-- **発見日**: 以前から TODO（`infra/lib/app-stack.ts:115` コメント）
-- **現状**: PLACEHOLDER 運用で middleware が secret チェックをスキップ
-- **対策**: クロスリージョン Secret (CloudFront=us-east-1 / Secret=ap-northeast-1) 問題を解決して有効化
-
 ---
 
 ## インフラクリーンアップ (β ローンチ後すぐ)

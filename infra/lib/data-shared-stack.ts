@@ -52,6 +52,10 @@ export class DataSharedStack extends cdk.Stack {
       secretName: `${props.projectName}/cloudfront-secret`,
       description: 'CloudFront → App Runner origin verification header',
       generateSecretString: { passwordLength: 64, excludePunctuation: true },
+      // CloudFront Distribution は us-east-1 固定のため、同 region にレプリカを配置して
+      // edge-stack (us-east-1) から CFN dynamic reference で参照できるようにする。
+      // primary (ap-northeast-1) で rotate すれば replica も自動追従。
+      replicaRegions: [{ region: 'us-east-1' }],
     });
 
     this.secrets = {

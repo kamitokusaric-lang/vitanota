@@ -74,7 +74,6 @@ new EdgeStack(app, `${prefix}-edge`, {
   envName,
   domainName,
   appRunnerUrl: appStack.appRunnerUrl,
-  cloudfrontSecretHeaderValue: dataShared.secrets.cloudfrontSecret,
 });
 
 app.synth();

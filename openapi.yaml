@@ -123,7 +123,6 @@ components:
           items:
             type: string
             format: uuid
-          maxItems: 10
           example: &a1 []
         isPublic:
           type: boolean
@@ -145,7 +144,6 @@ components:
           items:
             type: string
             format: uuid
-          maxItems: 10
           example: *a1
         isPublic:
           type: boolean
@@ -177,9 +175,21 @@ components:
         name:
           type: string
           example: うれしい
-        isEmotion:
-          type: boolean
-          example: true
+        type:
+          type: string
+          enum:
+            - emotion
+            - context
+          example: emotion
+        category:
+          type:
+            - string
+            - "null"
+          enum:
+            - positive
+            - negative
+            - neutral
+          example: positive
         isSystemDefault:
           type: boolean
         sortOrder:
@@ -196,7 +206,8 @@ components:
         - id
         - tenantId
         - name
-        - isEmotion
+        - type
+        - category
         - isSystemDefault
         - sortOrder
         - createdBy
@@ -224,11 +235,23 @@ components:
           type: string
           minLength: 1
           maxLength: 50
-          example: うれしい
-        isEmotion:
-          type: boolean
-          default: false
-          example: true
+          example: 喜び
+        type:
+          type: string
+          enum:
+            - emotion
+            - context
+          default: context
+          example: emotion
+        category:
+          type:
+            - string
+            - "null"
+          enum:
+            - positive
+            - negative
+            - neutral
+          example: positive
       required:
         - name
     TagDeleteResponse:

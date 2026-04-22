@@ -45,14 +45,14 @@ export default defineConfig({
         // Zod スキーマ（型定義のみ）
         'src/features/*/schemas/**',
         // Unit-04 admin-dashboard components: 未カバーの UI 群は MVP 後に test 追加予定
-        // (AlertItem / AlertList / StackedBarChart / Sparkline / TenantStatus* 計 7 file)
+        // (AlertItem / AlertList / SchoolTrendBarChart / Sparkline / TeacherStatus* 計 7 file)
         'src/features/admin-dashboard/components/AlertItem.tsx',
         'src/features/admin-dashboard/components/AlertList.tsx',
-        'src/features/admin-dashboard/components/StackedBarChart.tsx',
+        'src/features/admin-dashboard/components/SchoolTrendBarChart.tsx',
         'src/features/admin-dashboard/components/Sparkline.tsx',
-        'src/features/admin-dashboard/components/TenantStatusCard.tsx',
-        'src/features/admin-dashboard/components/TenantStatusGrid.tsx',
-        'src/features/admin-dashboard/components/TenantStatusTable.tsx',
+        'src/features/admin-dashboard/components/TeacherStatusCard.tsx',
+        'src/features/admin-dashboard/components/TeacherStatusGrid.tsx',
+        'src/features/admin-dashboard/components/TeacherStatusTable.tsx',
       ],
     },
   },

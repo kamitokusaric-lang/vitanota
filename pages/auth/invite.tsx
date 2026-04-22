@@ -4,6 +4,7 @@ import type { GetServerSideProps } from 'next';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
+import { logger } from '@/shared/lib/logger';
 
 interface InvitePageProps {
   valid: boolean;
@@ -79,12 +80,39 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     return { props: { valid: false, token: '', errorCode: 'NOT_FOUND' } };
   }
 
+  const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+  const fetchUrl = `${baseUrl}/api/invitations/${token}`;
+  logger.info({ event: 'invite.ssr.start', baseUrl, tokenLen: token.length });
+
   try {
-    const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/invitations/${token}`);
-    const data = await response.json();
+    const response = await fetch(fetchUrl);
+    const rawText = await response.text();
+    logger.info({
+      event: 'invite.ssr.fetched',
+      status: response.status,
+      ok: response.ok,
+      bodyLen: rawText.length,
+      bodyPreview: rawText.slice(0, 200),
+    });
+
+    let data: { error?: string; invitation?: { email: string; role: string } } = {};
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      logger.error({
+        event: 'invite.ssr.parse.error',
+        err: parseErr instanceof Error ? parseErr.message : String(parseErr),
+        bodyPreview: rawText.slice(0, 200),
+      });
+      return { props: { valid: false, token, errorCode: 'NOT_FOUND' } };
+    }
 
     if (!response.ok) {
+      logger.info({
+        event: 'invite.ssr.api.notok',
+        status: response.status,
+        apiError: data.error,
+      });
       return {
         props: { valid: false, token, errorCode: data.error ?? 'NOT_FOUND' },
       };
@@ -94,11 +122,16 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       props: {
         valid: true,
         token,
-        email: data.invitation.email,
-        role: data.invitation.role,
+        email: data.invitation?.email,
+        role: data.invitation?.role,
       },
     };
-  } catch {
+  } catch (err) {
+    logger.error({
+      event: 'invite.ssr.fetch.error',
+      fetchUrl,
+      err: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : String(err),
+    });
     return { props: { valid: false, token, errorCode: 'NOT_FOUND' } };
   }
 };

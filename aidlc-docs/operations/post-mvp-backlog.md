@@ -17,11 +17,15 @@
 - **理由**: Secret ローテ時の変更漏れリスク、変更箇所が散らばる
 - **対策**: Secrets Manager `vitanota/google-client-id` に一元化し、環境変数は `runtimeEnvironmentSecrets` で注入
 
-### 🟢 低: Google Token Proxy Lambda の inline code を別ファイル化
-- **発見日**: 2026-04-21
-- **現状**: `infra/lib/data-shared-stack.ts` 内の 88 行文字列リテラル
-- **理由**: syntax highlight なし、ユニットテスト不可
-- **対策**: `infra/lambda/google-token-proxy/index.js` に分離、`lambda.Code.fromAsset` で参照
+### 🟢 低: Lambda inline code を一貫して別ファイル化 (3 Lambda)
+- **発見日**: 2026-04-21 / 2026-04-22 に範囲拡張
+- **現状**: 以下 3 Lambda すべて `lambda.Code.fromInline` を使っており inline 文字列リテラル
+  - `infra/lib/data-shared-stack.ts:124` (GoogleTokenProxy, 88 行)
+  - `infra/lib/data-core-stack.ts:93` (SnapshotManager)
+  - db-migrator Lambda (推定同様、要確認)
+- **理由**: syntax highlight なし、ESLint/Prettier 不適用、testability 低
+- **対策**: `infra/lambda/<function-name>/index.js` の統一構造に分離、`lambda.Code.fromAsset` で参照
+- **判断メモ (2026-04-22)**: chimo と「MVP 前に 1 Lambda だけ先行はやらない」で合意。3 Lambda まとめて別ファイル化するまで inline 維持。単独先行は一貫性を壊すだけで価値が出ない
 
 ### 🟢 低: CSP の Lambda URL ハードコード解消
 - **発見日**: 2026-04-21
@@ -49,12 +53,6 @@
 - **現状**: `src/shared/lib/db.ts:35` で 30 秒
 - **影響**: idle 30 秒で connection が破棄され、次リクエストで新規 PAM 認証（コスト・レイテンシ）
 - **対策**: 5〜10 分に緩和して再利用率を上げる。ただし max 10 で RDS connection 数との兼ね合いを確認
-
-### 🟢 低: 古い App Runner ログ group の削除
-- **発見日**: 2026-04-21
-- **現状**: `/aws/apprunner/vitanota-prod-app/27cf452510c6471882edb89b6fb5fcf3/*` が停止 VPC Connector 時代の残骸で存続
-- **影響**: CloudWatch 保管コスト（微小）
-- **対策**: 新 group (`9063731f...`) が安定稼働後、旧 group を `aws logs delete-log-group` で削除
 
 ---
 

@@ -2,9 +2,12 @@
 // トークンを検証して Google OAuth へ誘導する
 import type { GetServerSideProps } from 'next';
 import { signIn } from 'next-auth/react';
+import { eq } from 'drizzle-orm';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { logger } from '@/shared/lib/logger';
+import { getDb } from '@/shared/lib/db';
+import { invitationTokens } from '@/db/schema';
 
 interface InvitePageProps {
   valid: boolean;
@@ -80,57 +83,44 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     return { props: { valid: false, token: '', errorCode: 'NOT_FOUND' } };
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-  const fetchUrl = `${baseUrl}/api/invitations/${token}`;
-  logger.info({ event: 'invite.ssr.start', baseUrl, tokenLen: token.length });
-
+  // 同一 Next.js プロセス内なので HTTP 越しに自 API を叩かず DB を直接引く。
+  // App Runner (PRIVATE_ISOLATED) から自ドメインへの外周 fetch は
+  // インターネット egress に依存して失敗する。
   try {
-    const response = await fetch(fetchUrl);
-    const rawText = await response.text();
-    logger.info({
-      event: 'invite.ssr.fetched',
-      status: response.status,
-      ok: response.ok,
-      bodyLen: rawText.length,
-      bodyPreview: rawText.slice(0, 200),
-    });
+    const db = await getDb();
+    const [invitation] = await db
+      .select({
+        email: invitationTokens.email,
+        role: invitationTokens.role,
+        expiresAt: invitationTokens.expiresAt,
+        usedAt: invitationTokens.usedAt,
+      })
+      .from(invitationTokens)
+      .where(eq(invitationTokens.token, token))
+      .limit(1);
 
-    let data: { error?: string; invitation?: { email: string; role: string } } = {};
-    try {
-      data = JSON.parse(rawText);
-    } catch (parseErr) {
-      logger.error({
-        event: 'invite.ssr.parse.error',
-        err: parseErr instanceof Error ? parseErr.message : String(parseErr),
-        bodyPreview: rawText.slice(0, 200),
-      });
+    if (!invitation) {
       return { props: { valid: false, token, errorCode: 'NOT_FOUND' } };
     }
-
-    if (!response.ok) {
-      logger.info({
-        event: 'invite.ssr.api.notok',
-        status: response.status,
-        apiError: data.error,
-      });
-      return {
-        props: { valid: false, token, errorCode: data.error ?? 'NOT_FOUND' },
-      };
+    if (invitation.usedAt) {
+      return { props: { valid: false, token, errorCode: 'INVITE_USED' } };
+    }
+    if (new Date(invitation.expiresAt) <= new Date()) {
+      return { props: { valid: false, token, errorCode: 'INVITE_EXPIRED' } };
     }
 
     return {
       props: {
         valid: true,
         token,
-        email: data.invitation?.email,
-        role: data.invitation?.role,
+        email: invitation.email,
+        role: invitation.role,
       },
     };
   } catch (err) {
     logger.error({
-      event: 'invite.ssr.fetch.error',
-      fetchUrl,
-      err: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : String(err),
+      event: 'invite.ssr.db.error',
+      err: err instanceof Error ? err.message : String(err),
     });
     return { props: { valid: false, token, errorCode: 'NOT_FOUND' } };
   }

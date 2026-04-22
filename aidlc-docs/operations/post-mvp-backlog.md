@@ -79,10 +79,7 @@
 
 出典: `aidlc-docs/operations/infrastructure-audit-20260419.md`
 
-### 🟡 中: AppRunner を PRIVATE_ISOLATED に戻し NAT Instance を削除
-- **現状**: Lambda Proxy 導入で AppRunner から Google への直接通信が不要になった
-- **影響**: `-$5.40/月` のコスト削減、attack surface 低減
-- **対策**: VPC Connector を PRIVATE_ISOLATED サブネット版に戻し、NAT Instance と egress サブネットを削除
+(すべて 2026-04-22 に完遂済: 旧 VPC Connector 削除 / 旧 Secret 判定撤回 / NAT Instance + PUBLIC subnet + IGW 完全撤廃)
 
 ---
 
@@ -151,6 +148,7 @@
 - **現状**: App Runner で安定稼働中。当時 App Runner 終了通知 (後に撤回) と外向き通信の NAT 要件で移行検討されたが、認証外部化 (Lambda Proxy) により後者は解決済
 - **判断保留**: 現状 AppRunner の実運用コスト・制約を継続観測。明確な必要性が生じるまで **塩漬け**
 - **着手条件**: App Runner の再価格改定・スケーリング上限 hit・未知の障害が頻発する等
+- **判断メモ (2026-04-22)**: chimo と確認。ECS 移行すると ALB ($17/月) + NAT Gateway ($33/月) で **月 $23-40 増**、実利なし。AppRunner 新規受付停止 (2026-04-30) は既存稼働に影響なく、AWS 終了告知時は 12-24 ヶ月の移行猶予が通例。よって塩漬け継続で合意
 
 ### Claude Code Review の段階導入
 - **出典**: `aidlc-docs/operations/claude-code-review-rollout.md`

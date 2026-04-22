@@ -11,15 +11,19 @@ const nextConfig = {
     const scriptSrc = isDev
       ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
       : "script-src 'self' 'unsafe-inline'";
+    // connect-src: Google Token Proxy Lambda (Function URL) への POST を許可。
+    // URL は build 時に NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL から origin 部分だけ抽出する
+    // (CSP は scheme://host までの origin を要求、末尾 path は不可)
+    const proxyUrl = process.env.NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL;
+    const proxyOrigin = proxyUrl ? new URL(proxyUrl).origin : '';
+    const connectSrc = ['\'self\'', proxyOrigin].filter(Boolean).join(' ');
     return [
       {
         source: '/(.*)',
         headers: [
           {
             key: 'Content-Security-Policy',
-            // connect-src: Google Token Proxy Lambda (Function URL) への POST を許可
-            //   Google /token への直接通信は行わず Lambda 経由で中継する
-            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://uwcw4vkloeh6yfbc462txfjhyu0qjyzx.lambda-url.ap-northeast-1.on.aws;`,
+            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src ${connectSrc};`,
           },
           {
             key: 'Strict-Transport-Security',

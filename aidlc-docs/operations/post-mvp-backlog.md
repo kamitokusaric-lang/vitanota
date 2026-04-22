@@ -27,11 +27,6 @@
 - **対策**: `infra/lambda/<function-name>/index.js` の統一構造に分離、`lambda.Code.fromAsset` で参照
 - **判断メモ (2026-04-22)**: chimo と「MVP 前に 1 Lambda だけ先行はやらない」で合意。3 Lambda まとめて別ファイル化するまで inline 維持。単独先行は一貫性を壊すだけで価値が出ない
 
-### 🟢 低: CSP の Lambda URL ハードコード解消
-- **発見日**: 2026-04-21
-- **現状**: `pages/api/auth/google-signin.ts` 等で CSP connect-src に Lambda URL を直書き
-- **対策**: CDK `GoogleTokenProxyUrl` output を GitHub Actions で読み取り、ビルド時 env var で注入
-
 ### 🟢 低: ログアウト動作の E2E カバレッジ
 - **発見日**: 2026-04-21 / 2026-04-22 に静的解析で設計完備を確認
 - **現状**: `pages/api/auth/[...nextauth].ts` が NextAuth catch-all で `/api/auth/signout` を処理。DrizzleAdapter + database strategy で sessions 行削除 + cookie 無効化が自動で走る。`vitanota_app` に DELETE 権限あり (`0008_app_role_nosuper.sql:24`)、sessions は RLS 無効 (`0009_rls_role_separation.sql:168`、鶏卵問題回避のため意図的)。`events.signOut` で `LogEvents.SessionRevoked` を構造化ログに記録

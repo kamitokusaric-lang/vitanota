@@ -14,7 +14,6 @@ export interface FoundationStackProps extends cdk.StackProps {
 export class FoundationStack extends cdk.Stack {
   public readonly vpc: ec2.IVpc;
   public readonly appSecurityGroup: ec2.ISecurityGroup;
-  public readonly appEgressSecurityGroup: ec2.ISecurityGroup;
   public readonly rdsSecurityGroup: ec2.ISecurityGroup;
   public readonly githubActionsRole: iam.Role;
 
@@ -24,38 +23,23 @@ export class FoundationStack extends cdk.Stack {
     const prefix = `${props.projectName}-${props.envName}`;
 
     // VPC
-    // PRIVATE_ISOLATED (RDS, db-migrator Lambda)
-    //   + PRIVATE_WITH_EGRESS (AppRunner VPC connector, 外向き HTTPS 必要)
-    //   + PUBLIC (NAT Instance 配置先)
-    // NAT Instance (t4g.nano) で PRIVATE_WITH_EGRESS の外向き通信を賄う
-    //   月額 ~$3-5・NAT Gateway ($32/月) の代替
+    // PRIVATE_ISOLATED のみ (RDS, db-migrator Lambda, AppRunner VPC Connector)
+    // AppRunner の外向き通信は発生しない (Google OAuth は Lambda Proxy 経由で browser から、
+    // Secrets Manager は VPC Interface Endpoint 経由)。そのため NAT / PUBLIC / IGW は不要。
+    // 2026-04-22: PRIVATE_WITH_EGRESS + PUBLIC + NAT Instance を撤廃。
     const vpc = new ec2.Vpc(this, 'Vpc', {
       vpcName: `${prefix}-vpc`,
       ipAddresses: ec2.IpAddresses.cidr(props.vpcCidr),
       maxAzs: 2,
-      // private-isolated を先頭に維持：既存 subnet の CIDR を保持
+      // private-isolated を先頭で維持：既存 subnet の Logical ID と CIDR を保持する
       subnetConfiguration: [
         {
           cidrMask: 24,
           name: 'private-isolated',
           subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
-        {
-          cidrMask: 24,
-          name: 'public',
-          subnetType: ec2.SubnetType.PUBLIC,
-        },
-        {
-          cidrMask: 24,
-          name: 'private-egress',
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
       ],
-      natGateways: 1, // コスト削減のため単一 AZ に 1 台
-      natGatewayProvider: ec2.NatProvider.instanceV2({
-        instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.NANO),
-        defaultAllowedTraffic: ec2.NatTrafficDirection.OUTBOUND_ONLY,
-      }),
+      natGateways: 0,
     });
     this.vpc = vpc;
 
@@ -80,18 +64,6 @@ export class FoundationStack extends cdk.Stack {
     // VPC Endpoint 経由の HTTPS Ingress を許可（Lambda から Secrets Manager への応答）
     this.appSecurityGroup.addIngressRule(this.appSecurityGroup, ec2.Port.tcp(443), 'From self for VPC Endpoint');
     this.rdsSecurityGroup = rdsSg;
-
-    // AppRunner 新 VPC Connector 用 SG（PRIVATE_WITH_EGRESS サブネット配置）
-    // AppRunner は同一 SG 組み合わせで 2 つの Connector を作れないため、別 SG を用意
-    this.appEgressSecurityGroup = new ec2.SecurityGroup(this, 'AppEgressSg', {
-      vpc,
-      securityGroupName: `${prefix}-app-egress-sg`,
-      description: 'App Runner VPC Connector (egress subnets via NAT)',
-      allowAllOutbound: false,
-    });
-    this.appEgressSecurityGroup.addEgressRule(rdsSg, ec2.Port.tcp(5432), 'To RDS');
-    this.appEgressSecurityGroup.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'To Internet / AWS APIs via NAT');
-    rdsSg.addIngressRule(this.appEgressSecurityGroup, ec2.Port.tcp(5432), 'From App Runner (egress subnet)');
 
     // VPC Interface Endpoint: Secrets Manager
     // PRIVATE_ISOLATED Lambda（db-migrator）から Secrets Manager API に到達するため必須

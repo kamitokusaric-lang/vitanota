@@ -55,7 +55,6 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   envName,
   vpc: foundation.vpc,
   appSecurityGroup: foundation.appSecurityGroup,
-  appEgressSecurityGroup: foundation.appEgressSecurityGroup,
   rdsEndpoint: dataCore.rdsEndpoint,
   rdsPort: dataCore.rdsPort,
   rdsResourceId: dataCore.rdsResourceId,

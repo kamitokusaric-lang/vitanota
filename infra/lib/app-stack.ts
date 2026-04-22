@@ -19,7 +19,6 @@ export interface AppStackProps extends cdk.StackProps {
   envName: string;
   vpc: ec2.IVpc;
   appSecurityGroup: ec2.ISecurityGroup;
-  appEgressSecurityGroup: ec2.ISecurityGroup;
   rdsEndpoint: string;
   rdsPort: string;
   rdsResourceId: string;
@@ -51,13 +50,13 @@ export class AppStack extends cdk.Stack {
     );
 
     // ── App Runner VPC コネクター ──
-    // PRIVATE_WITH_EGRESS に配置：NAT Instance 経由で Google OAuth 等の外向き HTTPS に到達可能
-    // 新 SG (appEgressSecurityGroup) を使用：AppRunner は同一 SG 組み合わせで
-    // 2 つの VPC Connector を作れないため、旧 Connector と SG を分ける必要がある
+    // PRIVATE_ISOLATED に配置。App Runner は外向き通信を行わない (Google OAuth は Lambda Proxy
+    // 経由で browser から、Secrets Manager は VPC Interface Endpoint 経由)。
+    // NAT Instance / PRIVATE_WITH_EGRESS subnet は 2026-04-22 に撤廃。
     const vpcConnector = new apprunner.CfnVpcConnector(this, 'VpcConnector', {
-      vpcConnectorName: `${prefix}-vpc-connector-egress`,
-      subnets: props.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds,
-      securityGroups: [props.appEgressSecurityGroup.securityGroupId],
+      vpcConnectorName: `${prefix}-vpc-connector`,
+      subnets: props.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_ISOLATED }).subnetIds,
+      securityGroups: [props.appSecurityGroup.securityGroupId],
     });
 
     // ── App Runner インスタンスロール ──

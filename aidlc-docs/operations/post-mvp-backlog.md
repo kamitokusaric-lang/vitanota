@@ -9,6 +9,26 @@
 
 ---
 
+## 脆弱性対応 / 依存更新
+
+### 🔴 高: Next.js 14 → 15 major upgrade + drizzle-orm 0.30 → 0.31+ upgrade
+- **発見日**: 2026-04-22 (Phase C CI GREEN 化中に OSV-Scanner の CVE 一斉発覚)
+- **期限**: 2026-06-30 (MVP ローンチから約 2 ヶ月)
+- **背景**: Next.js 14.2 系の 5 CVE (High 2 + Medium 3) と drizzle-orm 0.30.10 の 1 High CVE が、それぞれ 14.2 最終 patch / 0.30 最終 patch で fix 対応していない。major upgrade (Next.js) / minor upgrade (drizzle-orm) が必要
+- **MVP β 期間の allowlist 根拠**:
+  - vitanota は多層防御 (CloudFront secret 強制化 + WAF rate limit + 招待制 + RLS + session 8h) により実効リスクを中弱に抑制
+  - SSRF は VPC Private Isolated で外部到達不能、Cache 系は CachingDisabled で影響ゼロ
+  - drizzle SQL Injection は parameterized API のみ使用で実効リスク低
+  - 詳細な CVE 別評価は `osv-scanner.toml` の各 reason 欄
+- **upgrade 手順 (推定工数 2-4 日)**:
+  1. Next.js 14 → 15 migration (React 19 含む、App Router / Middleware signature 変更追従)
+  2. drizzle-orm 0.30 → 0.31+ migration (schema API 変更確認)
+  3. 統合テスト + E2E regression 確認
+  4. 本番 deploy (CloudFront + App Runner)
+- **運用監視**: 月次で OSV-Scanner 結果を review、新 CVE 発生 or severity 上方修正時は個別対応判断
+
+---
+
 ## Auth / OAuth
 
 ### 🟢 低: Lambda inline code を一貫して別ファイル化 (3 Lambda)

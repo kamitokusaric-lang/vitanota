@@ -57,6 +57,9 @@ export default defineConfig({
       NEXTAUTH_URL: BASE_URL,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? 'e2e-dummy',
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? 'e2e-dummy',
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? 'e2e-dummy',
+      NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL:
+        process.env.NEXT_PUBLIC_GOOGLE_TOKEN_PROXY_URL ?? 'http://localhost:9999/dummy',
       E2E_TEST_MODE: 'true',
       SKIP_SECRETS_MANAGER: 'true',
     },

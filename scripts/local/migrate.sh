@@ -6,20 +6,21 @@
 
 set -e
 
-DB_URL="${DATABASE_URL:-postgresql://vitanota:vitanota_local@localhost:5432/vitanota_dev}"
+DB_NAME="${DB_NAME:-vitanota_dev}"
+DB_URL="${DATABASE_URL:-postgresql://vitanota:vitanota_local@localhost:5432/${DB_NAME}}"
 MIGRATIONS_DIR="migrations"
 
 # pg_isready で疎通確認
-if ! docker exec vitanota-postgres pg_isready -U vitanota -d vitanota_dev >/dev/null 2>&1; then
+if ! docker exec vitanota-postgres pg_isready -U vitanota -d ${DB_NAME} >/dev/null 2>&1; then
   echo "❌ PostgreSQL が起動していません"
   echo "   docker compose up -d で起動してください"
   exit 1
 fi
 
-echo "🔄 マイグレーション適用中..."
+echo "🔄 マイグレーション適用中 (DB: ${DB_NAME})..."
 
 # マイグレーション履歴テーブルを作成（存在しなければ）
-docker exec -i vitanota-postgres psql -U vitanota -d vitanota_dev <<'SQL'
+docker exec -i vitanota-postgres psql -U vitanota -d ${DB_NAME} <<'SQL'
 CREATE TABLE IF NOT EXISTS _migrations (
   id SERIAL PRIMARY KEY,
   filename VARCHAR(255) NOT NULL UNIQUE,
@@ -34,7 +35,7 @@ for file in $(ls "$MIGRATIONS_DIR"/*.sql | sort); do
   filename=$(basename "$file")
 
   # 既に適用済みか確認
-  already=$(docker exec vitanota-postgres psql -U vitanota -d vitanota_dev -tAc \
+  already=$(docker exec vitanota-postgres psql -U vitanota -d ${DB_NAME} -tAc \
     "SELECT 1 FROM _migrations WHERE filename = '$filename'")
 
   if [ "$already" = "1" ]; then
@@ -44,12 +45,12 @@ for file in $(ls "$MIGRATIONS_DIR"/*.sql | sort); do
   fi
 
   echo "▶️  apply:   $filename"
-  if ! docker exec -i vitanota-postgres psql -U vitanota -d vitanota_dev < "$file"; then
+  if ! docker exec -i vitanota-postgres psql -U vitanota -d ${DB_NAME} < "$file"; then
     echo "❌ $filename の適用に失敗しました"
     exit 1
   fi
 
-  docker exec vitanota-postgres psql -U vitanota -d vitanota_dev -c \
+  docker exec vitanota-postgres psql -U vitanota -d ${DB_NAME} -c \
     "INSERT INTO _migrations (filename) VALUES ('$filename')" > /dev/null
 
   APPLIED_COUNT=$((APPLIED_COUNT + 1))

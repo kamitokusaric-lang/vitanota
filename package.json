@@ -25,6 +25,7 @@
     "db:local:down": "docker compose down",
     "db:local:reset": "docker compose down -v && docker compose up -d",
     "db:local:migrate": "./scripts/local/migrate.sh",
+    "db:local:migrate:test": "DB_NAME=vitanota_test ./scripts/local/migrate.sh",
     "db:local:seed": "./scripts/local/seed.sh",
     "gen:openapi": "tsx scripts/gen-openapi.ts",
     "openapi:check": "pnpm gen:openapi && git diff --exit-code openapi.yaml"

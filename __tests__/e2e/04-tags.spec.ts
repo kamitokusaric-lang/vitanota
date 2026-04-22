@@ -45,7 +45,7 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await emotionTag.click();
 
     // 選択件数カウンターが表示される
-    await expect(page.getByTestId('tag-filter-count')).toContainText('1 / 10');
+    await expect(page.getByTestId('tag-filter-count')).toContainText('1 件選択中');
 
     await page.getByTestId('entry-form-submit-button').click();
     await expect(page).toHaveURL(/\/journal\/mine/);
@@ -57,14 +57,14 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await page.getByTestId('entry-form-content-input').fill('複数タグ');
     await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' }).click();
     await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' }).click();
-    await expect(page.getByTestId('tag-filter-count')).toContainText('2 / 10');
+    await expect(page.getByTestId('tag-filter-count')).toContainText('2 件選択中');
   });
 
   test('タグの再クリックで選択解除される', async ({ page }) => {
     await page.goto('/journal/new');
     const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
     await emotionTag.click();
-    await expect(page.getByTestId('tag-filter-count')).toContainText('1 / 10');
+    await expect(page.getByTestId('tag-filter-count')).toContainText('1 件選択中');
     await emotionTag.click();
     // カウンターは 0 になる→非表示 or 0 表示
     // 実装は selectedTagIds.length > 0 のときのみカウンター表示

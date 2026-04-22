@@ -1,9 +1,8 @@
 // BP-02 Step 4〜5: 招待トークン処理ページ
-// トークンを検証して Google OAuth へ誘導する
+// トークンを検証し、Google OAuth (PKCE + Authorization Code Flow) を開始する。
+// 招待 token を sessionStorage に預け、callback で /api/auth/accept-invite へ誘導する。
 import type { GetServerSideProps } from 'next';
-import { signIn } from 'next-auth/react';
 import { eq } from 'drizzle-orm';
-import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { logger } from '@/shared/lib/logger';
 import { getDb } from '@/shared/lib/db';
@@ -15,6 +14,7 @@ interface InvitePageProps {
   role?: string;
   token: string;
   errorCode?: string;
+  googleClientId?: string;
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -28,7 +28,55 @@ const ROLE_LABELS: Record<string, string> = {
   school_admin: '学校管理者',
 };
 
-export default function InvitePage({ valid, email, role, token, errorCode }: InvitePageProps) {
+function generateCodeVerifier(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return base64urlEncode(bytes);
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const bytes = new TextEncoder().encode(verifier);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return base64urlEncode(new Uint8Array(hash));
+}
+
+function base64urlEncode(bytes: Uint8Array): string {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export default function InvitePage({
+  valid,
+  email,
+  role,
+  token,
+  errorCode,
+  googleClientId,
+}: InvitePageProps) {
+  async function handleAcceptInvite() {
+    if (!googleClientId) return;
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state = crypto.randomUUID();
+
+    sessionStorage.setItem('google_oauth_verifier', verifier);
+    sessionStorage.setItem('google_oauth_state', state);
+    sessionStorage.setItem('google_oauth_invite_token', token);
+
+    const params = new URLSearchParams({
+      client_id: googleClientId,
+      response_type: 'code',
+      scope: 'openid email profile',
+      redirect_uri: `${window.location.origin}/auth/google-callback`,
+      state,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      prompt: 'select_account',
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
   if (!valid || errorCode) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
@@ -59,18 +107,13 @@ export default function InvitePage({ valid, email, role, token, errorCode }: Inv
           以下のアカウントでログインして招待を承諾してください。
         </p>
 
-        <Button
-          variant="primary"
-          className="w-full"
-          onClick={() =>
-            signIn('google', {
-              callbackUrl: `/api/invitations/${token}`,
-            })
-          }
+        <button
+          onClick={handleAcceptInvite}
           data-testid="invite-signin-button"
+          className="w-full rounded-[10px] bg-vn-header py-[15px] text-[15px] font-semibold text-white transition-opacity hover:opacity-85"
         >
           Google でログインして参加
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -79,8 +122,13 @@ export default function InvitePage({ valid, email, role, token, errorCode }: Inv
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const { token } = context.query;
 
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  if (!googleClientId) {
+    throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID env var is not set');
+  }
+
   if (typeof token !== 'string') {
-    return { props: { valid: false, token: '', errorCode: 'NOT_FOUND' } };
+    return { props: { valid: false, token: '', errorCode: 'NOT_FOUND', googleClientId } };
   }
 
   // 同一 Next.js プロセス内なので HTTP 越しに自 API を叩かず DB を直接引く。
@@ -100,13 +148,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       .limit(1);
 
     if (!invitation) {
-      return { props: { valid: false, token, errorCode: 'NOT_FOUND' } };
+      return { props: { valid: false, token, errorCode: 'NOT_FOUND', googleClientId } };
     }
     if (invitation.usedAt) {
-      return { props: { valid: false, token, errorCode: 'INVITE_USED' } };
+      return { props: { valid: false, token, errorCode: 'INVITE_USED', googleClientId } };
     }
     if (new Date(invitation.expiresAt) <= new Date()) {
-      return { props: { valid: false, token, errorCode: 'INVITE_EXPIRED' } };
+      return { props: { valid: false, token, errorCode: 'INVITE_EXPIRED', googleClientId } };
     }
 
     return {
@@ -115,6 +163,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         token,
         email: invitation.email,
         role: invitation.role,
+        googleClientId,
       },
     };
   } catch (err) {
@@ -122,6 +171,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       event: 'invite.ssr.db.error',
       err: err instanceof Error ? err.message : String(err),
     });
-    return { props: { valid: false, token, errorCode: 'NOT_FOUND' } };
+    return { props: { valid: false, token, errorCode: 'NOT_FOUND', googleClientId } };
   }
 };

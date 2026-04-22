@@ -93,12 +93,19 @@ export default function GoogleCallbackPage() {
         return;
       }
 
-      // バックエンドにセッション発行依頼
+      // 招待経由の場合は accept-invite (users+roles+session 同時発行)、
+      // 通常ログインは google-signin (登録済み user 前提)。
+      const inviteToken = sessionStorage.getItem('google_oauth_invite_token');
+      sessionStorage.removeItem('google_oauth_invite_token');
+
+      const endpoint = inviteToken ? '/api/auth/accept-invite' : '/api/auth/google-signin';
+      const body = inviteToken ? { idToken, inviteToken } : { idToken };
+
       try {
-        const res = await fetch('/api/auth/google-signin', {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
+          body: JSON.stringify(body),
         });
 
         if (res.ok) {

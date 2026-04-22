@@ -12,7 +12,14 @@ import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 interface MigrateEvent {
-  command: 'migrate' | 'status' | 'drop' | 'bootstrap-admin' | 'inspect' | 'demo-setup';
+  command:
+    | 'migrate'
+    | 'status'
+    | 'drop'
+    | 'bootstrap-admin'
+    | 'inspect'
+    | 'demo-setup'
+    | 'seed-demo-posts';
   email?: string;
   name?: string;
 }
@@ -404,6 +411,198 @@ async function runDemoSetup(): Promise<{
   }
 }
 
+interface DemoPost {
+  userEmail: string;
+  date: string; // YYYY-MM-DD (JST)
+  time: string; // HH:MM (JST)
+  content: string;
+  emotion: string; // tag name
+  context?: string; // tag name
+}
+
+// 2026-04-01〜04-22 の平日ベースで 3 ユーザー × 16 投稿 = 48 投稿。
+// ペルソナ別トーン: testuser_1=ネガティブ多め / testuser_2=助けて欲しい /
+// testuser_3=余裕・楽しんでる。生徒名は名前空間分離 (A-D / E-G / H-K)。
+const DEMO_POSTS: DemoPost[] = [
+  // ── testuser_1 (ネガティブ多め、遅め投稿) ────────────────
+  { userEmail: 'testuser_1@example.com', date: '2026-04-01', time: '19:48', content: '着任初日。名簿だけで既に気が重いケースがあった。', emotion: '不安', context: '事務作業' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-02', time: '20:12', content: '職員会議が長い。自分の担当クラスの打ち合わせに辿り着かない。', emotion: '疲労', context: '会議' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-03', time: '19:30', content: '新学期の掲示物の準備が終わらない。週末も持ち帰り。', emotion: '焦り', context: '事務作業' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-06', time: '19:55', content: '始業式。担任発表で A さんの名前を見た瞬間、胃がキュッとなった。', emotion: '不安', context: '生徒対応' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-07', time: '20:18', content: '学級開きで自己紹介したら言葉が詰まった。準備不足を見抜かれた気がする。', emotion: '焦り', context: '授業' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-08', time: '18:45', content: '初日の授業、生徒の目が泳いでた。自分が話しすぎなのか。', emotion: '焦り', context: '授業' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-09', time: '20:32', content: 'B さんが保健室へ。声をかけるべきだったか。', emotion: '無力感', context: '生徒対応' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-10', time: '19:15', content: '今週はあっという間。ほとんど何もできていない気がする。', emotion: '疲労' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-13', time: '19:50', content: '週明け、C さんが教室に来れず渡り廊下にいた。どう声かければ。', emotion: '無力感', context: '生徒対応' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-14', time: '21:00', content: '授業準備が間に合わない。夜中に慌てて手書きで作る。', emotion: 'ストレス', context: '事務作業' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-15', time: '18:20', content: '年配の先生に注意された。謝ったのに、なぜか自分も腹が立っている。', emotion: '不満' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-16', time: '19:40', content: 'D さんが今日は笑った。それだけで少しだけ救われた気がする。', emotion: '安心', context: '生徒対応' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-17', time: '20:10', content: '一週間で何ができたか思い出せない。書き出してみたら空欄が多い。', emotion: '無力感' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-20', time: '19:05', content: '朝、出勤するのが少しだけ嫌だった。気づかないふりをした。', emotion: 'もやもや' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-21', time: '19:25', content: 'A さんとようやく廊下で目が合って、会釈した。それが今日の成果。', emotion: '安心', context: '生徒対応' },
+  { userEmail: 'testuser_1@example.com', date: '2026-04-22', time: '20:00', content: '職員室で誰とも話さず一日が終わった。静かすぎる。', emotion: 'もやもや' },
+
+  // ── testuser_2 (助けて欲しい、相談機会を探す時間帯) ────────
+  { userEmail: 'testuser_2@example.com', date: '2026-04-01', time: '18:30', content: '前担任からの引継で既に E さんのことが気になった。明日からどう動くか。', emotion: '不安', context: '校務' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-02', time: '19:12', content: '職員会議で E さんの名前が何度か出た。私ひとりで抱えるのは無理そう。', emotion: '混乱', context: '会議' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-03', time: '19:45', content: '週末までに保護者宛てのプリントを整える。書き方で迷って手が止まる。', emotion: '不安', context: '事務作業' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-06', time: '17:50', content: '始業式。E さんが急に泣き出して教室を出ていった。追いかけて良かったのか。', emotion: '混乱', context: '生徒対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-07', time: '18:40', content: 'E さんの保護者から電話。長話になって、正解が分からないまま切ってしまった。', emotion: '不安', context: '保護者対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-08', time: '19:20', content: '学年主任に相談したかったが、タイミングを逃した。', emotion: 'もやもや', context: '会議' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-09', time: '18:15', content: 'F さんが授業中に寝ていた。起こすか放っておくかの判断でフリーズした。', emotion: '焦り', context: '授業' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-10', time: '19:30', content: '保護者連絡の返事が返ってこない。読まれているのかも分からない。', emotion: '不安', context: '保護者対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-13', time: '18:05', content: '同僚の先生が「困ったら言って」と声をかけてくれた。言えない自分がいる。', emotion: '無力感' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-14', time: '19:00', content: 'G さんが欠席続き。保護者から事情を聞いたが、踏み込めていない。', emotion: '焦り', context: '保護者対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-15', time: '17:45', content: '主任が相談に乗ってくれた。話せただけで少し軽くなった。', emotion: '感謝', context: '会議' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-16', time: '18:50', content: 'F さんの学習面が気になる。補習をどう案内するか決めかねている。', emotion: '混乱', context: '生徒対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-17', time: '19:15', content: '週末に振り返る時間が取れそうだ。整理すれば見えるものがあるはず。', emotion: '気づき' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-20', time: '18:25', content: 'E さんが自分から話しかけてくれた。何気ない会話だけど嬉しい。', emotion: '達成感', context: '生徒対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-21', time: '19:40', content: 'でも G さんは今日も欠席。自分の手が届いていない。', emotion: '無力感', context: '生徒対応' },
+  { userEmail: 'testuser_2@example.com', date: '2026-04-22', time: '18:35', content: '助けを求めるのが苦手だ。でも今年は声に出そうと決めた。', emotion: '気づき' },
+
+  // ── testuser_3 (余裕・楽しんでる、早め退勤傾向) ─────────
+  { userEmail: 'testuser_3@example.com', date: '2026-04-01', time: '17:30', content: '新年度始動。今年は授業に新しい試みを入れてみる予定。楽しみ。', emotion: '充実', context: '事務作業' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-02', time: '18:15', content: '職員会議で去年のテンプレを共有したら学年で使ってもらえた。', emotion: '達成感', context: '会議' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-03', time: '17:50', content: '新学期の掲示物を早めに仕上げた。週末はのんびりしよう。', emotion: '充実', context: '事務作業' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-06', time: '17:45', content: '始業式の生徒の顔ぶれを見ながら、今年も楽しそうだと素直に思った。', emotion: '喜び' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-07', time: '17:20', content: '学級開きで自己紹介ゲームをしたら H さんが爆笑していた。掴みは OK。', emotion: '達成感', context: '授業' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-08', time: '18:30', content: '初日の授業、思ったより生徒が乗ってきた。準備した価値があった。', emotion: '充実', context: '授業' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-09', time: '17:55', content: 'I さんが自主的に黒板を拭いていた。感謝を伝えるとはにかんでいた。', emotion: '感謝', context: '生徒対応' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-10', time: '18:10', content: '一週間お疲れ。帰りに同僚とラーメンに行ってよく笑った。', emotion: '充実' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-13', time: '17:40', content: '部活の新入部員が予想以上に多かった。嬉しい悲鳴。', emotion: '喜び', context: '部活動' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-14', time: '17:25', content: 'K さんが去年より明らかに積極的になっていた。成長を感じる。', emotion: '気づき', context: '生徒対応' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-15', time: '18:00', content: '授業に動画を取り入れたら、生徒が目を輝かせた。次も試してみる。', emotion: '充実', context: '授業' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-16', time: '18:20', content: '少し疲れが出てきたけど、生徒の顔を見ると元気が戻る。', emotion: '疲労', context: '生徒対応' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-17', time: '17:35', content: 'H さんが去年の苦手教科を克服しつつある。一緒に喜んだ。', emotion: '達成感', context: '生徒対応' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-20', time: '18:00', content: '部活の試合前で落ち着かない生徒たちを見守るのも楽しい。', emotion: '喜び', context: '部活動' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-21', time: '17:50', content: '職員室で新人の先生の相談に乗った。昔の自分を思い出した。', emotion: '安心' },
+  { userEmail: 'testuser_3@example.com', date: '2026-04-22', time: '18:15', content: '今日の締めくくりは J さんの「楽しかった」の一言。最高。', emotion: '喜び', context: '生徒対応' },
+];
+
+async function runSeedDemoPosts(): Promise<{
+  tenantId: string;
+  created: number;
+  skipped: number;
+  failed: number;
+  details: Array<{ user: string; date: string; status: 'created' | 'skipped' | 'failed'; error?: string }>;
+}> {
+  const client = await connect();
+  try {
+    const tenantRow = await client.query<{ id: string }>(
+      `SELECT id FROM tenants WHERE slug = $1`,
+      ['mito']
+    );
+    if (tenantRow.rows.length === 0) {
+      throw new Error(`demo tenant not found (slug='mito')`);
+    }
+    const tenantId = tenantRow.rows[0].id;
+
+    const tagRows = await client.query<{ id: string; name: string }>(
+      `SELECT id, name FROM tags WHERE tenant_id = $1`,
+      [tenantId]
+    );
+    const tagMap = new Map(tagRows.rows.map((r) => [r.name, r.id]));
+
+    const userRows = await client.query<{ id: string; email: string }>(
+      `SELECT id, email FROM users WHERE email = ANY($1::text[])`,
+      [Array.from(new Set(DEMO_POSTS.map((p) => p.userEmail)))]
+    );
+    const userMap = new Map(userRows.rows.map((r) => [r.email, r.id]));
+
+    let created = 0;
+    let skipped = 0;
+    let failed = 0;
+    const details: Array<{
+      user: string;
+      date: string;
+      status: 'created' | 'skipped' | 'failed';
+      error?: string;
+    }> = [];
+
+    for (const post of DEMO_POSTS) {
+      try {
+        const userId = userMap.get(post.userEmail);
+        if (!userId) {
+          failed++;
+          details.push({
+            user: post.userEmail,
+            date: post.date,
+            status: 'failed',
+            error: 'user not found',
+          });
+          continue;
+        }
+
+        const isoTime = `${post.date}T${post.time}:00+09:00`;
+
+        // 冪等: 同一 (user, tenant, 日付[JST]) の journal_entries があれば skip
+        const existing = await client.query(
+          `SELECT id FROM journal_entries
+           WHERE user_id = $1 AND tenant_id = $2
+             AND (created_at AT TIME ZONE 'Asia/Tokyo')::date = $3::date`,
+          [userId, tenantId, post.date]
+        );
+        if (existing.rows.length > 0) {
+          skipped++;
+          details.push({ user: post.userEmail, date: post.date, status: 'skipped' });
+          continue;
+        }
+
+        const emotionTagId = tagMap.get(post.emotion);
+        if (!emotionTagId) {
+          throw new Error(`emotion tag not found: ${post.emotion}`);
+        }
+        const contextTagId = post.context ? tagMap.get(post.context) : undefined;
+        if (post.context && !contextTagId) {
+          throw new Error(`context tag not found: ${post.context}`);
+        }
+
+        await client.query('BEGIN');
+        try {
+          const entryRow = await client.query<{ id: string }>(
+            `INSERT INTO journal_entries (tenant_id, user_id, content, is_public, created_at, updated_at)
+             VALUES ($1, $2, $3, true, $4, $4)
+             RETURNING id`,
+            [tenantId, userId, post.content, isoTime]
+          );
+          const entryId = entryRow.rows[0].id;
+
+          await client.query(
+            `INSERT INTO journal_entry_tags (tenant_id, entry_id, tag_id) VALUES ($1, $2, $3)`,
+            [tenantId, entryId, emotionTagId]
+          );
+
+          if (contextTagId) {
+            await client.query(
+              `INSERT INTO journal_entry_tags (tenant_id, entry_id, tag_id) VALUES ($1, $2, $3)`,
+              [tenantId, entryId, contextTagId]
+            );
+          }
+
+          await client.query('COMMIT');
+          created++;
+          details.push({ user: post.userEmail, date: post.date, status: 'created' });
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        }
+      } catch (err) {
+        failed++;
+        details.push({
+          user: post.userEmail,
+          date: post.date,
+          status: 'failed',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { tenantId, created, skipped, failed, details };
+  } finally {
+    await client.end();
+  }
+}
+
 export const handler = async (event: MigrateEvent) => {
   console.log(`vitanota-db-migrator invoked: ${event.command} (env=${ENV})`);
   try {
@@ -433,6 +632,10 @@ export const handler = async (event: MigrateEvent) => {
       }
       case 'demo-setup': {
         const result = await runDemoSetup();
+        return { statusCode: 200, body: JSON.stringify(result) };
+      }
+      case 'seed-demo-posts': {
+        const result = await runSeedDemoPosts();
         return { statusCode: 200, body: JSON.stringify(result) };
       }
       default:

@@ -14,25 +14,7 @@ import type { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { getSession } from 'next-auth/react';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  OAuthAccountNotLinked:
-    'このメールアドレスは別のログイン方式で登録されています',
-  AccessDenied:
-    'アカウントが見つかりません。招待リンクからサインアップしてください',
-  NOT_INVITED:
-    'アカウントが見つかりません。招待リンクからサインアップしてください',
-  INVALID_TOKEN:
-    'Google からのトークンが無効です。時計のずれやブラウザ拡張機能が原因の可能性があります。',
-  INVALID_RESPONSE:
-    'Google からの応答が不正です。再度お試しください。',
-  TOKEN_EXCHANGE_FAILED:
-    'Google とのトークン交換に失敗しました。再度お試しください。',
-  SERVER_CONFIG_ERROR:
-    'サーバ設定エラーです。管理者にお問い合わせください。',
-  VALIDATION_ERROR: 'リクエストが不正です。もう一度お試しください。',
-  UNKNOWN: 'ログインに失敗しました。再度お試しください。',
-};
+import { getErrorMessage } from '@/features/auth/lib/error-messages';
 
 interface SignInPageProps {
   error?: string;
@@ -65,9 +47,7 @@ export default function SignInPage({
   isDev,
   googleClientId,
 }: SignInPageProps) {
-  const errorMessage = error
-    ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.UNKNOWN)
-    : null;
+  const errorMessage = getErrorMessage(error);
 
   async function handleGoogleLogin() {
     // PKCE: verifier 生成 → challenge = base64url(SHA256(verifier))

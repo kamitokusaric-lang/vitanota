@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { getErrorMessage } from '@/features/auth/lib/error-messages';
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
@@ -118,12 +119,11 @@ export default function GoogleCallbackPage() {
   }, [router]);
 
   if (errorCode) {
+    const message = getErrorMessage(errorCode) ?? 'ログインに失敗しました。';
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-vn-bg px-4">
         <div className="w-full max-w-sm rounded-vn border border-vn-border bg-white p-8 text-center">
-          <p className="mb-4 text-sm text-vn-muted">
-            ログインに失敗しました（{errorCode}）。
-          </p>
+          <p className="mb-4 text-sm text-vn-muted">{message}</p>
           <Link
             href="/auth/signin"
             className="text-sm text-vn-accent hover:underline"

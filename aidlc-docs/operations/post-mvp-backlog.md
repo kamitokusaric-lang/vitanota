@@ -11,12 +11,6 @@
 
 ## Auth / OAuth
 
-### 🟡 中: `TOKEN_EXCHANGE_FAILED:<detail>` 画面 surface を plain に戻す
-- **発見日**: 2026-04-21
-- **現状**: `pages/auth/google-callback.tsx:78-98` が Lambda Proxy エラー詳細をユーザー画面に露出
-- **理由**: Auth 修正直後の診断価値のため残しているが、UX が英数字混じりで見苦しい
-- **着手判断**: Auth が 1〜2 週間無事故稼働を確認してから plain `TOKEN_EXCHANGE_FAILED` に戻す
-
 ### 🟡 中: Google Client ID の 3 重ハードコード解消
 - **発見日**: 2026-04-21
 - **現状**: `infra/lib/app-stack.ts:104,108` で 2 箇所 + GitHub variable の計 3 箇所に同値ハードコード

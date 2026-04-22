@@ -21,6 +21,7 @@
 | [LEGACY] | [`construction/auth-externalization.md`](construction/auth-externalization.md) | 旧認証外部化設計。Lambda Proxy 前の「ブラウザから Google /token 直接」前提。冒頭注記で誘導中 |
 | [HISTORY] | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) | Lambda Proxy 実装時のスナップショット |
 | [CURRENT] | [`construction/security/role-definitions.md`](construction/security/role-definitions.md) | 4 ロール (system_admin / school_admin / teacher / bootstrap) の定義 |
+| [CURRENT] | [`construction/auth-error-catalog.md`](construction/auth-error-catalog.md) | **正本**: 認証エラーコード 25 種の仕様書 (発生源・領域・実発生原因・ユーザー表示メッセージ) |
 
 ## 🗄️ DB / スキーマ / RLS
 

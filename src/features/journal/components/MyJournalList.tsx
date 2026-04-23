@@ -20,11 +20,13 @@ const fetcher = async (url: string): Promise<MyJournalResponse> => {
 interface MyJournalListProps {
   page?: number;
   perPage?: number;
+  onEdit?: (entry: EntryCardData) => void;
 }
 
 export function MyJournalList({
   page = 1,
   perPage = 20,
+  onEdit,
 }: MyJournalListProps) {
   const { data, error, isLoading } = useSWR(
     `/api/private/journal/entries/mine?page=${page}&perPage=${perPage}`,
@@ -61,7 +63,7 @@ export function MyJournalList({
           key={entry.id}
           entry={entry}
           showPrivacyBadge
-          showEditLink
+          onEdit={onEdit}
         />
       ))}
     </div>

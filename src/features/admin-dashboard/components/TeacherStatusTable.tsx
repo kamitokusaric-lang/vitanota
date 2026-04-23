@@ -6,7 +6,7 @@ import { Sparkline } from './Sparkline';
 
 interface TeacherStatusTableProps {
   teachers: TeacherStatusCard[];
-  onTeacherClick: (userId: string) => void;
+  onTeacherClick?: (userId: string) => void;
 }
 
 function calcScore(summary: TeacherStatusCard['emotionSummary']): number {
@@ -74,8 +74,12 @@ export function TeacherStatusTable({
             return (
               <tr
                 key={teacher.userId}
-                className="cursor-pointer border-b border-[#f5f4f1] transition-colors hover:bg-vn-bg"
-                onClick={() => onTeacherClick(teacher.userId)}
+                className={`border-b border-[#f5f4f1] transition-colors ${
+                  onTeacherClick ? 'cursor-pointer hover:bg-vn-bg' : ''
+                }`}
+                onClick={
+                  onTeacherClick ? () => onTeacherClick(teacher.userId) : undefined
+                }
                 data-testid={`teacher-row-${teacher.userId}`}
               >
                 <td className="px-4 py-3">

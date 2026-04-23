@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EntryCard, type EntryCardData } from '@/features/journal/components/EntryCard';
 
@@ -68,15 +68,18 @@ describe('EntryCard', () => {
     expect(screen.queryByTestId('entry-card-private-e1')).toBeNull();
   });
 
-  it('showEditLink=true で編集リンクを表示', () => {
-    render(<EntryCard entry={makeEntry()} showEditLink />);
-    const link = screen.getByTestId('entry-card-edit-link-e1');
-    expect(link.getAttribute('href')).toBe('/journal/e1/edit');
+  it('onEdit を渡すと編集ボタンを表示し、クリックで callback が呼ばれる', () => {
+    const onEdit = vi.fn();
+    const entry = makeEntry();
+    render(<EntryCard entry={entry} onEdit={onEdit} />);
+    const button = screen.getByTestId('entry-card-edit-button-e1');
+    button.click();
+    expect(onEdit).toHaveBeenCalledWith(entry);
   });
 
-  it('showEditLink=false（デフォルト）で編集リンクを表示しない', () => {
+  it('onEdit なしのとき (デフォルト) で編集ボタンを表示しない', () => {
     render(<EntryCard entry={makeEntry()} />);
-    expect(screen.queryByTestId('entry-card-edit-link-e1')).toBeNull();
+    expect(screen.queryByTestId('entry-card-edit-button-e1')).toBeNull();
   });
 
   it('タグを表示する', () => {

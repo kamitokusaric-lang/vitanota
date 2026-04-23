@@ -53,6 +53,17 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com'],
   },
+
+  // /journal/* は Phase 2 でダッシュボード内のタブに統合済み。
+  // 旧 URL のブックマーク救済として dashboard へ 307 redirect。
+  async redirects() {
+    return [
+      { source: '/journal', destination: '/dashboard/teacher?tab=timeline', permanent: false },
+      { source: '/journal/mine', destination: '/dashboard/teacher?tab=timeline', permanent: false },
+      { source: '/journal/new', destination: '/dashboard/teacher?tab=timeline', permanent: false },
+      { source: '/journal/:id/edit', destination: '/dashboard/teacher?tab=timeline', permanent: false },
+    ];
+  },
 };
 
 module.exports = nextConfig;

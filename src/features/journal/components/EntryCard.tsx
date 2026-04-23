@@ -1,6 +1,5 @@
 // エントリカード: 1件のエントリを表示する共通コンポーネント
 // 共有タイムライン・マイ記録の両方で使用
-import Link from 'next/link';
 import type { EmotionTag } from '@/db/schema';
 
 export interface EntryCardData {
@@ -16,7 +15,7 @@ export interface EntryCardData {
 interface EntryCardProps {
   entry: EntryCardData;
   showPrivacyBadge?: boolean;
-  showEditLink?: boolean;
+  onEdit?: (entry: EntryCardData) => void;
 }
 
 function formatDate(value: string | Date): string {
@@ -32,7 +31,7 @@ function formatDate(value: string | Date): string {
 export function EntryCard({
   entry,
   showPrivacyBadge = false,
-  showEditLink = false,
+  onEdit,
 }: EntryCardProps) {
   const contentPreview =
     entry.content.length > 50
@@ -85,15 +84,16 @@ export function EntryCard({
         </div>
       )}
 
-      {showEditLink && (
+      {onEdit && (
         <div className="flex justify-end">
-          <Link
-            href={`/journal/${entry.id}/edit`}
+          <button
+            type="button"
+            onClick={() => onEdit(entry)}
             className="text-xs text-blue-600 hover:underline"
-            data-testid={`entry-card-edit-link-${entry.id}`}
+            data-testid={`entry-card-edit-button-${entry.id}`}
           >
             編集
-          </Link>
+          </button>
         </div>
       )}
     </article>

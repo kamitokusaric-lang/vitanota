@@ -19,7 +19,7 @@ export default function TeacherDashboardPage({
 }: TeacherDashboardPageProps) {
   const tabs: TabDef[] = [
     { id: 'timeline', label: 'タイムライン', content: <TimelineTab /> },
-    { id: 'tasks', label: 'タスク', content: <TasksTab />, disabled: true },
+    { id: 'tasks', label: 'タスク', content: <TasksTab /> },
     {
       id: 'schedule',
       label: '今週の時間割',

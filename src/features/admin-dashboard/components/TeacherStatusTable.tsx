@@ -1,9 +1,10 @@
 // 教員ステータス表
-// カラム: 名前 / 感情バランス折れ線 / 感情先週比 / 稼働負荷棒 / 稼働負荷先週比
+// カラム: 名前 / 感情バランス (GitHub 草ヒートマップ) / 感情先週比 /
+//         稼働負荷 (ヒートマップ) / 稼働負荷先週比 / 最終記録
 // AI 分析は使わない (管理者が他者を AI 分析しない踏み絵)
 import type { TeacherStatusCard } from '../lib/adminDashboardService';
-import { EmotionSparkline } from './EmotionSparkline';
-import { WorkloadSparkline } from './WorkloadSparkline';
+import { EmotionHeatmap } from './EmotionHeatmap';
+import { WorkloadHeatmap } from './WorkloadHeatmap';
 import { TrendArrow } from './TrendArrow';
 
 interface TeacherStatusTableProps {
@@ -40,18 +41,18 @@ export function TeacherStatusTable({
 
   return (
     <div
-      className="overflow-hidden rounded-vn border border-vn-border"
+      className="overflow-x-auto rounded-vn border border-vn-border"
       data-testid="teacher-status-table"
     >
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-vn-border bg-vn-bg text-left text-[11px] uppercase tracking-wider text-vn-muted">
-            <th className="px-[18px] py-[14px] font-medium">名前</th>
-            <th className="px-[18px] py-[14px] font-medium">感情バランス (7 日)</th>
-            <th className="px-[18px] py-[14px] font-medium">先週比</th>
-            <th className="px-[18px] py-[14px] font-medium">稼働負荷 (7 日)</th>
-            <th className="px-[18px] py-[14px] font-medium">先週比</th>
-            <th className="px-[18px] py-[14px] font-medium">最終記録</th>
+            <th className="px-5 py-3 font-medium">名前</th>
+            <th className="px-5 py-3 font-medium">感情バランス (7 日)</th>
+            <th className="px-5 py-3 font-medium">先週比</th>
+            <th className="px-5 py-3 font-medium">稼働負荷 (7 日)</th>
+            <th className="px-5 py-3 font-medium">先週比</th>
+            <th className="px-5 py-3 font-medium">最終記録</th>
           </tr>
         </thead>
         <tbody>
@@ -66,7 +67,7 @@ export function TeacherStatusTable({
               }
               data-testid={`teacher-row-${teacher.userId}`}
             >
-              <td className="px-[18px] py-[14px]">
+              <td className="whitespace-nowrap px-5 py-4 align-middle">
                 <div className="font-medium text-gray-900">
                   {teacher.nickname ?? teacher.name}
                 </div>
@@ -74,28 +75,39 @@ export function TeacherStatusTable({
                   <div className="text-[11px] text-gray-400">{teacher.name}</div>
                 )}
               </td>
-              <td className="px-[18px] py-[14px]">
-                <EmotionSparkline data={teacher.emotionTrend} />
+              <td className="px-5 py-4 align-middle">
+                <EmotionHeatmap data={teacher.emotionTrend} />
               </td>
-              <td className="px-[18px] py-[14px]">
+              <td className="whitespace-nowrap px-5 py-4 align-middle">
                 <TrendArrow
                   direction={teacher.emotionWeekDelta}
+                  tone="up-good"
                   label={
                     teacher.emotionWeekDelta === 'up'
-                      ? 'ネガ寄り'
+                      ? 'ポジ寄り'
                       : teacher.emotionWeekDelta === 'down'
-                        ? 'ポジ寄り'
+                        ? 'ネガ寄り'
                         : '横ばい'
                   }
                 />
               </td>
-              <td className="px-[18px] py-[14px]">
-                <WorkloadSparkline data={teacher.workloadTrend} />
+              <td className="px-5 py-4 align-middle">
+                <WorkloadHeatmap data={teacher.workloadTrend} />
               </td>
-              <td className="px-[18px] py-[14px]">
-                <TrendArrow direction={teacher.workloadWeekDelta} />
+              <td className="whitespace-nowrap px-5 py-4 align-middle">
+                <TrendArrow
+                  direction={teacher.workloadWeekDelta}
+                  tone="up-bad"
+                  label={
+                    teacher.workloadWeekDelta === 'up'
+                      ? '重く'
+                      : teacher.workloadWeekDelta === 'down'
+                        ? '軽く'
+                        : '変わらず'
+                  }
+                />
               </td>
-              <td className="px-[18px] py-[14px] text-xs text-gray-500">
+              <td className="whitespace-nowrap px-5 py-4 align-middle text-xs text-gray-500">
                 {formatLastEntry(teacher.lastEntryDate)}
               </td>
             </tr>

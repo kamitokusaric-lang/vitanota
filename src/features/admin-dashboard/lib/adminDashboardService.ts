@@ -49,20 +49,22 @@ const EMOTION_DELTA_THRESHOLD = 5;
 // 未完了件数で ±2 件超を増加/減少判定する閾値
 const WORKLOAD_DELTA_THRESHOLD = 2;
 
-function negativeRatio(days: EmotionDay[]): number {
-  let neg = 0;
+function positiveRatio(days: EmotionDay[]): number {
+  let pos = 0;
   let total = 0;
   for (const d of days) {
-    neg += d.negative;
+    pos += d.positive;
     total += d.positive + d.negative + d.neutral;
   }
-  return total === 0 ? 0 : (neg / total) * 100;
+  return total === 0 ? 0 : (pos / total) * 100;
 }
 
+// 感情先週比: ポジ率の変化で判定 (矢印と意味の直感を一致させる)
+// ポジ率 ↑ → up (↑ / 緑) / ポジ率 ↓ → down (↓ / 赤)
 function classifyEmotionDelta(thisWeek: EmotionDay[], lastWeek: EmotionDay[]): TrendDirection {
-  const diff = negativeRatio(thisWeek) - negativeRatio(lastWeek);
-  if (diff > EMOTION_DELTA_THRESHOLD) return 'up'; // ネガ率増 = 悪化
-  if (diff < -EMOTION_DELTA_THRESHOLD) return 'down'; // ネガ率減 = 改善
+  const diff = positiveRatio(thisWeek) - positiveRatio(lastWeek);
+  if (diff > EMOTION_DELTA_THRESHOLD) return 'up'; // ポジ率増 = ポジ寄り
+  if (diff < -EMOTION_DELTA_THRESHOLD) return 'down'; // ポジ率減 = ネガ寄り
   return 'flat';
 }
 

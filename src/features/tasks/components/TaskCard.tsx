@@ -56,8 +56,18 @@ export function TaskCard({ task, onEdit, onStatusChange }: TaskCardProps) {
           {task.title}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-          {task.ownerName && <span>{task.ownerName}</span>}
+          {(task.ownerNickname ?? task.ownerName) && (
+            <span>{task.ownerNickname ?? task.ownerName}</span>
+          )}
           {task.dueDate && <span>期限: {formatDate(task.dueDate)}</span>}
+          {task.commentCount > 0 && (
+            <span
+              className="inline-flex items-center gap-0.5 text-gray-500"
+              data-testid={`task-card-comment-count-${task.id}`}
+            >
+              💬 {task.commentCount}
+            </span>
+          )}
         </div>
       </button>
       <button

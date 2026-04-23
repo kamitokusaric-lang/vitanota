@@ -64,6 +64,37 @@ export const userTenantRoles = pgTable(
   })
 );
 
+// ── user_tenant_profiles ──────────────────────────────────────
+// tenant 別のユーザープロフィール。nickname は tenant 内 unique。
+// 将来的に自己紹介・アバター等もこのテーブルで持つ想定。
+export const userTenantProfiles = pgTable(
+  'user_tenant_profiles',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    nickname: varchar('nickname', { length: 50 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userTenantUnique: unique('user_tenant_profiles_user_tenant_unique').on(
+      table.userId,
+      table.tenantId,
+    ),
+    tenantNicknameUnique: unique('user_tenant_profiles_tenant_nickname_unique').on(
+      table.tenantId,
+      table.nickname,
+    ),
+    tenantIdx: index('user_tenant_profiles_tenant_idx').on(table.tenantId),
+    userIdx: index('user_tenant_profiles_user_idx').on(table.userId),
+  })
+);
+
 // ── invitation_tokens ──────────────────────────────────────────
 export const invitationTokens = pgTable('invitation_tokens', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -257,37 +288,8 @@ export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
     .where(eq(journalEntries.isPublic, true))
 );
 
-// ─────────────────────────────────────────────────────────────
-// Unit-04: 管理者ダッシュボード・アラート
-// ─────────────────────────────────────────────────────────────
-
-export const alertTypeEnum = pgEnum('alert_type', ['negative_trend', 'recording_gap']);
-export const alertStatusEnum = pgEnum('alert_status', ['open', 'closed']);
-
-// ── alerts ────────────────────────────────────────────────────
-// RLS: school_admin は自テナント、system_admin は全テナント、teacher はアクセス不可
-export const alerts = pgTable(
-  'alerts',
-  {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    teacherUserId: uuid('teacher_user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    type: alertTypeEnum('type').notNull(),
-    status: alertStatusEnum('status').notNull().default('open'),
-    detectionContext: text('detection_context').notNull().default('{}'),
-    closedBy: uuid('closed_by').references(() => users.id),
-    closedAt: timestamp('closed_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    tenantStatusIdx: index('alerts_tenant_status_idx').on(table.tenantId, table.status),
-    teacherIdx: index('alerts_teacher_idx').on(table.teacherUserId),
-  })
-);
+// alerts テーブル (旧 Unit-04 管理者アラート) は Phase 2 で哲学的観点から全面廃止。
+// migration 0018 で DROP 済み。稼働負荷の兆しは task ベースで可視化する方向に統合。
 
 // ─────────────────────────────────────────────────────────────
 // Unit-05: タスク管理 (稼働負荷の素材)
@@ -357,6 +359,31 @@ export const tasks = pgTable(
   })
 );
 
+// ── task_comments ───────────────────────────────────────────────
+// タスクへの追記・アサインメモ等。スレッドなし、時系列で並ぶ単線構造。
+// user_id は退会時 SET NULL で匿名化 (コメント自体は残す)
+export const taskComments = pgTable(
+  'task_comments',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id').notNull(),
+    taskId: uuid('task_id').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    taskFk: foreignKey({
+      columns: [table.taskId, table.tenantId],
+      foreignColumns: [tasks.id, tasks.tenantId],
+      name: 'task_comments_task_fk',
+    }).onDelete('cascade'),
+    taskCreatedIdx: index('task_comments_task_idx').on(table.taskId, table.createdAt),
+    tenantIdx: index('task_comments_tenant_idx').on(table.tenantId),
+  })
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -364,9 +391,11 @@ export type EmotionTag = typeof emotionTags.$inferSelect;
 export type NewEmotionTag = typeof emotionTags.$inferInsert;
 export type JournalEntryTag = typeof journalEntryTags.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
-export type Alert = typeof alerts.$inferSelect;
-export type NewAlert = typeof alerts.$inferInsert;
 export type TaskCategory = typeof taskCategories.$inferSelect;
 export type NewTaskCategory = typeof taskCategories.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
+export type TaskComment = typeof taskComments.$inferSelect;
+export type NewTaskComment = typeof taskComments.$inferInsert;
+export type UserTenantProfile = typeof userTenantProfiles.$inferSelect;
+export type NewUserTenantProfile = typeof userTenantProfiles.$inferInsert;

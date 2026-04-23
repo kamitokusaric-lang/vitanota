@@ -6,8 +6,6 @@ import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
-import { AlertBanner } from '@/features/admin-dashboard/components/AlertBanner';
-import { useAdminAlerts } from '@/features/admin-dashboard/hooks/useAdminAlerts';
 import { AdminTimelineTab } from '@/features/dashboard/components/AdminTimelineTab';
 import { TasksTab } from '@/features/dashboard/components/TasksTab';
 import { ScheduleTab } from '@/features/dashboard/components/ScheduleTab';
@@ -18,12 +16,9 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ session }: AdminDashboardProps) {
-  const { alerts } = useAdminAlerts();
-  const openAlertCount = alerts?.length ?? 0;
-
   const tabs: TabDef[] = [
     { id: 'timeline', label: 'タイムライン', content: <AdminTimelineTab /> },
-    { id: 'tasks', label: 'タスク', content: <TasksTab /> },
+    { id: 'tasks', label: 'タスク', content: <TasksTab session={session} /> },
     {
       id: 'schedule',
       label: '今週の時間割',
@@ -45,7 +40,6 @@ export default function AdminDashboard({ session }: AdminDashboardProps) {
       >
         <Layout session={session}>
           <div className="py-6" data-testid="admin-dashboard-page">
-            <AlertBanner openCount={openAlertCount} />
             <Tabs tabs={tabs} defaultTabId="timeline" />
           </div>
         </Layout>

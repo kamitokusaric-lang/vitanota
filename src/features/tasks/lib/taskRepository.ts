@@ -1,8 +1,8 @@
 // タスク Repository: tasks テーブルへの CRUD
 // RLS で tenant 内 SELECT 全員 / INSERT・UPDATE・DELETE は owner or school_admin
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { tasks, users } from '@/db/schema';
+import { tasks, users, userTenantProfiles } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { Task } from '@/db/schema';
 
@@ -32,6 +32,8 @@ export interface UpdateTaskParams {
 
 export type TaskWithOwner = Task & {
   ownerName: string | null;
+  ownerNickname: string | null;
+  commentCount: number;
 };
 
 export class TaskRepository {
@@ -60,9 +62,18 @@ export class TaskRepository {
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
         ownerName: users.name,
+        ownerNickname: userTenantProfiles.nickname,
+        commentCount: sql<number>`(SELECT COUNT(*)::int FROM task_comments WHERE task_comments.task_id = ${tasks.id})`,
       })
       .from(tasks)
       .innerJoin(users, eq(users.id, tasks.ownerUserId))
+      .leftJoin(
+        userTenantProfiles,
+        and(
+          eq(userTenantProfiles.userId, tasks.ownerUserId),
+          eq(userTenantProfiles.tenantId, tasks.tenantId),
+        ),
+      )
       .where(and(...conditions))
       // 期限降順で下に (期限なしは最後)、同期限は作成順
       .orderBy(asc(tasks.dueDate), desc(tasks.createdAt));

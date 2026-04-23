@@ -8,7 +8,6 @@ import {
   journalEntries,
   journalEntryTags,
   emotionTags,
-  alerts,
 } from '@/db/schema';
 import type * as schema from '@/db/schema';
 
@@ -25,7 +24,6 @@ export type TeacherStatusCard = {
     neutral: number;
     total: number;
   };
-  openAlertCount: number;
 };
 
 export async function getTeacherStatuses(
@@ -97,20 +95,6 @@ export async function getTeacherStatuses(
         )
       );
 
-    // アクティブアラート件数
-    const alertRows = await db
-      .select({
-        count: sql<number>`COUNT(*)`.as('count'),
-      })
-      .from(alerts)
-      .where(
-        and(
-          eq(alerts.teacherUserId, teacher.userId),
-          eq(alerts.tenantId, tenantId),
-          eq(alerts.status, 'open')
-        )
-      );
-
     result.push({
       userId: teacher.userId,
       name: teacher.name ?? teacher.email,
@@ -122,7 +106,6 @@ export async function getTeacherStatuses(
         neutral,
         total: positive + negative + neutral,
       },
-      openAlertCount: Number(alertRows[0]?.count ?? 0),
     });
   }
 

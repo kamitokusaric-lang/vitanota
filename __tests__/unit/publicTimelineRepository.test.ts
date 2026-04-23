@@ -2,9 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { PublicTimelineRepository } from '@/features/journal/lib/publicTimelineRepository';
 
 // Drizzle fluent API のモックチェーンヘルパー
+// users / user_tenant_profiles を 2 回 leftJoin するためチェーン内で返し続ける
 function makeSelectChain(result: unknown[]) {
   const chain = {
     from: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     offset: vi.fn().mockResolvedValue(result),

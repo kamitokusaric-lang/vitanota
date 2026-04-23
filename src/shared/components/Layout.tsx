@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import type { VitanotaSession } from '@/shared/types/auth';
-import { Button } from './Button';
+import { MyProfileModal } from '@/features/profile/components/MyProfileModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,12 +10,8 @@ interface LayoutProps {
 }
 
 export function Layout({ children, session }: LayoutProps) {
-  const { roles, name } = session.user;
-
-  const isTeacher = roles.includes('teacher');
-  const isSchoolAdmin = roles.includes('school_admin');
-  const isSystemAdmin = roles.includes('system_admin');
-  const hasMultipleViews = isTeacher && isSchoolAdmin;
+  const { name } = session.user;
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-vn-bg">
@@ -30,51 +27,16 @@ export function Layout({ children, session }: LayoutProps) {
             <span className="text-vn-accent">.</span>
           </Link>
 
-          {/* 中央: ナビゲーションリンク */}
-          <div className="flex gap-5 text-[13px]">
-            {isTeacher && (
-              <>
-                <Link
-                  href="/journal"
-                  className="text-gray-400 transition-colors hover:text-white"
-                  data-testid="nav-journal-link"
-                >
-                  タイムライン
-                </Link>
-                <Link
-                  href="/dashboard/teacher"
-                  className="text-gray-400 transition-colors hover:text-white"
-                  data-testid="nav-teacher-link"
-                >
-                  感情傾向
-                </Link>
-              </>
-            )}
-            {isSchoolAdmin && (
-              <>
-                <Link
-                  href="/dashboard/admin"
-                  className="text-gray-400 transition-colors hover:text-white"
-                  data-testid="nav-admin-link"
-                >
-                  ダッシュボード
-                </Link>
-                <Link
-                  href="/dashboard/admin/alerts"
-                  className="text-gray-400 transition-colors hover:text-white"
-                  data-testid="nav-alerts-link"
-                >
-                  アラート
-                </Link>
-              </>
-            )}
-          </div>
-
-          {/* 右: ユーザー名 + ログアウト */}
+          {/* 右: ユーザー名 (プロフィール) + ログアウト */}
           <div className="flex items-center gap-3 text-[13px]">
-            <span className="text-gray-400" data-testid="nav-username">
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              className="text-gray-400 transition-colors hover:text-white"
+              data-testid="nav-username"
+            >
               {name}
-            </span>
+            </button>
             <button
               onClick={() => signOut({ callbackUrl: '/auth/signin' })}
               data-testid="nav-signout-button"
@@ -86,6 +48,8 @@ export function Layout({ children, session }: LayoutProps) {
         </div>
       </nav>
       <main className="mx-auto max-w-[1040px] px-6 pt-24 pb-20 lg:px-10">{children}</main>
+
+      <MyProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }

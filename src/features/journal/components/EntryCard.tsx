@@ -8,7 +8,8 @@ export interface EntryCardData {
   content: string;
   createdAt: string | Date;
   isPublic?: boolean;  // マイ記録では必要、共有タイムラインでは undefined
-  authorName?: string;  // JOIN 済みの投稿者名
+  authorName?: string | null;  // JOIN 済みの投稿者名 (fallback)
+  authorNickname?: string | null;  // nickname 優先表示
   tags?: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
 }
 
@@ -45,9 +46,9 @@ export function EntryCard({
     >
       <header className="mb-2 flex items-center justify-between text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          {entry.authorName && (
+          {(entry.authorNickname ?? entry.authorName) && (
             <span data-testid={`entry-card-author-${entry.id}`}>
-              {entry.authorName}
+              {entry.authorNickname ?? entry.authorName}
             </span>
           )}
           <time dateTime={new Date(entry.createdAt).toISOString()}>

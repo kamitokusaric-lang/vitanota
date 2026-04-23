@@ -2,9 +2,15 @@
 // このクラスは public_journal_entries VIEW のみを SELECT し、
 // 型ブランド PublicJournalEntry を返却する。
 // create/update/delete/findById/findMine は意図的に存在しない。
-import { desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { publicJournalEntries, journalEntryTags, emotionTags } from '@/db/schema';
+import {
+  publicJournalEntries,
+  journalEntryTags,
+  emotionTags,
+  users,
+  userTenantProfiles,
+} from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { EmotionTag } from '@/db/schema';
 import type { PublicJournalEntry } from '@/shared/types/brand';
@@ -17,6 +23,8 @@ export interface TimelineOptions {
 }
 
 export type PublicEntryWithTags = PublicJournalEntry & {
+  authorName: string | null;
+  authorNickname: string | null;
   tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
 };
 
@@ -36,13 +44,32 @@ export class PublicTimelineRepository {
     opts: TimelineOptions
   ): Promise<PublicEntryWithTags[]> {
     const rows = await tx
-      .select()
+      .select({
+        id: publicJournalEntries.id,
+        tenantId: publicJournalEntries.tenantId,
+        userId: publicJournalEntries.userId,
+        content: publicJournalEntries.content,
+        createdAt: publicJournalEntries.createdAt,
+        updatedAt: publicJournalEntries.updatedAt,
+        authorName: users.name,
+        authorNickname: userTenantProfiles.nickname,
+      })
       .from(publicJournalEntries)
+      .leftJoin(users, eq(users.id, publicJournalEntries.userId))
+      .leftJoin(
+        userTenantProfiles,
+        and(
+          eq(userTenantProfiles.userId, publicJournalEntries.userId),
+          eq(userTenantProfiles.tenantId, publicJournalEntries.tenantId),
+        ),
+      )
       .orderBy(desc(publicJournalEntries.createdAt))
       .limit(opts.limit)
       .offset(opts.offset);
 
-    const entries = rows as unknown as PublicJournalEntry[];
+    const entries = rows as unknown as Array<
+      PublicJournalEntry & { authorName: string | null; authorNickname: string | null }
+    >;
     if (entries.length === 0) return [];
 
     // タグを別クエリで取得して付与

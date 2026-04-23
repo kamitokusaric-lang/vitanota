@@ -14,6 +14,7 @@ export interface TaskFormValues {
   description: string;
   dueDate: string; // YYYY-MM-DD or ''
   status: 'todo' | 'in_progress' | 'done';
+  initialComment: string; // create 時のみ使用、初回コメントとして追加される
 }
 
 interface TaskFormProps {
@@ -57,6 +58,7 @@ export function TaskForm({
     description: initial?.description ?? '',
     dueDate: initial?.dueDate ?? '',
     status: initial?.status ?? 'todo',
+    initialComment: '',
   });
 
   useEffect(() => {
@@ -162,6 +164,24 @@ export function TaskForm({
           </div>
         )}
       </div>
+
+      {mode === 'create' && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">
+            コメント (任意、初回コメントとして添えられます)
+          </label>
+          <textarea
+            value={values.initialComment}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, initialComment: e.target.value }))
+            }
+            rows={2}
+            maxLength={2000}
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            data-testid="task-form-initial-comment"
+          />
+        </div>
+      )}
 
       {canAssignToOthers && (
         <div>

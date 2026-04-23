@@ -62,7 +62,6 @@ export function TeacherStatusTable({
             <th className="px-[18px] py-[14px] font-medium">状態</th>
             <th className="px-[18px] py-[14px] font-medium">感情バランス</th>
             <th className="px-[18px] py-[14px] font-medium">最終記録</th>
-            <th className="px-[18px] py-[14px] font-medium">アラート</th>
           </tr>
         </thead>
         <tbody>
@@ -102,15 +101,6 @@ export function TeacherStatusTable({
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500">
                   {formatLastEntry(teacher.lastEntryDate)}
-                </td>
-                <td className="px-4 py-3">
-                  {teacher.openAlertCount > 0 ? (
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                      {teacher.openAlertCount}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-300">—</span>
-                  )}
                 </td>
               </tr>
             );

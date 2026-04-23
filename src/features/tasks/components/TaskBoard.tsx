@@ -2,7 +2,6 @@
 // 4 カテゴリ (クラス業務/教科業務/イベント業務/事務業務 + 拡張) を横に並べる
 // 絞込・新規/編集モーダルはこのコンポーネントで管理
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -13,21 +12,26 @@ import { useAssignees } from '../hooks/useAssignees';
 import { AssigneeFilter } from './AssigneeFilter';
 import { TaskColumn } from './TaskColumn';
 import { TaskForm, toFormInitial, type TaskFormValues } from './TaskForm';
+import { TaskCommentSection } from './TaskCommentSection';
 
 type ModalState =
   | { kind: 'closed' }
   | { kind: 'create'; categoryId?: string }
   | { kind: 'edit'; task: TaskWithOwner };
 
-export function TaskBoard() {
-  const { data: session } = useSession();
-  const selfUserId = session?.user.userId ?? '';
-  const isAdmin =
-    session?.user.roles?.includes('school_admin') ||
-    session?.user.roles?.includes('system_admin') ||
-    false;
+interface TaskBoardProps {
+  selfUserId: string;
+  canAssignToOthers: boolean;
+}
 
-  const [filterOwner, setFilterOwner] = useState<string | undefined>();
+export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
+  const isAdmin = canAssignToOthers;
+
+  // teacher は自分のタスクしか見えない (UI 側制約、RLS は全員 SELECT 可能のまま、
+  // 将来 UI を開放するだけで全員表示に戻せる)
+  const [filterOwner, setFilterOwner] = useState<string | undefined>(
+    isAdmin ? undefined : selfUserId,
+  );
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -62,6 +66,18 @@ export function TaskBoard() {
         setFormError(body.message ?? 'タスクの作成に失敗しました');
         return;
       }
+      const { task } = (await res.json()) as { task: { id: string } };
+
+      // 初回コメント (任意) をタスク作成直後に追加
+      const initialComment = values.initialComment.trim();
+      if (initialComment) {
+        await fetch(`/api/tasks/${task.id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: initialComment }),
+        });
+      }
+
       await mutateTasks();
       closeModal();
     } finally {
@@ -152,12 +168,16 @@ export function TaskBoard() {
   return (
     <div data-testid="task-board">
       <div className="mb-4 flex items-center justify-between">
-        <AssigneeFilter
-          value={filterOwner}
-          onChange={setFilterOwner}
-          assignees={assignees ?? []}
-          selfUserId={selfUserId}
-        />
+        {isAdmin ? (
+          <AssigneeFilter
+            value={filterOwner}
+            onChange={setFilterOwner}
+            assignees={assignees ?? []}
+            selfUserId={selfUserId}
+          />
+        ) : (
+          <div />
+        )}
         <Button
           type="button"
           onClick={() => setModal({ kind: 'create' })}
@@ -206,21 +226,29 @@ export function TaskBoard() {
         open={modal.kind === 'edit'}
         onClose={closeModal}
         title="タスクの編集"
+        maxWidth="max-w-lg"
       >
         {modal.kind === 'edit' && (
-          <TaskForm
-            mode="edit"
-            initial={toFormInitial(modal.task)}
-            categories={categories}
-            assignees={assignees ?? []}
-            canAssignToOthers={isAdmin}
-            selfUserId={selfUserId}
-            submitting={submitting}
-            error={formError}
-            onSubmit={(values) => handleUpdate(modal.task.id, values)}
-            onCancel={closeModal}
-            onDelete={() => handleDelete(modal.task.id)}
-          />
+          <>
+            <TaskForm
+              mode="edit"
+              initial={toFormInitial(modal.task)}
+              categories={categories}
+              assignees={assignees ?? []}
+              canAssignToOthers={isAdmin}
+              selfUserId={selfUserId}
+              submitting={submitting}
+              error={formError}
+              onSubmit={(values) => handleUpdate(modal.task.id, values)}
+              onCancel={closeModal}
+              onDelete={() => handleDelete(modal.task.id)}
+            />
+            <TaskCommentSection
+              taskId={modal.task.id}
+              selfUserId={selfUserId}
+              canDeleteAny={isAdmin}
+            />
+          </>
         )}
       </Modal>
     </div>

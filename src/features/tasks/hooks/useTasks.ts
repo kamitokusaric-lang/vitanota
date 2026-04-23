@@ -1,7 +1,11 @@
 import useSWR from 'swr';
 import type { Task } from '@/db/schema';
 
-export type TaskWithOwner = Task & { ownerName: string | null };
+export type TaskWithOwner = Task & {
+  ownerName: string | null;
+  ownerNickname: string | null;
+  commentCount: number;
+};
 
 interface TasksResponse {
   tasks: TaskWithOwner[];

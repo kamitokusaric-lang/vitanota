@@ -7,7 +7,7 @@ import {
   userTenantRoles,
   journalEntries,
   journalEntryTags,
-  tags,
+  emotionTags,
   alerts,
 } from '@/db/schema';
 import type * as schema from '@/db/schema';
@@ -65,16 +65,13 @@ export async function getTeacherStatuses(
     // 感情集計（直近7日）
     const emotionRows = await db
       .select({
-        positive: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'positive')`.as('positive'),
-        negative: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'negative')`.as('negative'),
-        neutral: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'neutral')`.as('neutral'),
+        positive: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'positive')`.as('positive'),
+        negative: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'negative')`.as('negative'),
+        neutral: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'neutral')`.as('neutral'),
       })
       .from(journalEntries)
       .innerJoin(journalEntryTags, eq(journalEntryTags.entryId, journalEntries.id))
-      .innerJoin(
-        tags,
-        and(eq(tags.id, journalEntryTags.tagId), eq(tags.type, 'emotion'))
-      )
+      .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
       .where(
         and(
           eq(journalEntries.userId, teacher.userId),

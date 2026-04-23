@@ -498,7 +498,7 @@ async function runSeedDemoPosts(): Promise<{
     const tenantId = tenantRow.rows[0].id;
 
     const tagRows = await client.query<{ id: string; name: string }>(
-      `SELECT id, name FROM tags WHERE tenant_id = $1`,
+      `SELECT id, name FROM emotion_tags WHERE tenant_id = $1`,
       [tenantId]
     );
     const tagMap = new Map(tagRows.rows.map((r) => [r.name, r.id]));
@@ -552,10 +552,8 @@ async function runSeedDemoPosts(): Promise<{
         if (!emotionTagId) {
           throw new Error(`emotion tag not found: ${post.emotion}`);
         }
-        const contextTagId = post.context ? tagMap.get(post.context) : undefined;
-        if (post.context && !contextTagId) {
-          throw new Error(`context tag not found: ${post.context}`);
-        }
+        // post.context は 0016 で廃止された context タグの名残 (DEMO_POSTS データに残留)。
+        // emotion タグのみを紐付ける。
 
         await client.query('BEGIN');
         try {
@@ -571,13 +569,6 @@ async function runSeedDemoPosts(): Promise<{
             `INSERT INTO journal_entry_tags (tenant_id, entry_id, tag_id) VALUES ($1, $2, $3)`,
             [tenantId, entryId, emotionTagId]
           );
-
-          if (contextTagId) {
-            await client.query(
-              `INSERT INTO journal_entry_tags (tenant_id, entry_id, tag_id) VALUES ($1, $2, $3)`,
-              [tenantId, entryId, contextTagId]
-            );
-          }
 
           await client.query('COMMIT');
           created++;

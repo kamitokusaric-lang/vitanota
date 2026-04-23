@@ -39,31 +39,33 @@ function makeSelectByTagIdChain(result: unknown[]) {
 }
 
 describe('SYSTEM_DEFAULT_TAGS', () => {
-  it('23件のデフォルトタグが定義されている', () => {
-    expect(SYSTEM_DEFAULT_TAGS).toHaveLength(23);
+  it('15 件のデフォルト感情タグが定義されている', () => {
+    expect(SYSTEM_DEFAULT_TAGS).toHaveLength(15);
   });
 
-  it('感情タグ15件とコンテキストタグ8件の構成', () => {
-    const emotions = SYSTEM_DEFAULT_TAGS.filter((t) => t.type === 'emotion');
-    const tasks = SYSTEM_DEFAULT_TAGS.filter((t) => t.type === 'context');
-    expect(emotions).toHaveLength(15);
-    expect(tasks).toHaveLength(8);
+  it('positive/negative/neutral が各 5 件ずつ', () => {
+    const positive = SYSTEM_DEFAULT_TAGS.filter((t) => t.category === 'positive');
+    const negative = SYSTEM_DEFAULT_TAGS.filter((t) => t.category === 'negative');
+    const neutral = SYSTEM_DEFAULT_TAGS.filter((t) => t.category === 'neutral');
+    expect(positive).toHaveLength(5);
+    expect(negative).toHaveLength(5);
+    expect(neutral).toHaveLength(5);
   });
 
-  it('sort_order が 1〜23 で連番', () => {
+  it('sort_order が 1〜15 で連番', () => {
     const sortOrders = SYSTEM_DEFAULT_TAGS.map((t) => t.sortOrder);
-    expect(sortOrders).toEqual(Array.from({ length: 23 }, (_, i) => i + 1));
+    expect(sortOrders).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
   });
 
   it('全てのタグ名がユニーク', () => {
     const names = SYSTEM_DEFAULT_TAGS.map((t) => t.name);
     const uniqueNames = new Set(names);
-    expect(uniqueNames.size).toBe(23);
+    expect(uniqueNames.size).toBe(15);
   });
 });
 
 describe('TagRepository.seedSystemDefaults', () => {
-  it('23件のデフォルトタグを INSERT する', async () => {
+  it('15 件のデフォルトタグを INSERT する', async () => {
     const insertChain = makeInsertChain(
       SYSTEM_DEFAULT_TAGS.map((t, i) => ({ id: `tag-${i}`, ...t, tenantId: 'tenant-1', isSystemDefault: true, createdBy: null, createdAt: new Date() }))
     );
@@ -83,8 +85,8 @@ describe('TagRepository.seedSystemDefaults', () => {
       ])
     );
     const insertedValues = (insertChain.values as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(insertedValues).toHaveLength(23);
-    expect(result).toHaveLength(23);
+    expect(insertedValues).toHaveLength(15);
+    expect(result).toHaveLength(15);
   });
 
   it('全シードタグで is_system_default=true・created_by=null', async () => {
@@ -105,14 +107,14 @@ describe('TagRepository.seedSystemDefaults', () => {
 describe('TagRepository.create', () => {
   it('ユーザー作成タグは isSystemDefault=false・createdBy=userId', async () => {
     const insertChain = makeInsertChain([
-      { id: 'tag-new', tenantId: 'tenant-1', name: 'カスタム', type: 'context', category: null, isSystemDefault: false, sortOrder: 0, createdBy: 'user-1', createdAt: new Date() },
+      { id: 'tag-new', tenantId: 'tenant-1', name: 'カスタム', category: 'positive', isSystemDefault: false, sortOrder: 0, createdBy: 'user-1', createdAt: new Date() },
     ]);
     const mockTx = { insert: vi.fn().mockReturnValue(insertChain) };
 
     const repo = new TagRepository();
     const result = await repo.create(
       mockTx as never,
-      { name: 'カスタム', type: 'context' },
+      { name: 'カスタム', category: 'positive' },
       ctx
     );
 
@@ -120,8 +122,7 @@ describe('TagRepository.create', () => {
       expect.objectContaining({
         tenantId: 'tenant-1',
         name: 'カスタム',
-        type: 'context',
-        category: null,
+        category: 'positive',
         isSystemDefault: false,
         createdBy: 'user-1',
       })
@@ -169,8 +170,8 @@ describe('TagRepository.delete', () => {
 describe('TagRepository.findAllByTenant', () => {
   it('テナント内のタグを sort_order 順で返す', async () => {
     const rows = [
-      { id: 't1', name: 'うれしい', sortOrder: 1, type: 'emotion', category: 'positive' },
-      { id: 't2', name: 'つかれた', sortOrder: 2, type: 'emotion', category: 'negative' },
+      { id: 't1', name: 'うれしい', sortOrder: 1, category: 'positive' },
+      { id: 't2', name: 'つかれた', sortOrder: 2, category: 'negative' },
     ];
     const mockTx = { select: vi.fn().mockReturnValue(makeSelectChain(rows)) };
 

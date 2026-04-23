@@ -1,11 +1,11 @@
-// PP-U02-01: クライアントサイドタグフィルタ（useMemo + includes）
-// NFR-U02-01: 20件上限 + テキスト入力フィルタ
-// Unit-03: タグを type (emotion/context) + category でグループ表示
+// PP-U02-01: クライアントサイドタグフィルタ (useMemo + includes)
+// 感情タグ (emotion_tags) を category (positive/negative/neutral) でグループ表示
+// 0016 で context は廃止、task_categories に役割移譲
 import { useMemo } from 'react';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 
 interface TagFilterProps {
-  tags: Tag[];
+  tags: EmotionTag[];
   selectedTagIds: string[];
   onChange: (selectedIds: string[]) => void;
 }
@@ -29,16 +29,11 @@ const CATEGORY_STYLES: Record<string, { normal: string; selected: string }> = {
     normal: 'border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100',
     selected: 'bg-gray-600 text-white',
   },
-  context: {
-    normal: 'border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100',
-    selected: 'bg-blue-600 text-white',
-  },
 };
 
-function getTagStyle(tag: Tag, isSelected: boolean): string {
+function getTagStyle(tag: EmotionTag, isSelected: boolean): string {
   const base = 'rounded-full px-3 py-1 text-xs font-medium transition-colors';
-  const key = tag.type === 'emotion' ? (tag.category ?? 'neutral') : 'context';
-  const styles = CATEGORY_STYLES[key] ?? CATEGORY_STYLES.context;
+  const styles = CATEGORY_STYLES[tag.category] ?? CATEGORY_STYLES.neutral;
   return `${base} ${isSelected ? styles.selected : styles.normal}`;
 }
 
@@ -47,7 +42,6 @@ export function TagFilter({
   selectedTagIds,
   onChange,
 }: TagFilterProps) {
-  // sort_order → name 順にソート（tagRepo と同じ並び）
   const sortedTags = useMemo(
     () =>
       [...tags].sort((a, b) => {
@@ -57,22 +51,15 @@ export function TagFilter({
     [tags]
   );
 
-  // Unit-03: タグをグループ分け（emotion: category 別、context: 1グループ）
   const emotionGroups = useMemo(() => {
-    const emotions = sortedTags.filter((t) => t.type === 'emotion');
-    const grouped: Record<string, Tag[]> = {};
-    for (const tag of emotions) {
-      const cat = tag.category ?? 'neutral';
+    const grouped: Record<string, EmotionTag[]> = {};
+    for (const tag of sortedTags) {
+      const cat = tag.category;
       if (!grouped[cat]) grouped[cat] = [];
       grouped[cat].push(tag);
     }
     return grouped;
   }, [sortedTags]);
-
-  const contextTags = useMemo(
-    () => sortedTags.filter((t) => t.type === 'context'),
-    [sortedTags]
-  );
 
   const toggleTag = (tagId: string) => {
     if (selectedTagIds.includes(tagId)) {
@@ -82,7 +69,7 @@ export function TagFilter({
     }
   };
 
-  const renderTagButton = (tag: Tag) => {
+  const renderTagButton = (tag: EmotionTag) => {
     const isSelected = selectedTagIds.includes(tag.id);
     return (
       <button
@@ -99,7 +86,6 @@ export function TagFilter({
 
   return (
     <div data-testid="tag-filter">
-      {/* 感情タグ */}
       {Object.keys(emotionGroups).length > 0 && (
         <div className="mb-3" data-testid="entry-form-emotion-tags">
           <p className="mb-1 text-xs font-semibold text-gray-500">感情タグ</p>
@@ -117,18 +103,6 @@ export function TagFilter({
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* コンテキストタグ */}
-      {contextTags.length > 0 && (
-        <div data-testid="entry-form-context-tags">
-          <p className="mb-1 text-xs font-semibold text-gray-500">
-            コンテキストタグ
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {contextTags.map(renderTagButton)}
-          </div>
         </div>
       )}
 

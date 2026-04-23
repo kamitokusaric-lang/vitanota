@@ -1,7 +1,7 @@
 // エントリカード: 1件のエントリを表示する共通コンポーネント
 // 共有タイムライン・マイ記録の両方で使用
 import Link from 'next/link';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 
 export interface EntryCardData {
   id: string;
@@ -10,7 +10,7 @@ export interface EntryCardData {
   createdAt: string | Date;
   isPublic?: boolean;  // マイ記録では必要、共有タイムラインでは undefined
   authorName?: string;  // JOIN 済みの投稿者名
-  tags?: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
+  tags?: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
 }
 
 interface EntryCardProps {
@@ -77,12 +77,7 @@ export function EntryCard({
           {entry.tags.map((tag) => (
             <span
               key={tag.id}
-              className={[
-                'rounded-full px-2 py-0.5 text-[10px]',
-                tag.type === 'emotion'
-                  ? 'bg-pink-50 text-pink-700'
-                  : 'bg-gray-100 text-gray-700',
-              ].join(' ')}
+              className="rounded-full bg-pink-50 px-2 py-0.5 text-[10px] text-pink-700"
             >
               {tag.name}
             </span>

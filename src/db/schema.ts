@@ -16,9 +16,12 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql, eq } from 'drizzle-orm';
 
-// ── enums（Unit-03） ─────────────────────────────────────────
-export const tagTypeEnum = pgEnum('tag_type', ['emotion', 'context']);
+// ── enums ────────────────────────────────────────────────────
+// tagTypeEnum ('emotion' | 'context') は 0016 で廃止。tags は emotion 専用に整理された。
 export const emotionCategoryEnum = pgEnum('emotion_category', ['positive', 'negative', 'neutral']);
+
+// Unit-05: タスク管理
+export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'done']);
 
 // ── tenants ────────────────────────────────────────────────────
 export const tenants = pgTable('tenants', {
@@ -181,19 +184,18 @@ export const journalEntries = pgTable(
   })
 );
 
-// ── tags ───────────────────────────────────────────────────────
-// 感情タグ (type='emotion') とコンテキストタグ (type='context') を type enum で分類
-// 感情タグには category (positive/negative/neutral) を付与
-export const tags = pgTable(
-  'tags',
+// ── emotion_tags ───────────────────────────────────────────────
+// 0016 で tags → emotion_tags にリネーム。感情タグ専用 (category NOT NULL)。
+// context タグは task_categories (Unit-05) に役割移譲。
+export const emotionTags = pgTable(
+  'emotion_tags',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 50 }).notNull(),
-    type: tagTypeEnum('type').notNull().default('context'),
-    category: emotionCategoryEnum('category'),
+    category: emotionCategoryEnum('category').notNull(),
     isSystemDefault: boolean('is_system_default').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     createdBy: uuid('created_by').references(() => users.id),
@@ -201,12 +203,12 @@ export const tags = pgTable(
   },
   (table) => ({
     // SP-U02-04 Layer 8: 複合 FK の参照先として必要な UNIQUE 制約
-    idTenantUnique: unique('tags_id_tenant_unique').on(table.id, table.tenantId),
+    idTenantUnique: unique('emotion_tags_id_tenant_unique').on(table.id, table.tenantId),
     // テナント内でタグ名は一意（case-insensitive は migration で対応）
-    tenantNameUnique: unique('tags_tenant_name_unique').on(table.tenantId, table.name),
-    tenantTypeIdx: index('tags_tenant_type_idx').on(
+    tenantNameUnique: unique('emotion_tags_tenant_name_unique').on(table.tenantId, table.name),
+    tenantCategoryIdx: index('emotion_tags_tenant_category_idx').on(
       table.tenantId,
-      table.type
+      table.category
     ),
   })
 );
@@ -230,8 +232,8 @@ export const journalEntryTags = pgTable(
     }).onDelete('cascade'),
     tagFk: foreignKey({
       columns: [table.tagId, table.tenantId],
-      foreignColumns: [tags.id, tags.tenantId],
-      name: 'journal_entry_tags_tag_fk',
+      foreignColumns: [emotionTags.id, emotionTags.tenantId],
+      name: 'journal_entry_emotion_tag_fk',
     }).onDelete('cascade'),
     tenantIdx: index('journal_entry_tags_tenant_idx').on(table.tenantId),
     tagIdx: index('journal_entry_tags_tag_idx').on(table.tagId),
@@ -287,12 +289,84 @@ export const alerts = pgTable(
   })
 );
 
+// ─────────────────────────────────────────────────────────────
+// Unit-05: タスク管理 (稼働負荷の素材)
+// ─────────────────────────────────────────────────────────────
+
+// ── task_categories ────────────────────────────────────────────
+// 業務分類マスタ。is_system_default で恒常 (クラス業務・教科業務・イベント業務・事務業務) を識別。
+// tenant 固有の時限カテゴリ (文化祭 2026 等) も school_admin が追加可能。
+export const taskCategories = pgTable(
+  'task_categories',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 50 }).notNull(),
+    isSystemDefault: boolean('is_system_default').notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdBy: uuid('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    idTenantUnique: unique('task_categories_id_tenant_unique').on(table.id, table.tenantId),
+    tenantNameUnique: unique('task_categories_tenant_name_unique').on(table.tenantId, table.name),
+    tenantIdx: index('task_categories_tenant_idx').on(table.tenantId),
+  })
+);
+
+// ── tasks ──────────────────────────────────────────────────────
+// owner_user_id = 担当者 (誰のタスクか)、created_by = 作成者
+// teacher: owner = 自分のタスクのみ INSERT / UPDATE (RLS)
+// school_admin: 任意の教員にアサイン可
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    categoryId: uuid('category_id').notNull(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    title: varchar('title', { length: 200 }).notNull(),
+    description: text('description'),
+    dueDate: timestamp('due_date', { mode: 'date' }), // DATE 型
+    status: taskStatusEnum('status').notNull().default('todo'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    idTenantUnique: unique('tasks_id_tenant_unique').on(table.id, table.tenantId),
+    // SP-U02-04 Layer 8: category への複合 FK でクロステナント参照を物理防止
+    categoryFk: foreignKey({
+      columns: [table.categoryId, table.tenantId],
+      foreignColumns: [taskCategories.id, taskCategories.tenantId],
+      name: 'tasks_category_fk',
+    }).onDelete('restrict'),
+    tenantIdx: index('tasks_tenant_idx').on(table.tenantId),
+    ownerCreatedIdx: index('tasks_owner_created_idx').on(table.ownerUserId, table.createdAt),
+    tenantStatusIdx: index('tasks_tenant_status_idx').on(table.tenantId, table.status),
+    categoryIdx: index('tasks_category_idx').on(table.categoryId),
+  })
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
-export type Tag = typeof tags.$inferSelect;
-export type NewTag = typeof tags.$inferInsert;
+export type EmotionTag = typeof emotionTags.$inferSelect;
+export type NewEmotionTag = typeof emotionTags.$inferInsert;
 export type JournalEntryTag = typeof journalEntryTags.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Alert = typeof alerts.$inferSelect;
 export type NewAlert = typeof alerts.$inferInsert;
+export type TaskCategory = typeof taskCategories.$inferSelect;
+export type NewTaskCategory = typeof taskCategories.$inferInsert;
+export type Task = typeof tasks.$inferSelect;
+export type NewTask = typeof tasks.$inferInsert;

@@ -5,7 +5,7 @@ import {
   users,
   userTenantRoles,
   journalEntries,
-  tags,
+  emotionTags,
   journalEntryTags,
 } from '@/db/schema';
 import type { TestDb } from './testDb';
@@ -35,8 +35,7 @@ export interface SeededTag {
   id: string;
   tenantId: string;
   name: string;
-  type: 'emotion' | 'context';
-  category: 'positive' | 'negative' | 'neutral' | null;
+  category: 'positive' | 'negative' | 'neutral';
 }
 
 let counter = 0;
@@ -125,8 +124,7 @@ export async function seedTag(
     tenantId: string;
     userId: string;
     name?: string;
-    type?: 'emotion' | 'context';
-    category?: 'positive' | 'negative' | 'neutral' | null;
+    category?: 'positive' | 'negative' | 'neutral';
   }
 ): Promise<SeededTag> {
   return db.transaction(async (tx) => {
@@ -134,12 +132,11 @@ export async function seedTag(
     await tx.execute(sql`SELECT set_config('app.user_id', ${params.userId}, true)`);
     await tx.execute(sql`SELECT set_config('app.role', 'teacher', true)`);
     const [t] = await tx
-      .insert(tags)
+      .insert(emotionTags)
       .values({
         tenantId: params.tenantId,
         name: params.name ?? nextId('tag'),
-        type: params.type ?? 'context',
-        category: params.category ?? null,
+        category: params.category ?? 'neutral',
         isSystemDefault: false,
         sortOrder: 0,
         createdBy: params.userId,
@@ -149,7 +146,6 @@ export async function seedTag(
       id: t.id,
       tenantId: t.tenantId,
       name: t.name,
-      type: t.type,
       category: t.category,
     };
   });

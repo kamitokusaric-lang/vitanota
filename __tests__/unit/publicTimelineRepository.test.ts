@@ -76,7 +76,7 @@ describe('PublicTimelineRepository', () => {
       const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 });
 
       expect(result[0].tags).toHaveLength(1);
-      expect(result[0].tags[0]).toMatchObject({ id: 'tag1', name: '喜び', type: 'emotion', category: 'positive' });
+      expect(result[0].tags[0]).toMatchObject({ id: 'tag1', name: '喜び', category: 'positive' });
     });
   });
 

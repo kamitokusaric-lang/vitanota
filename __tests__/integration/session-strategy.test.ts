@@ -11,7 +11,7 @@ import {
   type TestDb,
 } from './helpers/testDb';
 import { seedTenant, seedUser } from './helpers/seed';
-import { sessions, tenants, tags } from '@/db/schema';
+import { sessions, tenants, emotionTags } from '@/db/schema';
 import { tagRepo, SYSTEM_DEFAULT_TAGS } from '@/features/journal/lib/tagRepository';
 
 describe('Suite 7: Database session strategy (SP-07)', () => {
@@ -150,7 +150,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     await truncateAll(db);
   });
 
-  it('seedSystemDefaults inserts exactly 23 tags', async () => {
+  it('seedSystemDefaults inserts exactly 15 emotion tags', async () => {
     const tenant = await seedTenant(db, '新規学校');
 
     await db.transaction(async (tx) => {
@@ -161,9 +161,9 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     });
 
     const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
-      return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
+      return tx.select().from(emotionTags).where(eq(emotionTags.tenantId, tenant.id));
     });
-    expect(seeded).toHaveLength(23);
+    expect(seeded).toHaveLength(15);
   });
 
   it('seeded tags have isSystemDefault=true and createdBy=null', async () => {
@@ -175,14 +175,14 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tagRepo.seedSystemDefaults(tx as never, tenant.id);
     });
 
-    const seeded = await db.select().from(tags).where(eq(tags.tenantId, tenant.id));
+    const seeded = await db.select().from(emotionTags).where(eq(emotionTags.tenantId, tenant.id));
     seeded.forEach((t) => {
       expect(t.isSystemDefault).toBe(true);
       expect(t.createdBy).toBeNull();
     });
   });
 
-  it('seeded tags have 15 emotion + 8 context split', async () => {
+  it('seeded tags have 5 positive + 5 negative + 5 neutral', async () => {
     const tenant = await seedTenant(db, '学校');
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
@@ -192,12 +192,14 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     });
 
     const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
-      return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
+      return tx.select().from(emotionTags).where(eq(emotionTags.tenantId, tenant.id));
     });
-    const emotions = seeded.filter((t) => t.type === 'emotion');
-    const tasks = seeded.filter((t) => t.type === 'context');
-    expect(emotions).toHaveLength(15);
-    expect(tasks).toHaveLength(8);
+    const positive = seeded.filter((t) => t.category === 'positive');
+    const negative = seeded.filter((t) => t.category === 'negative');
+    const neutral = seeded.filter((t) => t.category === 'neutral');
+    expect(positive).toHaveLength(5);
+    expect(negative).toHaveLength(5);
+    expect(neutral).toHaveLength(5);
   });
 
   it('seeded tag names match SYSTEM_DEFAULT_TAGS constant', async () => {
@@ -210,7 +212,7 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
     });
 
     const seeded = await withSystemAdminContext(db, '00000000-0000-0000-0000-000000000000', async (tx) => {
-      return tx.select().from(tags).where(eq(tags.tenantId, tenant.id));
+      return tx.select().from(emotionTags).where(eq(emotionTags.tenantId, tenant.id));
     });
     const names = seeded.map((t) => t.name).sort();
     const expected = SYSTEM_DEFAULT_TAGS.map((t) => t.name).sort();
@@ -227,10 +229,9 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true)`);
       await tx.execute(sql`SELECT set_config('app.role', 'system_admin', true)`);
-      await tx.insert(tags).values({
+      await tx.insert(emotionTags).values({
         tenantId: tenant.id,
         name: '喜び',
-        type: 'emotion',
         category: 'positive',
         isSystemDefault: false,
         sortOrder: 0,
@@ -274,8 +275,8 @@ describe('Suite 7a: Tenant creation seeds default tags (NFR-U02-03)', () => {
       await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenant.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.user_id', ${adminUser.id}, true)`);
       await tx.execute(sql`SELECT set_config('app.role', 'school_admin', true)`);
-      return tx.select().from(tags);
+      return tx.select().from(emotionTags);
     });
-    expect(rows).toHaveLength(23);
+    expect(rows).toHaveLength(15);
   });
 });

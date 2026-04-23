@@ -17,7 +17,7 @@ import {
   users,
   userTenantRoles,
   journalEntries,
-  tags,
+  emotionTags,
   sessions,
 } from '@/db/schema';
 
@@ -47,8 +47,7 @@ const actionSchema = z.discriminatedUnion('action', [
     tenantId: z.string().uuid(),
     userId: z.string().uuid(),
     name: z.string(),
-    type: z.enum(['emotion', 'context']),
-    category: z.enum(['positive', 'negative', 'neutral']).nullable().optional(),
+    category: z.enum(['positive', 'negative', 'neutral']),
   }),
   z.object({
     action: z.literal('createSession'),
@@ -92,7 +91,9 @@ export default async function handler(
           TRUNCATE TABLE
             journal_entry_tags,
             journal_entries,
-            tags,
+            emotion_tags,
+            tasks,
+            task_categories,
             sessions,
             verification_tokens,
             accounts,
@@ -143,15 +144,14 @@ export default async function handler(
         return res.status(201).json({ entry: e });
       }
       case 'tag': {
-        const { tenantId, userId, name, type, category } = parsed.data;
+        const { tenantId, userId, name, category } = parsed.data;
         const t = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
           const [created] = await tx
-            .insert(tags)
+            .insert(emotionTags)
             .values({
               tenantId,
               name,
-              type,
-              category: category ?? null,
+              category,
               isSystemDefault: false,
               sortOrder: 0,
               createdBy: userId,

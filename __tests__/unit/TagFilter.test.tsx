@@ -1,31 +1,31 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TagFilter } from '@/features/journal/components/TagFilter';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 
-function makeTag(overrides: Partial<Tag> = {}): Tag {
+function makeTag(overrides: Partial<EmotionTag> = {}): EmotionTag {
   return {
     id: overrides.id ?? 'tag-1',
     tenantId: 'tenant-1',
     name: overrides.name ?? 'default',
-    type: overrides.type ?? 'context',
-    category: overrides.category ?? null,
+    category: overrides.category ?? 'neutral',
     isSystemDefault: false,
     sortOrder: overrides.sortOrder ?? 0,
     createdBy: null,
     createdAt: new Date(),
-  } as Tag;
+  };
 }
 
 describe('TagFilter', () => {
   it('タグを sort_order → name 順に表示する', () => {
     const tags = [
-      makeTag({ id: 't3', name: 'うれしい', sortOrder: 1 }),
-      makeTag({ id: 't1', name: 'あとで相談', sortOrder: 3 }),
-      makeTag({ id: 't2', name: 'つかれた', sortOrder: 2 }),
+      makeTag({ id: 't3', name: 'うれしい', category: 'positive', sortOrder: 1 }),
+      makeTag({ id: 't1', name: 'あとで相談', category: 'neutral', sortOrder: 3 }),
+      makeTag({ id: 't2', name: 'つかれた', category: 'negative', sortOrder: 2 }),
     ];
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
+    // category でグループ化されるので、positive → negative → neutral の順
     expect(buttons.map((b) => b.textContent)).toEqual([
       'うれしい',
       'つかれた',
@@ -33,7 +33,7 @@ describe('TagFilter', () => {
     ]);
   });
 
-  it('全タグが表示される（上限なし）', () => {
+  it('全タグが表示される (上限なし)', () => {
     const tags = Array.from({ length: 30 }, (_, i) =>
       makeTag({ id: `t${i}`, name: `tag${i}`, sortOrder: i })
     );
@@ -57,7 +57,7 @@ describe('TagFilter', () => {
 
   it('タグクリックで onChange が呼ばれる', () => {
     const onChange = vi.fn();
-    const tags = [makeTag({ id: 't1', name: 'うれしい' })];
+    const tags = [makeTag({ id: 't1', name: 'うれしい', category: 'positive' })];
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={onChange} />);
     fireEvent.click(screen.getByTestId('tag-filter-t1'));
     expect(onChange).toHaveBeenCalledWith(['t1']);
@@ -66,8 +66,8 @@ describe('TagFilter', () => {
   it('選択済みタグをクリックすると解除される', () => {
     const onChange = vi.fn();
     const tags = [
-      makeTag({ id: 't1', name: 'うれしい' }),
-      makeTag({ id: 't2', name: 'つかれた' }),
+      makeTag({ id: 't1', name: 'うれしい', category: 'positive' }),
+      makeTag({ id: 't2', name: 'つかれた', category: 'negative' }),
     ];
     render(
       <TagFilter tags={tags} selectedTagIds={['t1', 't2']} onChange={onChange} />
@@ -102,14 +102,16 @@ describe('TagFilter', () => {
     );
   });
 
-  it('感情タグとコンテキストタグがグループ分けされる', () => {
+  it('positive/negative/neutral の各グループが表示される', () => {
     const tags = [
-      makeTag({ id: 't1', name: '喜び', type: 'emotion', category: 'positive', sortOrder: 1 }),
-      makeTag({ id: 't2', name: '不安', type: 'emotion', category: 'negative', sortOrder: 2 }),
-      makeTag({ id: 't3', name: '授業', type: 'context', sortOrder: 3 }),
+      makeTag({ id: 't1', name: '喜び', category: 'positive', sortOrder: 1 }),
+      makeTag({ id: 't2', name: '不安', category: 'negative', sortOrder: 2 }),
+      makeTag({ id: 't3', name: '気づき', category: 'neutral', sortOrder: 3 }),
     ];
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
     expect(screen.getByTestId('entry-form-emotion-tags')).toBeTruthy();
-    expect(screen.getByTestId('entry-form-context-tags')).toBeTruthy();
+    expect(screen.getByText('ポジティブ')).toBeTruthy();
+    expect(screen.getByText('ネガティブ')).toBeTruthy();
+    expect(screen.getByText('ニュートラル')).toBeTruthy();
   });
 });

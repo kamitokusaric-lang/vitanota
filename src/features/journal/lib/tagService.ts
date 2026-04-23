@@ -5,7 +5,7 @@ import { pickDbRole } from './apiHelpers';
 import { LogEvents, logEvent, logWarnEvent } from '@/shared/lib/log-events';
 import { tagRepo, type CreateTagParams } from './tagRepository';
 import { ForbiddenError, SystemTagDeleteError, TagNotFoundError } from './errors';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 
 export interface ServiceContext {
   userId: string;
@@ -18,7 +18,7 @@ export class TagService {
    * タグ作成（school_admin / system_admin のみ）
    * Unit-03: 教員のカスタムタグ作成を廃止
    */
-  async createTag(params: CreateTagParams, ctx: ServiceContext): Promise<Tag> {
+  async createTag(params: CreateTagParams, ctx: ServiceContext): Promise<EmotionTag> {
     if (!ctx.roles.includes('school_admin') && !ctx.roles.includes('system_admin')) {
       logWarnEvent(LogEvents.TagForbidden, {
         userId: ctx.userId,
@@ -37,7 +37,6 @@ export class TagService {
         userId: ctx.userId,
         tenantId: ctx.tenantId,
         name: tag.name,
-        type: tag.type,
         category: tag.category,
       });
 
@@ -86,7 +85,7 @@ export class TagService {
   /**
    * テナント内のタグ一覧取得
    */
-  async listTenantTags(ctx: ServiceContext): Promise<Tag[]> {
+  async listTenantTags(ctx: ServiceContext): Promise<EmotionTag[]> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const tags = await tagRepo.findAllByTenant(tx, ctx);
 

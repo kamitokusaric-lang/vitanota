@@ -84,13 +84,13 @@ describe('EntryCard', () => {
       <EntryCard
         entry={makeEntry({
           tags: [
-            { id: 't1', name: 'うれしい', type: 'emotion' as const, category: 'positive' as const },
-            { id: 't2', name: '授業準備', type: 'context' as const, category: null },
+            { id: 't1', name: 'うれしい', category: 'positive' as const },
+            { id: 't2', name: '気づき', category: 'neutral' as const },
           ],
         })}
       />
     );
     expect(screen.getByText('うれしい')).toBeTruthy();
-    expect(screen.getByText('授業準備')).toBeTruthy();
+    expect(screen.getByText('気づき')).toBeTruthy();
   });
 });

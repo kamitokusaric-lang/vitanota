@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
 import { startTestDb, stopTestDb, truncateAll, withTenantContext, rawQuery, type TestDb } from './helpers/testDb';
 import { seedTenant, seedUser, seedEntry, seedTag, attachTag } from './helpers/seed';
-import { journalEntries, tags, journalEntryTags, publicJournalEntries } from '@/db/schema';
+import { journalEntries, emotionTags, journalEntryTags, publicJournalEntries } from '@/db/schema';
 
 describe('Suite 1: Baseline happy path', () => {
   let db: TestDb;
@@ -162,7 +162,7 @@ describe('Suite 2: Cross-tenant protection', () => {
 
   it('tenantA user CANNOT see tenantB tags', async () => {
     const rows = await withTenantContext(db, tenantA.id, userA.id, async (tx) => {
-      return tx.select().from(tags);
+      return tx.select().from(emotionTags);
     });
     expect(rows.every((r) => r.tenantId === tenantA.id)).toBe(true);
     expect(rows.find((r) => r.id === tagB.id)).toBeUndefined();

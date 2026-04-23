@@ -2,7 +2,7 @@
 // US-T-030: 感情タグの category (positive/negative/neutral) を日別に集計
 import { sql, eq, and, gte, lt } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { journalEntries, journalEntryTags, tags } from '@/db/schema';
+import { journalEntries, journalEntryTags, emotionTags } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type {
   EmotionTrendDataPoint,
@@ -60,16 +60,13 @@ export async function getEmotionTrend(
   const rows = await db
     .select({
       date: sql<string>`DATE(${journalEntries.createdAt} AT TIME ZONE 'Asia/Tokyo')`.as('date'),
-      positive: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'positive')`.as('positive'),
-      negative: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'negative')`.as('negative'),
-      neutral: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'neutral')`.as('neutral'),
+      positive: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'positive')`.as('positive'),
+      negative: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'negative')`.as('negative'),
+      neutral: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'neutral')`.as('neutral'),
     })
     .from(journalEntries)
     .innerJoin(journalEntryTags, eq(journalEntryTags.entryId, journalEntries.id))
-    .innerJoin(
-      tags,
-      and(eq(tags.id, journalEntryTags.tagId), eq(tags.type, 'emotion'))
-    )
+    .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
     .where(
       and(
         eq(journalEntries.tenantId, tenantId),
@@ -140,16 +137,13 @@ export async function getSchoolEmotionTrend(
   const rows = await db
     .select({
       date: sql<string>`DATE(${journalEntries.createdAt} AT TIME ZONE 'Asia/Tokyo')`.as('date'),
-      positive: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'positive')`.as('positive'),
-      negative: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'negative')`.as('negative'),
-      neutral: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'neutral')`.as('neutral'),
+      positive: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'positive')`.as('positive'),
+      negative: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'negative')`.as('negative'),
+      neutral: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'neutral')`.as('neutral'),
     })
     .from(journalEntries)
     .innerJoin(journalEntryTags, eq(journalEntryTags.entryId, journalEntries.id))
-    .innerJoin(
-      tags,
-      and(eq(tags.id, journalEntryTags.tagId), eq(tags.type, 'emotion'))
-    )
+    .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
     .where(
       and(
         eq(journalEntries.tenantId, tenantId),

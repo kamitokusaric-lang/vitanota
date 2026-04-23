@@ -69,8 +69,7 @@ describe('logEvent', () => {
         userId: 'u1',
         tenantId: 't1',
         name: 'test',
-        type: 'context',
-        category: null,
+        category: 'neutral',
       },
       mockLogger as never
     );

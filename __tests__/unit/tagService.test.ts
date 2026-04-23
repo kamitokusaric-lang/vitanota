@@ -42,19 +42,19 @@ describe('TagService.createTag', () => {
   it('teacher ロールではタグ作成が拒否される', async () => {
     const service = new TagService();
     await expect(
-      service.createTag({ name: 'カスタム', type: 'context' }, teacherCtx)
+      service.createTag({ name: 'カスタム', category: 'positive' }, teacherCtx)
     ).rejects.toThrow(ForbiddenError);
 
     expect(mockTagRepo.create).not.toHaveBeenCalled();
   });
 
   it('school_admin ロールでタグを作成できる', async () => {
-    const expected = { id: 'tag-new', name: 'カスタム', type: 'context', category: null };
+    const expected = { id: 'tag-new', name: 'カスタム', category: 'positive' };
     mockTagRepo.create.mockResolvedValue(expected);
 
     const service = new TagService();
     const result = await service.createTag(
-      { name: 'カスタム', type: 'context' },
+      { name: 'カスタム', category: 'positive' },
       adminCtx
     );
 

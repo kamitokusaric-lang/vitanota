@@ -8,7 +8,7 @@ import {
   userTenantRoles,
   journalEntries,
   journalEntryTags,
-  tags,
+  emotionTags,
   alerts,
 } from '@/db/schema';
 import type * as schema from '@/db/schema';
@@ -101,14 +101,11 @@ async function checkNegativeTrend(
   const rows = await db
     .select({
       total: sql<number>`COUNT(*)`.as('total'),
-      negative: sql<number>`COUNT(*) FILTER (WHERE ${tags.category} = 'negative')`.as('negative'),
+      negative: sql<number>`COUNT(*) FILTER (WHERE ${emotionTags.category} = 'negative')`.as('negative'),
     })
     .from(journalEntries)
     .innerJoin(journalEntryTags, eq(journalEntryTags.entryId, journalEntries.id))
-    .innerJoin(
-      tags,
-      and(eq(tags.id, journalEntryTags.tagId), eq(tags.type, 'emotion'))
-    )
+    .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
     .where(
       and(
         eq(journalEntries.userId, userId),

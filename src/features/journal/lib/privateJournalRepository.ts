@@ -6,9 +6,9 @@
 // R1 対策: 全メソッドがトランザクションを第一引数で受け取り、withTenantUser 内で呼ばれる前提
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { journalEntries, journalEntryTags, tags } from '@/db/schema';
+import { journalEntries, journalEntryTags, emotionTags } from '@/db/schema';
 import type * as schema from '@/db/schema';
-import type { JournalEntry, Tag } from '@/db/schema';
+import type { JournalEntry, EmotionTag } from '@/db/schema';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -35,7 +35,7 @@ export interface PaginationOptions {
 }
 
 export type EntryWithTags = JournalEntry & {
-  tags: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
+  tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
 };
 
 async function attachTags(
@@ -48,19 +48,18 @@ async function attachTags(
   const rows = await tx
     .select({
       entryId: journalEntryTags.entryId,
-      tagId: tags.id,
-      tagName: tags.name,
-      tagType: tags.type,
-      tagCategory: tags.category,
+      tagId: emotionTags.id,
+      tagName: emotionTags.name,
+      tagCategory: emotionTags.category,
     })
     .from(journalEntryTags)
-    .innerJoin(tags, eq(tags.id, journalEntryTags.tagId))
+    .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
     .where(inArray(journalEntryTags.entryId, entryIds));
 
-  const tagMap = new Map<string, Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>>();
+  const tagMap = new Map<string, Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>>();
   for (const row of rows) {
     const list = tagMap.get(row.entryId) ?? [];
-    list.push({ id: row.tagId, name: row.tagName, type: row.tagType, category: row.tagCategory });
+    list.push({ id: row.tagId, name: row.tagName, category: row.tagCategory });
     tagMap.set(row.entryId, list);
   }
 

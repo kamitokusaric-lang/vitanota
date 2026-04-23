@@ -4,9 +4,9 @@
 // create/update/delete/findById/findMine は意図的に存在しない。
 import { desc, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { publicJournalEntries, journalEntryTags, tags } from '@/db/schema';
+import { publicJournalEntries, journalEntryTags, emotionTags } from '@/db/schema';
 import type * as schema from '@/db/schema';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 import type { PublicJournalEntry } from '@/shared/types/brand';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
@@ -17,7 +17,7 @@ export interface TimelineOptions {
 }
 
 export type PublicEntryWithTags = PublicJournalEntry & {
-  tags: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
+  tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
 };
 
 export interface TimelineResult {
@@ -50,19 +50,18 @@ export class PublicTimelineRepository {
     const tagRows = await tx
       .select({
         entryId: journalEntryTags.entryId,
-        tagId: tags.id,
-        tagName: tags.name,
-        tagType: tags.type,
-        tagCategory: tags.category,
+        tagId: emotionTags.id,
+        tagName: emotionTags.name,
+        tagCategory: emotionTags.category,
       })
       .from(journalEntryTags)
-      .innerJoin(tags, eq(tags.id, journalEntryTags.tagId))
+      .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
       .where(inArray(journalEntryTags.entryId, entryIds));
 
-    const tagMap = new Map<string, Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>>();
+    const tagMap = new Map<string, Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>>();
     for (const row of tagRows) {
       const list = tagMap.get(row.entryId) ?? [];
-      list.push({ id: row.tagId, name: row.tagName, type: row.tagType, category: row.tagCategory });
+      list.push({ id: row.tagId, name: row.tagName, category: row.tagCategory });
       tagMap.set(row.entryId, list);
     }
 

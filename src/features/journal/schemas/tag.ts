@@ -1,11 +1,11 @@
-// SP-U02-01: タグ関連の Zod スキーマ
-// + Step 18: zod-to-openapi メタデータ
+// 感情タグ関連の Zod スキーマ
+// 0016 で context タグは廃止 (task_categories に役割移譲)
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 
 extendZodWithOpenApi(z);
 
-// タグ作成入力
+// 感情タグ作成入力
 export const createTagSchema = z
   .object({
     name: z
@@ -14,19 +14,10 @@ export const createTagSchema = z
       .min(1, 'タグ名を入力してください')
       .max(50, 'タグ名は50文字以内で入力してください')
       .openapi({ example: '喜び' }),
-    type: z.enum(['emotion', 'context']).default('context').openapi({ example: 'emotion' }),
     category: z
       .enum(['positive', 'negative', 'neutral'])
-      .nullable()
-      .optional()
       .openapi({ example: 'positive' }),
   })
-  .refine(
-    (data) =>
-      (data.type === 'emotion' && data.category != null) ||
-      (data.type === 'context' && (data.category == null || data.category === undefined)),
-    { message: '感情タグにはカテゴリが必須です。コンテキストタグにはカテゴリを指定できません。' }
-  )
   .openapi('CreateTagInput');
 
 export type CreateTagInput = z.infer<typeof createTagSchema>;

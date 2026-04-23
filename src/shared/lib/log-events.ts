@@ -85,8 +85,7 @@ interface JournalEntryListReadPayload extends BaseEventFields {
 interface TagCreatedPayload extends BaseEventFields {
   tagId: string;
   name: string;
-  type: 'emotion' | 'context';
-  category: 'positive' | 'negative' | 'neutral' | null;
+  category: 'positive' | 'negative' | 'neutral';
 }
 
 interface TagDeletedPayload extends BaseEventFields {

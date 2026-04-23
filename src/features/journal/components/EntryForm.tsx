@@ -10,7 +10,7 @@ import {
 import { TagFilter } from './TagFilter';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 
 interface EntryFormProps {
   mode: 'create' | 'edit';
@@ -27,7 +27,7 @@ interface EntryFormProps {
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<{ tags: Tag[] }>;
+  return res.json() as Promise<{ tags: EmotionTag[] }>;
 };
 
 export function EntryForm({

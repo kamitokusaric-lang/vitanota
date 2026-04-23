@@ -1,11 +1,11 @@
 import useSWR from 'swr';
-import type { Tag } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 
 export type TeacherEntry = {
   id: string;
   content: string;
   createdAt: string;
-  tags: Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>;
+  tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
 };
 
 const fetcher = async (url: string) => {

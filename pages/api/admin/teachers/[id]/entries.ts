@@ -4,8 +4,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { desc, eq, and } from 'drizzle-orm';
 import { requireAuth, pickDbRole } from '@/features/journal/lib/apiHelpers';
 import { withTenantUser } from '@/shared/lib/db';
-import { publicJournalEntries, journalEntryTags, tags } from '@/db/schema';
-import type { Tag } from '@/db/schema';
+import { publicJournalEntries, journalEntryTags, emotionTags } from '@/db/schema';
+import type { EmotionTag } from '@/db/schema';
 import { teacherIdParamSchema } from '@/features/admin-dashboard/schemas/admin';
 import { timelineQuerySchema } from '@/features/journal/schemas/journal';
 import { logger } from '@/shared/lib/logger';
@@ -58,19 +58,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const tagRows = await db
           .select({
             entryId: journalEntryTags.entryId,
-            tagId: tags.id,
-            tagName: tags.name,
-            tagType: tags.type,
-            tagCategory: tags.category,
+            tagId: emotionTags.id,
+            tagName: emotionTags.name,
+            tagCategory: emotionTags.category,
           })
           .from(journalEntryTags)
-          .innerJoin(tags, eq(tags.id, journalEntryTags.tagId))
+          .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
           .where(inArray(journalEntryTags.entryId, entryIds));
 
-        const tagMap = new Map<string, Array<Pick<Tag, 'id' | 'name' | 'type' | 'category'>>>();
+        const tagMap = new Map<string, Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>>();
         for (const row of tagRows) {
           const list = tagMap.get(row.entryId) ?? [];
-          list.push({ id: row.tagId, name: row.tagName, type: row.tagType, category: row.tagCategory });
+          list.push({ id: row.tagId, name: row.tagName, category: row.tagCategory });
           tagMap.set(row.entryId, list);
         }
 

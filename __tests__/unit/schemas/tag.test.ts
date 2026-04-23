@@ -4,41 +4,39 @@ import { createTagSchema, tagIdParamSchema } from '@/features/journal/schemas/ta
 describe('createTagSchema', () => {
   describe('正常系', () => {
     it('最小1文字のタグ名を受け入れる', () => {
-      const result = createTagSchema.safeParse({ name: 'a', type: 'context' });
+      const result = createTagSchema.safeParse({ name: 'a', category: 'positive' });
       expect(result.success).toBe(true);
     });
 
     it('最大50文字のタグ名を受け入れる', () => {
       const result = createTagSchema.safeParse({
         name: 'x'.repeat(50),
-        type: 'context',
+        category: 'neutral',
       });
       expect(result.success).toBe(true);
     });
 
-    it('type のデフォルト値は context', () => {
-      const result = createTagSchema.safeParse({ name: 'test' });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.type).toBe('context');
-      }
-    });
-
-    it('type=emotion + category を受け入れる', () => {
+    it('category=positive を受け入れる', () => {
       const result = createTagSchema.safeParse({
         name: 'うれしい',
-        type: 'emotion',
         category: 'positive',
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.type).toBe('emotion');
         expect(result.data.category).toBe('positive');
       }
     });
 
+    it('category=negative を受け入れる', () => {
+      const result = createTagSchema.safeParse({
+        name: '疲労',
+        category: 'negative',
+      });
+      expect(result.success).toBe(true);
+    });
+
     it('前後の空白を trim する', () => {
-      const result = createTagSchema.safeParse({ name: '  test  ' });
+      const result = createTagSchema.safeParse({ name: '  test  ', category: 'neutral' });
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.name).toBe('test');
@@ -48,27 +46,37 @@ describe('createTagSchema', () => {
 
   describe('異常系', () => {
     it('空文字列を拒否する', () => {
-      const result = createTagSchema.safeParse({ name: '' });
+      const result = createTagSchema.safeParse({ name: '', category: 'positive' });
       expect(result.success).toBe(false);
     });
 
     it('空白のみを拒否する', () => {
-      const result = createTagSchema.safeParse({ name: '   ' });
+      const result = createTagSchema.safeParse({ name: '   ', category: 'positive' });
       expect(result.success).toBe(false);
     });
 
     it('51文字を拒否する', () => {
-      const result = createTagSchema.safeParse({ name: 'x'.repeat(51) });
+      const result = createTagSchema.safeParse({ name: 'x'.repeat(51), category: 'positive' });
+      expect(result.success).toBe(false);
+    });
+
+    it('category 欠落を拒否する', () => {
+      const result = createTagSchema.safeParse({ name: 'test' });
+      expect(result.success).toBe(false);
+    });
+
+    it('category=invalid を拒否する', () => {
+      const result = createTagSchema.safeParse({ name: 'test', category: 'invalid' });
       expect(result.success).toBe(false);
     });
 
     it('name フィールド欠落を拒否する', () => {
-      const result = createTagSchema.safeParse({});
+      const result = createTagSchema.safeParse({ category: 'positive' });
       expect(result.success).toBe(false);
     });
 
     it('name が数値の場合を拒否する', () => {
-      const result = createTagSchema.safeParse({ name: 123 });
+      const result = createTagSchema.safeParse({ name: 123, category: 'positive' });
       expect(result.success).toBe(false);
     });
   });

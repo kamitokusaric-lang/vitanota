@@ -1,5 +1,8 @@
-// ダッシュボード「タイムライン」タブ: 常駐投稿欄 + 共有/自分切替 + 編集/削除モーダル
-// 投稿は X ライクに最上部常駐 (compact)、編集はモーダル (compact ではない)
+// ダッシュボードのタイムラインタブ (マイボードの「日々ノート」と職員室ボードの
+// 「全体のタイムライン」で同一コンポーネントを mode で切替える)
+// - mode='personal':  自分の投稿のみ (MyJournalList)
+// - mode='staffroom': 全員の公開投稿 (TimelineList)
+// 両 mode とも最上部に常駐投稿欄、自分の投稿には kebab メニューを表示。
 import { useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { Button } from '@/shared/components/Button';
@@ -12,10 +15,8 @@ import { TimelineList } from '@/features/journal/components/TimelineList';
 import type { EntryCardData } from '@/features/journal/components/EntryCard';
 import type { JournalEntry } from '@/db/schema';
 import type { VitanotaSession } from '@/shared/types/auth';
-import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
 
-type Filter = 'all' | 'mine';
-type Category = 'all' | 'positive' | 'negative' | 'neutral';
+type TimelineMode = 'personal' | 'staffroom';
 
 type ModalState =
   | { kind: 'closed' }
@@ -34,13 +35,11 @@ const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
 
 interface TimelineTabProps {
   session: VitanotaSession;
+  mode: TimelineMode;
 }
 
-export function TimelineTab({ session }: TimelineTabProps) {
+export function TimelineTab({ session, mode }: TimelineTabProps) {
   const currentUserId = session.user.userId;
-  const isAdmin = canUseAdminFeatures(session.user.roles);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [category, setCategory] = useState<Category>('all');
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const { mutate } = useSWRConfig();
 
@@ -72,7 +71,7 @@ export function TimelineTab({ session }: TimelineTabProps) {
   };
 
   return (
-    <div className="space-y-4" data-testid="timeline-tab">
+    <div className="space-y-4" data-testid={`timeline-tab-${mode}`}>
       {/* 投稿欄は nav (h-16 = 64px) の真下に sticky */}
       <div className="sticky top-16 z-[5] -mx-6 bg-vn-bg px-6 pb-3 pt-3 lg:-mx-10 lg:px-10">
         <EntryForm
@@ -82,17 +81,9 @@ export function TimelineTab({ session }: TimelineTabProps) {
         />
       </div>
 
-      <div className="space-y-2">
-        <FilterToggle value={filter} onChange={setFilter} />
-        {isAdmin && filter === 'all' && (
-          <CategoryToggle value={category} onChange={setCategory} />
-        )}
-      </div>
-
-      {filter === 'all' ? (
+      {mode === 'staffroom' ? (
         <TimelineList
           currentUserId={currentUserId}
-          category={category === 'all' ? undefined : category}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
@@ -127,70 +118,6 @@ export function TimelineTab({ session }: TimelineTabProps) {
           />
         )}
       </Modal>
-    </div>
-  );
-}
-
-interface FilterToggleProps {
-  value: Filter;
-  onChange: (value: Filter) => void;
-}
-
-function FilterToggle({ value, onChange }: FilterToggleProps) {
-  const button = (key: Filter, label: string) => (
-    <button
-      type="button"
-      onClick={() => onChange(key)}
-      data-testid={`timeline-filter-${key}`}
-      className={[
-        'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-        value === key
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-      ].join(' ')}
-    >
-      {label}
-    </button>
-  );
-  return (
-    <div className="flex gap-2" role="group" aria-label="タイムラインフィルタ">
-      {button('all', '全員')}
-      {button('mine', '自分')}
-    </div>
-  );
-}
-
-interface CategoryToggleProps {
-  value: Category;
-  onChange: (value: Category) => void;
-}
-
-function CategoryToggle({ value, onChange }: CategoryToggleProps) {
-  const button = (key: Category, label: string, activeClass: string) => (
-    <button
-      type="button"
-      onClick={() => onChange(key)}
-      data-testid={`timeline-category-${key}`}
-      className={[
-        'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-        value === key
-          ? activeClass
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-      ].join(' ')}
-    >
-      {label}
-    </button>
-  );
-  return (
-    <div
-      className="flex flex-wrap gap-2"
-      role="group"
-      aria-label="タイムライン カテゴリフィルタ (管理者のみ)"
-    >
-      {button('all', 'すべて', 'bg-gray-700 text-white')}
-      {button('positive', 'ポジ', 'bg-green-600 text-white')}
-      {button('negative', 'ネガ', 'bg-red-600 text-white')}
-      {button('neutral', 'ニュートラル', 'bg-slate-500 text-white')}
     </div>
   );
 }
@@ -230,6 +157,7 @@ function EditEntryModalBody({
         content: data.entry.content,
         tagIds: data.entry.tags?.map((t) => t.id) ?? [],
         isPublic: data.entry.isPublic,
+        mood: data.entry.mood,
       }}
       onSuccess={onSuccess}
       onCancel={onCancel}

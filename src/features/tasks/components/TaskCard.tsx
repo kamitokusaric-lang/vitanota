@@ -1,11 +1,14 @@
 // カンバン上の個別タスクカード
-// カードクリックで編集モーダル、status バッジクリックでステータス前進 (todo → 進行中 → 完了 → todo)
+// readonly: 他人のタスク (閲覧のみ可、ステータス変更不可)
+// delegated: 自分が作成したが owner が他人のタスク (色違い表示、マイボードで「あの先生に振ったやつ」を識別)
 import type { TaskWithOwner } from '../hooks/useTasks';
 
 interface TaskCardProps {
   task: TaskWithOwner;
   onEdit: (task: TaskWithOwner) => void;
   onStatusChange: (id: string, status: 'todo' | 'in_progress' | 'done') => void;
+  readonly?: boolean;
+  delegated?: boolean;
 }
 
 const STATUS_LABEL: Record<'todo' | 'in_progress' | 'done', string> = {
@@ -34,30 +37,53 @@ function formatDate(value: string | Date): string {
   }).format(date);
 }
 
-export function TaskCard({ task, onEdit, onStatusChange }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onEdit,
+  onStatusChange,
+  readonly = false,
+  delegated = false,
+}: TaskCardProps) {
+  const cardClass = [
+    'rounded-md border border-gray-200 bg-white p-3 text-sm shadow-sm transition-opacity',
+    task.status === 'done' ? 'opacity-60' : '',
+    // delegated (= 自分が振ったが他人が owner) は左側に amber のアクセントと淡い背景
+    delegated ? 'border-l-4 border-l-amber-400 bg-amber-50/40' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div
-      className={`rounded-md border border-gray-200 bg-white p-3 text-sm shadow-sm transition-opacity ${
-        task.status === 'done' ? 'opacity-60' : ''
-      }`}
-      data-testid={`task-card-${task.id}`}
-    >
+    <div className={cardClass} data-testid={`task-card-${task.id}`}>
       <button
         type="button"
         onClick={() => onEdit(task)}
         className="block w-full text-left"
         data-testid={`task-card-edit-${task.id}`}
       >
-        <div
-          className={`font-medium text-gray-900 ${
-            task.status === 'done' ? 'line-through' : ''
-          }`}
-        >
-          {task.title}
+        <div className="flex items-start justify-between gap-2">
+          <div
+            className={`flex-1 font-medium text-gray-900 ${
+              task.status === 'done' ? 'line-through' : ''
+            }`}
+          >
+            {task.title}
+          </div>
+          {delegated && (
+            <span
+              className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+              data-testid={`task-card-delegated-${task.id}`}
+            >
+              依頼中
+            </span>
+          )}
         </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
           {(task.ownerNickname ?? task.ownerName) && (
-            <span>{task.ownerNickname ?? task.ownerName}</span>
+            <span>
+              {delegated && <span className="text-amber-700">→ </span>}
+              {task.ownerNickname ?? task.ownerName}
+            </span>
           )}
           {task.dueDate && <span>期限: {formatDate(task.dueDate)}</span>}
           {task.commentCount > 0 && (
@@ -72,11 +98,15 @@ export function TaskCard({ task, onEdit, onStatusChange }: TaskCardProps) {
       </button>
       <button
         type="button"
+        disabled={readonly}
         onClick={(e) => {
           e.stopPropagation();
+          if (readonly) return;
           onStatusChange(task.id, nextStatus(task.status));
         }}
-        className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLE[task.status]}`}
+        className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLE[task.status]} ${
+          readonly ? 'cursor-default opacity-80' : ''
+        }`}
         data-testid={`task-card-status-${task.id}`}
       >
         {STATUS_LABEL[task.status]}

@@ -8,10 +8,6 @@ import { taskCategoryRepo } from './taskCategoryRepository';
 import { TaskNotFoundError } from './errors';
 import type { Task, TaskCategory } from '@/db/schema';
 
-function isAdmin(ctx: AuthContext): boolean {
-  return ctx.roles.includes('school_admin') || ctx.roles.includes('system_admin');
-}
-
 function parseDueDate(input: string | null | undefined): Date | null | undefined {
   if (input === undefined) return undefined;
   if (input === null) return null;
@@ -37,7 +33,7 @@ export interface UpdateTaskServiceInput {
 export class TaskService {
   async listTasks(
     ctx: AuthContext,
-    filters?: { ownerUserId?: string },
+    filters?: { ownerUserId?: string; scope?: 'mine' },
   ): Promise<TaskWithOwner[]> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return taskRepo.findAllByTenant(tx, ctx, filters);
@@ -54,11 +50,8 @@ export class TaskService {
     params: CreateTaskServiceInput,
     ctx: AuthContext,
   ): Promise<Task> {
-    // teacher: owner=自分に強制 (RLS でも弾かれるが入力段階でも縛る)
-    // admin : params.ownerUserId が指定されていれば使用、なければ自分
-    const ownerUserId = isAdmin(ctx)
-      ? (params.ownerUserId ?? ctx.userId)
-      : ctx.userId;
+    // 誰にアサインするかは teacher / school_admin とも自由 (chimo 仕様)
+    const ownerUserId = params.ownerUserId ?? ctx.userId;
 
     const due = parseDueDate(params.dueDate);
 

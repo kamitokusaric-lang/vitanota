@@ -1,12 +1,19 @@
 // GET /api/school/teachers-workload — 教員別未完了タスク件数推移 (感情情報なし)
-// 全員 (teacher / school_admin) がアクセス可能
-// タスクは業務量の客観指標であり、カンバンで既に全員に可視化されているため
-// 名前付きで推移を出すことも情報公開の増加にはならない (踏み絵通過)
+// school_admin 特権 (学校エンゲージメントタブの一部)
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth, pickDbRole } from '@/features/journal/lib/apiHelpers';
 import { withTenantUser } from '@/shared/lib/db';
-import { getTeachersWorkload } from '@/features/dashboard/lib/schoolDashboardService';
+import {
+  getTeachersWorkload,
+  PERIOD_DAYS,
+  type PeriodKey,
+} from '@/features/dashboard/lib/schoolDashboardService';
 import { logger } from '@/shared/lib/logger';
+
+function parsePeriodDays(q: unknown): number {
+  const key = typeof q === 'string' ? (q as PeriodKey) : '1w';
+  return PERIOD_DAYS[key] ?? PERIOD_DAYS['1w'];
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'private, no-store');
@@ -19,12 +26,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const ctx = await requireAuth(req, res);
   if (!ctx) return;
 
+  if (!ctx.roles.includes('school_admin')) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: '管理者権限が必要です' });
+  }
+
+  const periodDays = parsePeriodDays(req.query.period);
+
   try {
     const teachers = await withTenantUser(
       ctx.tenantId,
       ctx.userId,
       pickDbRole(ctx),
-      (db) => getTeachersWorkload(db, ctx.tenantId),
+      (db) => getTeachersWorkload(db, ctx.tenantId, periodDays),
     );
     return res.status(200).json({ teachers });
   } catch (err) {

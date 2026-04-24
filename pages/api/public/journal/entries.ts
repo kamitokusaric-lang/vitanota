@@ -29,20 +29,12 @@ export default async function handler(
     });
   }
 
-  const { page, perPage, category } = parsed.data;
+  const { page, perPage } = parsed.data;
   const offset = (page - 1) * perPage;
-
-  // カテゴリ絞り込みは school_admin のみ (UI 上も管理者にだけ見える特権)
-  if (category && !ctx.roles.includes('school_admin')) {
-    return res.status(403).json({
-      error: 'FORBIDDEN',
-      message: 'カテゴリ絞り込みは管理者のみ利用できます',
-    });
-  }
 
   try {
     const entries = await withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      return publicTimelineRepo.findTimeline(tx, { limit: perPage, offset, category });
+      return publicTimelineRepo.findTimeline(tx, { limit: perPage, offset });
     });
 
     // PP-U02-02: エッジキャッシュ対象（CloudFront ホワイトリスト方式）

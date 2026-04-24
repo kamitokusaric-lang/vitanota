@@ -1,10 +1,11 @@
-// GET /api/school/wellness — 全校の感情集計 (個人特定なし)
+// GET /api/school/mood-analysis — 全校の mood 別集計 (個人特定なし)
 // school_admin 特権 (学校エンゲージメントタブの一部)
+// 公開・非公開問わず mood 付き投稿を集計する
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth, pickDbRole } from '@/features/journal/lib/apiHelpers';
 import { withTenantUser } from '@/shared/lib/db';
 import {
-  getSchoolWellness,
+  getSchoolMoodAnalysis,
   PERIOD_DAYS,
   type PeriodKey,
 } from '@/features/dashboard/lib/schoolDashboardService';
@@ -37,11 +38,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ctx.tenantId,
       ctx.userId,
       pickDbRole(ctx),
-      (db) => getSchoolWellness(db, ctx.tenantId, periodDays),
+      (db) => getSchoolMoodAnalysis(db, ctx.tenantId, periodDays),
     );
     return res.status(200).json(data);
   } catch (err) {
-    logger.error({ event: 'school.wellness.error', err });
+    logger.error({ event: 'school.mood-analysis.error', err });
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 }

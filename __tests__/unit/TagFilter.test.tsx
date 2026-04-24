@@ -17,7 +17,7 @@ function makeTag(overrides: Partial<EmotionTag> = {}): EmotionTag {
 }
 
 describe('TagFilter', () => {
-  it('タグを sort_order → name 順に表示する', () => {
+  it('タグを sort_order → name 順に 1 行で表示する', () => {
     const tags = [
       makeTag({ id: 't3', name: 'うれしい', category: 'positive', sortOrder: 1 }),
       makeTag({ id: 't1', name: 'あとで相談', category: 'neutral', sortOrder: 3 }),
@@ -25,7 +25,7 @@ describe('TagFilter', () => {
     ];
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
-    // category でグループ化されるので、positive → negative → neutral の順
+    // カテゴリ別グループ化は廃止、純粋に sortOrder → name 順
     expect(buttons.map((b) => b.textContent)).toEqual([
       'うれしい',
       'つかれた',
@@ -102,7 +102,7 @@ describe('TagFilter', () => {
     );
   });
 
-  it('positive/negative/neutral の各グループが表示される', () => {
+  it('カテゴリ見出し付きグループ表示 (ポジティブ / ちょっと大変 / 状態)', () => {
     const tags = [
       makeTag({ id: 't1', name: '喜び', category: 'positive', sortOrder: 1 }),
       makeTag({ id: 't2', name: '不安', category: 'negative', sortOrder: 2 }),
@@ -111,7 +111,7 @@ describe('TagFilter', () => {
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
     expect(screen.getByTestId('entry-form-emotion-tags')).toBeTruthy();
     expect(screen.getByText('ポジティブ')).toBeTruthy();
-    expect(screen.getByText('ネガティブ')).toBeTruthy();
-    expect(screen.getByText('ニュートラル')).toBeTruthy();
+    expect(screen.getByText('ちょっと大変')).toBeTruthy();
+    expect(screen.getByText('状態')).toBeTruthy();
   });
 });

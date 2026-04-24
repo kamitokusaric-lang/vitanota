@@ -87,7 +87,7 @@ export function EntryCard({
           {entry.tags.map((tag) => (
             <span
               key={tag.id}
-              className="rounded-full bg-pink-50 px-2 py-0.5 text-[10px] text-pink-700"
+              className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] text-gray-600"
             >
               {tag.name}
             </span>

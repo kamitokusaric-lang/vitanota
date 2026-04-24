@@ -6,21 +6,30 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 
 extendZodWithOpenApi(z);
 
+// 投稿ムード (絵文字ベース・必須)
+export const moodLevelSchema = z
+  .enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative'])
+  .openapi({ example: 'neutral' });
+
+export type MoodLevel = z.infer<typeof moodLevelSchema>;
+
 // エントリ作成入力
 // NFR-U02-05: content 200文字
-// Unit-03: tagIds の上限撤廃（タグはシステム定義 23個 + 管理者追加分）
+// mood はタグ必須化の代わりに必須化した軽量なムード選択 (絵文字 5 段階)
 export const createEntrySchema = z
   .object({
+    // content は任意。ムード必須化の代わりに、絵文字だけで投稿可能にする。
+    // 空文字許容、上限 200 文字。
     content: z
       .string()
       .trim()
-      .min(1, '記録内容を入力してください')
       .max(200, '200文字以内で入力してください')
       .openapi({ example: '今日の授業の振り返り' }),
     tagIds: z
       .array(z.string().uuid('不正なタグIDです'))
       .openapi({ example: [] }),
     isPublic: z.boolean().openapi({ example: true }),
+    mood: moodLevelSchema,
   })
   .openapi('CreateEntryInput');
 
@@ -32,15 +41,10 @@ export const updateEntrySchema = createEntrySchema.partial().openapi('UpdateEntr
 export type UpdateEntryInput = z.infer<typeof updateEntrySchema>;
 
 // タイムライン取得クエリ
-// category: 管理者特権 (school_admin) のときのみ UI から渡される感情カテゴリ絞り込み
 export const timelineQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1).openapi({ example: 1 }),
     perPage: z.coerce.number().int().min(1).max(50).default(50).openapi({ example: 50 }),
-    category: z
-      .enum(['positive', 'negative', 'neutral'])
-      .optional()
-      .openapi({ example: 'positive' }),
   })
   .openapi('TimelineQuery');
 

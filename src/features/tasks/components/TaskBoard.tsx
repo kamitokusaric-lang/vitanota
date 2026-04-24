@@ -6,10 +6,12 @@ import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
+import { useToast } from '@/shared/components/Toast';
 import { useTasks, type TaskWithOwner } from '../hooks/useTasks';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
 import { AssigneeFilter } from './AssigneeFilter';
+import { CategoryFilter } from './CategoryFilter';
 import { TaskColumn } from './TaskColumn';
 import { TaskForm, toFormInitial, type TaskFormValues } from './TaskForm';
 import { TaskCommentSection } from './TaskCommentSection';
@@ -21,23 +23,29 @@ type ModalState =
 
 interface TaskBoardProps {
   selfUserId: string;
-  canAssignToOthers: boolean;
+  // personal: マイボード用、自分のタスクのみ表示、AssigneeFilter 非表示
+  // staffroom: 職員室ボード用、全員のタスク表示、AssigneeFilter あり
+  mode: 'personal' | 'staffroom';
 }
 
-export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
-  const isAdmin = canAssignToOthers;
-
-  // teacher は自分のタスクしか見えない (UI 側制約、RLS は全員 SELECT 可能のまま、
-  // 将来 UI を開放するだけで全員表示に戻せる)
-  const [filterOwner, setFilterOwner] = useState<string | undefined>(
-    isAdmin ? undefined : selfUserId,
+export function TaskBoard({ selfUserId, mode }: TaskBoardProps) {
+  // staffroom は AssigneeFilter で絞り込み可、personal は scope='mine' 固定
+  // (scope='mine' = owner=自分 OR createdBy=自分、アサイン元のタスクも表示)
+  const [filterOwner, setFilterOwner] = useState<string | undefined>(undefined);
+  const [filterCategoryId, setFilterCategoryId] = useState<string | undefined>(
+    undefined,
   );
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const { tasks, error: tasksError, isLoading: tasksLoading, mutate: mutateTasks } =
-    useTasks({ ownerUserId: filterOwner });
+    useTasks(
+      mode === 'personal'
+        ? { scope: 'mine' }
+        : { ownerUserId: filterOwner },
+    );
   const { categories, error: catsError, isLoading: catsLoading } = useTaskCategories();
   const { assignees } = useAssignees();
 
@@ -55,7 +63,7 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           categoryId: values.categoryId,
-          ownerUserId: isAdmin ? values.ownerUserId : undefined,
+          ownerUserId: values.ownerUserId,
           title: values.title,
           description: values.description || undefined,
           dueDate: values.dueDate || undefined,
@@ -80,6 +88,17 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
 
       await mutateTasks();
       closeModal();
+
+      // 登録完了フィードバック
+      const ownerLabel = (() => {
+        if (values.ownerUserId === selfUserId) return '自分';
+        const a = (assignees ?? []).find((x) => x.userId === values.ownerUserId);
+        return a?.name ?? '他の先生';
+      })();
+      showToast(
+        `${ownerLabel}のタスク「${values.title}」を登録しました`,
+        'success',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -107,6 +126,7 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
       }
       await mutateTasks();
       closeModal();
+      showToast('タスクを更新しました', 'success');
     } finally {
       setSubmitting(false);
     }
@@ -118,11 +138,12 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
     try {
       const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
       if (!res.ok) {
-        alert('削除に失敗しました');
+        showToast('削除に失敗しました', 'error');
         return;
       }
       await mutateTasks();
       closeModal();
+      showToast('タスクを削除しました', 'success');
     } finally {
       setSubmitting(false);
     }
@@ -168,13 +189,20 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
   return (
     <div data-testid="task-board">
       <div className="mb-4 flex items-center justify-between">
-        {isAdmin ? (
-          <AssigneeFilter
-            value={filterOwner}
-            onChange={setFilterOwner}
-            assignees={assignees ?? []}
-            selfUserId={selfUserId}
-          />
+        {mode === 'staffroom' ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <AssigneeFilter
+              value={filterOwner}
+              onChange={setFilterOwner}
+              assignees={assignees ?? []}
+              selfUserId={selfUserId}
+            />
+            <CategoryFilter
+              value={filterCategoryId}
+              onChange={setFilterCategoryId}
+              categories={categories}
+            />
+          </div>
         ) : (
           <div />
         )}
@@ -189,16 +217,19 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2">
-        {categories.map((category) => (
-          <TaskColumn
-            key={category.id}
-            category={category}
-            tasks={tasksByCategory.get(category.id) ?? []}
-            onAdd={(categoryId) => setModal({ kind: 'create', categoryId })}
-            onEdit={(task) => setModal({ kind: 'edit', task })}
-            onStatusChange={handleStatusChange}
-          />
-        ))}
+        {categories
+          .filter((c) => !filterCategoryId || c.id === filterCategoryId)
+          .map((category) => (
+            <TaskColumn
+              key={category.id}
+              category={category}
+              tasks={tasksByCategory.get(category.id) ?? []}
+              selfUserId={selfUserId}
+              onAdd={(categoryId) => setModal({ kind: 'create', categoryId })}
+              onEdit={(task) => setModal({ kind: 'edit', task })}
+              onStatusChange={handleStatusChange}
+            />
+          ))}
       </div>
 
       <Modal
@@ -212,7 +243,7 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
             initial={{ categoryId: modal.categoryId ?? categories[0]?.id }}
             categories={categories}
             assignees={assignees ?? []}
-            canAssignToOthers={isAdmin}
+            canAssignToOthers
             selfUserId={selfUserId}
             submitting={submitting}
             error={formError}
@@ -225,7 +256,11 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
       <Modal
         open={modal.kind === 'edit'}
         onClose={closeModal}
-        title="タスクの編集"
+        title={
+          modal.kind === 'edit' && modal.task.ownerUserId !== selfUserId
+            ? 'タスクを見る'
+            : 'タスクの編集'
+        }
         maxWidth="max-w-lg"
       >
         {modal.kind === 'edit' && (
@@ -235,10 +270,11 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
               initial={toFormInitial(modal.task)}
               categories={categories}
               assignees={assignees ?? []}
-              canAssignToOthers={isAdmin}
+              canAssignToOthers
               selfUserId={selfUserId}
               submitting={submitting}
               error={formError}
+              readonly={modal.task.ownerUserId !== selfUserId}
               onSubmit={(values) => handleUpdate(modal.task.id, values)}
               onCancel={closeModal}
               onDelete={() => handleDelete(modal.task.id)}
@@ -246,7 +282,7 @@ export function TaskBoard({ selfUserId, canAssignToOthers }: TaskBoardProps) {
             <TaskCommentSection
               taskId={modal.task.id}
               selfUserId={selfUserId}
-              canDeleteAny={isAdmin}
+              canDeleteAny={false}
             />
           </>
         )}

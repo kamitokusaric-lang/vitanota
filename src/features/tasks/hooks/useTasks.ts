@@ -17,10 +17,13 @@ const fetcher = async (url: string): Promise<TasksResponse> => {
   return res.json();
 };
 
-export function useTasks(filters?: { ownerUserId?: string }) {
-  const qs = filters?.ownerUserId
-    ? `?ownerUserId=${encodeURIComponent(filters.ownerUserId)}`
-    : '';
+export function useTasks(filters?: { ownerUserId?: string; scope?: 'mine' }) {
+  const params = new URLSearchParams();
+  if (filters?.scope) params.set('scope', filters.scope);
+  if (filters?.ownerUserId && !filters.scope) {
+    params.set('ownerUserId', filters.ownerUserId);
+  }
+  const qs = params.toString() ? `?${params.toString()}` : '';
   const { data, error, isLoading, mutate } = useSWR(
     `/api/tasks${qs}`,
     fetcher,

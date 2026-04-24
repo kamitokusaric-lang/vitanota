@@ -6,6 +6,7 @@ import type { TaskWithOwner } from '../hooks/useTasks';
 interface TaskColumnProps {
   category: TaskCategory;
   tasks: TaskWithOwner[];
+  selfUserId: string;
   onAdd: (categoryId: string) => void;
   onEdit: (task: TaskWithOwner) => void;
   onStatusChange: (id: string, status: 'todo' | 'in_progress' | 'done') => void;
@@ -14,6 +15,7 @@ interface TaskColumnProps {
 export function TaskColumn({
   category,
   tasks,
+  selfUserId,
   onAdd,
   onEdit,
   onStatusChange,
@@ -28,14 +30,20 @@ export function TaskColumn({
         <span className="text-xs text-gray-400">{tasks.length}</span>
       </div>
       <div className="space-y-2">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onEdit={onEdit}
-            onStatusChange={onStatusChange}
-          />
-        ))}
+        {tasks.map((task) => {
+          const isMine = task.ownerUserId === selfUserId;
+          const delegated = !isMine && task.createdBy === selfUserId;
+          return (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onEdit={onEdit}
+              onStatusChange={onStatusChange}
+              readonly={!isMine}
+              delegated={delegated}
+            />
+          );
+        })}
         <button
           type="button"
           onClick={() => onAdd(category.id)}

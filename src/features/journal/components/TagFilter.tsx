@@ -1,6 +1,7 @@
-// PP-U02-01: クライアントサイドタグフィルタ (useMemo + includes)
-// 感情タグ (emotion_tags) を category (positive/negative/neutral) でグループ表示
-// 0016 で context は廃止、task_categories に役割移譲
+// PP-U02-01: クライアントサイドタグフィルタ
+// category 見出し付きグループ表示 (ポジティブ / ちょっと大変 / 状態)
+// 色はカテゴリ問わず同一 (選択中: 青、非選択: 薄灰) で、視覚的な
+// カテゴリ差異を出さない (観測されてる感を薄める配慮)
 import { useMemo } from 'react';
 import type { EmotionTag } from '@/db/schema';
 
@@ -10,31 +11,20 @@ interface TagFilterProps {
   onChange: (selectedIds: string[]) => void;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABEL: Record<string, string> = {
   positive: 'ポジティブ',
-  negative: 'ネガティブ',
-  neutral: 'ニュートラル',
+  negative: 'ちょっと大変',
+  neutral: '状態',
 };
 
-const CATEGORY_STYLES: Record<string, { normal: string; selected: string }> = {
-  positive: {
-    normal: 'border border-green-300 bg-green-50 text-green-700 hover:bg-green-100',
-    selected: 'bg-green-600 text-white',
-  },
-  negative: {
-    normal: 'border border-red-300 bg-red-50 text-red-700 hover:bg-red-100',
-    selected: 'bg-red-600 text-white',
-  },
-  neutral: {
-    normal: 'border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100',
-    selected: 'bg-gray-600 text-white',
-  },
-};
+const CATEGORY_ORDER = ['positive', 'negative', 'neutral'] as const;
 
-function getTagStyle(tag: EmotionTag, isSelected: boolean): string {
-  const base = 'rounded-full px-3 py-1 text-xs font-medium transition-colors';
-  const styles = CATEGORY_STYLES[tag.category] ?? CATEGORY_STYLES.neutral;
-  return `${base} ${isSelected ? styles.selected : styles.normal}`;
+function getTagStyle(isSelected: boolean): string {
+  const base =
+    'rounded-full px-3 py-1 text-xs font-medium transition-colors';
+  return isSelected
+    ? `${base} bg-blue-600 text-white`
+    : `${base} border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100`;
 }
 
 export function TagFilter({
@@ -51,7 +41,7 @@ export function TagFilter({
     [tags]
   );
 
-  const emotionGroups = useMemo(() => {
+  const groups = useMemo(() => {
     const grouped: Record<string, EmotionTag[]> = {};
     for (const tag of sortedTags) {
       const cat = tag.category;
@@ -69,44 +59,42 @@ export function TagFilter({
     }
   };
 
-  const renderTagButton = (tag: EmotionTag) => {
-    const isSelected = selectedTagIds.includes(tag.id);
-    return (
-      <button
-        key={tag.id}
-        type="button"
-        onClick={() => toggleTag(tag.id)}
-        className={getTagStyle(tag, isSelected)}
-        data-testid={`tag-filter-${tag.id}`}
-      >
-        {tag.name}
-      </button>
-    );
-  };
-
   return (
     <div data-testid="tag-filter">
-      {Object.keys(emotionGroups).length > 0 && (
-        <div className="mb-3" data-testid="entry-form-emotion-tags">
-          <p className="mb-1 text-xs font-semibold text-gray-500">感情タグ</p>
-          {(['positive', 'negative', 'neutral'] as const).map((cat) => {
-            const group = emotionGroups[cat];
+      {sortedTags.length > 0 ? (
+        <div
+          className="space-y-3"
+          data-testid="entry-form-emotion-tags"
+        >
+          {CATEGORY_ORDER.map((cat) => {
+            const group = groups[cat];
             if (!group || group.length === 0) return null;
             return (
-              <div key={cat} className="mb-2">
-                <p className="mb-1 text-xs text-gray-400">
-                  {CATEGORY_LABELS[cat]}
+              <div key={cat}>
+                <p className="mb-1 text-xs font-medium text-gray-500">
+                  {CATEGORY_LABEL[cat]}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {group.map(renderTagButton)}
+                  {group.map((tag) => {
+                    const isSelected = selectedTagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={getTagStyle(isSelected)}
+                        data-testid={`tag-filter-${tag.id}`}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
         </div>
-      )}
-
-      {sortedTags.length === 0 && (
+      ) : (
         <span className="text-sm text-gray-400">
           該当するタグがありません
         </span>

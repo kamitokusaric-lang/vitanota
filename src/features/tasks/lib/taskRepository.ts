@@ -1,6 +1,6 @@
 // タスク Repository: tasks テーブルへの CRUD
 // RLS で tenant 内 SELECT 全員 / INSERT・UPDATE・DELETE は owner or school_admin
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import { tasks, users, userTenantProfiles } from '@/db/schema';
 import type * as schema from '@/db/schema';
@@ -40,10 +40,17 @@ export class TaskRepository {
   async findAllByTenant(
     tx: DrizzleDb,
     ctx: TaskContext,
-    filters?: { ownerUserId?: string },
+    filters?: { ownerUserId?: string; scope?: 'mine' },
   ): Promise<TaskWithOwner[]> {
     const conditions = [eq(tasks.tenantId, ctx.tenantId)];
-    if (filters?.ownerUserId) {
+    if (filters?.scope === 'mine') {
+      // 自分が owner または createdBy (マイボード: アサイン元も含む)
+      const scopeCondition = or(
+        eq(tasks.ownerUserId, ctx.userId),
+        eq(tasks.createdBy, ctx.userId),
+      );
+      if (scopeCondition) conditions.push(scopeCondition);
+    } else if (filters?.ownerUserId) {
       conditions.push(eq(tasks.ownerUserId, filters.ownerUserId));
     }
 

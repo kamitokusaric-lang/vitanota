@@ -68,11 +68,12 @@ export default async function handler(
     const tenantId = roles.find((r) => r.tenantId !== null)?.tenantId ?? null;
     const roleNames = roles.map((r) => r.role);
 
-    // ロールに応じたリダイレクト先
-    if (roleNames.includes('school_admin')) {
-      redirectTo = '/dashboard/admin';
-    } else if (roleNames.includes('teacher')) {
-      redirectTo = '/journal';
+    // teacher / school_admin は共通ダッシュボードへ
+    if (
+      roleNames.includes('teacher') ||
+      roleNames.includes('school_admin')
+    ) {
+      redirectTo = '/dashboard';
     }
 
     // セッション作成

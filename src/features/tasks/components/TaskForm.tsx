@@ -26,6 +26,9 @@ interface TaskFormProps {
   selfUserId: string;
   submitting: boolean;
   error?: string | null;
+  // readonly=true: 他人のタスクを閲覧するモード。全フィールド disabled、
+  // 保存・削除ボタン非表示、キャンセルは「閉じる」として機能する
+  readonly?: boolean;
   onSubmit: (values: TaskFormValues) => void;
   onCancel: () => void;
   onDelete?: () => void;
@@ -47,6 +50,7 @@ export function TaskForm({
   selfUserId,
   submitting,
   error,
+  readonly = false,
   onSubmit,
   onCancel,
   onDelete,
@@ -84,9 +88,10 @@ export function TaskForm({
         <select
           value={values.categoryId}
           onChange={(e) => setValues((v) => ({ ...v, categoryId: e.target.value }))}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
           data-testid="task-form-category"
           required
+          disabled={readonly}
         >
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -105,9 +110,10 @@ export function TaskForm({
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
           maxLength={200}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
           data-testid="task-form-title"
           required
+          disabled={readonly}
         />
       </div>
 
@@ -122,8 +128,9 @@ export function TaskForm({
           }
           rows={3}
           maxLength={2000}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
           data-testid="task-form-description"
+          disabled={readonly}
         />
       </div>
 
@@ -136,8 +143,9 @@ export function TaskForm({
             type="date"
             value={values.dueDate}
             onChange={(e) => setValues((v) => ({ ...v, dueDate: e.target.value }))}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
             data-testid="task-form-due-date"
+            disabled={readonly}
           />
         </div>
 
@@ -154,8 +162,9 @@ export function TaskForm({
                   status: e.target.value as TaskFormValues['status'],
                 }))
               }
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
               data-testid="task-form-status"
+              disabled={readonly}
             >
               <option value="todo">未着手</option>
               <option value="in_progress">進行中</option>
@@ -177,7 +186,7 @@ export function TaskForm({
             }
             rows={2}
             maxLength={2000}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
             data-testid="task-form-initial-comment"
           />
         </div>
@@ -193,9 +202,10 @@ export function TaskForm({
             onChange={(e) =>
               setValues((v) => ({ ...v, ownerUserId: e.target.value }))
             }
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
             data-testid="task-form-owner"
             required
+            disabled={readonly}
           >
             <option value={selfUserId}>自分</option>
             {assignees
@@ -211,7 +221,7 @@ export function TaskForm({
 
       <div className="flex items-center justify-between gap-2 pt-2">
         <div>
-          {mode === 'edit' && onDelete && (
+          {mode === 'edit' && onDelete && !readonly && (
             <Button
               variant="danger"
               type="button"
@@ -232,16 +242,18 @@ export function TaskForm({
             disabled={submitting}
             className="text-xs"
           >
-            キャンセル
+            {readonly ? '閉じる' : 'キャンセル'}
           </Button>
-          <Button
-            type="submit"
-            disabled={submitting || !values.title.trim()}
-            className="text-xs"
-            data-testid="task-form-submit"
-          >
-            {mode === 'create' ? '作成' : '保存'}
-          </Button>
+          {!readonly && (
+            <Button
+              type="submit"
+              disabled={submitting || !values.title.trim()}
+              className="text-xs"
+              data-testid="task-form-submit"
+            >
+              {mode === 'create' ? '作成' : '保存'}
+            </Button>
+          )}
         </div>
       </div>
     </form>

@@ -68,15 +68,23 @@ describe('EntryForm - create mode', () => {
     );
   });
 
-  it('空文字で submit するとバリデーションエラー', async () => {
+  it('content は任意 (空文字でも送信される)', async () => {
     const onSuccess = vi.fn();
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('/api/private/journal/tags') && !init) {
+        return new Response(JSON.stringify({ tags: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ entry: { id: 'e-empty' } }), {
+        status: 201,
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
     renderWithSWR(<EntryForm mode="create" onSuccess={onSuccess} />);
     fireEvent.click(screen.getByTestId('entry-form-submit-button'));
     await waitFor(() => {
-      const err = screen.getByTestId('entry-form-content-error').textContent;
-      expect(err).toBeTruthy();
+      expect(onSuccess).toHaveBeenCalled();
     });
-    expect(onSuccess).not.toHaveBeenCalled();
   });
 
   it('有効な入力で送信が成功し onSuccess が呼ばれる', async () => {
@@ -210,40 +218,80 @@ describe('EntryForm - edit mode', () => {
 });
 
 describe('EntryForm - compact mode', () => {
-  it('初期状態ではタグ選択と公開トグルが非表示', () => {
+  it('初期状態ではムード絵文字のみ表示、textarea とタグは非表示', () => {
     renderWithSWR(
       <EntryForm mode="create" compact onSuccess={vi.fn()} />,
     );
+    // ムード絵文字は表示
+    expect(
+      screen.getByTestId('entry-form-mood-neutral'),
+    ).toBeInTheDocument();
+    // textarea, タグ, 公開トグルは初期非表示
+    expect(screen.queryByTestId('entry-form-content-input')).toBeNull();
     expect(screen.queryByTestId('tag-filter')).toBeNull();
     expect(
       screen.queryByTestId('entry-form-is-public-toggle'),
     ).toBeNull();
   });
 
-  it('textarea focus で展開してタグ選択と公開トグルが表示される', async () => {
+  it('ムード絵文字クリックで直接 expand ステップ (textarea 表示)', async () => {
     renderWithSWR(
       <EntryForm mode="create" compact onSuccess={vi.fn()} />,
     );
-    const textarea = screen.getByTestId('entry-form-content-input');
-    fireEvent.focus(textarea);
+    fireEvent.click(screen.getByTestId('entry-form-mood-positive'));
     await waitFor(() => {
       expect(
-        screen.getByTestId('entry-form-is-public-toggle'),
+        screen.getByTestId('entry-form-content-input'),
       ).toBeInTheDocument();
     });
+    expect(
+      screen.getByTestId('entry-form-is-public-toggle'),
+    ).toBeInTheDocument();
   });
 
-  it('compact ではキャンセルボタンを出さない (onCancel 不在)', () => {
+  it('選んだムードの prompts からランダムな placeholder が設定される', async () => {
     renderWithSWR(
       <EntryForm mode="create" compact onSuccess={vi.fn()} />,
     );
-    fireEvent.focus(screen.getByTestId('entry-form-content-input'));
-    expect(
-      screen.queryByTestId('entry-form-cancel-button'),
-    ).toBeNull();
+    fireEvent.click(screen.getByTestId('entry-form-mood-positive'));
+    const textarea = (await waitFor(() =>
+      screen.getByTestId('entry-form-content-input'),
+    )) as HTMLTextAreaElement;
+    const placeholder = textarea.getAttribute('placeholder');
+    expect([
+      'いい感じだったこと、ちょっと教えて',
+      '今日、どんなことがスムーズだった?',
+      '落ち着いて過ごせた瞬間は?',
+      '少し嬉しかったこと、ある?',
+    ]).toContain(placeholder);
   });
 
-  it('compact モードで投稿成功後に form が reset される', async () => {
+  it('ムードだけで投稿が成功する (content 空のまま送信ボタン)', async () => {
+    const onSuccess = vi.fn();
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('/api/private/journal/tags') && !init) {
+        return new Response(JSON.stringify({ tags: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ entry: { id: 'quick-1' } }), {
+        status: 201,
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithSWR(
+      <EntryForm mode="create" compact onSuccess={onSuccess} />,
+    );
+    fireEvent.click(screen.getByTestId('entry-form-mood-positive'));
+    fireEvent.click(
+      await waitFor(() =>
+        screen.getByTestId('entry-form-submit-button'),
+      ),
+    );
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+  });
+
+  it('投稿成功後は mood ステップに戻る', async () => {
     const fetchMock = vi.fn(async (url, init) => {
       const u = typeof url === 'string' ? url : url.toString();
       if (u.includes('/api/private/journal/tags') && !init) {
@@ -258,15 +306,17 @@ describe('EntryForm - compact mode', () => {
     renderWithSWR(
       <EntryForm mode="create" compact onSuccess={vi.fn()} />,
     );
-    const textarea = screen.getByTestId(
-      'entry-form-content-input',
-    ) as HTMLTextAreaElement;
-    fireEvent.focus(textarea);
-    fireEvent.change(textarea, { target: { value: '新規投稿テスト' } });
-    fireEvent.click(screen.getByTestId('entry-form-submit-button'));
-
+    fireEvent.click(screen.getByTestId('entry-form-mood-positive'));
+    fireEvent.click(
+      await waitFor(() =>
+        screen.getByTestId('entry-form-submit-button'),
+      ),
+    );
     await waitFor(() => {
-      expect(textarea.value).toBe('');
+      expect(screen.queryByTestId('entry-form-content-input')).toBeNull();
     });
+    expect(
+      screen.getByTestId('entry-form-mood-neutral'),
+    ).toBeInTheDocument();
   });
 });

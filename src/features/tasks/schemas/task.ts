@@ -39,8 +39,10 @@ export const taskIdParamSchema = z
   .object({ id: z.string().uuid('不正なタスクIDです') })
   .openapi('TaskIdParam');
 
+// scope='mine': owner=自分 OR createdBy=自分 (マイボード用、アサイン元も含む)
 export const listTasksQuerySchema = z
   .object({
     ownerUserId: z.string().uuid().optional(),
+    scope: z.enum(['mine']).optional(),
   })
   .openapi('ListTasksQuery');

@@ -1,13 +1,15 @@
 // 全校の感情集計を可視化する折れ線 + 総投稿件数バー
 // ポジ=緑太線 / ネガ=赤太線 / ニュートラル=薄グレー点線 / 総投稿=下部バー
 // chimo 要件: 折れ線が見づらいのは絶対避ける・色の可視性担保
+// 幅は親コンテナに追従 (ResizeObserver) し、最小 480px を確保
+import { useEffect, useRef, useState } from 'react';
 import type { EmotionDay } from '@/features/dashboard/lib/schoolDashboardService';
 
 interface SchoolWellnessChartProps {
   emotionTrend: EmotionDay[];
   totalPostsByDay: Array<{ day: string; total: number }>;
-  width?: number;
   height?: number;
+  minWidth?: number;
 }
 
 function formatDay(iso: string): string {
@@ -18,9 +20,25 @@ function formatDay(iso: string): string {
 export function SchoolWellnessChart({
   emotionTrend,
   totalPostsByDay,
-  width = 640,
   height = 280,
+  minWidth = 480,
 }: SchoolWellnessChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(minWidth);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        if (w > 0) setContainerWidth(Math.max(w, minWidth));
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [minWidth]);
+
   if (emotionTrend.length === 0) {
     return (
       <div
@@ -32,6 +50,7 @@ export function SchoolWellnessChart({
     );
   }
 
+  const width = containerWidth;
   const margin = { top: 16, right: 20, bottom: 60, left: 36 };
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
@@ -58,10 +77,11 @@ export function SchoolWellnessChart({
       .join(' ');
 
   return (
+    <div ref={containerRef} className="w-full overflow-x-auto">
     <svg
       width={width}
       height={height}
-      className="block max-w-full"
+      className="block"
       role="img"
       aria-label="全校の感情集計折れ線グラフ"
       data-testid="school-wellness-chart"
@@ -185,5 +205,6 @@ export function SchoolWellnessChart({
         <text x={266} y={4}>総投稿数</text>
       </g>
     </svg>
+    </div>
   );
 }

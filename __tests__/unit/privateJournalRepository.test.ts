@@ -79,7 +79,7 @@ describe('PrivateJournalRepository.create', () => {
     const repo = new PrivateJournalRepository();
     const result = await repo.create(
       mockTx as never,
-      { content: 'test', tagIds: ['tag-1', 'tag-2'], isPublic: false },
+      { content: 'test', tagIds: ['tag-1', 'tag-2'], isPublic: false, mood: 'neutral' },
       ctx
     );
 
@@ -89,6 +89,7 @@ describe('PrivateJournalRepository.create', () => {
       userId: 'user-1',
       content: 'test',
       isPublic: false,
+      mood: 'neutral',
     });
     expect(tagsInsert.values).toHaveBeenCalledWith([
       { tenantId: 'tenant-1', entryId: 'entry-1', tagId: 'tag-1' },
@@ -104,7 +105,7 @@ describe('PrivateJournalRepository.create', () => {
     const repo = new PrivateJournalRepository();
     await repo.create(
       mockTx as never,
-      { content: 'notag', tagIds: [], isPublic: true },
+      { content: 'notag', tagIds: [], isPublic: true, mood: 'neutral' },
       ctx
     );
 

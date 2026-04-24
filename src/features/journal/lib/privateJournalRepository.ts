@@ -17,16 +17,25 @@ export interface Context {
   tenantId: string;
 }
 
+export type MoodLevel =
+  | 'very_positive'
+  | 'positive'
+  | 'neutral'
+  | 'negative'
+  | 'very_negative';
+
 export interface CreateEntryParams {
   content: string;
   tagIds: string[];
   isPublic: boolean;
+  mood: MoodLevel;
 }
 
 export interface UpdateEntryParams {
   content?: string;
   tagIds?: string[];
   isPublic?: boolean;
+  mood?: MoodLevel;
 }
 
 export interface PaginationOptions {
@@ -84,6 +93,7 @@ export class PrivateJournalRepository {
         userId: ctx.userId,
         content: params.content,
         isPublic: params.isPublic,
+        mood: params.mood,
       })
       .returning();
 
@@ -116,6 +126,7 @@ export class PrivateJournalRepository {
     };
     if (params.content !== undefined) updateValues.content = params.content;
     if (params.isPublic !== undefined) updateValues.isPublic = params.isPublic;
+    if (params.mood !== undefined) updateValues.mood = params.mood;
 
     const [entry] = await tx
       .update(journalEntries)

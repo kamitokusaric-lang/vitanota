@@ -64,7 +64,7 @@ describe('JournalEntryService.createEntry', () => {
 
     const service = new JournalEntryService();
     const result = await service.createEntry(
-      { content: 'test', tagIds: ['tag-1'], isPublic: false },
+      { content: 'test', tagIds: ['tag-1'], isPublic: false, mood: 'neutral' },
       ctx
     );
 
@@ -85,7 +85,7 @@ describe('JournalEntryService.createEntry', () => {
 
     const service = new JournalEntryService();
     await service.createEntry(
-      { content: 'notag', tagIds: [], isPublic: true },
+      { content: 'notag', tagIds: [], isPublic: true, mood: 'neutral' },
       ctx
     );
 
@@ -98,7 +98,7 @@ describe('JournalEntryService.createEntry', () => {
     const service = new JournalEntryService();
     await expect(
       service.createEntry(
-        { content: 'test', tagIds: ['tag-valid', 'tag-invalid'], isPublic: false },
+        { content: 'test', tagIds: ['tag-valid', 'tag-invalid'], isPublic: false, mood: 'neutral' },
         ctx
       )
     ).rejects.toThrow(InvalidTagReferenceError);

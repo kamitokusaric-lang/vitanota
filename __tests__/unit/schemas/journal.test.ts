@@ -14,6 +14,7 @@ describe('createEntrySchema', () => {
       const result = createEntrySchema.safeParse({
         content: 'a',
         tagIds: [],
+        mood: 'neutral',
         isPublic: true,
       });
       expect(result.success).toBe(true);
@@ -23,6 +24,7 @@ describe('createEntrySchema', () => {
       const result = createEntrySchema.safeParse({
         content: 'x'.repeat(200),
         tagIds: [],
+        mood: 'neutral',
         isPublic: false,
       });
       expect(result.success).toBe(true);
@@ -33,6 +35,7 @@ describe('createEntrySchema', () => {
         content: 'test',
         tagIds: Array.from({ length: 10 }, () => validUuid),
         isPublic: true,
+        mood: 'neutral',
       });
       expect(result.success).toBe(true);
     });
@@ -41,6 +44,7 @@ describe('createEntrySchema', () => {
       const result = createEntrySchema.safeParse({
         content: '  test  ',
         tagIds: [],
+        mood: 'neutral',
         isPublic: true,
       });
       expect(result.success).toBe(true);
@@ -51,28 +55,34 @@ describe('createEntrySchema', () => {
   });
 
   describe('異常系', () => {
-    it('空文字列 content を拒否する', () => {
+    it('空文字列 content を受け入れる (content は任意)', () => {
       const result = createEntrySchema.safeParse({
         content: '',
         tagIds: [],
+        mood: 'neutral',
         isPublic: true,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
-    it('空白のみの content を拒否する（trim 後に空）', () => {
+    it('空白のみの content は trim されて空文字として受け入れられる', () => {
       const result = createEntrySchema.safeParse({
         content: '   ',
         tagIds: [],
+        mood: 'neutral',
         isPublic: true,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.content).toBe('');
+      }
     });
 
     it('201文字の content を拒否する', () => {
       const result = createEntrySchema.safeParse({
         content: 'x'.repeat(201),
         tagIds: [],
+        mood: 'neutral',
         isPublic: true,
       });
       expect(result.success).toBe(false);
@@ -83,6 +93,7 @@ describe('createEntrySchema', () => {
         content: 'test',
         tagIds: Array.from({ length: 11 }, () => validUuid),
         isPublic: true,
+        mood: 'neutral',
       });
       expect(result.success).toBe(true);
     });
@@ -100,6 +111,7 @@ describe('createEntrySchema', () => {
       const result = createEntrySchema.safeParse({
         content: 'test',
         tagIds: [],
+        mood: 'neutral',
         isPublic: 'true',
       });
       expect(result.success).toBe(false);
@@ -109,6 +121,7 @@ describe('createEntrySchema', () => {
       const result = createEntrySchema.safeParse({
         content: 'test',
         tagIds: [],
+        mood: 'neutral',
       });
       expect(result.success).toBe(false);
     });
@@ -117,6 +130,7 @@ describe('createEntrySchema', () => {
       const result = createEntrySchema.safeParse({
         content: 123,
         tagIds: [],
+        mood: 'neutral',
         isPublic: true,
       });
       expect(result.success).toBe(false);

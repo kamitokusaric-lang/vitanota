@@ -6,7 +6,13 @@ import { SchoolWellnessChart } from './SchoolWellnessChart';
 import { TrendArrow } from './TrendArrow';
 import type {
   EmotionDay,
+  PeriodKey,
   TrendDirection,
+} from '@/features/dashboard/lib/schoolDashboardService';
+import {
+  aggregateEmotionByWeek,
+  aggregateTotalByWeek,
+  PERIOD_COMPARISON_LABEL,
 } from '@/features/dashboard/lib/schoolDashboardService';
 
 interface WellnessResponse {
@@ -28,9 +34,15 @@ function deltaLabel(dir: TrendDirection): string {
   return '横ばい';
 }
 
-export function SchoolWellnessTab() {
+interface SchoolWellnessTabProps {
+  period?: PeriodKey;
+}
+
+export function SchoolWellnessTab({
+  period = '1w',
+}: SchoolWellnessTabProps = {}) {
   const { data, error, isLoading } = useSWR<WellnessResponse>(
-    '/api/school/wellness',
+    `/api/school/wellness?period=${period}`,
     fetcher,
   );
 
@@ -52,10 +64,10 @@ export function SchoolWellnessTab() {
       className="space-y-6"
       data-testid="school-wellness-tab"
     >
-      {/* サマリ行 */}
-      <div className="flex flex-wrap items-center gap-6 rounded-vn border border-vn-border bg-white px-5 py-4">
+      {/* サマリ行 (タグ別分析は amber 系) */}
+      <div className="flex flex-wrap items-center gap-6 rounded-vn border border-amber-200 bg-amber-50 px-5 py-4">
         <div className="flex flex-col">
-          <span className="text-[11px] text-gray-500">今週の投稿数</span>
+          <span className="text-[11px] text-gray-500">今期の投稿数</span>
           <span className="text-xl font-semibold text-gray-900">
             {totalThisWeek}
             <span className="ml-1 text-xs text-gray-500">件</span>
@@ -69,7 +81,9 @@ export function SchoolWellnessTab() {
           </span>
         </div>
         <div className="flex flex-col">
-          <span className="text-[11px] text-gray-500">先週比 (ポジ率)</span>
+          <span className="text-[11px] text-gray-500">
+            {PERIOD_COMPARISON_LABEL[period]} (ポジ率)
+          </span>
           <TrendArrow
             direction={data.emotionWeekDelta}
             tone="up-good"
@@ -78,14 +92,22 @@ export function SchoolWellnessTab() {
         </div>
       </div>
 
-      {/* 折れ線グラフ */}
+      {/* 折れ線グラフ (3 ヶ月のときだけ週別集約) */}
       <div className="rounded-vn border border-vn-border bg-white p-5">
         <h3 className="mb-3 text-sm font-semibold text-gray-800">
-          感情の動き (直近 7 日)
+          感情の動き{period === '3m' ? ' (週別)' : ''}
         </h3>
         <SchoolWellnessChart
-          emotionTrend={data.emotionTrend}
-          totalPostsByDay={data.totalPostsByDay}
+          emotionTrend={
+            period === '3m'
+              ? aggregateEmotionByWeek(data.emotionTrend)
+              : data.emotionTrend
+          }
+          totalPostsByDay={
+            period === '3m'
+              ? aggregateTotalByWeek(data.totalPostsByDay)
+              : data.totalPostsByDay
+          }
         />
       </div>
 

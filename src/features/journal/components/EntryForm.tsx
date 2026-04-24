@@ -1,18 +1,28 @@
 // US-T-010/011: エントリ作成・編集フォーム
-// SP-U02-01: Zod スキーマを共有（サーバーと同じ createEntrySchema を import）
-// compact=true: タイムライン最上部に常駐する X ライクな段階展開 UI
-import { useState } from 'react';
+// SP-U02-01: Zod スキーマを共有 (サーバーと同じ createEntrySchema を import)
+// compact=true: タイムライン最上部に常駐する UI
+//   - 初期表示は問いかけ文 + ムード絵文字 5 つのみ
+//   - 絵文字をクリック → textarea とタグ選択・公開トグルが展開される
+//   - 投稿成功後は form reset + 折りたたみ + 問いかけ切替
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import useSWR from 'swr';
 import {
   createEntrySchema,
   type CreateEntryInput,
+  type MoodLevel,
 } from '@/features/journal/schemas/journal';
+import { pickRandomMoodPrompt } from '@/features/journal/lib/mood-prompts';
 import { TagFilter } from './TagFilter';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
-import type { EmotionTag } from '@/db/schema';
+import type { EmotionTag, JournalEntry } from '@/db/schema';
+
+export interface EntrySaveResult {
+  entry: JournalEntry;
+  tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
+}
 
 interface EntryFormProps {
   mode: 'create' | 'edit';
@@ -21,10 +31,86 @@ interface EntryFormProps {
     content: string;
     tagIds: string[];
     isPublic: boolean;
+    mood?: MoodLevel | null;
   };
-  onSuccess: () => void;
+  onSuccess: (result?: EntrySaveResult) => void | Promise<void>;
   onCancel?: () => void;
   compact?: boolean;
+}
+
+const MOOD_OPTIONS: Array<{
+  value: MoodLevel;
+  emoji: string;
+  label: string;
+  caption: string;
+  prompts: string[];
+}> = [
+  {
+    value: 'very_positive',
+    emoji: '😊',
+    label: 'とても良い',
+    caption: 'すごくいい感じでした',
+    prompts: [
+      'どんなことがよかった?',
+      '何が嬉しかった?',
+      '今日の良かったこと、一つあげるなら?',
+      '誰かに感謝したいこと、ある?',
+    ],
+  },
+  {
+    value: 'positive',
+    emoji: '🙂',
+    label: '良い',
+    caption: 'いい感じでした',
+    prompts: [
+      'いい感じだったこと、ちょっと教えて',
+      '今日、どんなことがスムーズだった?',
+      '落ち着いて過ごせた瞬間は?',
+      '少し嬉しかったこと、ある?',
+    ],
+  },
+  {
+    value: 'neutral',
+    emoji: '😐',
+    label: 'ふつう',
+    caption: 'ふつうでした',
+    prompts: [
+      '今日はどんな一日だった?',
+      'なんとなく印象に残ってることある?',
+      '今日、気になったこと書いておく?',
+      'ふと思い出すと、どんな一日?',
+    ],
+  },
+  {
+    value: 'negative',
+    emoji: '😥',
+    label: 'ちょっと大変',
+    caption: 'ちょっと大変でした',
+    prompts: [
+      '何が大変だった?',
+      'どこに引っかかった?',
+      '少し疲れた場面、どこだった?',
+      'うまくいかなかったこと、書いてみる?',
+    ],
+  },
+  {
+    value: 'very_negative',
+    emoji: '😣',
+    label: 'かなり大変',
+    caption: 'かなり大変でした',
+    prompts: [
+      'ちょっとつらかったことは?',
+      'いま、一番重いのはどれ?',
+      '誰かに聞いてほしいこと、ある?',
+      '無理してない?',
+    ],
+  },
+];
+
+function pickPromptFor(mood: MoodLevel): string {
+  const opt = MOOD_OPTIONS.find((o) => o.value === mood);
+  if (!opt || opt.prompts.length === 0) return '';
+  return opt.prompts[Math.floor(Math.random() * opt.prompts.length)];
 }
 
 const fetcher = async (url: string) => {
@@ -37,6 +123,7 @@ const DEFAULT_VALUES: CreateEntryInput = {
   content: '',
   tagIds: [],
   isPublic: true,
+  mood: 'neutral',
 };
 
 export function EntryForm({
@@ -66,6 +153,7 @@ export function EntryForm({
           content: initialData.content,
           tagIds: initialData.tagIds,
           isPublic: initialData.isPublic,
+          mood: initialData.mood ?? 'neutral',
         }
       : DEFAULT_VALUES,
   });
@@ -73,9 +161,44 @@ export function EntryForm({
   const content = watch('content');
   const tagIds = watch('tagIds');
   const isPublic = watch('isPublic');
+  const mood = watch('mood');
 
-  const [expanded, setExpanded] = useState(!compact);
-  const showOptions = expanded || (content?.length ?? 0) > 0;
+  // compact モード 2 段階:
+  //   'mood'   : 絵文字 5 つのみ (初期)
+  //   'expand' : textarea + タグ + 公開トグル (絵文字クリックで直接展開)
+  type CompactStep = 'mood' | 'expand';
+  const [step, setStep] = useState<CompactStep>(
+    !compact || mode === 'edit' ? 'expand' : 'mood',
+  );
+
+  // SSR/CSR で別の文字列が出ると hydration mismatch になるため、
+  // 初期値は固定文字列で SSR とクライアント最初のレンダーを揃え、
+  // マウント後にクライアントだけランダムに置き換える。
+  const [prompt, setPrompt] = useState<string>('調子はどうですか?');
+  useEffect(() => {
+    setPrompt(pickRandomMoodPrompt());
+  }, []);
+
+  // 絵文字選択時に、その mood 専用のランダムプロンプトを textarea placeholder に設定
+  const [moodPlaceholder, setMoodPlaceholder] = useState<string>('');
+
+  const handleMoodPick = (m: MoodLevel) => {
+    setValue('mood', m, { shouldValidate: true });
+    setMoodPlaceholder(pickPromptFor(m));
+    setStep('expand');
+  };
+
+  const handleResetMood = () => {
+    setStep('mood');
+    setValue('mood', 'neutral');
+    setMoodPlaceholder('');
+  };
+
+  const resetForm = () => {
+    reset(DEFAULT_VALUES);
+    setStep('mood');
+    setPrompt(pickRandomMoodPrompt());
+  };
 
   const onSubmit = async (data: CreateEntryInput) => {
     try {
@@ -101,11 +224,17 @@ export function EntryForm({
         return;
       }
 
+      const { entry } = (await res.json().catch(() => ({}))) as {
+        entry?: JournalEntry;
+      };
+      const selectedTags = (tagsData?.tags ?? [])
+        .filter((t) => data.tagIds.includes(t.id))
+        .map((t) => ({ id: t.id, name: t.name, category: t.category }));
+
       if (compact) {
-        reset(DEFAULT_VALUES);
-        setExpanded(false);
+        resetForm();
       }
-      onSuccess();
+      await onSuccess(entry ? { entry, tags: selectedTags } : undefined);
     } catch {
       setError('root', { message: 'ネットワークエラーが発生しました' });
     }
@@ -115,63 +244,160 @@ export function EntryForm({
     return <ErrorMessage message="タグの取得に失敗しました" />;
   }
 
+  const showFullForm = !compact || step === 'expand';
+
+  const moodButtonClass = (value: MoodLevel) =>
+    [
+      'flex h-10 w-10 items-center justify-center rounded-full text-2xl transition-all',
+      mood === value && step !== 'mood'
+        ? 'bg-blue-100 ring-2 ring-blue-500 scale-110'
+        : 'hover:bg-gray-100 hover:scale-110',
+    ].join(' ');
+
+  const selectedMoodOption = useMemo(
+    () => MOOD_OPTIONS.find((o) => o.value === mood),
+    [mood],
+  );
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
       className={
         compact
-          ? 'rounded-vn border border-vn-border bg-white p-4'
+          ? 'rounded-vn border border-vn-border bg-gray-50 p-4'
           : 'space-y-4'
       }
       data-testid="entry-form"
       data-compact={compact ? 'true' : 'false'}
     >
-      {/* 本文 */}
-      <div>
-        {!compact && (
+      {/* ムード選択ステップ (compact のみ、edit では非表示) */}
+      {compact && step === 'mood' && (
+        <div className="mb-3">
+          <p
+            className="mb-2 text-sm font-medium text-gray-700"
+            data-testid="entry-form-prompt"
+          >
+            {prompt}
+          </p>
+          <div
+            role="group"
+            aria-label="ムード選択"
+            className="flex items-center gap-2"
+          >
+            {MOOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleMoodPick(opt.value)}
+                className={moodButtonClass(opt.value)}
+                aria-label={opt.label}
+                data-testid={`entry-form-mood-${opt.value}`}
+              >
+                <span aria-hidden>{opt.emoji}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* compact expand: 絵文字 + 横並び textarea + 右上に選び直しボタン */}
+      {compact && step === 'expand' && selectedMoodOption && (
+        <div className="mb-2">
+          <div
+            className="flex items-start gap-2"
+            data-testid="entry-form-mood-label"
+          >
+            <span
+              className="pt-1 text-lg"
+              aria-label={selectedMoodOption.label}
+            >
+              {selectedMoodOption.emoji}
+            </span>
+            <textarea
+              id="entry-form-content"
+              rows={2}
+              maxLength={200}
+              placeholder={moodPlaceholder || selectedMoodOption.caption}
+              className="flex-1 resize-none rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200 focus:placeholder:text-transparent"
+              data-testid="entry-form-content-input"
+              {...register('content')}
+            />
+            <button
+              type="button"
+              onClick={handleResetMood}
+              className="flex shrink-0 items-center gap-1 self-start rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-800"
+              aria-label="ムードを選び直す"
+              data-testid="entry-form-mood-reset"
+            >
+              <span aria-hidden className="text-sm leading-none">⟲</span>
+              <span>別の気分にする</span>
+            </button>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span
+              className={errors.content ? 'text-red-600' : 'text-gray-400'}
+              data-testid="entry-form-content-error"
+            >
+              {errors.content?.message}
+            </span>
+            <span
+              className={
+                (content?.length ?? 0) > 200
+                  ? 'text-red-600'
+                  : 'text-gray-400'
+              }
+              data-testid="entry-form-content-counter"
+            >
+              {content?.length ?? 0} / 200
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 非 compact (edit モーダル等): 従来どおりラベル付き textarea */}
+      {!compact && showFullForm && (
+        <div>
           <label
             htmlFor="entry-form-content"
             className="mb-1 block text-sm font-medium text-gray-700"
           >
             記録内容
           </label>
-        )}
-        <textarea
-          id="entry-form-content"
-          rows={compact && !showOptions ? 2 : 4}
-          maxLength={200}
-          placeholder={compact ? 'いまの気持ちや出来事をメモ...' : undefined}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          data-testid="entry-form-content-input"
-          onFocus={() => compact && setExpanded(true)}
-          {...register('content')}
-        />
-        <div className="mt-1 flex items-center justify-between text-xs">
-          <span
-            className={
-              errors.content ? 'text-red-600' : 'text-gray-400'
-            }
-            data-testid="entry-form-content-error"
-          >
-            {errors.content?.message}
-          </span>
-          <span
-            className={
-              (content?.length ?? 0) > 200 ? 'text-red-600' : 'text-gray-400'
-            }
-            data-testid="entry-form-content-counter"
-          >
-            {content?.length ?? 0} / 200
-          </span>
+          <textarea
+            id="entry-form-content"
+            rows={4}
+            maxLength={200}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            data-testid="entry-form-content-input"
+            {...register('content')}
+          />
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span
+              className={errors.content ? 'text-red-600' : 'text-gray-400'}
+              data-testid="entry-form-content-error"
+            >
+              {errors.content?.message}
+            </span>
+            <span
+              className={
+                (content?.length ?? 0) > 200
+                  ? 'text-red-600'
+                  : 'text-gray-400'
+              }
+              data-testid="entry-form-content-counter"
+            >
+              {content?.length ?? 0} / 200
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {showOptions && (
+      {showFullForm && (
         <>
-          {/* タグ選択 */}
+          {/* タグ選択 (任意) */}
           <div className={compact ? 'mt-3' : ''}>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              タグ（任意・最大10件）
+              タグを選ぶ
             </label>
             {tagsData ? (
               <TagFilter
@@ -217,14 +443,14 @@ export function EntryForm({
                 />
               </span>
               <span className="text-sm text-gray-700">
-                タイムラインに共有する
+                職員室ボードにも公開
               </span>
             </label>
-            <p className="mt-1 ml-12 text-xs text-gray-400">
-              {isPublic
-                ? 'テナント内の全員に表示されます'
-                : '自分だけが見られる記録として保存されます'}
-            </p>
+            {!isPublic && (
+              <p className="mt-1 ml-12 text-xs text-gray-400">
+                自分だけが見られる記録として保存されます
+              </p>
+            )}
           </div>
         </>
       )}
@@ -237,25 +463,29 @@ export function EntryForm({
       )}
 
       {/* 送信・キャンセル */}
-      <div className={['flex justify-end gap-2', compact ? 'mt-3' : ''].join(' ')}>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onCancel}
-            data-testid="entry-form-cancel-button"
-          >
-            キャンセル
-          </Button>
-        )}
-        <Button
-          type="submit"
-          isLoading={isSubmitting}
-          data-testid="entry-form-submit-button"
+      {showFullForm && (
+        <div
+          className={['flex justify-end gap-2', compact ? 'mt-3' : ''].join(' ')}
         >
-          {mode === 'create' ? '投稿' : '保存'}
-        </Button>
-      </div>
+          {onCancel && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onCancel}
+              data-testid="entry-form-cancel-button"
+            >
+              キャンセル
+            </Button>
+          )}
+          <Button
+            type="submit"
+            isLoading={isSubmitting}
+            data-testid="entry-form-submit-button"
+          >
+            {mode === 'create' ? '投稿' : '保存'}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

@@ -93,7 +93,8 @@ describe('TimelineList', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/public/journal/entries?page=1&perPage=10'
+        '/api/public/journal/entries?page=1&perPage=10',
+        { cache: 'no-store' }
       );
     });
   });

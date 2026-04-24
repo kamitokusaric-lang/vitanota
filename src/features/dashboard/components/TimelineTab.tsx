@@ -3,15 +3,21 @@
 // - mode='personal':  自分の投稿のみ (MyJournalList)
 // - mode='staffroom': 全員の公開投稿 (TimelineList)
 // 両 mode とも最上部に常駐投稿欄、自分の投稿には kebab メニューを表示。
-import { useState } from 'react';
-import useSWR, { useSWRConfig } from 'swr';
+import { useRef, useState } from 'react';
+import useSWR from 'swr';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
 import { EntryForm } from '@/features/journal/components/EntryForm';
-import { MyJournalList } from '@/features/journal/components/MyJournalList';
-import { TimelineList } from '@/features/journal/components/TimelineList';
+import {
+  MyJournalList,
+  type MyJournalMutate,
+} from '@/features/journal/components/MyJournalList';
+import {
+  TimelineList,
+  type TimelineMutate,
+} from '@/features/journal/components/TimelineList';
 import type { EntryCardData } from '@/features/journal/components/EntryCard';
 import type { JournalEntry } from '@/db/schema';
 import type { VitanotaSession } from '@/shared/types/auth';
@@ -41,16 +47,20 @@ interface TimelineTabProps {
 export function TimelineTab({ session, mode }: TimelineTabProps) {
   const currentUserId = session.user.userId;
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
-  const { mutate } = useSWRConfig();
+
+  // 子コンポーネント (useSWRInfinite 保有) の mutate を ref で受け取る。
+  // global mutate の matcher 関数は SWR v2 で `$inf$` キーが skip されるため、
+  // Infinite キャッシュの再検証は子の mutate を直接呼ぶ必要がある。
+  const timelineMutateRef = useRef<TimelineMutate | null>(null);
+  const myJournalMutateRef = useRef<MyJournalMutate | null>(null);
 
   const refreshLists = async () => {
-    // useSWRInfinite はキーを `$inf$...` でラップするため includes で判定
-    await mutate(
-      (key) =>
-        typeof key === 'string' &&
-        (key.includes('/api/public/journal/entries') ||
-          key.includes('/api/private/journal/entries/mine')),
-    );
+    // 現在マウント中のリストだけ同期再検証 (非アクティブ側は unmount 中で ref が null)。
+    // 非アクティブ側は revalidateOnMount: true により remount 時に必ず再取得される。
+    await Promise.all([
+      timelineMutateRef.current?.(),
+      myJournalMutateRef.current?.(),
+    ]);
   };
 
   const handleCreateSuccess = async () => {
@@ -86,9 +96,14 @@ export function TimelineTab({ session, mode }: TimelineTabProps) {
           currentUserId={currentUserId}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          mutateRef={timelineMutateRef}
         />
       ) : (
-        <MyJournalList onEdit={handleEdit} onDelete={handleDelete} />
+        <MyJournalList
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          mutateRef={myJournalMutateRef}
+        />
       )}
 
       <Modal

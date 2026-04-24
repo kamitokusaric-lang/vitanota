@@ -1,6 +1,11 @@
 // US-T-014: 共有タイムライン表示
 // useSWRInfinite + IntersectionObserver で無限スクロール読み込み
-import { useEffect, useRef } from 'react';
+//
+// 投稿即時反映: useSWRConfig の global mutate は matcher 関数に `$inf$` キーを
+// 渡さない (SWR v2.4.1 internalMutate が $inf$/$sub$ を skip する) ため、
+// 親 (TimelineTab) から revalidate を走らせるには useSWRInfinite 由来の
+// mutate を親に渡す必要がある。mutateRef にセットして親がそれを呼ぶ。
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import useSWRInfinite from 'swr/infinite';
 import { EntryCard, type EntryCardData } from './EntryCard';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -18,11 +23,14 @@ const fetcher = async (url: string): Promise<TimelineResponse> => {
   return res.json();
 };
 
+export type TimelineMutate = () => Promise<unknown>;
+
 interface TimelineListProps {
   perPage?: number;
   currentUserId?: string;
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
+  mutateRef?: MutableRefObject<TimelineMutate | null>;
 }
 
 export function TimelineList({
@@ -30,16 +38,29 @@ export function TimelineList({
   currentUserId,
   onEdit,
   onDelete,
+  mutateRef,
 }: TimelineListProps) {
-  const { data, error, isLoading, isValidating, size, setSize } =
+  const { data, error, isLoading, isValidating, size, setSize, mutate } =
     useSWRInfinite<TimelineResponse>(
       (index, prev) => {
         if (prev && prev.entries.length < perPage) return null;
         return `/api/public/journal/entries?page=${index + 1}&perPage=${perPage}`;
       },
       fetcher,
-      { revalidateFirstPage: false, revalidateOnFocus: true }
+      {
+        revalidateFirstPage: false,
+        revalidateOnFocus: true,
+        revalidateOnMount: true,
+      }
     );
+
+  useEffect(() => {
+    if (!mutateRef) return;
+    mutateRef.current = () => mutate();
+    return () => {
+      mutateRef.current = null;
+    };
+  }, [mutate, mutateRef]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const entries = data?.flatMap((p) => p.entries) ?? [];

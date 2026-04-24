@@ -1,6 +1,10 @@
 // マイ記録一覧（自分の公開・非公開エントリ両方）
 // useSWRInfinite + IntersectionObserver で無限スクロール読み込み
-import { useEffect, useRef } from 'react';
+//
+// 投稿即時反映: 親 (TimelineTab) から revalidate を走らせるため、
+// useSWRInfinite 由来の mutate を mutateRef で親に expose する
+// (詳細は TimelineList.tsx の冒頭コメント参照)
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import useSWRInfinite from 'swr/infinite';
 import { EntryCard, type EntryCardData } from './EntryCard';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -18,26 +22,38 @@ const fetcher = async (url: string): Promise<MyJournalResponse> => {
   return res.json();
 };
 
+export type MyJournalMutate = () => Promise<unknown>;
+
 interface MyJournalListProps {
   perPage?: number;
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
+  mutateRef?: MutableRefObject<MyJournalMutate | null>;
 }
 
 export function MyJournalList({
   perPage = 50,
   onEdit,
   onDelete,
+  mutateRef,
 }: MyJournalListProps) {
-  const { data, error, isLoading, isValidating, size, setSize } =
+  const { data, error, isLoading, isValidating, size, setSize, mutate } =
     useSWRInfinite<MyJournalResponse>(
       (index, prev) => {
         if (prev && prev.entries.length < perPage) return null;
         return `/api/private/journal/entries/mine?page=${index + 1}&perPage=${perPage}`;
       },
       fetcher,
-      { revalidateFirstPage: false }
+      { revalidateFirstPage: false, revalidateOnMount: true }
     );
+
+  useEffect(() => {
+    if (!mutateRef) return;
+    mutateRef.current = () => mutate();
+    return () => {
+      mutateRef.current = null;
+    };
+  }, [mutate, mutateRef]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const entries = data?.flatMap((p) => p.entries) ?? [];

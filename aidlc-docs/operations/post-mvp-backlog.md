@@ -11,25 +11,7 @@
 
 ## 未解決バグ
 
-### 🔴 高: タイムライン投稿の即時反映が効かない
-- **発見日**: 2026-04-24 (本番で chimo が発見)
-- **症状**:
-  - 全員タブで投稿 → タイムラインに新規投稿が表示されない
-  - 1 回目の投稿のみ、自分タブに切り替えると表示される (初マウント時の fetch)
-  - 2 回目以降はどちらのタブにも表示されない
-  - 時間経過では反映されず、リロードが必要
-- **根本原因 (推定)**: 特定できていない
-- **試した対策 (いずれも効果なし)**:
-  1. `/api/public/journal/entries` の Cache-Control を `public, s-maxage=30` → `private, no-store` に変更 (CloudFront キャッシュ無効化の試み)
-  2. SWR fetcher に `{ cache: 'no-store' }` オプション追加 (ブラウザ HTTP キャッシュ bypass の試み)
-  3. 楽観的更新 (mutate の updater で SWR cache に直接 insert + `revalidate: true` で背景同期) — 実装したが挙動変わらず
-- **現状**: 2026-04-24 の revert 3 件 (6ce37a8 / 54640df / 723b8fa) で元の `public, s-maxage=30` + `refreshLists` (再 fetch) 方式に戻した
-- **次のアプローチ候補**:
-  - (a) デバッグログを仕込んで `mutate` の matcher に渡される SWR Infinite の cache key 実態を確定する。key の形式が想定と違う場合、堅牢な matcher に書き直す
-  - (b) `useSWRInfinite` の `mutate` を TimelineList 側 hook 経由で直接取得し、子→親に expose する設計に切り替える (親からの global mutate に頼らない)
-  - (c) POST レスポンスをローカル React state で merge し SWR とは別経路で画面更新する (SWR の複雑性を避ける)
-- **原則 (memory 記録済)**: 即時反映系は CloudFront リフレッシュに頼らず、楽観的更新でキャッシュ層を bypass する設計が基本。ただし今回はその楽観的更新自体も効かなかったため、SWR (特に useSWRInfinite) の内部挙動まで踏み込んだ調査が必要
-- **優先度根拠**: MVP β 運用 (2026-04-26) の第一印象を決める機能。リロードで回避可能だが、教員が「投稿した感」を得られないと times の利用動機が落ちる。ローンチ直後〜初週で解消したい
+(現在なし)
 
 ---
 

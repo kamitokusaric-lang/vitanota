@@ -6,6 +6,7 @@ import {
   varchar,
   text,
   timestamp,
+  date,
   integer,
   boolean,
   primaryKey,
@@ -19,6 +20,15 @@ import { sql, eq } from 'drizzle-orm';
 // ── enums ────────────────────────────────────────────────────
 // tagTypeEnum ('emotion' | 'context') は 0016 で廃止。tags は emotion 専用に整理された。
 export const emotionCategoryEnum = pgEnum('emotion_category', ['positive', 'negative', 'neutral']);
+
+// 投稿ムード (絵文字ベース、必須)
+export const moodLevelEnum = pgEnum('mood_level', [
+  'very_positive',
+  'positive',
+  'neutral',
+  'negative',
+  'very_negative',
+]);
 
 // Unit-05: タスク管理
 export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'done']);
@@ -195,6 +205,8 @@ export const journalEntries = pgTable(
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     content: text('content').notNull(),
     isPublic: boolean('is_public').notNull().default(true),
+    // 新規投稿では必須 (API 側で要求)、既存データは NULL のまま (migration 0021)
+    mood: moodLevelEnum('mood'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -338,7 +350,7 @@ export const tasks = pgTable(
       .references(() => users.id),
     title: varchar('title', { length: 200 }).notNull(),
     description: text('description'),
-    dueDate: timestamp('due_date', { mode: 'date' }), // DATE 型
+    dueDate: date('due_date', { mode: 'date' }), // PostgreSQL DATE 型
     status: taskStatusEnum('status').notNull().default('todo'),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -13,8 +13,7 @@ interface TimelineResponse {
 }
 
 const fetcher = async (url: string): Promise<TimelineResponse> => {
-  // ブラウザ HTTP キャッシュを bypass して新規投稿を即時反映させる
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };

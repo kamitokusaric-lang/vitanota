@@ -35,11 +35,12 @@ export function TimelineTab() {
   const { mutate } = useSWRConfig();
 
   const refreshLists = async () => {
+    // useSWRInfinite はキーを `$inf$...` でラップするため includes で判定
     await mutate(
       (key) =>
         typeof key === 'string' &&
-        (key.startsWith('/api/public/journal/entries') ||
-          key.startsWith('/api/private/journal/entries/mine')),
+        (key.includes('/api/public/journal/entries') ||
+          key.includes('/api/private/journal/entries/mine')),
     );
   };
 

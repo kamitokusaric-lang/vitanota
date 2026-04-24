@@ -167,7 +167,7 @@ describe('timelineQuerySchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.page).toBe(1);
-      expect(result.data.perPage).toBe(20);
+      expect(result.data.perPage).toBe(50);
     }
   });
 

@@ -80,20 +80,20 @@ describe('TimelineList', () => {
     });
   });
 
-  it('正しいページネーション URL を叩く', async () => {
+  it('1 ページ目を perPage パラメータ付きで取得する', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
-        JSON.stringify({ entries: [], page: 2, perPage: 10 }),
+        JSON.stringify({ entries: [], page: 1, perPage: 10 }),
         { status: 200 }
       )
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    renderWithSWR(<TimelineList page={2} perPage={10} />);
+    renderWithSWR(<TimelineList perPage={10} />);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/public/journal/entries?page=2&perPage=10'
+        '/api/public/journal/entries?page=1&perPage=10'
       );
     });
   });

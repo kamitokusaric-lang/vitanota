@@ -9,6 +9,7 @@ import {
   type CreateEntryParams,
   type UpdateEntryParams,
   type Context,
+  type EntryWithTags,
 } from './privateJournalRepository';
 import { tagRepo } from './tagRepository';
 import {
@@ -131,12 +132,12 @@ export class JournalEntryService {
   }
 
   /**
-   * 自分のエントリ1件取得
+   * 自分のエントリ1件取得 (tags 付き)
    */
   async getEntryById(
     id: string,
     ctx: ServiceContext
-  ): Promise<JournalEntry> {
+  ): Promise<EntryWithTags> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const entry = await privateJournalRepo.findById(tx, id, ctx);
       if (!entry) {

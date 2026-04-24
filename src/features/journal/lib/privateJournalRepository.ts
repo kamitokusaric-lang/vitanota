@@ -172,14 +172,14 @@ export class PrivateJournalRepository {
   }
 
   /**
-   * エントリ1件取得（所有者のみ・非公開含む）
+   * エントリ1件取得（所有者のみ・非公開含む、tags 付き）
    * 共有タイムライン経由の読み取りは PublicTimelineRepository を使うこと。
    */
   async findById(
     tx: DrizzleDb,
     id: string,
     ctx: Context
-  ): Promise<JournalEntry | null> {
+  ): Promise<EntryWithTags | null> {
     const [entry] = await tx
       .select()
       .from(journalEntries)
@@ -192,7 +192,9 @@ export class PrivateJournalRepository {
       )
       .limit(1);
 
-    return entry ?? null;
+    if (!entry) return null;
+    const [withTags] = await attachTags(tx, [entry]);
+    return withTags;
   }
 
   /**

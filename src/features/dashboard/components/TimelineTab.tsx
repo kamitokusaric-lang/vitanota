@@ -69,11 +69,14 @@ export function TimelineTab({ session }: TimelineTabProps) {
 
   return (
     <div className="space-y-4" data-testid="timeline-tab">
-      <EntryForm
-        mode="create"
-        compact
-        onSuccess={handleCreateSuccess}
-      />
+      {/* 投稿欄は nav (h-16 = 64px) の真下に sticky */}
+      <div className="sticky top-16 z-[5] -mx-6 bg-vn-bg px-6 pb-3 pt-3 lg:-mx-10 lg:px-10">
+        <EntryForm
+          mode="create"
+          compact
+          onSuccess={handleCreateSuccess}
+        />
+      </div>
 
       <FilterToggle value={filter} onChange={setFilter} />
 

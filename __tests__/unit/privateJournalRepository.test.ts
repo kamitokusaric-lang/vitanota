@@ -208,14 +208,33 @@ describe('PrivateJournalRepository.delete', () => {
 });
 
 describe('PrivateJournalRepository.findById', () => {
-  it('見つかった場合はエントリを返す', async () => {
+  it('見つかった場合はタグ付きエントリを返す', async () => {
     const row = { id: 'entry-1', userId: 'user-1', tenantId: 'tenant-1', content: 'x', isPublic: false, createdAt: new Date(), updatedAt: new Date() };
-    const mockTx = { select: vi.fn().mockReturnValue(makeSelectByIdChain([row])) };
+    let callCount = 0;
+    const mockTx = {
+      select: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return makeSelectByIdChain([row]);
+        // attachTags: タグ JOIN クエリ
+        return {
+          from: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockResolvedValue([
+                { entryId: 'entry-1', tagId: 't1', tagName: 'うれしい', tagCategory: 'positive' },
+              ]),
+            }),
+          }),
+        };
+      }),
+    };
 
     const repo = new PrivateJournalRepository();
     const result = await repo.findById(mockTx as never, 'entry-1', ctx);
 
     expect(result).toMatchObject({ id: 'entry-1' });
+    expect(result?.tags).toEqual([
+      { id: 't1', name: 'うれしい', category: 'positive' },
+    ]);
   });
 
   it('見つからない場合は null を返す', async () => {

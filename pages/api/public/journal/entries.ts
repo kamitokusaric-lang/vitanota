@@ -37,12 +37,10 @@ export default async function handler(
       return publicTimelineRepo.findTimeline(tx, { limit: perPage, offset });
     });
 
-    // PP-U02-02: エッジキャッシュ対象（CloudFront ホワイトリスト方式）
-    // テナント内の教員全員で共有可能なキャッシュ
-    res.setHeader(
-      'Cache-Control',
-      'public, s-maxage=30, stale-while-revalidate=60'
-    );
+    // MVP 期間は投稿の即時反映を優先して CloudFront キャッシュを無効化。
+    // 教員数が少ないうち (~数十人/テナント) はキャッシュ効果が限定的で、
+    // 投稿→タイムライン更新の体感ラグの方が UX を損ねるため。
+    res.setHeader('Cache-Control', 'private, no-store');
 
     logEvent(LogEvents.JournalEntryListRead, {
       userId: ctx.userId,

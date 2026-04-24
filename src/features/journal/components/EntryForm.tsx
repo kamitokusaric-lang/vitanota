@@ -240,6 +240,11 @@ export function EntryForm({
     }
   };
 
+  const selectedMoodOption = useMemo(
+    () => MOOD_OPTIONS.find((o) => o.value === mood),
+    [mood],
+  );
+
   if (tagsError) {
     return <ErrorMessage message="タグの取得に失敗しました" />;
   }
@@ -253,11 +258,6 @@ export function EntryForm({
         ? 'bg-blue-100 ring-2 ring-blue-500 scale-110'
         : 'hover:bg-gray-100 hover:scale-110',
     ].join(' ');
-
-  const selectedMoodOption = useMemo(
-    () => MOOD_OPTIONS.find((o) => o.value === mood),
-    [mood],
-  );
 
   return (
     <form

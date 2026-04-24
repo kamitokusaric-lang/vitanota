@@ -21,11 +21,13 @@ const fetcher = async (url: string): Promise<MyJournalResponse> => {
 interface MyJournalListProps {
   perPage?: number;
   onEdit?: (entry: EntryCardData) => void;
+  onDelete?: (entry: EntryCardData) => void;
 }
 
 export function MyJournalList({
   perPage = 50,
   onEdit,
+  onDelete,
 }: MyJournalListProps) {
   const { data, error, isLoading, isValidating, size, setSize } =
     useSWRInfinite<MyJournalResponse>(
@@ -92,6 +94,7 @@ export function MyJournalList({
           entry={entry}
           showPrivacyBadge
           onEdit={onEdit}
+          onDelete={onDelete}
         />
       ))}
 

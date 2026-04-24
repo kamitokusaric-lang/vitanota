@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { EntryCard, type EntryCardData } from '@/features/journal/components/EntryCard';
 
 function makeEntry(overrides: Partial<EntryCardData> = {}): EntryCardData {
@@ -68,18 +68,33 @@ describe('EntryCard', () => {
     expect(screen.queryByTestId('entry-card-private-e1')).toBeNull();
   });
 
-  it('onEdit を渡すと編集ボタンを表示し、クリックで callback が呼ばれる', () => {
+  it('onEdit/onDelete なしのとき kebab メニューは表示しない', () => {
+    render(<EntryCard entry={makeEntry()} />);
+    expect(screen.queryByTestId('entry-card-menu-button-e1')).toBeNull();
+  });
+
+  it('onEdit 指定時は kebab → 編集メニューでコールバック', () => {
     const onEdit = vi.fn();
     const entry = makeEntry();
     render(<EntryCard entry={entry} onEdit={onEdit} />);
-    const button = screen.getByTestId('entry-card-edit-button-e1');
-    button.click();
+    fireEvent.click(screen.getByTestId('entry-card-menu-button-e1'));
+    fireEvent.click(screen.getByTestId('entry-card-menu-edit-e1'));
     expect(onEdit).toHaveBeenCalledWith(entry);
   });
 
-  it('onEdit なしのとき (デフォルト) で編集ボタンを表示しない', () => {
-    render(<EntryCard entry={makeEntry()} />);
-    expect(screen.queryByTestId('entry-card-edit-button-e1')).toBeNull();
+  it('onDelete 指定時は kebab → 削除メニューでコールバック', () => {
+    const onDelete = vi.fn();
+    const entry = makeEntry();
+    render(<EntryCard entry={entry} onDelete={onDelete} />);
+    fireEvent.click(screen.getByTestId('entry-card-menu-button-e1'));
+    fireEvent.click(screen.getByTestId('entry-card-menu-delete-e1'));
+    expect(onDelete).toHaveBeenCalledWith(entry);
+  });
+
+  it('onEdit のみの場合、削除メニュー項目は表示しない', () => {
+    render(<EntryCard entry={makeEntry()} onEdit={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('entry-card-menu-button-e1'));
+    expect(screen.queryByTestId('entry-card-menu-delete-e1')).toBeNull();
   });
 
   it('タグを表示する', () => {

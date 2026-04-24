@@ -17,7 +17,8 @@ type Filter = 'all' | 'mine';
 type ModalState =
   | { kind: 'closed' }
   | { kind: 'create' }
-  | { kind: 'edit'; entryId: string };
+  | { kind: 'edit'; entryId: string }
+  | { kind: 'confirm-delete'; entryId: string };
 
 interface EntryDetailResponse {
   entry: JournalEntry & { tags?: Array<{ id: string }> };
@@ -53,6 +54,10 @@ export function TimelineTab() {
     setModal({ kind: 'edit', entryId: entry.id });
   };
 
+  const handleDelete = (entry: EntryCardData) => {
+    setModal({ kind: 'confirm-delete', entryId: entry.id });
+  };
+
   return (
     <div data-testid="timeline-tab">
       <div className="mb-4 flex items-center justify-between">
@@ -69,7 +74,7 @@ export function TimelineTab() {
       {filter === 'all' ? (
         <TimelineList />
       ) : (
-        <MyJournalList onEdit={handleEdit} />
+        <MyJournalList onEdit={handleEdit} onDelete={handleDelete} />
       )}
 
       <Modal
@@ -93,6 +98,20 @@ export function TimelineTab() {
       >
         {modal.kind === 'edit' && (
           <EditEntryModalBody
+            entryId={modal.entryId}
+            onSuccess={handleSuccess}
+            onCancel={() => setModal({ kind: 'closed' })}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={modal.kind === 'confirm-delete'}
+        onClose={() => setModal({ kind: 'closed' })}
+        title="記録を削除しますか?"
+      >
+        {modal.kind === 'confirm-delete' && (
+          <ConfirmDeleteModalBody
             entryId={modal.entryId}
             onSuccess={handleSuccess}
             onCancel={() => setModal({ kind: 'closed' })}
@@ -148,20 +167,6 @@ function EditEntryModalBody({
     detailFetcher,
   );
 
-  const handleDelete = async () => {
-    if (!confirm('このエントリを削除しますか? この操作は取り消せません。')) {
-      return;
-    }
-    const res = await fetch(`/api/private/journal/entries/${entryId}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) {
-      alert('削除に失敗しました');
-      return;
-    }
-    await onSuccess();
-  };
-
   if (isLoading) {
     return (
       <div className="py-6 text-center">
@@ -174,28 +179,78 @@ function EditEntryModalBody({
   }
 
   return (
-    <>
-      <EntryForm
-        mode="edit"
-        initialData={{
-          id: data.entry.id,
-          content: data.entry.content,
-          tagIds: data.entry.tags?.map((t) => t.id) ?? [],
-          isPublic: data.entry.isPublic,
-        }}
-        onSuccess={onSuccess}
-        onCancel={onCancel}
-      />
-      <div className="mt-4 flex justify-end">
+    <EntryForm
+      mode="edit"
+      initialData={{
+        id: data.entry.id,
+        content: data.entry.content,
+        tagIds: data.entry.tags?.map((t) => t.id) ?? [],
+        isPublic: data.entry.isPublic,
+      }}
+      onSuccess={onSuccess}
+      onCancel={onCancel}
+    />
+  );
+}
+
+interface ConfirmDeleteModalBodyProps {
+  entryId: string;
+  onSuccess: () => Promise<void>;
+  onCancel: () => void;
+}
+
+function ConfirmDeleteModalBody({
+  entryId,
+  onSuccess,
+  onCancel,
+}: ConfirmDeleteModalBodyProps) {
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setError(null);
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/private/journal/entries/${entryId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        setError('削除に失敗しました');
+        return;
+      }
+      await onSuccess();
+    } catch {
+      setError('ネットワークエラーが発生しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="confirm-delete-body">
+      <p className="text-sm text-gray-700">
+        この操作は取り消せません。削除するとタイムラインとマイ記録の両方から消えます。
+      </p>
+      {error && <ErrorMessage message={error} />}
+      <div className="flex justify-end gap-2">
         <Button
-          variant="danger"
-          onClick={handleDelete}
-          className="text-xs"
-          data-testid="edit-entry-delete-button"
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          data-testid="confirm-delete-cancel-button"
         >
-          削除
+          キャンセル
+        </Button>
+        <Button
+          type="button"
+          variant="danger"
+          onClick={handleConfirm}
+          isLoading={isDeleting}
+          data-testid="confirm-delete-confirm-button"
+        >
+          削除する
         </Button>
       </div>
-    </>
+    </div>
   );
 }

@@ -12,7 +12,12 @@ import {
 import { TagFilter } from './TagFilter';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
-import type { EmotionTag } from '@/db/schema';
+import type { EmotionTag, JournalEntry } from '@/db/schema';
+
+export interface EntrySaveResult {
+  entry: JournalEntry;
+  tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
+}
 
 interface EntryFormProps {
   mode: 'create' | 'edit';
@@ -22,7 +27,7 @@ interface EntryFormProps {
     tagIds: string[];
     isPublic: boolean;
   };
-  onSuccess: () => void;
+  onSuccess: (result?: EntrySaveResult) => void | Promise<void>;
   onCancel?: () => void;
   compact?: boolean;
 }
@@ -101,11 +106,18 @@ export function EntryForm({
         return;
       }
 
+      const { entry } = (await res.json().catch(() => ({}))) as {
+        entry?: JournalEntry;
+      };
+      const selectedTags = (tagsData?.tags ?? [])
+        .filter((t) => data.tagIds.includes(t.id))
+        .map((t) => ({ id: t.id, name: t.name, category: t.category }));
+
       if (compact) {
         reset(DEFAULT_VALUES);
         setExpanded(false);
       }
-      onSuccess();
+      await onSuccess(entry ? { entry, tags: selectedTags } : undefined);
     } catch {
       setError('root', { message: 'ネットワークエラーが発生しました' });
     }

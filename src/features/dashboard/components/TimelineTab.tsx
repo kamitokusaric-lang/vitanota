@@ -6,7 +6,7 @@ import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
-import { EntryForm } from '@/features/journal/components/EntryForm';
+import { EntryForm, type EntrySaveResult } from '@/features/journal/components/EntryForm';
 import { MyJournalList } from '@/features/journal/components/MyJournalList';
 import { TimelineList } from '@/features/journal/components/TimelineList';
 import type { EntryCardData } from '@/features/journal/components/EntryCard';
@@ -40,18 +40,71 @@ export function TimelineTab({ session }: TimelineTabProps) {
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const { mutate } = useSWRConfig();
 
+  // SWR Infinite の cache key は string/array 両方の形で格納されうるため
+  // 堅牢に文字列化して含有判定する
+  const keyMatches = (key: unknown, needle: string): boolean => {
+    try {
+      const s = typeof key === 'string' ? key : JSON.stringify(key);
+      return s.includes(needle);
+    } catch {
+      return false;
+    }
+  };
+
   const refreshLists = async () => {
-    // useSWRInfinite はキーを `$inf$...` でラップするため includes で判定
     await mutate(
-      (key) =>
-        typeof key === 'string' &&
-        (key.includes('/api/public/journal/entries') ||
-          key.includes('/api/private/journal/entries/mine')),
+      (key: unknown) =>
+        keyMatches(key, '/api/public/journal/entries') ||
+        keyMatches(key, '/api/private/journal/entries/mine'),
+      undefined,
+      { revalidate: true },
     );
   };
 
-  const handleCreateSuccess = async () => {
-    await refreshLists();
+  // SWR Infinite の data は Page[] (ページ配列)
+  type InfinitePages = Array<{
+    entries: EntryCardData[];
+    page: number;
+    perPage: number;
+  }>;
+
+  const handleCreateSuccess = async (result?: EntrySaveResult) => {
+    if (!result) {
+      await refreshLists();
+      return;
+    }
+    const { entry, tags } = result;
+    const optimistic: EntryCardData = {
+      id: entry.id,
+      userId: entry.userId ?? session.user.userId,
+      content: entry.content,
+      createdAt: entry.createdAt,
+      isPublic: entry.isPublic,
+      authorName: session.user.name,
+      authorNickname: null,
+      tags,
+    };
+
+    const prependToFirstPage = (pages: InfinitePages | undefined) => {
+      if (!pages || !Array.isArray(pages) || pages.length === 0) return pages;
+      const [first, ...rest] = pages;
+      return [{ ...first, entries: [optimistic, ...first.entries] }, ...rest];
+    };
+
+    // マイ記録は isPublic 問わず常に insert
+    await mutate(
+      (key: unknown) => keyMatches(key, '/api/private/journal/entries/mine'),
+      prependToFirstPage,
+      { revalidate: true },
+    );
+    // 共有タイムラインは public のときだけ insert
+    if (entry.isPublic) {
+      await mutate(
+        (key: unknown) => keyMatches(key, '/api/public/journal/entries'),
+        prependToFirstPage,
+        { revalidate: true },
+      );
+    }
   };
 
   const handleModalSuccess = async () => {

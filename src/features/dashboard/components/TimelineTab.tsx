@@ -11,6 +11,7 @@ import { MyJournalList } from '@/features/journal/components/MyJournalList';
 import { TimelineList } from '@/features/journal/components/TimelineList';
 import type { EntryCardData } from '@/features/journal/components/EntryCard';
 import type { JournalEntry } from '@/db/schema';
+import type { VitanotaSession } from '@/shared/types/auth';
 
 type Filter = 'all' | 'mine';
 
@@ -30,7 +31,12 @@ const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
   return res.json();
 };
 
-export function TimelineTab() {
+interface TimelineTabProps {
+  session: VitanotaSession;
+}
+
+export function TimelineTab({ session }: TimelineTabProps) {
+  const currentUserId = session.user.userId;
   const [filter, setFilter] = useState<Filter>('all');
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const { mutate } = useSWRConfig();
@@ -72,7 +78,11 @@ export function TimelineTab() {
       </div>
 
       {filter === 'all' ? (
-        <TimelineList />
+        <TimelineList
+          currentUserId={currentUserId}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       ) : (
         <MyJournalList onEdit={handleEdit} onDelete={handleDelete} />
       )}

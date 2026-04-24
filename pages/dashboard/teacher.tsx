@@ -18,7 +18,7 @@ export default function TeacherDashboardPage({
   session,
 }: TeacherDashboardPageProps) {
   const tabs: TabDef[] = [
-    { id: 'timeline', label: 'タイムライン', content: <TimelineTab /> },
+    { id: 'timeline', label: 'タイムライン', content: <TimelineTab session={session} /> },
     { id: 'tasks', label: 'タスク', content: <TasksTab session={session} /> },
     {
       id: 'schedule',

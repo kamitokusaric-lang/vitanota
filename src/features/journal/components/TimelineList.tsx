@@ -20,9 +20,17 @@ const fetcher = async (url: string): Promise<TimelineResponse> => {
 
 interface TimelineListProps {
   perPage?: number;
+  currentUserId?: string;
+  onEdit?: (entry: EntryCardData) => void;
+  onDelete?: (entry: EntryCardData) => void;
 }
 
-export function TimelineList({ perPage = 50 }: TimelineListProps) {
+export function TimelineList({
+  perPage = 50,
+  currentUserId,
+  onEdit,
+  onDelete,
+}: TimelineListProps) {
   const { data, error, isLoading, isValidating, size, setSize } =
     useSWRInfinite<TimelineResponse>(
       (index, prev) => {
@@ -82,9 +90,17 @@ export function TimelineList({ perPage = 50 }: TimelineListProps) {
 
   return (
     <div className="space-y-3" data-testid="timeline-list">
-      {entries.map((entry) => (
-        <EntryCard key={entry.id} entry={entry} />
-      ))}
+      {entries.map((entry) => {
+        const isMine = currentUserId !== undefined && entry.userId === currentUserId;
+        return (
+          <EntryCard
+            key={entry.id}
+            entry={entry}
+            onEdit={isMine ? onEdit : undefined}
+            onDelete={isMine ? onDelete : undefined}
+          />
+        );
+      })}
 
       {!reachedEnd && (
         <div

@@ -163,16 +163,42 @@ export function EntryForm({
 
       {/* 公開設定 */}
       <div>
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            data-testid="entry-form-private-checkbox"
-            checked={!watch('isPublic')}
-            onChange={(e) => setValue('isPublic', !e.target.checked)}
-          />
-          自分だけに保存（タイムラインに表示しない）
+        <label
+          className="inline-flex cursor-pointer items-center gap-3"
+          htmlFor="entry-form-is-public-toggle"
+        >
+          <span className="relative inline-block h-5 w-9 flex-shrink-0">
+            <input
+              id="entry-form-is-public-toggle"
+              type="checkbox"
+              role="switch"
+              className="peer sr-only"
+              data-testid="entry-form-is-public-toggle"
+              checked={watch('isPublic')}
+              onChange={(e) => setValue('isPublic', e.target.checked)}
+            />
+            <span
+              className={[
+                'absolute inset-0 rounded-full transition-colors',
+                watch('isPublic') ? 'bg-blue-600' : 'bg-gray-300',
+              ].join(' ')}
+            />
+            <span
+              className={[
+                'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]',
+                watch('isPublic') ? 'left-[18px]' : 'left-0.5',
+              ].join(' ')}
+            />
+          </span>
+          <span className="text-sm text-gray-700">
+            タイムラインに共有する
+          </span>
         </label>
+        <p className="mt-1 ml-12 text-xs text-gray-400">
+          {watch('isPublic')
+            ? 'テナント内の全員に表示されます'
+            : '自分だけが見られる記録として保存されます'}
+        </p>
       </div>
 
       {/* ルートエラー */}

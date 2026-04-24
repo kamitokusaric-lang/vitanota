@@ -37,10 +37,11 @@ test.describe('日誌エントリ CRUD', () => {
     await expect(page.getByTestId('entry-form-content-error')).not.toBeEmpty();
   });
 
-  test('US-T-010: 「自分だけに保存」チェックで非公開エントリ作成', async ({ page }) => {
+  test('US-T-010: 共有トグル OFF で非公開エントリ作成', async ({ page }) => {
     await page.goto('/journal/new');
     await page.getByTestId('entry-form-content-input').fill('非公開の日記');
-    await page.getByTestId('entry-form-private-checkbox').check();
+    // 共有トグルは role="switch", 初期 ON → クリックで OFF (= 非公開)
+    await page.getByTestId('entry-form-is-public-toggle').click();
     await page.getByTestId('entry-form-submit-button').click();
 
     await expect(page).toHaveURL(/\/journal\/mine/);

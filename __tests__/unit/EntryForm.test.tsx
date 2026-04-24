@@ -133,15 +133,15 @@ describe('EntryForm - create mode', () => {
     expect(onSuccess).not.toHaveBeenCalled();
   });
 
-  it('公開設定チェックボックスで isPublic を切替', async () => {
+  it('公開トグルで isPublic を切替', async () => {
     renderWithSWR(<EntryForm mode="create" onSuccess={vi.fn()} />);
-    const checkbox = screen.getByTestId(
-      'entry-form-private-checkbox'
+    const toggle = screen.getByTestId(
+      'entry-form-is-public-toggle'
     ) as HTMLInputElement;
-    // 初期は isPublic=true なので checkbox（= 非公開）は false
-    expect(checkbox.checked).toBe(false);
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
+    // 初期は isPublic=true (トグル ON)
+    expect(toggle.checked).toBe(true);
+    fireEvent.click(toggle);
+    expect(toggle.checked).toBe(false);
   });
 });
 
@@ -163,11 +163,11 @@ describe('EntryForm - edit mode', () => {
       'entry-form-content-input'
     ) as HTMLTextAreaElement;
     expect(textarea.value).toBe('既存の本文');
-    const checkbox = screen.getByTestId(
-      'entry-form-private-checkbox'
+    const toggle = screen.getByTestId(
+      'entry-form-is-public-toggle'
     ) as HTMLInputElement;
-    // isPublic=false なので checkbox は true（非公開チェック）
-    expect(checkbox.checked).toBe(true);
+    // isPublic=false なのでトグルは OFF
+    expect(toggle.checked).toBe(false);
   });
 
   it('edit mode では PUT リクエストが送信される', async () => {

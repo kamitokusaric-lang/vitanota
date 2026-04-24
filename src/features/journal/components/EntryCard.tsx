@@ -34,11 +34,6 @@ export function EntryCard({
   showPrivacyBadge = false,
   onEdit,
 }: EntryCardProps) {
-  const contentPreview =
-    entry.content.length > 50
-      ? `${entry.content.slice(0, 50)}…`
-      : entry.content;
-
   return (
     <article
       className="rounded-vn border border-vn-border bg-white p-4"
@@ -69,7 +64,7 @@ export function EntryCard({
         className="mb-3 whitespace-pre-wrap text-sm text-gray-900"
         data-testid={`entry-card-content-${entry.id}`}
       >
-        {contentPreview}
+        {entry.content}
       </p>
 
       {entry.tags && entry.tags.length > 0 && (

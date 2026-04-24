@@ -21,16 +21,16 @@ describe('EntryCard', () => {
     );
   });
 
-  it('50文字超の content は省略表示される', () => {
-    const longContent = 'あ'.repeat(60);
+  it('content は省略せず全文表示される (200 文字まで)', () => {
+    const longContent = 'あ'.repeat(200);
     render(<EntryCard entry={makeEntry({ content: longContent })} />);
     const text = screen.getByTestId('entry-card-content-e1').textContent ?? '';
-    expect(text).toHaveLength(51); // 50 + "…"
-    expect(text.endsWith('…')).toBe(true);
+    expect(text).toBe(longContent);
+    expect(text.endsWith('…')).toBe(false);
   });
 
-  it('50文字以下の content はそのまま表示される', () => {
-    const content = 'あ'.repeat(50);
+  it('改行を含む content は whitespace-pre-wrap で保持される', () => {
+    const content = '1 行目\n2 行目\n3 行目';
     render(<EntryCard entry={makeEntry({ content })} />);
     const text = screen.getByTestId('entry-card-content-e1').textContent ?? '';
     expect(text).toBe(content);

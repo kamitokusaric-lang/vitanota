@@ -1,5 +1,5 @@
-// ダッシュボード「タイムライン」タブ: 共有タイムライン + マイ記録切替 + 投稿モーダル
-// 既存 /journal/index + /journal/mine + /journal/new + /journal/[id]/edit をタブ内に統合
+// ダッシュボード「タイムライン」タブ: 常駐投稿欄 + 共有/自分切替 + 編集/削除モーダル
+// 投稿は X ライクに最上部常駐 (compact)、編集はモーダル (compact ではない)
 import { useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { Button } from '@/shared/components/Button';
@@ -17,7 +17,6 @@ type Filter = 'all' | 'mine';
 
 type ModalState =
   | { kind: 'closed' }
-  | { kind: 'create' }
   | { kind: 'edit'; entryId: string }
   | { kind: 'confirm-delete'; entryId: string };
 
@@ -51,7 +50,11 @@ export function TimelineTab({ session }: TimelineTabProps) {
     );
   };
 
-  const handleSuccess = async () => {
+  const handleCreateSuccess = async () => {
+    await refreshLists();
+  };
+
+  const handleModalSuccess = async () => {
     await refreshLists();
     setModal({ kind: 'closed' });
   };
@@ -65,17 +68,14 @@ export function TimelineTab({ session }: TimelineTabProps) {
   };
 
   return (
-    <div data-testid="timeline-tab">
-      <div className="mb-4 flex items-center justify-between">
-        <FilterToggle value={filter} onChange={setFilter} />
-        <Button
-          onClick={() => setModal({ kind: 'create' })}
-          className="text-xs"
-          data-testid="timeline-tab-new-button"
-        >
-          + 新規投稿
-        </Button>
-      </div>
+    <div className="space-y-4" data-testid="timeline-tab">
+      <EntryForm
+        mode="create"
+        compact
+        onSuccess={handleCreateSuccess}
+      />
+
+      <FilterToggle value={filter} onChange={setFilter} />
 
       {filter === 'all' ? (
         <TimelineList
@@ -88,20 +88,6 @@ export function TimelineTab({ session }: TimelineTabProps) {
       )}
 
       <Modal
-        open={modal.kind === 'create'}
-        onClose={() => setModal({ kind: 'closed' })}
-        title="新規投稿"
-      >
-        {modal.kind === 'create' && (
-          <EntryForm
-            mode="create"
-            onSuccess={handleSuccess}
-            onCancel={() => setModal({ kind: 'closed' })}
-          />
-        )}
-      </Modal>
-
-      <Modal
         open={modal.kind === 'edit'}
         onClose={() => setModal({ kind: 'closed' })}
         title="記録の編集"
@@ -109,7 +95,7 @@ export function TimelineTab({ session }: TimelineTabProps) {
         {modal.kind === 'edit' && (
           <EditEntryModalBody
             entryId={modal.entryId}
-            onSuccess={handleSuccess}
+            onSuccess={handleModalSuccess}
             onCancel={() => setModal({ kind: 'closed' })}
           />
         )}
@@ -123,7 +109,7 @@ export function TimelineTab({ session }: TimelineTabProps) {
         {modal.kind === 'confirm-delete' && (
           <ConfirmDeleteModalBody
             entryId={modal.entryId}
-            onSuccess={handleSuccess}
+            onSuccess={handleModalSuccess}
             onCancel={() => setModal({ kind: 'closed' })}
           />
         )}

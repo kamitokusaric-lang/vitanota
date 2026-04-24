@@ -208,3 +208,65 @@ describe('EntryForm - edit mode', () => {
     expect(putCall).toBeDefined();
   });
 });
+
+describe('EntryForm - compact mode', () => {
+  it('初期状態ではタグ選択と公開トグルが非表示', () => {
+    renderWithSWR(
+      <EntryForm mode="create" compact onSuccess={vi.fn()} />,
+    );
+    expect(screen.queryByTestId('tag-filter')).toBeNull();
+    expect(
+      screen.queryByTestId('entry-form-is-public-toggle'),
+    ).toBeNull();
+  });
+
+  it('textarea focus で展開してタグ選択と公開トグルが表示される', async () => {
+    renderWithSWR(
+      <EntryForm mode="create" compact onSuccess={vi.fn()} />,
+    );
+    const textarea = screen.getByTestId('entry-form-content-input');
+    fireEvent.focus(textarea);
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('entry-form-is-public-toggle'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('compact ではキャンセルボタンを出さない (onCancel 不在)', () => {
+    renderWithSWR(
+      <EntryForm mode="create" compact onSuccess={vi.fn()} />,
+    );
+    fireEvent.focus(screen.getByTestId('entry-form-content-input'));
+    expect(
+      screen.queryByTestId('entry-form-cancel-button'),
+    ).toBeNull();
+  });
+
+  it('compact モードで投稿成功後に form が reset される', async () => {
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('/api/private/journal/tags') && !init) {
+        return new Response(JSON.stringify({ tags: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ entry: { id: 'new' } }), {
+        status: 200,
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderWithSWR(
+      <EntryForm mode="create" compact onSuccess={vi.fn()} />,
+    );
+    const textarea = screen.getByTestId(
+      'entry-form-content-input',
+    ) as HTMLTextAreaElement;
+    fireEvent.focus(textarea);
+    fireEvent.change(textarea, { target: { value: '新規投稿テスト' } });
+    fireEvent.click(screen.getByTestId('entry-form-submit-button'));
+
+    await waitFor(() => {
+      expect(textarea.value).toBe('');
+    });
+  });
+});

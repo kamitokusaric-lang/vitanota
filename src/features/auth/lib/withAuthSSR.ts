@@ -1,6 +1,7 @@
 import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from './auth-options';
+import { hasRequiredRole } from './role-helpers';
 import type { VitanotaSession, Role } from '@/shared/types/auth';
 
 interface WithAuthSSROptions<P extends Record<string, unknown>> {
@@ -39,7 +40,7 @@ export function withAuthSSR<P extends Record<string, unknown> = Record<string, n
       return { redirect: { destination: '/auth/signin?error=TenantSuspended', permanent: false } };
     }
 
-    if (options?.requireRole && !session.user.roles.includes(options.requireRole)) {
+    if (options?.requireRole && !hasRequiredRole(session.user.roles, options.requireRole)) {
       return { notFound: true };
     }
 

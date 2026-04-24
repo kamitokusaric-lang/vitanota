@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
 import { requireAuth, type AuthContext } from '@/features/journal/lib/apiHelpers';
+import { hasRequiredRole } from './role-helpers';
 import type { Role } from '@/shared/types/auth';
 
 interface WithAuthApiOptions {
@@ -14,7 +15,7 @@ export function withAuthApi(
     const ctx = await requireAuth(req, res);
     if (!ctx) return;
 
-    if (options?.requireRole && !ctx.roles.includes(options.requireRole)) {
+    if (options?.requireRole && !hasRequiredRole(ctx.roles as Role[], options.requireRole)) {
       return res.status(403).json({ error: 'FORBIDDEN', message: '権限がありません' });
     }
 

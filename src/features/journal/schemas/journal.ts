@@ -32,10 +32,15 @@ export const updateEntrySchema = createEntrySchema.partial().openapi('UpdateEntr
 export type UpdateEntryInput = z.infer<typeof updateEntrySchema>;
 
 // タイムライン取得クエリ
+// category: 管理者特権 (school_admin) のときのみ UI から渡される感情カテゴリ絞り込み
 export const timelineQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1).openapi({ example: 1 }),
     perPage: z.coerce.number().int().min(1).max(50).default(50).openapi({ example: 50 }),
+    category: z
+      .enum(['positive', 'negative', 'neutral'])
+      .optional()
+      .openapi({ example: 'positive' }),
   })
   .openapi('TimelineQuery');
 

@@ -20,6 +20,7 @@ type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 export interface TimelineOptions {
   limit: number;
   offset: number;
+  category?: 'positive' | 'negative' | 'neutral';
 }
 
 export type PublicEntryWithTags = PublicJournalEntry & {
@@ -43,6 +44,19 @@ export class PublicTimelineRepository {
     tx: DrizzleDb,
     opts: TimelineOptions
   ): Promise<PublicEntryWithTags[]> {
+    // カテゴリ絞り込みは school_admin 特権。SQL で emotion_tags と JOIN して
+    // 指定カテゴリを含む entry だけを対象にする。
+    let entryIdsForCategory: string[] | null = null;
+    if (opts.category) {
+      const matchedRows = await tx
+        .selectDistinct({ entryId: journalEntryTags.entryId })
+        .from(journalEntryTags)
+        .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
+        .where(eq(emotionTags.category, opts.category));
+      entryIdsForCategory = matchedRows.map((r) => r.entryId);
+      if (entryIdsForCategory.length === 0) return [];
+    }
+
     const rows = await tx
       .select({
         id: publicJournalEntries.id,
@@ -62,6 +76,11 @@ export class PublicTimelineRepository {
           eq(userTenantProfiles.userId, publicJournalEntries.userId),
           eq(userTenantProfiles.tenantId, publicJournalEntries.tenantId),
         ),
+      )
+      .where(
+        entryIdsForCategory
+          ? inArray(publicJournalEntries.id, entryIdsForCategory)
+          : undefined,
       )
       .orderBy(desc(publicJournalEntries.createdAt))
       .limit(opts.limit)

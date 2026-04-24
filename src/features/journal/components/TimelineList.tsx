@@ -18,9 +18,12 @@ const fetcher = async (url: string): Promise<TimelineResponse> => {
   return res.json();
 };
 
+type EmotionCategory = 'positive' | 'negative' | 'neutral';
+
 interface TimelineListProps {
   perPage?: number;
   currentUserId?: string;
+  category?: EmotionCategory;
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
 }
@@ -28,6 +31,7 @@ interface TimelineListProps {
 export function TimelineList({
   perPage = 50,
   currentUserId,
+  category,
   onEdit,
   onDelete,
 }: TimelineListProps) {
@@ -35,7 +39,8 @@ export function TimelineList({
     useSWRInfinite<TimelineResponse>(
       (index, prev) => {
         if (prev && prev.entries.length < perPage) return null;
-        return `/api/public/journal/entries?page=${index + 1}&perPage=${perPage}`;
+        const base = `/api/public/journal/entries?page=${index + 1}&perPage=${perPage}`;
+        return category ? `${base}&category=${category}` : base;
       },
       fetcher,
       { revalidateFirstPage: false, revalidateOnFocus: true }

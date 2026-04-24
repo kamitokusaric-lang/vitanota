@@ -12,8 +12,10 @@ import { TimelineList } from '@/features/journal/components/TimelineList';
 import type { EntryCardData } from '@/features/journal/components/EntryCard';
 import type { JournalEntry } from '@/db/schema';
 import type { VitanotaSession } from '@/shared/types/auth';
+import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
 
 type Filter = 'all' | 'mine';
+type Category = 'all' | 'positive' | 'negative' | 'neutral';
 
 type ModalState =
   | { kind: 'closed' }
@@ -36,7 +38,9 @@ interface TimelineTabProps {
 
 export function TimelineTab({ session }: TimelineTabProps) {
   const currentUserId = session.user.userId;
+  const isAdmin = canUseAdminFeatures(session.user.roles);
   const [filter, setFilter] = useState<Filter>('all');
+  const [category, setCategory] = useState<Category>('all');
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const { mutate } = useSWRConfig();
 
@@ -78,11 +82,17 @@ export function TimelineTab({ session }: TimelineTabProps) {
         />
       </div>
 
-      <FilterToggle value={filter} onChange={setFilter} />
+      <div className="space-y-2">
+        <FilterToggle value={filter} onChange={setFilter} />
+        {isAdmin && filter === 'all' && (
+          <CategoryToggle value={category} onChange={setCategory} />
+        )}
+      </div>
 
       {filter === 'all' ? (
         <TimelineList
           currentUserId={currentUserId}
+          category={category === 'all' ? undefined : category}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
@@ -146,6 +156,41 @@ function FilterToggle({ value, onChange }: FilterToggleProps) {
     <div className="flex gap-2" role="group" aria-label="タイムラインフィルタ">
       {button('all', '全員')}
       {button('mine', '自分')}
+    </div>
+  );
+}
+
+interface CategoryToggleProps {
+  value: Category;
+  onChange: (value: Category) => void;
+}
+
+function CategoryToggle({ value, onChange }: CategoryToggleProps) {
+  const button = (key: Category, label: string, activeClass: string) => (
+    <button
+      type="button"
+      onClick={() => onChange(key)}
+      data-testid={`timeline-category-${key}`}
+      className={[
+        'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+        value === key
+          ? activeClass
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div
+      className="flex flex-wrap gap-2"
+      role="group"
+      aria-label="タイムライン カテゴリフィルタ (管理者のみ)"
+    >
+      {button('all', 'すべて', 'bg-gray-700 text-white')}
+      {button('positive', 'ポジ', 'bg-green-600 text-white')}
+      {button('negative', 'ネガ', 'bg-red-600 text-white')}
+      {button('neutral', 'ニュートラル', 'bg-slate-500 text-white')}
     </div>
   );
 }

@@ -21,9 +21,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     return { redirect: { destination: '/admin/tenants', permanent: false } };
   }
 
-  if (roles.includes('school_admin')) {
-    return { redirect: { destination: '/dashboard/admin', permanent: false } };
-  }
-
-  return { redirect: { destination: '/dashboard/teacher', permanent: false } };
+  // teacher / school_admin は共通ダッシュボードへ
+  return { redirect: { destination: '/dashboard', permanent: false } };
 };

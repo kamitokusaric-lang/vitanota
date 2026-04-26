@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import type { VitanotaSession } from '@/shared/types/auth';
 import { MyProfileModal } from '@/features/profile/components/MyProfileModal';
+import { AboutVitanotaModal } from '@/shared/components/AboutVitanotaModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,20 +13,31 @@ interface LayoutProps {
 export function Layout({ children, session }: LayoutProps) {
   const { name } = session.user;
   const [profileOpen, setProfileOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-vn-bg">
       <nav className="fixed inset-x-0 top-0 z-10 bg-vn-header">
         <div className="mx-auto flex h-16 max-w-[1040px] items-center justify-between px-6 lg:px-10">
-          {/* 左: ロゴ */}
-          <Link
-            href="/"
-            className="text-xl font-bold tracking-tight text-white"
-            data-testid="nav-logo"
-          >
-            vita<span className="text-vn-accent">nota</span>
-            <span className="text-vn-accent">.</span>
-          </Link>
+          {/* 左: ロゴ + vitanotaとは */}
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="text-xl font-bold tracking-tight text-white"
+              data-testid="nav-logo"
+            >
+              vita<span className="text-vn-accent">nota</span>
+              <span className="text-vn-accent">.</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setAboutOpen(true)}
+              className="text-[13px] text-gray-400 transition-colors hover:text-white"
+              data-testid="nav-about"
+            >
+              vitanotaとは
+            </button>
+          </div>
 
           {/* 右: ユーザー名 (プロフィール) + ログアウト */}
           <div className="flex items-center gap-3 text-[13px]">
@@ -50,6 +62,7 @@ export function Layout({ children, session }: LayoutProps) {
       <main className="mx-auto max-w-[1040px] px-6 pt-24 pb-20 lg:px-10">{children}</main>
 
       <MyProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <AboutVitanotaModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }

@@ -251,13 +251,8 @@ export function EntryForm({
 
   const showFullForm = !compact || step === 'expand';
 
-  const moodButtonClass = (value: MoodLevel) =>
-    [
-      'flex h-10 w-10 items-center justify-center rounded-full text-2xl transition-all',
-      mood === value && step !== 'mood'
-        ? 'bg-blue-100 ring-2 ring-blue-500 scale-110'
-        : 'hover:bg-gray-100 hover:scale-110',
-    ].join(' ');
+  const moodCardClass =
+    'flex flex-col items-center justify-center gap-1 rounded-vn border border-vn-border bg-white px-2 py-3 transition-all hover:border-vn-accent hover:bg-vn-bg active:scale-95';
 
   return (
     <form
@@ -274,7 +269,7 @@ export function EntryForm({
       {compact && step === 'mood' && (
         <div className="mb-3">
           <p
-            className="mb-2 text-sm font-medium text-gray-700"
+            className="mb-3 text-sm font-medium text-gray-700"
             data-testid="entry-form-prompt"
           >
             {prompt}
@@ -282,18 +277,23 @@ export function EntryForm({
           <div
             role="group"
             aria-label="ムード選択"
-            className="flex items-center gap-2"
+            className="grid grid-cols-5 gap-2"
           >
             {MOOD_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => handleMoodPick(opt.value)}
-                className={moodButtonClass(opt.value)}
+                className={moodCardClass}
                 aria-label={opt.label}
                 data-testid={`entry-form-mood-${opt.value}`}
               >
-                <span aria-hidden>{opt.emoji}</span>
+                <span aria-hidden className="text-2xl leading-none">
+                  {opt.emoji}
+                </span>
+                <span className="text-[11px] leading-tight text-gray-600">
+                  {opt.label}
+                </span>
               </button>
             ))}
           </div>

@@ -1,8 +1,5 @@
-// ダッシュボードのタイムラインタブ (マイボードの「日々ノート」と職員室ボードの
-// 「全体のタイムライン」で同一コンポーネントを mode で切替える)
-// - mode='personal':  自分の投稿のみ (MyJournalList)
-// - mode='staffroom': 全員の公開投稿 (TimelineList)
-// 両 mode とも最上部に常駐投稿欄、自分の投稿には kebab メニューを表示。
+// 日々ノート: 投稿フォーム (sticky) + 子タブ (みんなの投稿 / わたしの投稿)
+// 投稿成功時は両方のリストを再検証 (子の useSWRInfinite mutate を ref 経由で呼ぶ)
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Button } from '@/shared/components/Button';
@@ -22,7 +19,7 @@ import type { EntryCardData } from '@/features/journal/components/EntryCard';
 import type { JournalEntry } from '@/db/schema';
 import type { VitanotaSession } from '@/shared/types/auth';
 
-type TimelineMode = 'personal' | 'staffroom';
+type TimelineMode = 'staffroom' | 'personal';
 
 type ModalState =
   | { kind: 'closed' }
@@ -41,11 +38,11 @@ const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
 
 interface TimelineTabProps {
   session: VitanotaSession;
-  mode: TimelineMode;
 }
 
-export function TimelineTab({ session, mode }: TimelineTabProps) {
+export function TimelineTab({ session }: TimelineTabProps) {
   const currentUserId = session.user.userId;
+  const [mode, setMode] = useState<TimelineMode>('personal');
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
 
   // 子コンポーネント (useSWRInfinite 保有) の mutate を ref で受け取る。
@@ -81,14 +78,28 @@ export function TimelineTab({ session, mode }: TimelineTabProps) {
   };
 
   return (
-    <div className="space-y-4" data-testid={`timeline-tab-${mode}`}>
+    <div className="space-y-4" data-testid="timeline-tab">
       {/* 投稿欄は nav (h-16 = 64px) の真下に sticky */}
       <div className="sticky top-16 z-[5] -mx-6 bg-vn-bg px-6 pb-3 pt-3 lg:-mx-10 lg:px-10">
-        <EntryForm
-          mode="create"
-          compact
-          onSuccess={handleCreateSuccess}
-        />
+        <EntryForm mode="create" compact onSuccess={handleCreateSuccess} />
+      </div>
+
+      {/* 子タブ: 自分のタイムライン / 職員室タイムライン */}
+      <div role="tablist" className="flex gap-1 border-b border-vn-border">
+        <SubTab
+          active={mode === 'personal'}
+          onClick={() => setMode('personal')}
+          testId="timeline-subtab-personal"
+        >
+          自分のタイムライン
+        </SubTab>
+        <SubTab
+          active={mode === 'staffroom'}
+          onClick={() => setMode('staffroom')}
+          testId="timeline-subtab-staffroom"
+        >
+          職員室タイムライン
+        </SubTab>
       </div>
 
       {mode === 'staffroom' ? (
@@ -134,6 +145,33 @@ export function TimelineTab({ session, mode }: TimelineTabProps) {
         )}
       </Modal>
     </div>
+  );
+}
+
+interface SubTabProps {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  testId?: string;
+}
+
+function SubTab({ active, onClick, children, testId }: SubTabProps) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      data-testid={testId}
+      className={[
+        'px-4 py-2 text-sm font-medium transition-colors',
+        active
+          ? 'border-b-2 border-vn-accent text-gray-900'
+          : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900',
+      ].join(' ')}
+    >
+      {children}
+    </button>
   );
 }
 

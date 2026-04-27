@@ -219,14 +219,25 @@
   - DB: `journal_entries.content_masked` カラム + `journal_weekly_summaries` テーブルは適用済 (= データなし、害なし、5月で再利用)
   - Secret: `vitanota/anthropic-api-key` 残置 (値設定済)
   - コード資産: WeeklySummaryTab / weeklySummaryService / mask-content / API endpoint / seed-hanako.sh は残置
+
+- **⚠️ コードと CFN の drift (= 段階剥がしを諦めた帰結、5月で必ずクリーンアップ)**:
+  - **コード (main 最新 = `b767bec`)**: `f288a33` 状態 (Lambda Proxy 関連は revert 済、AppRunner env は `ANTHROPIC_API_KEY` 注入想定)
+  - **本番 CFN (= `vitanota-prod-app` + `vitanota-prod-data-shared`)**: `5d44d29` 状態 (Lambda Proxy 関連が残置)
+    - `data-shared`: AnthropicProxy Lambda + AnthropicProxySecret + Function URL がデプロイ済 (= 誰も呼ばない、無害)
+    - `app`: AppRunner runtimeEnvironmentVariables に `ANTHROPIC_PROXY_URL` 注入、runtimeEnvironmentSecrets に `ANTHROPIC_PROXY_SECRET` + `ANTHROPIC_API_KEY_LEGACY` 注入 (アプリは未参照)
+    - app.instanceRole: `anthropicProxySecret.grantRead` 残置
+  - **drift が起きた理由**: コード revert 後に `cdk deploy app` を実行すると CFN export (Function URL) の削除を試みるが、export を import 中の app stack の旧 deploy 状態と循環 deadlock → rollback。段階剥がし (2 commit + 2 deploy) で回避可能だが、UI tab disabled で機能影響ゼロのため 5月送り
+
 - **5月で必要な作業**:
   1. **Anthropic 接続戦略を確定**:
      - 案 A: NAT Gateway 追加 (foundation-stack)、+¥4,800/月、最もシンプル
      - 案 B: ブラウザ → Lambda Proxy 経由、ただし集計データがクライアントに流れる (踏み絵チェック必要)
      - 案 C: Anthropic Bedrock 経由 (= AWS API、VPC endpoint 経由で到達可能、Bedrock の Claude モデル価格次第)
-  2. インフラ実装 (案により foundation/data-shared/app stack 修正)
-  3. UI 復活: `pages/dashboard/index.tsx` の `weekly` タブを ComingSoonTab → `<WeeklySummaryTab />`、`disabled` 削除、import コメント解除
-  4. ローカル + 本番動作確認
+  2. **インフラ drift クリーンアップ** (= コードと CFN を一致させる):
+     - 案 A を採用する場合: 既存 AnthropicProxy Lambda + Secret + AppRunner PROXY env を削除。`段階剥がし` 必須 (詳細手順は本セッションログ `audit.md` 参照、もしくは: 一時的に app stack で PROXY env を維持しつつ ANTHROPIC_API_KEY 注入を追加 → cdk deploy app → 別 commit で PROXY 完全削除 → cdk deploy app + data-shared)
+     - 案 B/C を採用する場合: AnthropicProxy 関連は既存資産として再利用 (案 B) or 一旦削除して別経路に (案 C)
+  3. **UI 復活**: `pages/dashboard/index.tsx` の `weekly` タブを ComingSoonTab → `<WeeklySummaryTab />`、`disabled` 削除、import コメント解除
+  4. **ローカル + 本番動作確認**
 
 ### 🟢 低: 既存 journal_entries の content_masked を batch backfill
 - **発見日**: 2026-04-27

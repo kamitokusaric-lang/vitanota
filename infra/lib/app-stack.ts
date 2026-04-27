@@ -68,6 +68,7 @@ export class AppStack extends cdk.Stack {
     props.secrets.googleClientId.grantRead(instanceRole);
     props.secrets.googleClientSecret.grantRead(instanceRole);
     props.secrets.cloudfrontSecret.grantRead(instanceRole);
+    props.secrets.anthropicApiKey.grantRead(instanceRole);
 
     // RDS IAM 認証: vitanota_app ユーザーとしての接続のみ許可
     instanceRole.addToPolicy(
@@ -130,6 +131,7 @@ export class AppStack extends cdk.Stack {
             // 埋め込んでいるため、正しい CloudFront 経由リクエストは 200 で通過する。
             runtimeEnvironmentSecrets: [
               { name: 'CLOUDFRONT_SECRET', value: props.secrets.cloudfrontSecret.secretArn },
+              { name: 'ANTHROPIC_API_KEY', value: props.secrets.anthropicApiKey.secretArn },
             ],
           },
         },

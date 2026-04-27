@@ -1,14 +1,16 @@
-// /dashboard - 統合ダッシュボード (教員・school_admin 共通 UI)
-// 大タブ: マイボード / 職員室ボード / 学校エンゲージメント (school_admin 特権)
-// 各大タブ内にサブタブ
+// /dashboard - 統合ダッシュボード (大タブ切替: 日々ノート / タスクボード / 学校全体の温度)
+// 大タブはシンプルな underline スタイル (Tabs default variant)
+// 各タブ内の構造:
+//   - 日々ノート: 投稿フォーム sticky + 子タブ「みんなの投稿 / わたしの投稿」
+//   - タスクボード: デフォルト「自分」フィルタ、期限早い順、今日期限赤マーク
+//   - 学校全体の温度 (school_admin のみ)
 import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TimelineTab } from '@/features/dashboard/components/TimelineTab';
-import { MyTasksTab } from '@/features/dashboard/components/MyTasksTab';
-import { StaffroomTasksTab } from '@/features/dashboard/components/StaffroomTasksTab';
+import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
 import type { VitanotaSession } from '@/shared/types/auth';
@@ -28,35 +30,16 @@ function ComingSoonTab({ label }: { label: string }) {
 export default function DashboardPage({ session }: DashboardPageProps) {
   const isAdmin = canUseAdminFeatures(session.user.roles);
 
-  const myBoardTabs: TabDef[] = [
+  const mainTabs: TabDef[] = [
     {
       id: 'notes',
       label: '日々ノート',
-      content: <TimelineTab session={session} mode="personal" />,
+      content: <TimelineTab session={session} />,
     },
     {
       id: 'tasks',
       label: 'タスクボード',
-      content: <MyTasksTab session={session} />,
-    },
-    {
-      id: 'weekly',
-      label: '今週のひとこと',
-      content: <ComingSoonTab label="今週のひとこと" />,
-      disabled: true,
-    },
-  ];
-
-  const staffroomTabs: TabDef[] = [
-    {
-      id: 'timeline',
-      label: 'みんなの日々ノート',
-      content: <TimelineTab session={session} mode="staffroom" />,
-    },
-    {
-      id: 'tasks',
-      label: 'みんなのタスクボード',
-      content: <StaffroomTasksTab session={session} />,
+      content: <TaskBoard selfUserId={session.user.userId} />,
     },
     {
       id: 'schedule',
@@ -66,35 +49,10 @@ export default function DashboardPage({ session }: DashboardPageProps) {
     },
   ];
 
-  const mainTabs: TabDef[] = [
-    {
-      id: 'myboard',
-      label: 'マイボード',
-      content: (
-        <Tabs
-          tabs={myBoardTabs}
-          defaultTabId="notes"
-          queryParam="my_tab"
-        />
-      ),
-    },
-    {
-      id: 'staffroom',
-      label: '職員室ボード',
-      content: (
-        <Tabs
-          tabs={staffroomTabs}
-          defaultTabId="timeline"
-          queryParam="staff_tab"
-        />
-      ),
-    },
-  ];
-
   if (isAdmin) {
     mainTabs.push({
       id: 'engagement',
-      label: '学校エンゲージメント',
+      label: '学校全体の温度',
       content: <SchoolEngagementTab />,
     });
   }
@@ -103,8 +61,8 @@ export default function DashboardPage({ session }: DashboardPageProps) {
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="teacher">
         <Layout session={session}>
-          <div className="py-6" data-testid="dashboard-page">
-            <Tabs tabs={mainTabs} defaultTabId="myboard" queryParam="tab" />
+          <div className="pb-6 pt-2" data-testid="dashboard-page">
+            <Tabs tabs={mainTabs} defaultTabId="notes" queryParam="tab" />
           </div>
         </Layout>
       </RoleGuard>

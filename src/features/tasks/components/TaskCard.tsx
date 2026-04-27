@@ -37,6 +37,16 @@ function formatDate(value: string | Date): string {
   }).format(date);
 }
 
+function isDueToday(value: string | Date): boolean {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  const t = new Date();
+  return (
+    d.getFullYear() === t.getFullYear() &&
+    d.getMonth() === t.getMonth() &&
+    d.getDate() === t.getDate()
+  );
+}
+
 export function TaskCard({
   task,
   onEdit,
@@ -85,7 +95,25 @@ export function TaskCard({
               {task.ownerNickname ?? task.ownerName}
             </span>
           )}
-          {task.dueDate && <span>期限: {formatDate(task.dueDate)}</span>}
+          {task.dueDate && (
+            <span
+              className={
+                isDueToday(task.dueDate)
+                  ? 'inline-flex items-center gap-1 font-semibold text-vn-red'
+                  : undefined
+              }
+              data-testid={
+                isDueToday(task.dueDate)
+                  ? `task-card-due-today-${task.id}`
+                  : undefined
+              }
+            >
+              {isDueToday(task.dueDate) && (
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-vn-red" />
+              )}
+              期限: {formatDate(task.dueDate)}
+            </span>
+          )}
           {task.commentCount > 0 && (
             <span
               className="inline-flex items-center gap-0.5 text-gray-500"

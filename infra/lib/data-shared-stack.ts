@@ -11,8 +11,10 @@ export interface Secrets {
   googleClientId: secretsmanager.ISecret;
   googleClientSecret: secretsmanager.ISecret;
   cloudfrontSecret: secretsmanager.ISecret;
-  /** Anthropic API key (週次レポート AI 用)。値は CDK deploy 後に AWS Console で手動設定 */
+  /** Anthropic API key (週次レポート AI 用)。Lambda Proxy が使う、AppRunner には渡さない */
   anthropicApiKey: secretsmanager.ISecret;
+  /** AppRunner ↔ AnthropicProxy Lambda の認証用 shared secret (auto-generated) */
+  anthropicProxySecret: secretsmanager.ISecret;
 }
 
 export interface DataSharedStackProps extends cdk.StackProps {
@@ -27,6 +29,8 @@ export class DataSharedStack extends cdk.Stack {
   public readonly ecrRepository: ecr.IRepository;
   public readonly auditBucket: s3.IBucket;
   public readonly auditKmsKey: kms.IKey;
+  /** AnthropicProxy Lambda の Function URL (AppRunner から呼出し) */
+  public readonly anthropicProxyUrl: string;
 
   constructor(scope: Construct, id: string, props: DataSharedStackProps) {
     super(scope, id, props);
@@ -62,9 +66,18 @@ export class DataSharedStack extends cdk.Stack {
 
     // Anthropic API key (週次レポート AI 用)
     // 値は CDK deploy 後に手動設定: AWS Console → Secrets Manager → このシークレット → Retrieve secret value → Set
+    // Lambda Proxy が使う (AppRunner には渡さない、VPC 内から外向き不可なので)
     const anthropicApiKey = new secretsmanager.Secret(this, 'AnthropicApiKey', {
       secretName: `${props.projectName}/anthropic-api-key`,
-      description: 'Anthropic API key for weekly summary AI (set manually after deploy)',
+      description: 'Anthropic API key for weekly summary AI (used by AnthropicProxy Lambda)',
+    });
+
+    // AppRunner ↔ AnthropicProxy Lambda の認証用 shared secret (auto-generated 64 chars)
+    // 両方が同じ secret を見ることで、Function URL (NONE auth) を直接叩かれても reject できる
+    const anthropicProxySecret = new secretsmanager.Secret(this, 'AnthropicProxySecret', {
+      secretName: `${props.projectName}/anthropic-proxy-secret`,
+      description: 'Shared secret for AppRunner → AnthropicProxy Lambda authentication',
+      generateSecretString: { passwordLength: 64, excludePunctuation: true },
     });
 
     this.secrets = {
@@ -73,6 +86,7 @@ export class DataSharedStack extends cdk.Stack {
       googleClientSecret,
       cloudfrontSecret,
       anthropicApiKey,
+      anthropicProxySecret,
     };
 
     // ── KMS (監査ログ暗号化) ──
@@ -245,12 +259,123 @@ exports.handler = async (event) => {
       },
     });
 
+    // ── AnthropicProxy Lambda (VPC 外、AppRunner からインターネット呼出しを代行) ──
+    // AppRunner は PRIVATE_ISOLATED VPC で外向き不可。Anthropic API への呼出しを
+    // この Lambda 経由で行う。Google Token Proxy と同じパターン。
+    const anthropicProxy = new lambda.Function(this, 'AnthropicProxy', {
+      functionName: `${prefix}-anthropic-proxy`,
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(30),
+      handler: 'index.handler',
+      code: lambda.Code.fromInline(`
+const https = require('https');
+const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+
+const sm = new SecretsManagerClient({});
+const apiKeyCache = { value: null };
+const proxySecretCache = { value: null };
+
+async function getCached(arn, cache) {
+  if (cache.value) return cache.value;
+  const res = await sm.send(new GetSecretValueCommand({ SecretId: arn }));
+  cache.value = res.SecretString;
+  return cache.value;
+}
+
+function callAnthropic(apiKey, body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      'https://api.anthropic.com/v1/messages',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            resolve({ statusCode: res.statusCode, body: JSON.parse(data) });
+          } catch (e) {
+            resolve({ statusCode: 502, body: { error: 'invalid_anthropic_response', raw: data } });
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+exports.handler = async (event) => {
+  // 共有 secret 認証 (Function URL は NONE auth なので、誰でも叩ける = AppRunner だけ通すために secret 必須)
+  const expectedSecret = await getCached(process.env.PROXY_SECRET_ARN, proxySecretCache);
+  const headerSecret =
+    event.headers?.['x-anthropic-proxy-secret'] ||
+    event.headers?.['X-Anthropic-Proxy-Secret'];
+  if (headerSecret !== expectedSecret) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'unauthorized' }) };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'invalid_json' }) };
+  }
+  if (!parsed.model || !parsed.max_tokens || !Array.isArray(parsed.messages)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'missing_params' }) };
+  }
+
+  const apiKey = await getCached(process.env.API_KEY_ARN, apiKeyCache);
+  const anthropicRes = await callAnthropic(apiKey, JSON.stringify(parsed));
+
+  // 失敗時のみログ (成功時のレスポンスは記録しない、本人投稿が AI に渡るので残さない)
+  if (anthropicRes.statusCode !== 200) {
+    console.error('anthropic_call_failed', {
+      status: anthropicRes.statusCode,
+      error: anthropicRes.body?.error,
+    });
+  }
+
+  return {
+    statusCode: anthropicRes.statusCode,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(anthropicRes.body),
+  };
+};
+      `),
+      environment: {
+        API_KEY_ARN: anthropicApiKey.secretArn,
+        PROXY_SECRET_ARN: anthropicProxySecret.secretArn,
+      },
+    });
+    anthropicApiKey.grantRead(anthropicProxy);
+    anthropicProxySecret.grantRead(anthropicProxy);
+
+    // CORS なし (AppRunner は server-to-server 呼出し、Origin header 無し)
+    const anthropicProxyFnUrl = anthropicProxy.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
+    this.anthropicProxyUrl = anthropicProxyFnUrl.url;
+
     // ── 出力 ──
     new cdk.CfnOutput(this, 'AuditBucketName', { value: this.auditBucket.bucketName });
     new cdk.CfnOutput(this, 'EcrRepositoryUri', { value: this.ecrRepository.repositoryUri });
     new cdk.CfnOutput(this, 'GoogleTokenProxyUrl', {
       value: googleTokenProxyUrl.url,
       description: 'Function URL for Google OAuth token exchange proxy',
+    });
+    new cdk.CfnOutput(this, 'AnthropicProxyUrl', {
+      value: anthropicProxyFnUrl.url,
+      description: 'Function URL for Anthropic API proxy (used by AppRunner)',
     });
   }
 }

@@ -22,7 +22,7 @@ import type { MoodLevel } from '@/features/journal/schemas/journal';
 import { pickDbRole } from './apiHelpers';
 import { maskContent } from './mask-content';
 import {
-  getAnthropicClient,
+  callAnthropicMessages,
   ANTHROPIC_MODEL_HAIKU,
 } from '@/shared/lib/anthropic-client';
 
@@ -400,10 +400,9 @@ function applyGuardrails(output: string): string {
   return result.trim();
 }
 
-// ── AI 呼出し ───────────────────────────────────────────────────
+// ── AI 呼出し (AnthropicProxy Lambda 経由) ─────────────────────
 async function callAnthropic(prompt: string): Promise<string> {
-  const client = getAnthropicClient();
-  const response = await client.messages.create({
+  const response = await callAnthropicMessages({
     model: ANTHROPIC_MODEL_HAIKU,
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
@@ -413,7 +412,7 @@ async function callAnthropic(prompt: string): Promise<string> {
   if (!textBlock || textBlock.type !== 'text') {
     throw new Error('No text in Anthropic response');
   }
-  return textBlock.text;
+  return (textBlock as { type: 'text'; text: string }).text;
 }
 
 // ── サービス本体 ────────────────────────────────────────────────

@@ -58,7 +58,7 @@ export default function DashboardPage({ session }: DashboardPageProps) {
   if (isAdmin) {
     mainTabs.push({
       id: 'engagement',
-      label: '学校全体の温度',
+      label: '学校レポート',
       content: <SchoolEngagementTab />,
     });
   }

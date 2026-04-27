@@ -1,6 +1,5 @@
 #!/bin/sh
 # 山田花子 (hanako@local.test) のサンプルデータ投入
-# 「先週のひとこと」AI レポートの動作確認用
 #
 # 投稿: 先週 4/20 (月) 〜 4/24 (金) に毎日 2 件 (朝 + 夜)、計 10 件、疲れ気味のトーン
 # タスク: 10 件 (完了 3 / 進行中 3 / 未着手 4、依頼を受けた 2 / 他人へ依頼 1 含む)
@@ -78,9 +77,6 @@ SELECT set_config('app.tenant_id', '${TENANT_ID}', true);
 SELECT set_config('app.user_id', '${HANAKO_ID}', true);
 
 -- ── 投稿 10 件 (先週 4/20-4/24、毎日 2 件、疲れ気味のトーン) ──
--- 人名 (太郎くん / 田中先生) や クラス名 (3年2組) を意図的に混ぜて
--- マスキングの効果も確認できるようにする
--- content_masked は NULL のまま → 週次サマリ生成時に on-the-fly マスク
 INSERT INTO journal_entries (tenant_id, user_id, content, mood, is_public, created_at)
 VALUES
   -- 4/20 (月)

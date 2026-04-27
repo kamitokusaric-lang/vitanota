@@ -31,7 +31,6 @@
     "openapi:check": "pnpm gen:openapi && git diff --exit-code openapi.yaml"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1",
     "@auth/drizzle-adapter": "^1.11.2",
     "@aws-sdk/client-secrets-manager": "^3.574.0",
     "@aws-sdk/rds-signer": "^3.574.0",

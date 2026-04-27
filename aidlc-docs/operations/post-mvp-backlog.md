@@ -207,37 +207,22 @@
 
 ## 機能拡張候補
 
-### 🔴 高 (5月リリース予定): 先週のvitanotaレポート 機能の復活
-- **発見日**: 2026-04-23 → 4月公開 retreat → **5月リリース予定**: 2026-05-XX
-- **経緯**:
-  - 2026-04-27 に実装 + 本番デプロイまで完了したが、**AppRunner VPC egress 不可問題** で AI 呼出しが APIConnectionError → 機能不全
-  - Lambda Proxy 経由で回避を試みたが、AppRunner → Function URL も VPC 制約で到達不可と判明 (= Google OAuth Lambda はブラウザ経由なので動くが、server-to-server では動かない)
-  - chimo 判断で 4月公開からは退避 → 5月リリースで再アプローチ
-- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) (実装内容は仕様確定済)
-- **現状の本番 (4月公開時点)**:
-  - UI: ダッシュボードタブ「先週のvitanotaレポート」は **disabled の ComingSoonTab** 表示 (時間割と同じパターン)
-  - DB: `journal_entries.content_masked` カラム + `journal_weekly_summaries` テーブルは適用済 (= データなし、害なし、5月で再利用)
-  - Secret: `vitanota/anthropic-api-key` 残置 (値設定済)
-  - コード資産: WeeklySummaryTab / weeklySummaryService / mask-content / API endpoint / seed-hanako.sh は残置
-
-- **⚠️ コードと CFN の drift (= 段階剥がしを諦めた帰結、5月で必ずクリーンアップ)**:
-  - **コード (main 最新 = `b767bec`)**: `f288a33` 状態 (Lambda Proxy 関連は revert 済、AppRunner env は `ANTHROPIC_API_KEY` 注入想定)
-  - **本番 CFN (= `vitanota-prod-app` + `vitanota-prod-data-shared`)**: `5d44d29` 状態 (Lambda Proxy 関連が残置)
-    - `data-shared`: AnthropicProxy Lambda + AnthropicProxySecret + Function URL がデプロイ済 (= 誰も呼ばない、無害)
-    - `app`: AppRunner runtimeEnvironmentVariables に `ANTHROPIC_PROXY_URL` 注入、runtimeEnvironmentSecrets に `ANTHROPIC_PROXY_SECRET` + `ANTHROPIC_API_KEY_LEGACY` 注入 (アプリは未参照)
-    - app.instanceRole: `anthropicProxySecret.grantRead` 残置
-  - **drift が起きた理由**: コード revert 後に `cdk deploy app` を実行すると CFN export (Function URL) の削除を試みるが、export を import 中の app stack の旧 deploy 状態と循環 deadlock → rollback。段階剥がし (2 commit + 2 deploy) で回避可能だが、UI tab disabled で機能影響ゼロのため 5月送り
-
-- **5月で必要な作業**:
-  1. **Anthropic 接続戦略を確定**:
-     - 案 A: NAT Gateway 追加 (foundation-stack)、+¥4,800/月、最もシンプル
-     - 案 B: ブラウザ → Lambda Proxy 経由、ただし集計データがクライアントに流れる (踏み絵チェック必要)
-     - 案 C: Anthropic Bedrock 経由 (= AWS API、VPC endpoint 経由で到達可能、Bedrock の Claude モデル価格次第)
-  2. **インフラ drift クリーンアップ** (= コードと CFN を一致させる):
-     - 案 A を採用する場合: 既存 AnthropicProxy Lambda + Secret + AppRunner PROXY env を削除。`段階剥がし` 必須 (詳細手順は本セッションログ `audit.md` 参照、もしくは: 一時的に app stack で PROXY env を維持しつつ ANTHROPIC_API_KEY 注入を追加 → cdk deploy app → 別 commit で PROXY 完全削除 → cdk deploy app + data-shared)
-     - 案 B/C を採用する場合: AnthropicProxy 関連は既存資産として再利用 (案 B) or 一旦削除して別経路に (案 C)
-  3. **UI 復活**: `pages/dashboard/index.tsx` の `weekly` タブを ComingSoonTab → `<WeeklySummaryTab />`、`disabled` 削除、import コメント解除
-  4. **ローカル + 本番動作確認**
+### ⚪ 凍結 (2026-04-27 撤回): 先週のvitanotaレポート 機能
+- **撤回判断**: 2026-04-27、chimo 判断で AI 機能の使い所を再検討するフェーズに入ったため、Anthropic 接続を全面撤回。「AI ツールを使うこと自体に意味がある」前提で配置すると裏テーマ (観測されてると思われた瞬間に壊れる) を踏みかねないと判断。校長導入 (2026-05-04 週) 前のコード / CFN drift 解消も同時に達成。
+- **撤回 baseline**: `pre-anthropic-removal-baseline` tag (= 2026-04-27 撤回直前の main HEAD)
+- **撤回でやったこと**:
+  - アプリコード: `anthropic-client.ts` / `weeklySummaryService.ts` / `mask-content.ts` / `WeeklySummaryTab.tsx` / `pages/api/me/weekly-summary.ts` / dashboard `weekly` タブ / 関連 tests / `seed-hanako.sh` の AI コメント / `@anthropic-ai/sdk` dependency を全削除
+  - CFN: `vitanota-prod-app` (env 3 個 + IAM grant 2 個) / `vitanota-prod-data-shared` (AnthropicProxy Lambda + AnthropicProxySecret + AnthropicApiKey + Function URL + IAM Role/Policy) を `--exclusively` 段階剥がしで本番削除
+  - Secret: `vitanota/anthropic-api-key` 完全削除 (CFN destroy 時に同時削除確認)
+- **残置したもの (将来 AI 再開時の流用余地)**:
+  - DB: `journal_entries.content_masked` カラム + `journal_weekly_summaries` テーブル (本番に残、データなし、害なし)
+  - 設計書: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) ([LEGACY] マーク、参照用)
+  - ローカル `.env.local` の `ANTHROPIC_API_KEY` (chimo 指示)
+- **再開時に必要な作業**:
+  1. AI 機能の使い所 (どこで・なぜ・誰のために) を再設計
+  2. 接続経路を確定 (案 A: NAT GW / 案 B: ブラウザ Proxy / 案 C: Bedrock jp profile - 過去調査結果は `audit.md` 参照)
+  3. 残置 DB スキーマを再利用 or 別設計
+  4. `pre-anthropic-removal-baseline` tag のコードを参照しつつ再実装
 
 ### 🟢 低: 既存 journal_entries の content_masked を batch backfill
 - **発見日**: 2026-04-27

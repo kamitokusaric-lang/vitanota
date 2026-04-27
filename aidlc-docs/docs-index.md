@@ -116,7 +116,7 @@
 
 | 状態 | ファイル | 役割 |
 |---|---|---|
-| [CURRENT] | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) | **正本**: 週次レポート (今週のひとこと) 機能設計。マスキング・集計・プロンプト・ガードレール・テストケース・実装プラン |
+| [LEGACY] | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) | 週次レポート機能設計。**2026-04-27 に Anthropic 接続を全面撤回・凍結**。実装コード・CFN リソース・Secret は削除済み。DB スキーマのみ残置。AI 再開時の参照用 |
 
 ## 🛠️ 運用 / ロールアウト
 
@@ -177,7 +177,7 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | 費用感 | [`inception/requirements/cost-estimate.md`](inception/requirements/cost-estimate.md) |
 | 次にやること / 進捗 | [`aidlc-state.md`](aidlc-state.md) |
 | なぜその決定をしたか | [`audit.md`](audit.md) |
-| 週次レポート (AI) の仕様 | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) |
+| 週次レポート (AI) の仕様 [LEGACY 凍結 2026-04-27] | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) |
 
 ---
 

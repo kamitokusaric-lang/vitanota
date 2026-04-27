@@ -1483,3 +1483,46 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 **コンテキスト**: MVP β ローンチ (2026-04-26) に向けた準備完遂。残 4 日は余白、運用開始直後の見守りに充当可能。
 
 ---
+
+## Phase E: Anthropic 接続 全面撤回 + drift cleanup
+**タイムスタンプ**: 2026-04-27T19:50:00Z
+**ユーザー入力**: 「考え直すとして、Anthorophic接続してる箇所を全部なかったことにできる？APIKEYはそのままでいいわ（env.localだけね）」「1. A 2. A, 3. 今すぐ」「おk」
+**AI応答**: 「全部なかったことに」を 7 Phase の段階剥がしで実行:
+
+**Phase 0**: `pre-anthropic-removal-baseline` tag + `feature/remove-anthropic-everything` branch
+**Phase 1**: アプリコード削除
+- 削除ファイル: `src/shared/lib/anthropic-client.ts` / `src/features/journal/lib/weeklySummaryService.ts` / `src/features/journal/lib/mask-content.ts` / `src/features/dashboard/components/WeeklySummaryTab.tsx` / `pages/api/me/weekly-summary.ts` / `__tests__/unit/mask-content.test.ts`
+- 部分編集: `src/features/journal/lib/privateJournalRepository.ts` (maskContent 呼び出し削除) / `pages/dashboard/index.tsx` (weekly タブ削除) / `scripts/local/seed-hanako.sh` (AI コメント削除)
+- dependency 削除: `pnpm remove @anthropic-ai/sdk`
+- 確認: `pnpm type-check` / `pnpm test` (21 ファイル / 198 tests) 全通過
+
+**Phase 2**: app-stack drift cleanup
+- `infra/lib/app-stack.ts` から `anthropicApiKey.grantRead` と `ANTHROPIC_API_KEY` env 削除
+- `cdk deploy vitanota-prod-app --exclusively` (220 秒)
+- 本番 CFN から `ANTHROPIC_PROXY_URL` / `ANTHROPIC_PROXY_SECRET` / `ANTHROPIC_API_KEY_LEGACY` env + IAM grant 2 個 が消滅 (drift 解消)
+- 注: 最初に `--exclusively` なしで実行したら CFN export-import 循環 deadlock で UPDATE_ROLLBACK (backlog:229 で警告されていた挙動を実証)。`--exclusively` 必須。
+
+**Phase 3**: data-shared drift cleanup
+- `infra/lib/data-shared-stack.ts` から `Secrets` interface の `anthropicApiKey` entry + Secret 作成箇所削除
+- `cdk deploy vitanota-prod-data-shared --exclusively` (47 秒)
+- AnthropicProxy Lambda + AnthropicProxySecret + AnthropicApiKey + Function URL + IAM Role/Policy + Permissions が一括削除
+
+**Phase 4**: Secret 削除
+- CFN destroy 時に `vitanota/anthropic-api-key` Secret も即時削除済 (RemovalPolicy.DESTROY)
+- `aws secretsmanager describe-secret --secret-id vitanota/anthropic-api-key` で NotFound 確認
+
+**Phase 5**: docs 整理
+- `weekly-summary-design.md` を [LEGACY / 凍結 2026-04-27] マークに変更
+- `docs-index.md` の 🤖 AI 機能セクション + クイックリファレンス末尾を [LEGACY] に更新
+- `post-mvp-backlog.md` の「先週のvitanotaレポート 機能の復活」エントリを「⚪ 凍結 (2026-04-27 撤回)」に書換、撤回経緯と再開時手順を記載
+
+**残置したもの (chimo 判断 = 将来 AI 再開時の流用余地)**:
+- DB: `journal_entries.content_masked` カラム + `journal_weekly_summaries` テーブル
+- 設計書: `weekly-summary-design.md` ([LEGACY])
+- ローカル `.env.local` の `ANTHROPIC_API_KEY`
+
+**ロールバック**: `pre-anthropic-removal-baseline` tag に戻して `cdk deploy --all` で復元可能
+
+**コンテキスト**: 校長 (= vitanota にとって初の現場ステークホルダー) からの導入意思表明 (タスク管理を高評価) を受け、2026-05-04 週に説明会 → 1 校パイロット開始予定。chimo は「AI ツールを使うこと自体に意味がある」前提で配置すると裏テーマ (観測されてると思われた瞬間に壊れる = 最上位踏み絵) を踏みかねないと判断、AI 機能の使い所を一旦白紙に戻す決定。Bedrock jp profile 移行の事前調査 (jp.anthropic.claude-haiku-4-5-20251001-v1:0 で国内完結可能・案 A NAT GW より月 ¥1,750 安い) は完了していたが、本撤回により Bedrock 移行は後続に倒した。校長導入期間中は本番大変更を避ける慎重路線も合致。
+
+---

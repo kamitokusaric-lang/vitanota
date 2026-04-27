@@ -1,8 +1,9 @@
 # 先週のvitanotaレポート 機能設計
 
-- **Status**: [CURRENT] 実装完了 (`feature/weekly-summary` ブランチ、main 未マージ)
+- **Status**: [LEGACY / 凍結 2026-04-27] Anthropic 接続を一旦全面撤回。本設計書は将来 AI 機能を再開する際の参照用として保持する。実装コードは削除済み (`pre-anthropic-removal-baseline` tag 参照)。DB スキーマ (`journal_entries.content_masked` / `journal_weekly_summaries` テーブル) は本番に残置 (再開時の流用余地のため)。
+- **凍結理由**: AI 機能の使い所を再検討するフェーズに入ったため。校長導入 (2026-05-04 週パイロット開始予定) を前にコードと CFN の drift を解消するのが優先された。
 - **作成日**: 2026-04-27
-- **更新日**: 2026-04-27 (実装完了 + 度重なるトーン調整を反映)
+- **更新日**: 2026-04-27 (凍結マーク追記)
 - **作成者**: chimo + Claude
 
 ---

@@ -9,7 +9,6 @@ import type { drizzle } from 'drizzle-orm/node-postgres';
 import { journalEntries, journalEntryTags, emotionTags } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { JournalEntry, EmotionTag } from '@/db/schema';
-import { maskContent } from './mask-content';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -93,8 +92,6 @@ export class PrivateJournalRepository {
         tenantId: ctx.tenantId,
         userId: ctx.userId,
         content: params.content,
-        // 投稿時マスキング (設計書 § 6): 個人情報を AI 入力で扱わないため content_masked にも保存
-        contentMasked: maskContent(params.content),
         isPublic: params.isPublic,
         mood: params.mood,
       })
@@ -129,8 +126,6 @@ export class PrivateJournalRepository {
     };
     if (params.content !== undefined) {
       updateValues.content = params.content;
-      // content 更新時は content_masked も同期で更新 (設計書 § 6)
-      updateValues.contentMasked = maskContent(params.content);
     }
     if (params.isPublic !== undefined) updateValues.isPublic = params.isPublic;
     if (params.mood !== undefined) updateValues.mood = params.mood;

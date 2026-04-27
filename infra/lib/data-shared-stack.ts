@@ -11,8 +11,6 @@ export interface Secrets {
   googleClientId: secretsmanager.ISecret;
   googleClientSecret: secretsmanager.ISecret;
   cloudfrontSecret: secretsmanager.ISecret;
-  /** Anthropic API key (週次レポート AI 用)。値は CDK deploy 後に AWS Console で手動設定 */
-  anthropicApiKey: secretsmanager.ISecret;
 }
 
 export interface DataSharedStackProps extends cdk.StackProps {
@@ -60,19 +58,11 @@ export class DataSharedStack extends cdk.Stack {
       replicaRegions: [{ region: 'us-east-1' }],
     });
 
-    // Anthropic API key (週次レポート AI 用)
-    // 値は CDK deploy 後に手動設定: AWS Console → Secrets Manager → このシークレット → Retrieve secret value → Set
-    const anthropicApiKey = new secretsmanager.Secret(this, 'AnthropicApiKey', {
-      secretName: `${props.projectName}/anthropic-api-key`,
-      description: 'Anthropic API key for weekly summary AI (set manually after deploy)',
-    });
-
     this.secrets = {
       nextauthSecret,
       googleClientId,
       googleClientSecret,
       cloudfrontSecret,
-      anthropicApiKey,
     };
 
     // ── KMS (監査ログ暗号化) ──

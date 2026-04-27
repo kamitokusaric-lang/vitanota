@@ -207,16 +207,26 @@
 
 ## 機能拡張候補
 
-### ✅ 着手中 → MVP 実装移行: 本人向け週次 AI 振り返り (今週のひとこと)
-- **発見日**: 2026-04-23 → **MVP 着手**: 2026-04-27
-- **状態**: `feature/weekly-summary` ブランチで実装中。マージ後、本項目は削除する
-- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) を参照
-- **MVP 範囲との差分** (= 本来の backlog 想定との比較):
-  - ✅ 名称: 「振り返り」→ 「**今週のひとこと**」(chimo 確定)
-  - ✅ 出力タイプ: 鏡 narrative → 「**ねぎらい**」(評価でも分析でもなく、そっと言い換える)
-  - ✅ マスキング: 設計書になかった → **投稿時 正規表現マスキング** (`content_masked` カラム + AI 入力で使用) を追加
-  - 🔻 配信方式: 週次バッチ (月曜 5:00 JST EventBridge) → MVP では **アクセス時自動生成** に縮小 (バッチは Phase 2)
-  - 🔻 テーブル名: `weekly_self_reflections` → `journal_weekly_summaries` (命名統一)
+### 🔴 高 (5月リリース予定): 先週のvitanotaレポート 機能の復活
+- **発見日**: 2026-04-23 → 4月公開 retreat → **5月リリース予定**: 2026-05-XX
+- **経緯**:
+  - 2026-04-27 に実装 + 本番デプロイまで完了したが、**AppRunner VPC egress 不可問題** で AI 呼出しが APIConnectionError → 機能不全
+  - Lambda Proxy 経由で回避を試みたが、AppRunner → Function URL も VPC 制約で到達不可と判明 (= Google OAuth Lambda はブラウザ経由なので動くが、server-to-server では動かない)
+  - chimo 判断で 4月公開からは退避 → 5月リリースで再アプローチ
+- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) (実装内容は仕様確定済)
+- **現状の本番 (4月公開時点)**:
+  - UI: ダッシュボードタブ「先週のvitanotaレポート」は **disabled の ComingSoonTab** 表示 (時間割と同じパターン)
+  - DB: `journal_entries.content_masked` カラム + `journal_weekly_summaries` テーブルは適用済 (= データなし、害なし、5月で再利用)
+  - Secret: `vitanota/anthropic-api-key` 残置 (値設定済)
+  - コード資産: WeeklySummaryTab / weeklySummaryService / mask-content / API endpoint / seed-hanako.sh は残置
+- **5月で必要な作業**:
+  1. **Anthropic 接続戦略を確定**:
+     - 案 A: NAT Gateway 追加 (foundation-stack)、+¥4,800/月、最もシンプル
+     - 案 B: ブラウザ → Lambda Proxy 経由、ただし集計データがクライアントに流れる (踏み絵チェック必要)
+     - 案 C: Anthropic Bedrock 経由 (= AWS API、VPC endpoint 経由で到達可能、Bedrock の Claude モデル価格次第)
+  2. インフラ実装 (案により foundation/data-shared/app stack 修正)
+  3. UI 復活: `pages/dashboard/index.tsx` の `weekly` タブを ComingSoonTab → `<WeeklySummaryTab />`、`disabled` 削除、import コメント解除
+  4. ローカル + 本番動作確認
 
 ### 🟢 低: 既存 journal_entries の content_masked を batch backfill
 - **発見日**: 2026-04-27

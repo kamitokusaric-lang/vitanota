@@ -12,7 +12,8 @@ import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TimelineTab } from '@/features/dashboard/components/TimelineTab';
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
-import { WeeklySummaryTab } from '@/features/dashboard/components/WeeklySummaryTab';
+// 5月リリース送り: WeeklySummaryTab の import は復活時に解除する
+// import { WeeklySummaryTab } from '@/features/dashboard/components/WeeklySummaryTab';
 import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
 import type { VitanotaSession } from '@/shared/types/auth';
 
@@ -45,7 +46,10 @@ export default function DashboardPage({ session }: DashboardPageProps) {
     {
       id: 'weekly',
       label: '先週のvitanotaレポート',
-      content: <WeeklySummaryTab />,
+      // 5月リリース送り: AppRunner VPC egress 不可 (NAT 無し) で Anthropic 接続戦略が未確定。
+      // 復活時は ComingSoonTab → <WeeklySummaryTab /> に戻し、上の import コメント解除 + disabled を外す
+      content: <ComingSoonTab label="先週のvitanotaレポート" />,
+      disabled: true,
     },
     {
       id: 'schedule',

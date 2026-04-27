@@ -73,6 +73,9 @@ export class AppStack extends cdk.Stack {
     // anthropicApiKey は AnthropicProxy Lambda 側で読む。AppRunner には渡さない。
     // 代わりに Proxy 認証用 shared secret を渡す。
     props.secrets.anthropicProxySecret.grantRead(instanceRole);
+    // 一時的: 既存 CFN export (anthropicApiKey) を維持するため grantRead を残す。
+    // Phase 2 で完全削除予定 (= 別 commit で grantRead と export を同時に消す)
+    props.secrets.anthropicApiKey.grantRead(instanceRole);
 
     // RDS IAM 認証: vitanota_app ユーザーとしての接続のみ許可
     instanceRole.addToPolicy(
@@ -139,6 +142,9 @@ export class AppStack extends cdk.Stack {
             runtimeEnvironmentSecrets: [
               { name: 'CLOUDFRONT_SECRET', value: props.secrets.cloudfrontSecret.secretArn },
               { name: 'ANTHROPIC_PROXY_SECRET', value: props.secrets.anthropicProxySecret.secretArn },
+              // 一時的: 既存 CFN export を維持するため (アプリは ANTHROPIC_PROXY_URL 経由で
+              // 呼出すので実質未使用)。Phase 2 で grantRead と同時に削除
+              { name: 'ANTHROPIC_API_KEY_LEGACY', value: props.secrets.anthropicApiKey.secretArn },
             ],
           },
         },

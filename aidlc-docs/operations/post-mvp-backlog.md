@@ -233,9 +233,17 @@
      - 案 A: NAT Gateway 追加 (foundation-stack)、+¥4,800/月、最もシンプル
      - 案 B: ブラウザ → Lambda Proxy 経由、ただし集計データがクライアントに流れる (踏み絵チェック必要)
      - 案 C: Anthropic Bedrock 経由 (= AWS API、VPC endpoint 経由で到達可能、Bedrock の Claude モデル価格次第)
-  2. **インフラ drift クリーンアップ** (= コードと CFN を一致させる):
-     - 案 A を採用する場合: 既存 AnthropicProxy Lambda + Secret + AppRunner PROXY env を削除。`段階剥がし` 必須 (詳細手順は本セッションログ `audit.md` 参照、もしくは: 一時的に app stack で PROXY env を維持しつつ ANTHROPIC_API_KEY 注入を追加 → cdk deploy app → 別 commit で PROXY 完全削除 → cdk deploy app + data-shared)
-     - 案 B/C を採用する場合: AnthropicProxy 関連は既存資産として再利用 (案 B) or 一旦削除して別経路に (案 C)
+  2. **インフラ drift クリーンアップ** (= コードはすでに revert 済、CFN を追従させるだけ):
+     ```sh
+     cd infra
+     # ① AppRunner から PROXY env 削除 + ANTHROPIC_API_KEY 注入復活
+     #    --exclusively で「依存 stack を巻き込まない」を強制 (= data-shared の export 削除を試みず、app だけ更新)
+     pnpm cdk deploy --exclusively vitanota-prod-app
+     # ② data-shared から AnthropicProxy Lambda + AnthropicProxySecret 削除
+     #    (① で app が export を import しなくなっているので削除可能)
+     pnpm cdk deploy vitanota-prod-data-shared
+     ```
+     - `--exclusively` を付けないと、CDK が依存解決で data-shared も update しようとして CFN export 循環 deadlock になる (4月公開直前に踏んだ事象)
   3. **UI 復活**: `pages/dashboard/index.tsx` の `weekly` タブを ComingSoonTab → `<WeeklySummaryTab />`、`disabled` 削除、import コメント解除
   4. **ローカル + 本番動作確認**
 

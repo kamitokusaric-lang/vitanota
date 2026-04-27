@@ -112,6 +112,12 @@
 | [CURRENT] | [`construction/build-and-test/build-and-test-summary.md`](construction/build-and-test/build-and-test-summary.md) | 全体サマリー |
 | [CURRENT] | `unit-XX/nfr-design/integration-test-plan.md` | Unit 別テスト計画 |
 
+## 🤖 AI 機能
+
+| 状態 | ファイル | 役割 |
+|---|---|---|
+| [CURRENT] | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) | **正本**: 週次レポート (今週のひとこと) 機能設計。マスキング・集計・プロンプト・ガードレール・テストケース・実装プラン |
+
 ## 🛠️ 運用 / ロールアウト
 
 | 状態 | ファイル | 役割 |
@@ -171,6 +177,7 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | 費用感 | [`inception/requirements/cost-estimate.md`](inception/requirements/cost-estimate.md) |
 | 次にやること / 進捗 | [`aidlc-state.md`](aidlc-state.md) |
 | なぜその決定をしたか | [`audit.md`](audit.md) |
+| 週次レポート (AI) の仕様 | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) |
 
 ---
 

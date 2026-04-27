@@ -193,26 +193,30 @@
 
 ## 機能拡張候補
 
-### 🟡 中: 本人向け週次 AI 振り返り機能 (新「振り返り」タブ)
-- **発見日**: 2026-04-23 (Phase 2 コミット 3 完了時、chimo 指定)
-- **背景**: 「管理者が他者を AI 分析」は哲学踏み絵で不許可とした一方、
-  「本人が自分を振り返る AI 補助」は自己メタ認知として許容。
-  裏テーマ「世界を 1mm ズラす」に寄与する位置付け
-- **設計**:
-  - ダッシュボードに 4 つ目のタブ「振り返り」を追加
-    (現在: タイムライン / タスク / 時間割 (準備中))
-  - 週次バッチ (月曜朝 5:00 JST) で Claude Haiku 4.5 が教員本人の
-    直近 1 週間の投稿を集計 → 鏡 narrative (評価・提案なし、事実のみ)
-    を生成して DB に保存
-  - タブを開くと最新の振り返りが表示される
-  - 踏み絵: 評価・提案を含めない、管理者には見せない、本人専用
-- **必要なもの**:
-  - migration: `weekly_self_reflections` テーブル新設 + RLS
-  - schema.ts 追加
-  - 週次バッチ Lambda (Anthropic SDK + EventBridge cron)
-  - API: `GET /api/me/reflections` (自分の最新振り返り)
-  - UI: 新「振り返り」タブ + コンポーネント
-- **着手順序**: Task #34 (TeacherStatusTable 刷新) 完了後、次コミットで
+### ✅ 着手中 → MVP 実装移行: 本人向け週次 AI 振り返り (今週のひとこと)
+- **発見日**: 2026-04-23 → **MVP 着手**: 2026-04-27
+- **状態**: `feature/weekly-summary` ブランチで実装中。マージ後、本項目は削除する
+- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) を参照
+- **MVP 範囲との差分** (= 本来の backlog 想定との比較):
+  - ✅ 名称: 「振り返り」→ 「**今週のひとこと**」(chimo 確定)
+  - ✅ 出力タイプ: 鏡 narrative → 「**ねぎらい**」(評価でも分析でもなく、そっと言い換える)
+  - ✅ マスキング: 設計書になかった → **投稿時 正規表現マスキング** (`content_masked` カラム + AI 入力で使用) を追加
+  - 🔻 配信方式: 週次バッチ (月曜 5:00 JST EventBridge) → MVP では **アクセス時自動生成** に縮小 (バッチは Phase 2)
+  - 🔻 テーブル名: `weekly_self_reflections` → `journal_weekly_summaries` (命名統一)
+
+### 🟢 低: 既存 journal_entries の content_masked を batch backfill
+- **発見日**: 2026-04-27
+- **現状**: 週次レポート機能 MVP では「on-the-fly mask」(AI 入力時に `content_masked IS NULL` なら maskContent をその場で呼ぶ) で対応中。新規投稿は API 側で content_masked が常に埋まる
+- **影響**: 既存投稿が大量にある場合、週次サマリ生成時のレスポンスが遅くなる可能性 (1 ユーザー × 1 週で数件〜十数件マスク = 数 ms〜数十 ms で問題ないが、scale が増えれば気になる)
+- **対策**: TS スクリプト (`scripts/backfill-content-masked.ts`) で全 entries に対して maskContent を適用 → content_masked カラムを埋める。dotenv or @next/env で local DB 接続、本番は CDK migration job 内で 1 回だけ実行
+- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) § 9.3
+
+### 🟡 中: 週次レポート自動生成 Lambda (EventBridge cron)
+- **発見日**: 2026-04-27
+- **現状**: MVP では「アクセス時自動生成」(初回 GET /api/me/weekly-summary でその場で生成 + DB 保存)
+- **影響**: 月曜にアクセスがないと、火曜以降の初回アクセス時に生成。ユーザー体験はほぼ問題ないが、「常に月曜時点で fresh な summary がある」とは保証されない
+- **対策**: EventBridge Scheduler + Lambda で月曜 0:00 JST に全 active user 分を batch 生成 → DB 保存。アクセス時は既存を返すだけになる
+- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) § 17 (Phase 2)
 
 ---
 

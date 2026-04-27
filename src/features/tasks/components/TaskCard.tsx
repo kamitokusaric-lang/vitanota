@@ -1,6 +1,6 @@
 // カンバン上の個別タスクカード
 // readonly: 他人のタスク (閲覧のみ可、ステータス変更不可)
-// delegated: 自分が作成したが owner が他人のタスク (色違い表示、マイボードで「あの先生に振ったやつ」を識別)
+// delegated: 自分が作成したが owner が他人のタスク (色違い表示、「あの先生に振ったやつ」を識別)
 import type { TaskWithOwner } from '../hooks/useTasks';
 
 interface TaskCardProps {

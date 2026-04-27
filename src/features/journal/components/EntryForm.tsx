@@ -443,7 +443,7 @@ export function EntryForm({
                 />
               </span>
               <span className="text-sm text-gray-700">
-                職員室ボードにも公開
+                職員室タイムラインにも公開
               </span>
             </label>
             {!isPublic && (

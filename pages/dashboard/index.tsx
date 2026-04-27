@@ -12,6 +12,7 @@ import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TimelineTab } from '@/features/dashboard/components/TimelineTab';
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
+import { WeeklySummaryTab } from '@/features/dashboard/components/WeeklySummaryTab';
 import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
 import type { VitanotaSession } from '@/shared/types/auth';
 
@@ -40,6 +41,11 @@ export default function DashboardPage({ session }: DashboardPageProps) {
       id: 'tasks',
       label: 'タスクボード',
       content: <TaskBoard selfUserId={session.user.userId} />,
+    },
+    {
+      id: 'weekly',
+      label: '先週のvitanotaレポート',
+      content: <WeeklySummaryTab />,
     },
     {
       id: 'schedule',

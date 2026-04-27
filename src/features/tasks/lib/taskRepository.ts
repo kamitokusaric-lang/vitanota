@@ -44,7 +44,7 @@ export class TaskRepository {
   ): Promise<TaskWithOwner[]> {
     const conditions = [eq(tasks.tenantId, ctx.tenantId)];
     if (filters?.scope === 'mine') {
-      // 自分が owner または createdBy (マイボード: アサイン元も含む)
+      // 自分が owner または createdBy (scope='mine': アサイン元も含む)
       const scopeCondition = or(
         eq(tasks.ownerUserId, ctx.userId),
         eq(tasks.createdBy, ctx.userId),

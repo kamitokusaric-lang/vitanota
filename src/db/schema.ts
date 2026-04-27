@@ -207,6 +207,8 @@ export const journalEntries = pgTable(
     isPublic: boolean('is_public').notNull().default(true),
     // 新規投稿では必須 (API 側で要求)、既存データは NULL のまま (migration 0021)
     mood: moodLevelEnum('mood'),
+    // マスキング済み本文 (AI 入力用、新規投稿は API 側で生成、既存データは backfill で埋める)
+    contentMasked: text('content_masked'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -396,6 +398,34 @@ export const taskComments = pgTable(
   })
 );
 
+// ── journal_weekly_summaries (Unit-06) ─────────────────────────
+// 週次レポート (今週のひとこと) AI 出力。本人のみ閲覧可。
+// 1 ユーザー × 1 週 = 1 件 (PK で保証)。設計書 § 9。
+export const journalWeeklySummaries = pgTable(
+  'journal_weekly_summaries',
+  {
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    weekStart: date('week_start').notNull(), // 月曜日の日付
+    summary: text('summary').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.weekStart] }),
+    tenantUserWeekIdx: index('journal_weekly_summaries_tenant_user_week_idx').on(
+      table.tenantId,
+      table.userId,
+      table.weekStart,
+    ),
+  }),
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -411,3 +441,5 @@ export type TaskComment = typeof taskComments.$inferSelect;
 export type NewTaskComment = typeof taskComments.$inferInsert;
 export type UserTenantProfile = typeof userTenantProfiles.$inferSelect;
 export type NewUserTenantProfile = typeof userTenantProfiles.$inferInsert;
+export type JournalWeeklySummary = typeof journalWeeklySummaries.$inferSelect;
+export type NewJournalWeeklySummary = typeof journalWeeklySummaries.$inferInsert;

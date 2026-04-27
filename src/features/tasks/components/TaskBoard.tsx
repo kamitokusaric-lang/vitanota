@@ -1,7 +1,8 @@
 // タスクカンバンボード全体
 // 4 カテゴリ (クラス業務/教科業務/イベント業務/事務業務 + 拡張) を横に並べる
 // 絞込・新規/編集モーダルはこのコンポーネントで管理
-import { useState } from 'react';
+// デフォルトは「自分」(= scope='mine'、assignee + requester 両方を含む)
+import { useMemo, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -23,15 +24,14 @@ type ModalState =
 
 interface TaskBoardProps {
   selfUserId: string;
-  // personal: マイボード用、自分のタスクのみ表示、AssigneeFilter 非表示
-  // staffroom: 職員室ボード用、全員のタスク表示、AssigneeFilter あり
-  mode: 'personal' | 'staffroom';
 }
 
-export function TaskBoard({ selfUserId, mode }: TaskBoardProps) {
-  // staffroom は AssigneeFilter で絞り込み可、personal は scope='mine' 固定
-  // (scope='mine' = owner=自分 OR createdBy=自分、アサイン元のタスクも表示)
-  const [filterOwner, setFilterOwner] = useState<string | undefined>(undefined);
+export function TaskBoard({ selfUserId }: TaskBoardProps) {
+  // フィルタの意味:
+  //   filterOwner === selfUserId → scope='mine' (assignee OR requester 両方)
+  //   filterOwner === <他ユーザーID> → ownerUserId 指定 (その人が assignee のもののみ)
+  //   filterOwner === undefined → 全員
+  const [filterOwner, setFilterOwner] = useState<string | undefined>(selfUserId);
   const [filterCategoryId, setFilterCategoryId] = useState<string | undefined>(
     undefined,
   );
@@ -40,12 +40,29 @@ export function TaskBoard({ selfUserId, mode }: TaskBoardProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const { tasks, error: tasksError, isLoading: tasksLoading, mutate: mutateTasks } =
-    useTasks(
-      mode === 'personal'
-        ? { scope: 'mine' }
-        : { ownerUserId: filterOwner },
-    );
+  const taskQueryOptions =
+    filterOwner === selfUserId
+      ? ({ scope: 'mine' } as const)
+      : filterOwner
+        ? { ownerUserId: filterOwner }
+        : {};
+  const {
+    tasks: rawTasks,
+    error: tasksError,
+    isLoading: tasksLoading,
+    mutate: mutateTasks,
+  } = useTasks(taskQueryOptions);
+
+  // 期限が早い順にソート (期限なしは末尾)
+  const tasks = useMemo(() => {
+    if (!rawTasks) return undefined;
+    return [...rawTasks].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+  }, [rawTasks]);
   const { categories, error: catsError, isLoading: catsLoading } = useTaskCategories();
   const { assignees } = useAssignees();
 
@@ -189,23 +206,19 @@ export function TaskBoard({ selfUserId, mode }: TaskBoardProps) {
   return (
     <div data-testid="task-board">
       <div className="mb-4 flex items-center justify-between">
-        {mode === 'staffroom' ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <AssigneeFilter
-              value={filterOwner}
-              onChange={setFilterOwner}
-              assignees={assignees ?? []}
-              selfUserId={selfUserId}
-            />
-            <CategoryFilter
-              value={filterCategoryId}
-              onChange={setFilterCategoryId}
-              categories={categories}
-            />
-          </div>
-        ) : (
-          <div />
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <AssigneeFilter
+            value={filterOwner}
+            onChange={setFilterOwner}
+            assignees={assignees ?? []}
+            selfUserId={selfUserId}
+          />
+          <CategoryFilter
+            value={filterCategoryId}
+            onChange={setFilterCategoryId}
+            categories={categories}
+          />
+        </div>
         <Button
           type="button"
           onClick={() => setModal({ kind: 'create' })}

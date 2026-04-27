@@ -218,13 +218,6 @@
   - 🔻 配信方式: 週次バッチ (月曜 5:00 JST EventBridge) → MVP では **アクセス時自動生成** に縮小 (バッチは Phase 2)
   - 🔻 テーブル名: `weekly_self_reflections` → `journal_weekly_summaries` (命名統一)
 
-### 🟢 低: AppRunner の anthropicApiKey 参照を完全削除 (CFN export クリーンアップ)
-- **発見日**: 2026-04-27
-- **現状**: AppRunner の `runtimeEnvironmentSecrets` に `ANTHROPIC_API_KEY_LEGACY` (未使用) と instanceRole の `anthropicApiKey.grantRead` を一時維持中。理由: 削除すると CFN export が in-use で削除拒否されデプロイ rollback するため。Lambda Proxy 経由に切替済みでアプリ側は使用していない
-- **対策**: 別 commit で 2 行を削除 → cdk deploy app → 成功すれば自動で export も削除される
-- **影響**: 機能影響ゼロ (= 既に未使用)、CFN テンプレ整理のみ
-- **着手判断**: 急ぎではない、いつでも
-
 ### 🟢 低: 既存 journal_entries の content_masked を batch backfill
 - **発見日**: 2026-04-27
 - **現状**: 週次レポート機能 MVP では「on-the-fly mask」(AI 入力時に `content_masked IS NULL` なら maskContent をその場で呼ぶ) で対応中。新規投稿は API 側で content_masked が常に埋まる

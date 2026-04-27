@@ -65,7 +65,6 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   githubActionsRole: foundation.githubActionsRole,
   alertEmail,
   googleClientId,
-  anthropicProxyUrl: dataShared.anthropicProxyUrl,
 });
 
 new EdgeStack(app, `${prefix}-edge`, {

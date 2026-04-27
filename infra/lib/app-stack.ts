@@ -30,8 +30,6 @@ export interface AppStackProps extends cdk.StackProps {
   alertEmail: string;
   /** Google OAuth Client ID (public 値・cdk.json で一元管理) */
   googleClientId: string;
-  /** AnthropicProxy Lambda の Function URL (data-shared から渡される) */
-  anthropicProxyUrl: string;
 }
 
 export class AppStack extends cdk.Stack {
@@ -70,11 +68,6 @@ export class AppStack extends cdk.Stack {
     props.secrets.googleClientId.grantRead(instanceRole);
     props.secrets.googleClientSecret.grantRead(instanceRole);
     props.secrets.cloudfrontSecret.grantRead(instanceRole);
-    // anthropicApiKey は AnthropicProxy Lambda 側で読む。AppRunner には渡さない。
-    // 代わりに Proxy 認証用 shared secret を渡す。
-    props.secrets.anthropicProxySecret.grantRead(instanceRole);
-    // 一時的: 既存 CFN export (anthropicApiKey) を維持するため grantRead を残す。
-    // Phase 2 で完全削除予定 (= 別 commit で grantRead と export を同時に消す)
     props.secrets.anthropicApiKey.grantRead(instanceRole);
 
     // RDS IAM 認証: vitanota_app ユーザーとしての接続のみ許可
@@ -131,9 +124,6 @@ export class AppStack extends cdk.Stack {
               // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、
               // runtimeEnvironmentVariables 経由で明示的に 0.0.0.0 に再上書きする必要がある。
               { name: 'HOSTNAME', value: '0.0.0.0' },
-              // 週次レポート AI: AppRunner は VPC 内 (egress 不可) で Anthropic API を直接呼べない。
-              // VPC 外の AnthropicProxy Lambda 経由で呼出す (Function URL + shared secret 認証)
-              { name: 'ANTHROPIC_PROXY_URL', value: props.anthropicProxyUrl },
             ],
             // CloudFront 迂回攻撃防御: middleware が X-CloudFront-Secret header を
             // CLOUDFRONT_SECRET env と照合し、不一致なら 403 返却。
@@ -141,10 +131,7 @@ export class AppStack extends cdk.Stack {
             // 埋め込んでいるため、正しい CloudFront 経由リクエストは 200 で通過する。
             runtimeEnvironmentSecrets: [
               { name: 'CLOUDFRONT_SECRET', value: props.secrets.cloudfrontSecret.secretArn },
-              { name: 'ANTHROPIC_PROXY_SECRET', value: props.secrets.anthropicProxySecret.secretArn },
-              // 一時的: 既存 CFN export を維持するため (アプリは ANTHROPIC_PROXY_URL 経由で
-              // 呼出すので実質未使用)。Phase 2 で grantRead と同時に削除
-              { name: 'ANTHROPIC_API_KEY_LEGACY', value: props.secrets.anthropicApiKey.secretArn },
+              { name: 'ANTHROPIC_API_KEY', value: props.secrets.anthropicApiKey.secretArn },
             ],
           },
         },

@@ -147,6 +147,20 @@
 
 ---
 
+## CI / テスト
+
+### 🔴 高: 統合テストの DB schema 追従 (main の CI が常時赤)
+- **発見日**: 2026-04-27
+- **現状**: `__tests__/integration/*.test.ts` (session-strategy / tenant-isolation 等) で `relation "tags" does not exist` エラー多発。`0016_tags_to_emotion_tags.sql` で `tags` → `emotion_tags` にリネームされて以降、統合テストが追従されていない
+- **影響**: **main の CI が連続 8 commit 以上 failure**。「CI で何かが壊れてもアラートが出ない」状態 = 防衛機能ゼロ。今後の変更で何が壊れたか判別できなくなる
+- **対策**:
+  1. `__tests__/integration/` の全テストで `tags` テーブル参照を `emotion_tags` (and Drizzle スキーマ `emotionTags`) に書き換え
+  2. CI で integration test を green に
+  3. main への push で CI が連続赤の状態を block する運用ルール検討 (例: required check 設定)
+- **着手判断**: ローンチ後すぐ。長く放置するほど追従コストが増える
+
+---
+
 ## 戦略的検討事項
 
 ### ECS Express Mode への移行検討

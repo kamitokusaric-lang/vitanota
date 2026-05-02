@@ -1,9 +1,10 @@
 // 機能 B: 教員 → 運営 投稿 API
-// tenant_id / user_id は session から強制注入 (なりすまし防止、RLS WITH CHECK でも二重防御)
+// tenant_id / user_id は session から強制注入 (なりすまし防止)
+// feedback_submissions は RLS なし (invitation_tokens と同じパターン、API 層保護のみ)
 // 権限: 認証済み teacher / school_admin (system_admin は tenantId 不在で requireAuth が 403)
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { requireAuth, pickDbRole } from '@/features/journal/lib/apiHelpers';
-import { withTenantUser } from '@/shared/lib/db';
+import { requireAuth } from '@/features/journal/lib/apiHelpers';
+import { getDb } from '@/shared/lib/db';
 import { feedbackSubmissions } from '@/db/schema';
 import { feedbackSubmissionSchema } from '@/features/feedback/lib/feedbackSchemas';
 import { logger } from '@/shared/lib/logger';
@@ -28,23 +29,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { topicId, content } = parsed.data;
 
   try {
-    const submission = await withTenantUser(
-      ctx.tenantId,
-      ctx.userId,
-      pickDbRole(ctx),
-      async (tx) => {
-        const [created] = await tx
-          .insert(feedbackSubmissions)
-          .values({
-            topicId,
-            content: content.trim(),
-            tenantId: ctx.tenantId,
-            userId: ctx.userId,
-          })
-          .returning({ id: feedbackSubmissions.id });
-        return created;
-      }
-    );
+    const db = await getDb();
+    const [submission] = await db
+      .insert(feedbackSubmissions)
+      .values({
+        topicId,
+        content: content.trim(),
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
+      })
+      .returning({ id: feedbackSubmissions.id });
 
     logger.info({
       event: 'feedback.submitted',

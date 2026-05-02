@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
-import { withSystemAdmin } from '@/shared/lib/db';
+import { getDb } from '@/shared/lib/db';
 import { feedbackTopics, feedbackSubmissions } from '@/db/schema';
 import { feedbackTopicUpdateSchema } from '@/features/feedback/lib/feedbackSchemas';
 import { logger } from '@/shared/lib/logger';
@@ -55,22 +55,20 @@ async function handleUpdate(
 
   const patch = parsed.data;
   try {
-    const updated = await withSystemAdmin(adminUserId, async (tx) => {
-      const [row] = await tx
-        .update(feedbackTopics)
-        .set({
-          ...(patch.title !== undefined && { title: patch.title.trim() }),
-          ...(patch.description !== undefined && {
-            description: patch.description?.trim() || null,
-          }),
-          ...(patch.sortOrder !== undefined && { sortOrder: patch.sortOrder }),
-          ...(patch.isActive !== undefined && { isActive: patch.isActive }),
-          updatedAt: new Date(),
-        })
-        .where(eq(feedbackTopics.id, id))
-        .returning();
-      return row;
-    });
+    const db = await getDb();
+    const [updated] = await db
+      .update(feedbackTopics)
+      .set({
+        ...(patch.title !== undefined && { title: patch.title.trim() }),
+        ...(patch.description !== undefined && {
+          description: patch.description?.trim() || null,
+        }),
+        ...(patch.sortOrder !== undefined && { sortOrder: patch.sortOrder }),
+        ...(patch.isActive !== undefined && { isActive: patch.isActive }),
+        updatedAt: new Date(),
+      })
+      .where(eq(feedbackTopics.id, id))
+      .returning();
 
     if (!updated) {
       return res.status(404).json({ error: 'NOT_FOUND', message: 'トピックが見つかりません' });
@@ -95,7 +93,8 @@ async function handleUpdate(
 
 async function handleDelete(res: NextApiResponse, id: string, adminUserId: string) {
   try {
-    const result = await withSystemAdmin(adminUserId, async (tx) => {
+    const db = await getDb();
+    const result = await db.transaction(async (tx) => {
       const [count] = await tx
         .select({ n: sql<number>`COUNT(*)::int` })
         .from(feedbackSubmissions)

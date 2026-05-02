@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { asc, eq, sql } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
-import { withSystemAdmin } from '@/shared/lib/db';
+import { getDb } from '@/shared/lib/db';
 import { feedbackTopics, feedbackSubmissions } from '@/db/schema';
 import { feedbackTopicCreateSchema } from '@/features/feedback/lib/feedbackSchemas';
 import { logger } from '@/shared/lib/logger';
@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'GET') {
-    return handleList(res, session.user.userId);
+    return handleList(res);
   }
   if (req.method === 'POST') {
     return handleCreate(req, res, session.user.userId);
@@ -27,26 +27,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return res.status(405).end();
 }
 
-async function handleList(res: NextApiResponse, adminUserId: string) {
+async function handleList(res: NextApiResponse) {
   try {
-    const topics = await withSystemAdmin(adminUserId, async (tx) => {
-      return tx
-        .select({
-          id: feedbackTopics.id,
-          title: feedbackTopics.title,
-          description: feedbackTopics.description,
-          isActive: feedbackTopics.isActive,
-          sortOrder: feedbackTopics.sortOrder,
-          createdAt: feedbackTopics.createdAt,
-          updatedAt: feedbackTopics.updatedAt,
-          submissionCount: sql<number>`(
-            SELECT COUNT(*)::int FROM ${feedbackSubmissions}
-            WHERE ${feedbackSubmissions.topicId} = ${feedbackTopics.id}
-          )`,
-        })
-        .from(feedbackTopics)
-        .orderBy(asc(feedbackTopics.sortOrder), asc(feedbackTopics.createdAt));
-    });
+    const db = await getDb();
+    // LEFT JOIN + GROUP BY で投稿数を集計 (sub-query 経由より確実)
+    const topics = await db
+      .select({
+        id: feedbackTopics.id,
+        title: feedbackTopics.title,
+        description: feedbackTopics.description,
+        isActive: feedbackTopics.isActive,
+        sortOrder: feedbackTopics.sortOrder,
+        createdAt: feedbackTopics.createdAt,
+        updatedAt: feedbackTopics.updatedAt,
+        submissionCount: sql<number>`COUNT(${feedbackSubmissions.id})::int`,
+      })
+      .from(feedbackTopics)
+      .leftJoin(feedbackSubmissions, eq(feedbackSubmissions.topicId, feedbackTopics.id))
+      .groupBy(feedbackTopics.id)
+      .orderBy(asc(feedbackTopics.sortOrder), asc(feedbackTopics.createdAt));
     return res.status(200).json({ topics });
   } catch (err) {
     logger.error({ event: 'system.feedback.topics.list.error', err });
@@ -73,18 +72,16 @@ async function handleCreate(
   const { title, description, sortOrder, isActive } = parsed.data;
 
   try {
-    const created = await withSystemAdmin(adminUserId, async (tx) => {
-      const [row] = await tx
-        .insert(feedbackTopics)
-        .values({
-          title: title.trim(),
-          description: description?.trim() || null,
-          sortOrder,
-          isActive,
-        })
-        .returning();
-      return row;
-    });
+    const db = await getDb();
+    const [created] = await db
+      .insert(feedbackTopics)
+      .values({
+        title: title.trim(),
+        description: description?.trim() || null,
+        sortOrder,
+        isActive,
+      })
+      .returning();
 
     logger.info({
       event: 'system.feedback.topic.created',

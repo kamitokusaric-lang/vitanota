@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { eq, desc, and, type SQL } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
-import { withSystemAdmin } from '@/shared/lib/db';
+import { getDb } from '@/shared/lib/db';
 import { feedbackSubmissions, feedbackTopics, users, tenants } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
 
@@ -42,27 +42,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (topicId) conditions.push(eq(feedbackSubmissions.topicId, topicId));
 
   try {
-    const submissions = await withSystemAdmin(session.user.userId, async (tx) => {
-      return tx
-        .select({
-          id: feedbackSubmissions.id,
-          createdAt: feedbackSubmissions.createdAt,
-          content: feedbackSubmissions.content,
-          topicId: feedbackTopics.id,
-          topicTitle: feedbackTopics.title,
-          userEmail: users.email,
-          userName: users.name,
-          tenantId: tenants.id,
-          tenantName: tenants.name,
-          tenantSlug: tenants.slug,
-        })
-        .from(feedbackSubmissions)
-        .innerJoin(feedbackTopics, eq(feedbackTopics.id, feedbackSubmissions.topicId))
-        .innerJoin(users, eq(users.id, feedbackSubmissions.userId))
-        .innerJoin(tenants, eq(tenants.id, feedbackSubmissions.tenantId))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(feedbackSubmissions.createdAt));
-    });
+    const db = await getDb();
+    const submissions = await db
+      .select({
+        id: feedbackSubmissions.id,
+        createdAt: feedbackSubmissions.createdAt,
+        content: feedbackSubmissions.content,
+        topicId: feedbackTopics.id,
+        topicTitle: feedbackTopics.title,
+        userEmail: users.email,
+        userName: users.name,
+        tenantId: tenants.id,
+        tenantName: tenants.name,
+        tenantSlug: tenants.slug,
+      })
+      .from(feedbackSubmissions)
+      .innerJoin(feedbackTopics, eq(feedbackTopics.id, feedbackSubmissions.topicId))
+      .innerJoin(users, eq(users.id, feedbackSubmissions.userId))
+      .innerJoin(tenants, eq(tenants.id, feedbackSubmissions.tenantId))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(feedbackSubmissions.createdAt));
 
     return res.status(200).json({ submissions });
   } catch (err) {

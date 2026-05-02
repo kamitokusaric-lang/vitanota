@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
+import { AdminLayout } from '@/shared/components/AdminLayout';
 import { Button } from '@/shared/components/Button';
 import { Modal } from '@/shared/components/Modal';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
@@ -177,7 +178,8 @@ export default function FeedbackTopicsPage({ session }: PageProps) {
   return (
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="system_admin">
-        <div className="min-h-screen bg-gray-50 p-8">
+        <AdminLayout session={session}>
+        <div className="p-8">
           <div className="mx-auto max-w-5xl">
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-2xl font-bold text-gray-800">トピック管理</h1>
@@ -282,6 +284,7 @@ export default function FeedbackTopicsPage({ session }: PageProps) {
             </div>
           </div>
         </div>
+        </AdminLayout>
 
         <Modal
           open={modalOpen}

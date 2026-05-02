@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
+import { AdminLayout } from '@/shared/components/AdminLayout';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import type { VitanotaSession } from '@/shared/types/auth';
@@ -95,7 +96,8 @@ export default function FeedbackListPage({ session }: PageProps) {
   return (
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="system_admin">
-        <div className="min-h-screen bg-gray-50 p-8">
+        <AdminLayout session={session}>
+        <div className="p-8">
           <div className="mx-auto max-w-6xl">
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-2xl font-bold text-gray-800">フィードバック投稿一覧</h1>
@@ -210,6 +212,7 @@ export default function FeedbackListPage({ session }: PageProps) {
             </div>
           </div>
         </div>
+        </AdminLayout>
       </RoleGuard>
     </TenantGuard>
   );

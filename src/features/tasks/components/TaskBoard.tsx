@@ -340,7 +340,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
                 className="text-xs"
                 data-testid="task-edit-duplicate-button"
               >
-                このタスクを別の先生にも振る (複製)
+                このタスクを別の先生と共有する (複製)
               </Button>
             </div>
             <TaskCommentSection

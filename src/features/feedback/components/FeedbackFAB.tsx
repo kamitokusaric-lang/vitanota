@@ -3,8 +3,8 @@
 // クリックで Modal を開き、トピック選択 + 自由記述 textarea で運営に投稿。
 //
 // 裏テーマ防御 (memory: 観測されてると思われた瞬間に壊れる):
-//   - 「運営にだけ届きます」を必ず明示
-//   - 教員 / school_admin から他者投稿は DB レベルで物理不可視 (RLS)
+//   - 「システム開発者に届きます」を必ず明示
+//   - 教員 / school_admin から他者投稿は API 層で system_admin 限定 SELECT
 //   - 自分の投稿履歴も UI に出さない (送信したら確定、編集不可)
 import { useEffect, useState } from 'react';
 import { Modal } from '@/shared/components/Modal';
@@ -109,7 +109,7 @@ function FeedbackModal({ open, onClose }: FeedbackModalProps) {
   return (
     <Modal open={open} onClose={resetAndClose} title="フィードバックを送る" maxWidth="max-w-lg">
       <div className="mb-4 rounded-md border border-vn-border bg-blue-50 px-3 py-2 text-xs text-blue-800">
-        ℹ️ 運営にだけ届きます (同じ学校の先生方には見えません)
+        ℹ️ システム開発者に届きます
       </div>
 
       {topicsLoading && (

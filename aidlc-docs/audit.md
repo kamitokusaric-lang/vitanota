@@ -1526,3 +1526,119 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 **コンテキスト**: 校長 (= vitanota にとって初の現場ステークホルダー) からの導入意思表明 (タスク管理を高評価) を受け、2026-05-04 週に説明会 → 1 校パイロット開始予定。chimo は「AI ツールを使うこと自体に意味がある」前提で配置すると裏テーマ (観測されてると思われた瞬間に壊れる = 最上位踏み絵) を踏みかねないと判断、AI 機能の使い所を一旦白紙に戻す決定。Bedrock jp profile 移行の事前調査 (jp.anthropic.claude-haiku-4-5-20251001-v1:0 で国内完結可能・案 A NAT GW より月 ¥1,750 安い) は完了していたが、本撤回により Bedrock 移行は後続に倒した。校長導入期間中は本番大変更を避ける慎重路線も合致。
 
 ---
+
+## 2026-05-02 セッション: 5/7 教員向け説明会 — 機能追加リクエスト
+**タイムスタンプ**: 2026-05-02T00:00:00Z
+**コンテキスト**: 校長導入意思表明 (2026-04-27) を受けた現場展開フェーズ。25 名教員初顔合わせを 2026-05-07 に開催決定。説明会までに揃える必要がある機能を chimo と相談して確定するセッション。
+
+### やり取り 1: リクエスト発端
+**ユーザー入力**: "5/7に、教員向け説明会をすることになった。それまでに、揃えておきたい機能がいくつかあるので相談したい"
+**AI 応答**: 説明会日程の認識を共有 (5 日後)。リスト羅列を要求しつつ、既存 backlog 状態の確認を提案。
+
+### やり取り 2: backlog 確認の同意
+**ユーザー入力**: "うん、おねがい"
+**AI 応答**: `aidlc-docs/operations/post-mvp-backlog.md` を読み込み、5/7 説明会への直接影響を持つ項目を抽出。結論: 説明会向けに必須となる新機能は backlog 外の新規追加であることを確認し、chimo にリストアップを要求。
+
+### やり取り 3: 候補機能リスト提示
+**ユーザー入力**: "25名の教員の招待機能、教員からのフィードバック機能、タスクへのアサインを複数人設定できるように修正、DBバックアップ設定"
+**AI 応答**: 4 件をコードベース調査の上で個別評価。
+- **招待**: 個別招待 API のみ実装 (`pages/api/invitations/index.ts`)、メール送信なし。25 名一括投入が新規必要。
+- **フィードバック**: コードベースに痕跡なし、完全新規。意図 (A=運営宛 / B=教員間 / C=管理職宛) の確認が必要。
+- **複数アサイン**: tasks スキーマ単数 owner (`migrations/0014_unit05_task_core.sql`)、本実装は 5 日リスク高、複製代替を提案。
+- **DB バックアップ**: SnapshotManager Lambda で日次 7 日 retention 既稼働 (`infra/lib/data-core-stack.ts:55-176`)。
+工数感: A 1〜1.5 日 / B 意図次第 / C 本実装 4-6 日 vs 複製代替 0.5 日 / D 既存十分。
+
+### やり取り 4: 設計意図の確定
+**ユーザー入力**: "フィードバックはA。何観点でフィードバックが欲しいかを運営側で設定して、投稿しやすくしたい。複数アサインは、まずはコピーでよい。"
+**AI 応答**: 設計案を改訂。
+- フィードバック: トピック制 (運営側定義) + 投稿 UI + system_admin 閲覧 view。同校教員間で不可視 (RLS で system_admin 以外 read 拒否) を裏テーマ防御として設計。
+- 複数アサイン: タスク複製ボタンで代替 (0.5 日)。本実装は post-MVP backlog に倒す方針。
+
+### やり取り 5: 招待管理画面要件追加
+**ユーザー入力**: "未受諾の名前は出して欲しい。system_adminのダッシュボードに、学校に紐づく招待一覧を表示して、招待URLと受諾済みかを表示して欲しい"
+**AI 応答**: school_admin への踏み絵配慮は不要 (system_admin = chimo 自身向け画面)。設計を改訂し、`pages/admin/invitations.tsx` 新設 + `GET /api/system/invitations` + `POST /api/system/invitations/bulk` の 2 API を提示。一覧カラム: Email / ロール / 招待日 / 期限 / ステータス (受諾済 / 未受諾 / 期限切れ) / 招待 URL。
+
+### やり取り 6: 詳細詰め (フィードバックトピック叩き台 + DB バックアップ確認)
+**ユーザー入力**: "フィードバックの初期トピック観点は、叩き台を出してみて。DBバックアップは1日前までスナップショットがあるということ？それならそのままで。"
+**AI 応答**: バックアップの正確な現状を共有 (PITR 1 日 + 日次 snapshot 7 日 = 過去 7 日間の復旧可)。フィードバック初期トピック叩き台 5 個提示 (率直な感想 / 現場で使うイメージ / 改善要望 / 嬉しい機能 / 説明会自体への FB)。
+
+### やり取り 7: トピック数の絞り込み + バックアップ確定
+**ユーザー入力**: "改善してほしい点、あったら嬉しい機能、その他なんでも感想や質問、の3つにして欲しい。DBバックアップはそのままで良い"
+**AI 応答**: 3 トピック確定。DB バックアップ現状維持で確定。CLAUDE.md ワークフローに沿って次フェーズ (要件分析 → 設計 → 実装) に入る同意を要求。
+
+### やり取り 8: ワークフロー進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: state.md / audit.md / backlog.md 更新 + タスクリスト作成を開始。
+
+### やり取り 9: 要件分析フェーズ進行同意
+**ユーザー入力**: "おк"
+**AI 応答**: T2 を in_progress、要件ファイル `aidlc-docs/inception/requirements/2026-05-07-meeting-features.md` を作成、docs-index.md に追加。要件主要決定事項 4 点を chimo に提示し承認待ち。
+
+### やり取り 10: 機能 B トピック CRUD UI 追加要望
+**ユーザー入力**: "能 B トピック CRUD は MVP では UI なし、seed SQL で chimo が管理は難しい、UIを作る方向で"
+**AI 応答**: 要件改訂。
+- AC-B-08 (CRUD 操作)、AC-B-09 (累計投稿数表示) を追加
+- Out of scope から「トピック CRUD UI」を削除
+- 新規作成ファイルに `/admin/feedback/topics` ページ + API 2 本追加
+- 物理削除は当初不採用案として提示 (is_active による論理削除のみ、過去投稿の topic_id 参照を維持)
+- 工数見積を 3〜3.5 日 → 3.8〜4.3 日 に更新 (B が +0.8 日)
+- デプロイ計画を 5/4 (B 前半) + 5/5 (B 後半) に再配分
+
+### やり取り 11: 削除と並び替え方針の詳細確認要望
+**ユーザー入力**: "残りの確認の２つについて、詳しく教えて"
+**AI 応答**: 物理削除と論理削除の違い、FK 挙動 (CASCADE / SET NULL / RESTRICT) のトレードオフを表で説明。打ち間違いトピックへの対処として案 B (ハイブリッド = 投稿 0 件は物理削除可、それ以外は論理削除のみ) を推奨。並び替えは数値入力 (案 A) / DnD (案 B) / 固定順 (案 C) の選択肢を提示し、トピック数 3〜5 個想定なら案 A で十分と推奨。
+
+### やり取り 12: トピックと投稿の関係性確認
+**ユーザー入力**: "投稿とトピックってどういう関係なんだっけ"
+**AI 応答**: 1 トピック : N 投稿 (1 対多) の関係をテーブル例で図示。topic_id (FK) で繋がる構造を具体例 (改善してほしい点 / あったら嬉しい機能 / その他) + 投稿サンプル 4 件で説明。物理削除した場合の参照孤児問題が具体化され、論理削除の正当性が明確化された。並び替えは「教員 UI のトピック表示順」の話で、投稿時系列とは別軸であることを補足。
+
+### やり取り 13: 削除と並び替えの方針確定
+**ユーザー入力**: "なるほど、提案の通りで良いよ、あとドラッグ&ドロップの並び替えは不要"
+**AI 応答**: AC-B-08 を「ハイブリッド削除」に改訂確定 (投稿 0 件 → 物理削除可 / 投稿あり → 論理削除のみ)。FK ON DELETE は RESTRICT で DB レベル保護。並び替えは sort_order 数値入力で確定 (DnD 不採用)。Out of scope から「物理削除」を削除し、DnD のみ残す。要件分析フェーズ完了、T1 ワークフロープランニングへの進行同意を確認。
+
+### やり取り 14: T1 ワークフロープランニング進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: T1 を in_progress、実装プラン `aidlc-docs/inception/plans/2026-05-07-meeting-features-plan.md` を作成。タイムライン (5/2-5/7) + ブランチ戦略 (`feat/2026-05-07-meeting-features` + `pre-meeting-features-baseline` tag による revert 可能性確保) + 機能 A (Step A-1〜A-6) + 機能 B 前半 (B-01〜B-10) + 機能 B 後半 (B-11〜B-19) + 機能 C (C-1〜C-5) + 統合フェーズ (Z-1〜Z-8) + ロールバック手順 (コード / スキーマ / 部分) を全網羅。docs-index.md にプランを追加。
+
+### やり取り 15: T6 アプリケーション設計進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: T6 を in_progress、設計ファイル `aidlc-docs/inception/application-design/2026-05-07-meeting-features-design.md` を作成。既存 RLS パターン (`migrations/0009_rls_role_separation.sql` の CASE 式 + ヘルパー関数) を確認し、それに準拠した feedback_topics / feedback_submissions の RLS 設計を確定。機能 A の招待管理画面 (component 分解 + データフロー + API シグネチャ) / 機能 B の DB スキーマ詳細 (CREATE TABLE + INDEX + FK 設計) + RLS ポリシー (FOR ALL + FOR SELECT 併用パターン) + 投稿 / 一覧 / CRUD UI 構成 + API シグネチャ 7 本 / 機能 C の API + UI フロー / ER 差分図を全網羅。docs-index.md に設計ファイルを追加。
+
+### やり取り 16: T5 機能 C コード生成進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: T5 を in_progress、git tag `pre-meeting-features-baseline` を main HEAD (8708a98) に付与、`feat/2026-05-07-meeting-features` ブランチを作成。既存タスク実装 (`pages/api/tasks/[id].ts` / `taskService.ts` / `taskRepository.ts` / `TaskBoard.tsx` / `TaskForm.tsx` / `TaskCard.tsx` / `task.ts` schema) のパターン把握後、以下を実装:
+- `src/features/tasks/schemas/task.ts`: `duplicateTaskSchema` 追加 (ownerUserId 必須、その他 optional)
+- `src/features/tasks/lib/taskService.ts`: `duplicateTask` メソッド追加 (source 検索 → repo.create で新規 INSERT、status は repo デフォルトで 'todo')
+- `pages/api/tasks/[id]/duplicate.ts`: 新規 POST API (既存 [id].ts のパターン踏襲、TaskNotFoundError → 404)
+- `src/features/tasks/components/TaskForm.tsx`: `mode: 'create' | 'edit' | 'duplicate'` に拡張、duplicate 時は submit ラベル「複製」、placeholder option 追加、disabled 条件に `mode === 'duplicate' && !values.ownerUserId` 追加
+- `src/features/tasks/components/TaskBoard.tsx`: `ModalState` に 'duplicate' 追加、`handleDuplicate` ハンドラ追加 (POST /api/tasks/:id/duplicate)、編集モーダル内に「このタスクを別の先生にも振る (複製)」ボタン追加、複製モーダル新設
+- `__tests__/unit/taskService.duplicate.test.ts`: 新規 4 ケース (正常系 / source not found / params 上書き / description=null)
+動作確認:
+- `pnpm type-check`: GREEN
+- `pnpm lint`: GREEN (既存の AboutVitanotaModal img warning のみ、本実装に関係なし)
+- `pnpm test`: 22 ファイル / 202 tests 全 GREEN (新規 4 件含む、既存への regression なし)
+未実施:
+- ローカル動作確認 (chimo の手動検証待ち)
+- Playwright E2E (本番デプロイ後の検証で代替する可能性、要相談)
+- 統合テスト (memory: main の CI integration が常時赤の状況、新規追加せず手動検証で代替)
+- commit (chimo の指示待ち)
+
+## 5/7 説明会向け確定スコープ
+| # | 機能 | 内容 | 工数 |
+|---|---|---|---|
+| A | 25 名一括招待 + system_admin 招待管理画面 | テナント別一覧 (URL / ステータス) + 一括投入 UI | 1〜1.5 日 |
+| B | フィードバック (運営宛 / トピック制) | 3 トピック (改善してほしい点 / あったら嬉しい機能 / その他) + 投稿 UI + system_admin 閲覧 view | 1〜1.5 日 |
+| C | タスク複製ボタン | 既存タスクから別人にアサインしてコピー | 0.5 日 |
+| D | DB バックアップ | 現状維持 (PITR 1 日 + 日次 snapshot 7 日) | 0 日 |
+
+合計: 3〜3.5 日 / バッファ 1.5〜2 日 (5/6 予備日)
+
+## 裏テーマ踏み絵チェック (3 機能とも合格判定)
+- **招待管理画面**: system_admin (chimo) 専用画面なので教員間プレッシャー化なし。school_admin 向けには出さない。
+- **フィードバック**: 投稿は同校教員・school_admin から不可視 (RLS で system_admin 以外 read 拒否)。教員 → 運営の一方向ルート。トピック設計が教員自己評価を要求しない構造 (改善要望 / 機能要望 / 自由感想の 3 種で全て vitanota 側へのフィードバック)。
+- **タスク複製**: 単純な複製操作、進捗管理系・評価系には触れない。
+
+## post-MVP backlog 追加項目
+- タスク複数アサイン本実装 (M:N スキーマ化) — 5/7 説明会後の教員フィードバック次第で着手判断
+
+---

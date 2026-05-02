@@ -20,7 +20,8 @@ import { TaskCommentSection } from './TaskCommentSection';
 type ModalState =
   | { kind: 'closed' }
   | { kind: 'create'; categoryId?: string }
-  | { kind: 'edit'; task: TaskWithOwner };
+  | { kind: 'edit'; task: TaskWithOwner }
+  | { kind: 'duplicate'; sourceTask: TaskWithOwner };
 
 interface TaskBoardProps {
   selfUserId: string;
@@ -166,6 +167,42 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     }
   };
 
+  const handleDuplicate = async (sourceTaskId: string, values: TaskFormValues) => {
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const res = await fetch(`/api/tasks/${sourceTaskId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerUserId: values.ownerUserId,
+          categoryId: values.categoryId,
+          title: values.title,
+          description: values.description || null,
+          dueDate: values.dueDate || null,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string };
+        setFormError(body.message ?? 'タスクの複製に失敗しました');
+        return;
+      }
+      await mutateTasks();
+      closeModal();
+      const ownerLabel = (() => {
+        if (values.ownerUserId === selfUserId) return '自分';
+        const a = (assignees ?? []).find((x) => x.userId === values.ownerUserId);
+        return a?.name ?? '他の先生';
+      })();
+      showToast(
+        `${ownerLabel}のタスクとして「${values.title}」を複製しました`,
+        'success',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleStatusChange = async (
     id: string,
     status: 'todo' | 'in_progress' | 'done',
@@ -292,10 +329,51 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
               onCancel={closeModal}
               onDelete={() => handleDelete(modal.task.id)}
             />
+            <div className="mt-2 border-t border-gray-100 pt-3">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() =>
+                  modal.kind === 'edit' &&
+                  setModal({ kind: 'duplicate', sourceTask: modal.task })
+                }
+                className="text-xs"
+                data-testid="task-edit-duplicate-button"
+              >
+                このタスクを別の先生にも振る (複製)
+              </Button>
+            </div>
             <TaskCommentSection
               taskId={modal.task.id}
               selfUserId={selfUserId}
               canDeleteAny={false}
+            />
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        open={modal.kind === 'duplicate'}
+        onClose={closeModal}
+        title="タスクを複製"
+        maxWidth="max-w-lg"
+      >
+        {modal.kind === 'duplicate' && (
+          <>
+            <p className="mb-3 text-xs text-gray-600" data-testid="task-duplicate-source">
+              元タスク「{modal.sourceTask.title}」をコピーします。担当者を選択してください。
+            </p>
+            <TaskForm
+              mode="duplicate"
+              initial={{ ...toFormInitial(modal.sourceTask), ownerUserId: '' }}
+              categories={categories}
+              assignees={assignees ?? []}
+              canAssignToOthers
+              selfUserId={selfUserId}
+              submitting={submitting}
+              error={formError}
+              onSubmit={(values) => handleDuplicate(modal.sourceTask.id, values)}
+              onCancel={closeModal}
             />
           </>
         )}

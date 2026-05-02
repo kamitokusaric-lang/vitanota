@@ -1,11 +1,13 @@
 // system_admin 用テナント管理画面（US-S-001・US-S-002 実装）
 import { useState, useEffect } from 'react';
 import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 // system_admin は tenantId を持たないため withAuthSSR（tenantId 必須チェックあり）は使わない
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
+import { AdminLayout } from '@/shared/components/AdminLayout';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -88,11 +90,11 @@ export default function TenantsPage({ session }: TenantsPageProps) {
   return (
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="system_admin">
-        <div className="min-h-screen bg-gray-50 p-8">
+        <AdminLayout session={session}>
+        <div className="p-8">
           <div className="mx-auto max-w-4xl">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-800">テナント管理</h1>
-              <span className="text-sm text-gray-500">vitanota system admin</span>
             </div>
 
             {/* テナント作成フォーム */}
@@ -172,14 +174,23 @@ export default function TenantsPage({ session }: TenantsPageProps) {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Button
-                            variant={tenant.status === 'active' ? 'danger' : 'secondary'}
-                            onClick={() => handleToggleStatus(tenant)}
-                            className="text-xs"
-                            data-testid={`tenant-toggle-${tenant.id}`}
-                          >
-                            {tenant.status === 'active' ? '停止' : '再開'}
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`/admin/invitations?tenantId=${tenant.id}`}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              data-testid={`tenant-invitations-link-${tenant.id}`}
+                            >
+                              招待管理
+                            </Link>
+                            <Button
+                              variant={tenant.status === 'active' ? 'danger' : 'secondary'}
+                              onClick={() => handleToggleStatus(tenant)}
+                              className="text-xs"
+                              data-testid={`tenant-toggle-${tenant.id}`}
+                            >
+                              {tenant.status === 'active' ? '停止' : '再開'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -196,6 +207,7 @@ export default function TenantsPage({ session }: TenantsPageProps) {
             </div>
           </div>
         </div>
+        </AdminLayout>
       </RoleGuard>
     </TenantGuard>
   );

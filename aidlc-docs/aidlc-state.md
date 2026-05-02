@@ -217,3 +217,57 @@
 - `aidlc-docs/construction/local-development.md` - ローカル環境セットアップ
 - `aidlc-docs/inception/requirements/security-review.md` - 論点 A-M 対応済み
 - `aidlc-docs/construction/plans/unit-02-code-generation-plan.md` - 全 Step チェックリスト
+
+---
+
+## 2026-05-02 セッション: 5/7 教員向け説明会向け機能追加
+
+### セッション概要
+- **目的**: 2026-05-07 の 25 名教員向け説明会までに必要な機能 3 件を実装
+- **背景**: 校長導入意思表明 (2026-04-27) → 1 校パイロット開始の前段階として現場教員向け説明会
+- **想定工数**: 3.8〜4.3 日 (5/6 予備日 / バッファ 0.7〜1.2 日)
+- **前提**: 既存基盤 (Auth・RLS 4 ロール・タスク・テナント) は本番稼働中、本セッションは機能追加のみ
+
+### 確定スコープ
+| # | 機能 | 説明 |
+|---|---|---|
+| A | 25 名一括招待 + system_admin 招待管理画面 | `/admin/invitations` 新設 + bulk API + 一覧 (URL / ステータス) |
+| B | フィードバック (運営宛 / トピック制 + CRUD UI) | seed 3 トピック + 教員投稿 UI + system_admin 閲覧 view + トピック CRUD UI |
+| C | タスク複製ボタン | 既存タスクから別人にアサインしてコピー (M:N 本実装は post-MVP) |
+
+### ワークフロープラン (アダプティブ短縮)
+- ワークスペース検出: ✅ 完了 (state 既存・ブラウンフィールド継続)
+- リバースエンジニアリング: ⏭️ スキップ (既存基盤理解済み)
+- 要件分析: 🔵 最小限〜標準で実施 (3 機能の受け入れ条件・スコープ明確化)
+- ユーザーストーリー: ⏭️ スキップ (機能 A は system_admin = chimo 自身、B/C は要件で十分明示可能)
+- ワークフロープランニング: 🔵 実施 (実行順 + ファイル一覧)
+- アプリケーション設計: 🔵 実施 (招待管理画面構成 + フィードバック DB スキーマ)
+- ユニット生成: ⏭️ スキップ (既存ユニット内の追加)
+- コンストラクション: 機能 A → B → C の順
+  - 機能設計: 🔵 (B のみ、A/C は API/UI スコープが明確で省略可)
+  - NFR 要件 / NFR 設計: ⏭️ スキップ (新規 NFR なし)
+  - インフラ設計: ⏭️ スキップ (既存インフラで完結)
+  - コード生成: 🔵 (3 機能とも実施)
+- ビルド & テスト: 🔵 実施 (既存テストへの影響確認 + 新規テスト追加)
+
+### ステージ進捗
+- [x] 要件分析 — 完了 (2026-05-02)
+- [x] ワークフロープランニング — 完了 (2026-05-02)
+- [x] アプリケーション設計 — 完了 (2026-05-02)
+- [x] 機能 C コード生成 (タスク複製) — 完了 (2026-05-02、commit 4b79f6c)
+- [x] 機能 A コード生成 (一括招待 + 管理画面) — 完了 (2026-05-03、commit 042460e、type-check / lint / test 213/213 GREEN、ローカル動作確認待ち)
+- [x] 機能 B コード生成 (フィードバック) — 完了 (2026-05-03、test 233/233 GREEN)
+  - [x] B-01: migration 0022 (feedback_topics + feedback_submissions + RLS + index)
+  - [x] B-02: src/db/schema.ts に Drizzle 定義追加
+  - [x] B-03: RLS DSL は既存パターンに合わせ migration の手書きを正本としスキップ (rls:check 通過)
+  - [x] B-04: ローカル DB に migration 適用
+  - [x] B-05: 教員用 API (GET /api/feedback/topics + POST /api/feedback/submissions)
+  - [x] B-06: 教員用 UI (FAB + 投稿モーダル、teacher/school_admin のみ表示)
+  - [x] B-07: ユニットテスト 前半 (Zod schema 7 + Layout FAB 3)
+  - [x] B-08: GET /api/system/feedback (全投稿一覧 + テナント/トピックフィルタ)
+  - [x] B-09: GET/POST /api/system/feedback/topics (一覧 + 投稿数 + 新規)
+  - [x] B-10: PATCH/DELETE /api/system/feedback/topics/[id] (hybrid 削除: 投稿数 0 なら DELETE / >0 は 409)
+  - [x] B-11: pages/admin/feedback.tsx (投稿一覧 UI + フィルタ)
+  - [x] B-12: pages/admin/feedback/topics.tsx (CRUD UI + モーダル)
+  - [x] B-13: ユニットテスト 後半 (topic create / update Zod schema 10)
+- [ ] ビルド・統合テスト

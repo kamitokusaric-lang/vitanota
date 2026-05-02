@@ -105,6 +105,48 @@ export class TaskService {
       if (!deleted) throw new TaskNotFoundError();
     });
   }
+
+  // 元タスクから新規タスクを複製。ownerUserId は呼出側で必ず指定される。
+  // status / completed_at / コメント は引き継がず、純粋な内容コピーのみ。
+  async duplicateTask(
+    sourceId: string,
+    params: {
+      ownerUserId: string;
+      categoryId?: string;
+      title?: string;
+      description?: string | null;
+      dueDate?: string | null;
+    },
+    ctx: AuthContext,
+  ): Promise<Task> {
+    const due = parseDueDate(params.dueDate);
+
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      const source = await taskRepo.findById(tx, sourceId, ctx);
+      if (!source) throw new TaskNotFoundError();
+
+      const description =
+        params.description !== undefined
+          ? (params.description ?? undefined)
+          : (source.description ?? undefined);
+
+      const dueDate =
+        due !== undefined ? (due ?? undefined) : (source.dueDate ?? undefined);
+
+      return taskRepo.create(
+        tx,
+        {
+          categoryId: params.categoryId ?? source.categoryId,
+          ownerUserId: params.ownerUserId,
+          createdBy: ctx.userId,
+          title: params.title ?? source.title,
+          description,
+          dueDate,
+        },
+        ctx,
+      );
+    });
+  }
 }
 
 export const taskService = new TaskService();

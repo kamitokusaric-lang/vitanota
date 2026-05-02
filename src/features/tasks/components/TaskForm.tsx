@@ -18,7 +18,7 @@ export interface TaskFormValues {
 }
 
 interface TaskFormProps {
-  mode: 'create' | 'edit';
+  mode: 'create' | 'edit' | 'duplicate';
   initial?: Partial<TaskFormValues>;
   categories: TaskCategory[];
   assignees: Assignee[];
@@ -207,6 +207,9 @@ export function TaskForm({
             required
             disabled={readonly}
           >
+            {mode === 'duplicate' && (
+              <option value="">-- 担当者を選択 --</option>
+            )}
             <option value={selfUserId}>自分</option>
             {assignees
               .filter((a) => a.userId !== selfUserId)
@@ -247,11 +250,15 @@ export function TaskForm({
           {!readonly && (
             <Button
               type="submit"
-              disabled={submitting || !values.title.trim()}
+              disabled={
+                submitting ||
+                !values.title.trim() ||
+                (mode === 'duplicate' && !values.ownerUserId)
+              }
               className="text-xs"
               data-testid="task-form-submit"
             >
-              {mode === 'create' ? '作成' : '保存'}
+              {mode === 'create' ? '作成' : mode === 'duplicate' ? '複製' : '保存'}
             </Button>
           )}
         </div>

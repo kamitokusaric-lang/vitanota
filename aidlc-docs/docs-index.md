@@ -47,6 +47,7 @@
 | [CURRENT] | [`inception/requirements/requirement-verification-questions.md`](inception/requirements/requirement-verification-questions.md) | 要件確認 Q&A (Q1〜14) |
 | [CURRENT] | [`inception/requirements/cost-estimate.md`](inception/requirements/cost-estimate.md) | 開発費・月次コスト試算 |
 | [CURRENT] | [`inception/requirements/security-review.md`](inception/requirements/security-review.md) | セキュリティ要件レビュー |
+| [CURRENT] | [`inception/requirements/2026-05-07-meeting-features.md`](inception/requirements/2026-05-07-meeting-features.md) | 5/7 教員向け説明会向け機能追加要件 (招待管理 / フィードバック / タスク複製) |
 | [CURRENT] | [`inception/user-stories/personas.md`](inception/user-stories/personas.md) | 3 ペルソナ (教員 / 校長 / システム管理者) |
 | [CURRENT] | [`inception/user-stories/stories.md`](inception/user-stories/stories.md) | 24 ストーリー + MoSCoW |
 
@@ -63,6 +64,7 @@
 | [CURRENT] | [`inception/application-design/unit-of-work-dependency.md`](inception/application-design/unit-of-work-dependency.md) | Unit 間依存 |
 | [CURRENT] | [`inception/application-design/unit-of-work-story-map.md`](inception/application-design/unit-of-work-story-map.md) | Unit ↔ Story マッピング |
 | [CURRENT] | [`construction/sequence-diagrams.md`](construction/sequence-diagrams.md) | 主要シーケンス図 |
+| [CURRENT] | [`inception/application-design/2026-05-07-meeting-features-design.md`](inception/application-design/2026-05-07-meeting-features-design.md) | 5/7 教員向け説明会向け機能の設計 (DB スキーマ + RLS + 画面構成 + API シグネチャ) |
 
 ## 🧩 Unit 別設計（実装詳細）
 
@@ -145,6 +147,7 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | [PROCESS] | [`aidlc-state.md`](aidlc-state.md) | 現在のステージ・進捗チェックリスト |
 | [PROCESS] | [`audit.md`](audit.md) | 全ユーザー入力・AI 応答・決定の時系列ログ |
 | [PROCESS] | [`inception/plans/`](inception/plans/) | インセプション各ステージのプラン (execution-plan.md 等) |
+| [CURRENT] | [`inception/plans/2026-05-07-meeting-features-plan.md`](inception/plans/2026-05-07-meeting-features-plan.md) | 5/7 教員向け説明会向け機能追加の実装プラン (機能 A/B/C のステップチェックリスト + デプロイ + ロールバック手順) |
 | [PROCESS] | [`construction/plans/`](construction/plans/) | Unit 別の functional/nfr/infra/code 生成プラン (20 ファイル) |
 | [PROCESS] | `construction/unit-XX-*-questions.md` | 質問・回答の記録 |
 

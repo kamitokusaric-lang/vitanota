@@ -39,6 +39,19 @@ export const taskIdParamSchema = z
   .object({ id: z.string().uuid('不正なタスクIDです') })
   .openapi('TaskIdParam');
 
+// 複製: ownerUserId は必須 (元タスクの owner と独立)、その他は任意で上書き
+export const duplicateTaskSchema = z
+  .object({
+    ownerUserId: z.string().uuid('担当者を選択してください'),
+    categoryId: z.string().uuid().optional(),
+    title: z.string().trim().min(1, 'タイトルを入力してください').max(200).optional(),
+    description: z.string().max(2000).nullable().optional(),
+    dueDate: dueDateString.nullable().optional(),
+  })
+  .openapi('DuplicateTaskInput');
+
+export type DuplicateTaskInput = z.infer<typeof duplicateTaskSchema>;
+
 // scope='mine': owner=自分 OR createdBy=自分 (タスクボードの「自分」フィルタ用、アサイン元も含む)
 export const listTasksQuerySchema = z
   .object({

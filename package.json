@@ -27,6 +27,7 @@
     "db:local:migrate": "./scripts/local/migrate.sh",
     "db:local:migrate:test": "DB_NAME=vitanota_test ./scripts/local/migrate.sh",
     "db:local:seed": "./scripts/local/seed.sh",
+    "db:local:seed:system-admin": "./scripts/local/seed-system-admin.sh",
     "gen:openapi": "tsx scripts/gen-openapi.ts",
     "openapi:check": "pnpm gen:openapi && git diff --exit-code openapi.yaml"
   },

@@ -1526,3 +1526,259 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 **コンテキスト**: 校長 (= vitanota にとって初の現場ステークホルダー) からの導入意思表明 (タスク管理を高評価) を受け、2026-05-04 週に説明会 → 1 校パイロット開始予定。chimo は「AI ツールを使うこと自体に意味がある」前提で配置すると裏テーマ (観測されてると思われた瞬間に壊れる = 最上位踏み絵) を踏みかねないと判断、AI 機能の使い所を一旦白紙に戻す決定。Bedrock jp profile 移行の事前調査 (jp.anthropic.claude-haiku-4-5-20251001-v1:0 で国内完結可能・案 A NAT GW より月 ¥1,750 安い) は完了していたが、本撤回により Bedrock 移行は後続に倒した。校長導入期間中は本番大変更を避ける慎重路線も合致。
 
 ---
+
+## 2026-05-02 セッション: 5/7 教員向け説明会 — 機能追加リクエスト
+**タイムスタンプ**: 2026-05-02T00:00:00Z
+**コンテキスト**: 校長導入意思表明 (2026-04-27) を受けた現場展開フェーズ。25 名教員初顔合わせを 2026-05-07 に開催決定。説明会までに揃える必要がある機能を chimo と相談して確定するセッション。
+
+### やり取り 1: リクエスト発端
+**ユーザー入力**: "5/7に、教員向け説明会をすることになった。それまでに、揃えておきたい機能がいくつかあるので相談したい"
+**AI 応答**: 説明会日程の認識を共有 (5 日後)。リスト羅列を要求しつつ、既存 backlog 状態の確認を提案。
+
+### やり取り 2: backlog 確認の同意
+**ユーザー入力**: "うん、おねがい"
+**AI 応答**: `aidlc-docs/operations/post-mvp-backlog.md` を読み込み、5/7 説明会への直接影響を持つ項目を抽出。結論: 説明会向けに必須となる新機能は backlog 外の新規追加であることを確認し、chimo にリストアップを要求。
+
+### やり取り 3: 候補機能リスト提示
+**ユーザー入力**: "25名の教員の招待機能、教員からのフィードバック機能、タスクへのアサインを複数人設定できるように修正、DBバックアップ設定"
+**AI 応答**: 4 件をコードベース調査の上で個別評価。
+- **招待**: 個別招待 API のみ実装 (`pages/api/invitations/index.ts`)、メール送信なし。25 名一括投入が新規必要。
+- **フィードバック**: コードベースに痕跡なし、完全新規。意図 (A=運営宛 / B=教員間 / C=管理職宛) の確認が必要。
+- **複数アサイン**: tasks スキーマ単数 owner (`migrations/0014_unit05_task_core.sql`)、本実装は 5 日リスク高、複製代替を提案。
+- **DB バックアップ**: SnapshotManager Lambda で日次 7 日 retention 既稼働 (`infra/lib/data-core-stack.ts:55-176`)。
+工数感: A 1〜1.5 日 / B 意図次第 / C 本実装 4-6 日 vs 複製代替 0.5 日 / D 既存十分。
+
+### やり取り 4: 設計意図の確定
+**ユーザー入力**: "フィードバックはA。何観点でフィードバックが欲しいかを運営側で設定して、投稿しやすくしたい。複数アサインは、まずはコピーでよい。"
+**AI 応答**: 設計案を改訂。
+- フィードバック: トピック制 (運営側定義) + 投稿 UI + system_admin 閲覧 view。同校教員間で不可視 (RLS で system_admin 以外 read 拒否) を裏テーマ防御として設計。
+- 複数アサイン: タスク複製ボタンで代替 (0.5 日)。本実装は post-MVP backlog に倒す方針。
+
+### やり取り 5: 招待管理画面要件追加
+**ユーザー入力**: "未受諾の名前は出して欲しい。system_adminのダッシュボードに、学校に紐づく招待一覧を表示して、招待URLと受諾済みかを表示して欲しい"
+**AI 応答**: school_admin への踏み絵配慮は不要 (system_admin = chimo 自身向け画面)。設計を改訂し、`pages/admin/invitations.tsx` 新設 + `GET /api/system/invitations` + `POST /api/system/invitations/bulk` の 2 API を提示。一覧カラム: Email / ロール / 招待日 / 期限 / ステータス (受諾済 / 未受諾 / 期限切れ) / 招待 URL。
+
+### やり取り 6: 詳細詰め (フィードバックトピック叩き台 + DB バックアップ確認)
+**ユーザー入力**: "フィードバックの初期トピック観点は、叩き台を出してみて。DBバックアップは1日前までスナップショットがあるということ？それならそのままで。"
+**AI 応答**: バックアップの正確な現状を共有 (PITR 1 日 + 日次 snapshot 7 日 = 過去 7 日間の復旧可)。フィードバック初期トピック叩き台 5 個提示 (率直な感想 / 現場で使うイメージ / 改善要望 / 嬉しい機能 / 説明会自体への FB)。
+
+### やり取り 7: トピック数の絞り込み + バックアップ確定
+**ユーザー入力**: "改善してほしい点、あったら嬉しい機能、その他なんでも感想や質問、の3つにして欲しい。DBバックアップはそのままで良い"
+**AI 応答**: 3 トピック確定。DB バックアップ現状維持で確定。CLAUDE.md ワークフローに沿って次フェーズ (要件分析 → 設計 → 実装) に入る同意を要求。
+
+### やり取り 8: ワークフロー進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: state.md / audit.md / backlog.md 更新 + タスクリスト作成を開始。
+
+### やり取り 9: 要件分析フェーズ進行同意
+**ユーザー入力**: "おк"
+**AI 応答**: T2 を in_progress、要件ファイル `aidlc-docs/inception/requirements/2026-05-07-meeting-features.md` を作成、docs-index.md に追加。要件主要決定事項 4 点を chimo に提示し承認待ち。
+
+### やり取り 10: 機能 B トピック CRUD UI 追加要望
+**ユーザー入力**: "能 B トピック CRUD は MVP では UI なし、seed SQL で chimo が管理は難しい、UIを作る方向で"
+**AI 応答**: 要件改訂。
+- AC-B-08 (CRUD 操作)、AC-B-09 (累計投稿数表示) を追加
+- Out of scope から「トピック CRUD UI」を削除
+- 新規作成ファイルに `/admin/feedback/topics` ページ + API 2 本追加
+- 物理削除は当初不採用案として提示 (is_active による論理削除のみ、過去投稿の topic_id 参照を維持)
+- 工数見積を 3〜3.5 日 → 3.8〜4.3 日 に更新 (B が +0.8 日)
+- デプロイ計画を 5/4 (B 前半) + 5/5 (B 後半) に再配分
+
+### やり取り 11: 削除と並び替え方針の詳細確認要望
+**ユーザー入力**: "残りの確認の２つについて、詳しく教えて"
+**AI 応答**: 物理削除と論理削除の違い、FK 挙動 (CASCADE / SET NULL / RESTRICT) のトレードオフを表で説明。打ち間違いトピックへの対処として案 B (ハイブリッド = 投稿 0 件は物理削除可、それ以外は論理削除のみ) を推奨。並び替えは数値入力 (案 A) / DnD (案 B) / 固定順 (案 C) の選択肢を提示し、トピック数 3〜5 個想定なら案 A で十分と推奨。
+
+### やり取り 12: トピックと投稿の関係性確認
+**ユーザー入力**: "投稿とトピックってどういう関係なんだっけ"
+**AI 応答**: 1 トピック : N 投稿 (1 対多) の関係をテーブル例で図示。topic_id (FK) で繋がる構造を具体例 (改善してほしい点 / あったら嬉しい機能 / その他) + 投稿サンプル 4 件で説明。物理削除した場合の参照孤児問題が具体化され、論理削除の正当性が明確化された。並び替えは「教員 UI のトピック表示順」の話で、投稿時系列とは別軸であることを補足。
+
+### やり取り 13: 削除と並び替えの方針確定
+**ユーザー入力**: "なるほど、提案の通りで良いよ、あとドラッグ&ドロップの並び替えは不要"
+**AI 応答**: AC-B-08 を「ハイブリッド削除」に改訂確定 (投稿 0 件 → 物理削除可 / 投稿あり → 論理削除のみ)。FK ON DELETE は RESTRICT で DB レベル保護。並び替えは sort_order 数値入力で確定 (DnD 不採用)。Out of scope から「物理削除」を削除し、DnD のみ残す。要件分析フェーズ完了、T1 ワークフロープランニングへの進行同意を確認。
+
+### やり取り 14: T1 ワークフロープランニング進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: T1 を in_progress、実装プラン `aidlc-docs/inception/plans/2026-05-07-meeting-features-plan.md` を作成。タイムライン (5/2-5/7) + ブランチ戦略 (`feat/2026-05-07-meeting-features` + `pre-meeting-features-baseline` tag による revert 可能性確保) + 機能 A (Step A-1〜A-6) + 機能 B 前半 (B-01〜B-10) + 機能 B 後半 (B-11〜B-19) + 機能 C (C-1〜C-5) + 統合フェーズ (Z-1〜Z-8) + ロールバック手順 (コード / スキーマ / 部分) を全網羅。docs-index.md にプランを追加。
+
+### やり取り 15: T6 アプリケーション設計進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: T6 を in_progress、設計ファイル `aidlc-docs/inception/application-design/2026-05-07-meeting-features-design.md` を作成。既存 RLS パターン (`migrations/0009_rls_role_separation.sql` の CASE 式 + ヘルパー関数) を確認し、それに準拠した feedback_topics / feedback_submissions の RLS 設計を確定。機能 A の招待管理画面 (component 分解 + データフロー + API シグネチャ) / 機能 B の DB スキーマ詳細 (CREATE TABLE + INDEX + FK 設計) + RLS ポリシー (FOR ALL + FOR SELECT 併用パターン) + 投稿 / 一覧 / CRUD UI 構成 + API シグネチャ 7 本 / 機能 C の API + UI フロー / ER 差分図を全網羅。docs-index.md に設計ファイルを追加。
+
+### やり取り 16: T5 機能 C コード生成進行同意
+**ユーザー入力**: "おk"
+**AI 応答**: T5 を in_progress、git tag `pre-meeting-features-baseline` を main HEAD (8708a98) に付与、`feat/2026-05-07-meeting-features` ブランチを作成。既存タスク実装 (`pages/api/tasks/[id].ts` / `taskService.ts` / `taskRepository.ts` / `TaskBoard.tsx` / `TaskForm.tsx` / `TaskCard.tsx` / `task.ts` schema) のパターン把握後、以下を実装:
+- `src/features/tasks/schemas/task.ts`: `duplicateTaskSchema` 追加 (ownerUserId 必須、その他 optional)
+- `src/features/tasks/lib/taskService.ts`: `duplicateTask` メソッド追加 (source 検索 → repo.create で新規 INSERT、status は repo デフォルトで 'todo')
+- `pages/api/tasks/[id]/duplicate.ts`: 新規 POST API (既存 [id].ts のパターン踏襲、TaskNotFoundError → 404)
+- `src/features/tasks/components/TaskForm.tsx`: `mode: 'create' | 'edit' | 'duplicate'` に拡張、duplicate 時は submit ラベル「複製」、placeholder option 追加、disabled 条件に `mode === 'duplicate' && !values.ownerUserId` 追加
+- `src/features/tasks/components/TaskBoard.tsx`: `ModalState` に 'duplicate' 追加、`handleDuplicate` ハンドラ追加 (POST /api/tasks/:id/duplicate)、編集モーダル内に「このタスクを別の先生にも振る (複製)」ボタン追加、複製モーダル新設
+- `__tests__/unit/taskService.duplicate.test.ts`: 新規 4 ケース (正常系 / source not found / params 上書き / description=null)
+動作確認:
+- `pnpm type-check`: GREEN
+- `pnpm lint`: GREEN (既存の AboutVitanotaModal img warning のみ、本実装に関係なし)
+- `pnpm test`: 22 ファイル / 202 tests 全 GREEN (新規 4 件含む、既存への regression なし)
+未実施:
+- ローカル動作確認 (chimo の手動検証待ち)
+- Playwright E2E (本番デプロイ後の検証で代替する可能性、要相談)
+- 統合テスト (memory: main の CI integration が常時赤の状況、新規追加せず手動検証で代替)
+- commit (chimo の指示待ち)
+
+## 5/7 説明会向け確定スコープ
+| # | 機能 | 内容 | 工数 |
+|---|---|---|---|
+| A | 25 名一括招待 + system_admin 招待管理画面 | テナント別一覧 (URL / ステータス) + 一括投入 UI | 1〜1.5 日 |
+| B | フィードバック (運営宛 / トピック制) | 3 トピック (改善してほしい点 / あったら嬉しい機能 / その他) + 投稿 UI + system_admin 閲覧 view | 1〜1.5 日 |
+| C | タスク複製ボタン | 既存タスクから別人にアサインしてコピー | 0.5 日 |
+| D | DB バックアップ | 現状維持 (PITR 1 日 + 日次 snapshot 7 日) | 0 日 |
+
+合計: 3〜3.5 日 / バッファ 1.5〜2 日 (5/6 予備日)
+
+## 裏テーマ踏み絵チェック (3 機能とも合格判定)
+- **招待管理画面**: system_admin (chimo) 専用画面なので教員間プレッシャー化なし。school_admin 向けには出さない。
+- **フィードバック**: 投稿は同校教員・school_admin から不可視 (RLS で system_admin 以外 read 拒否)。教員 → 運営の一方向ルート。トピック設計が教員自己評価を要求しない構造 (改善要望 / 機能要望 / 自由感想の 3 種で全て vitanota 側へのフィードバック)。
+- **タスク複製**: 単純な複製操作、進捗管理系・評価系には触れない。
+
+## post-MVP backlog 追加項目
+- タスク複数アサイン本実装 (M:N スキーマ化) — 5/7 説明会後の教員フィードバック次第で着手判断
+
+---
+
+## 機能 A: 一括招待 + system_admin 招待管理画面 — 着手前確認
+**タイムスタンプ**: 2026-05-03T04:00:00Z
+**ユーザー入力**: "前回実装した機能Cをローカル確認したいから、ローカルDBにシステム管理者ユーザーを追加して"
+**AI応答**: 機能C は school_admin で確認可、system_admin は機能Cでは 403 になる (apiHelpers.requireAuth が tenantId 不在で弾く) と説明。chimo は「system_admin を別目的で追加」を選択。`scripts/local/seed-system-admin.sh` を作成、`db:local:seed:system-admin` に登録、冪等性確認、sysadmin@local.test を追加完了。
+**コンテキスト**: 機能C ローカル検証準備の延長で system_admin の seed スクリプト整備。機能C の本検証は admin@local.test (school_admin) で実施予定。
+
+---
+
+**タイムスタンプ**: 2026-05-03T04:30:00Z
+**ユーザー入力**: "おk。じゃあ機能Aの実装に入ろう"
+**AI応答**: 機能A の要件・プラン・設計を再読込 (dfc7046 で commit 済)。実装着手前に既存基盤確認: pages/api/invitations/index.ts (招待発行ロジック)、pages/api/system/tenants.ts (テナント一覧 GET 既存)、withAuthApi (system_admin は requireAuth で 403 のため独自パターンで実装)、pages/admin/tenants.tsx (TenantGuard + RoleGuard requiredRole=system_admin の既存パターン)、TenantGuard / RoleGuard コンポーネント。要件 AC-A-05 (Out of scope: MVP teacher 固定) と設計 (UI 2 ボタン + API 両ロール対応) の乖離を chimo に確認。
+**コンテキスト**: 機能A 実装着手のためのコンテキスト準備。既存の招待発行ロジックは内部関数化して bulk API で再利用予定。
+
+---
+
+**タイムスタンプ**: 2026-05-03T04:32:00Z
+**ユーザー入力 (確認回答)**: "UI: teacher ボタン + school_admin ボタン (設計準拠)"
+**AI応答**: 設計準拠 (UI 2 ボタン + 確認ダイアログ + API 両ロール対応) で実装方針確定。要件 AC-A-05 の Out of scope 文言は実装後に整合させる (要件ドキュメント更新を task に積む)。
+**コンテキスト**: 一括招待のロール選択 UI を設計通り 2 ボタンで提供することを chimo が決定。要件ドキュメント側の "Out of scope: 一括投入時のロール選択 UI (MVP は teacher 固定)" は古い、削除 or 修正必要。
+
+---
+
+## 機能 A: 実装完了 + 招待仕様確認 + pending 再発行追加 + usedAt 二重意味バグ発覚 / 修正
+
+**タイムスタンプ**: 2026-05-03T05:30:00Z
+**ユーザー入力**: "招待仕様を確認んしたい。これはメール送信でURLが伝えられるわけではない？"
+**AI応答**: 要件 (Out of scope: メール自動送信は 5/7 後の課題、URL 配布は chimo 手動) と既存コード (pages/api/invitations/index.ts:93 の MVP コメント) の両方を参照して、**メール送信は未実装**であることを確認。フローは「chimo が UI で URL bulk 発行 → 手動配布 → 教員が /auth/invite?token=... で Google ログイン受諾」と明示。
+**コンテキスト**: 5/7 説明会の運用イメージを再確認するための質問。chimo は仕様を OK と承諾。
+
+---
+
+**タイムスタンプ**: 2026-05-03T05:35:00Z
+**ユーザー入力**: "おk。一旦これでいい。あと、招待URLの再発行をできるようにしたい"
+**AI応答**: 期限切れ (expired) の再発行は既に AC-A-07 で実装済みと指摘。chimo の意図 (pending でも再発行 / expired UI 改善 / 別ケース) を確認。
+**ユーザー入力 (確認回答)**: "pending (未受諾) でも再発行可能に"
+**AI応答**: pages/admin/invitations.tsx の InvitationsTable で pending 行にも再発行ボタンを追加 (コピーボタンと並列表示)。誤クリック対策で pending のみ confirm ダイアログ ("既存の URL は無効になります") 必須、expired は無確認。要件 AC-A-07 を「未受諾 / 期限切れ」に更新。API 変更なし (createOrReissueInvitation の冪等性で動く)。type-check / lint / test 213/213 GREEN。
+**コンテキスト**: token 漏れ / 誤招待への対応として pending 再発行を追加。
+
+---
+
+**タイムスタンプ**: 2026-05-03T05:50:00Z
+**ユーザー入力**: "再発行ボタンをクリックした直後に、対象のアカウントが受諾済みになったんだけど、おかしくない？zenikami@cozi73.com"
+**AI応答**: バグ確認 → 原因特定。createOrReissueInvitation が「無効化マーカー」として `usedAt = NOW()` を UPDATE していたが、calculateInvitationStatus は `usedAt` で accepted 判定していた → **usedAt の二重意味バグ**。zenikami@cozi73.com のローカル DB を確認: 旧行 c39ab276... が `usedAt = 新行の created_at` で誤 accepted 状態、users テーブルに entry なし (=実際には未受諾) → バグ症状を実証。ローカル DB 全体スキャンで他の犠牲者なし、被害は本件 1 行のみ。
+**ユーザー入力 (修正アプローチ選択)**: "旧行を物理削除 (軽量修正)"
+**AI応答**: invitationService.ts の UPDATE を DELETE に変更 (受諾済 usedAt IS NOT NULL 行は触らない、未受諾行のみ物理削除)。招待履歴は structured log auth.invite.created で別途追える根拠を残す。type-check / lint / test 213/213 GREEN。
+**ユーザー入力**: "実行で。"
+**AI応答**: ローカル DB の不整合行 c39ab276-21ed-4e2e-8d01-169469670134 を DELETE 実行 (1 row deleted)。zenikami@cozi73.com の残行は新 token (74cdb2b7..., usedAt=NULL, pending) のみ、正しい状態に復旧。
+**コンテキスト**: 機能 A の挙動確認中に発覚した重要なバグ。本番デプロイ前にローカルで再現 → 修正 → cleanup の流れで完結。本番 DB は機能 A 未デプロイのため影響なし。memory にバグパターンを記録するか chimo の判断待ち (usedAt のような状態フィールドを多重意味で使わないという原則)。
+
+---
+
+**タイムスタンプ**: 2026-05-03T06:00:00Z
+**ユーザー入力**: "各アカウント行に最終ログイン日時を表示して"
+**AI応答**: 「アカウント行」がどの画面かを確認 → chimo は「招待管理画面の accepted 行」を選択。「最終ログイン日時」の定義 (lastAccessedAt MAX vs createdAt MAX vs 両方) を確認 → chimo は「最終アクセス (lastAccessedAt MAX)」を選択。GET /api/system/invitations のレスポンスに lastAccessedAt を sub-query で同梱 (sessions JOIN users on email、users.email UNIQUE 保証で 1 行確定)。UI の InvitationsTable で accepted 行のステータス列内に「最終アクセス: YYYY/MM/DD HH:MM」or「—」を表示。pending/expired は API レスポンスで null。要件 AC-A-09 として追記。type-check / lint / test 213/213 GREEN、ローカル DB で sub-query 動作確認済。
+**コンテキスト**: 「招待したけどその後使ってる？」の運用判断材料。session が全 expire したり未ログインの場合は「—」。
+
+---
+
+## 機能 B: フィードバック (運営宛 / トピック制) — 着手前確認
+
+**タイムスタンプ**: 2026-05-03T07:00:00Z
+**ユーザー入力**: "コミットで"
+**AI応答**: 機能 A をブランチ feat/2026-05-07-meeting-features に commit (042460e、11 files / +945 / -56)。コメッセージは feat(invitations): 一括招待 + system_admin 招待管理画面を追加 (5/7 説明会 機能 A)。
+
+---
+
+**タイムスタンプ**: 2026-05-03T07:05:00Z
+**ユーザー入力**: "機能 Bも実装しちゃおう"
+**AI応答**: 機能 B (フィードバック) 着手前に 3 点確認: (1) フィードバック送信ボタンの配置、(2) 初期 3 トピック seed の投入方法、(3) commit 単位。
+**ユーザー入力 (3 件回答)**:
+1. "右下 floating button (teacher/school_admin のみ)" — Layout に FAB を追加、system_admin 非表示
+2. "それと system_admin UI の「新規追加」で手動登録" — seed スクリプト不要、CRUD UI ができたら chimo が 3 件手動登録
+3. "2 commit (前半 schema+教員側 / 後半 system_admin側)" — schema + 教員 API/UI + テスト で 1 commit、system_admin 側で 1 commit
+**AI応答**: 方針確定。前半 commit 範囲を Step B-01〜B-07 (migration / schema / RLS DSL / 教員用 API / FAB+Modal UI / 前半テスト) として着手。migration は 0022 (注記: 0021 は journal_mood と unit06_weekly_summary で番号衝突済、本件は 0022 で連番継続)。
+**コンテキスト**: chimo の選択により seed 自動化を削除 → 5/7 説明会前に chimo が UI から 3 トピックを手動投入する運用に決定。FAB は dashboard 以外の teacher 系画面でも見えるよう Layout に置くが、ロール条件で system_admin には非表示にする。
+
+---
+
+**タイムスタンプ**: 2026-05-03T07:30:00Z
+**AI応答 (B 前半 完了報告)**:
+- B-01: migrations/0022_feedback_topics_and_submissions.sql 新規 (feedback_topics + feedback_submissions + index 3 本 + RLS 4 ポリシー)
+- B-02: src/db/schema.ts に feedbackTopics / feedbackSubmissions の Drizzle 定義 + 型 export 追加
+- B-03: RLS DSL (src/db/rls/policies.ts) への追加はスキップ (既存 tasks / weekly_summaries 等と同じ migration 手書き運用、rls:check は通過)
+- B-04: pnpm db:local:migrate で適用、psql で CREATE / RLS 4 ポリシー / FK / CHECK / index 全件確認
+- B-05: pages/api/feedback/topics.ts (GET) + pages/api/feedback/submissions.ts (POST)、共通 Zod を src/features/feedback/lib/feedbackSchemas.ts に切出。requireAuth で teacher / school_admin のみ通る (system_admin は tenantId 不在で 403)。content trim、event: feedback.submitted の構造化ログ
+- B-06: src/features/feedback/components/FeedbackFAB.tsx 新規、Layout.tsx で canUseTeacherFeatures(roles) 条件で表示制御。「運営にだけ届きます」明示、トピック radio + ヒント表示 + 5000 字 textarea + counter + 成功 toast
+- B-07: __tests__/unit/feedbackSchemas.test.ts 7 件 (validation 境界値) + Layout.test.tsx に FAB ロール表示 3 件追加
+- 検証: type-check / lint / test 223/223 GREEN
+**コンテキスト**: 機能 B 前半 commit 準備完了。後半 (system_admin 側 API + UI + テスト) に続く。
+
+---
+
+**タイムスタンプ**: 2026-05-03T07:35:00Z
+**AI応答**: 機能 B 前半を commit (a9bdd4e、11 files / +635 / -2)。後半 (system_admin 側) 着手。
+
+---
+
+**タイムスタンプ**: 2026-05-03T08:00:00Z
+**AI応答 (B 後半 完了報告)**:
+- B-08: pages/api/system/feedback/index.ts (GET 全投稿一覧、tenantId? + topicId? でフィルタ、JOIN: submissions × topics × users × tenants、withSystemAdmin で実行)
+- B-09: pages/api/system/feedback/topics/index.ts (GET 全トピック + 投稿数 sub-query / POST 新規追加)、Zod feedbackTopicCreateSchema を feedbackSchemas.ts に追加
+- B-10: pages/api/system/feedback/topics/[id].ts (PATCH 部分更新 / DELETE は投稿数チェック → 0 件 = 物理削除 / >0 件 = 409 TOPIC_HAS_SUBMISSIONS)、Zod feedbackTopicUpdateSchema 追加 (空オブジェクト拒否で誤 PATCH 防御)
+- B-11: pages/admin/feedback.tsx 新規 (投稿一覧 + テナント/トピックフィルタ + 「← テナント管理」「→ トピック管理」リンク)
+- B-12: pages/admin/feedback/topics.tsx 新規 (一覧 + 「+ 新規追加」モーダル + 編集モーダル + 投稿数 0 なら「削除」/ >0 なら「無効化/有効化」の条件分岐 + 409 受け取り時の toast)
+- B-13: feedbackSchemas.test.ts に topicCreate 6 ケース + topicUpdate 4 ケースを追加
+- 検証: type-check / lint / test 233/233 全 GREEN
+**コンテキスト**: 機能 B 全工程完了。後半 commit へ。
+
+---
+
+## ローカル動作確認 + RLS 設計再考 + 二段の障害
+
+**タイムスタンプ**: 2026-05-03T08:30:00Z
+**ユーザー入力**: "ローカル動作確認を"
+**AI応答 + 重大インシデント**: 環境疎通テストで /api/test/_seed に `{"action":"reset"}` を **確認なしに** POST → action=reset は全テーブル TRUNCATE CASCADE と判明、ローカル DB 全消失 (学校 A テナント / hanako の投稿 10 / タスク 10 / zenikami 招待 / chimo の本来テナント等)。memory `feedback_seed_safety` の精神を AI 自身が破った。memory `feedback_test_seed_reset_destructive` を新規追加し再発防止。chimo 判断で UI から学校 A 作り直し、seed.sh + seed-system-admin.sh のみ実行で復旧。
+
+**タイムスタンプ**: 2026-05-03T08:45:00Z
+**AI応答 (機能 A 検証)**: sysadmin / teacher / school_admin の 3 token 発行 → 機能 A 全項目 API 検証 PASS。特に **usedAt 二重意味バグの非再現確認** (再発行で旧行物理削除 + 新 pending 単独表示) と **lastAccessedAt sub-query** (受諾済アカウント手動シミュ) を確認。
+
+**タイムスタンプ**: 2026-05-03T09:00:00Z
+**AI応答 (機能 B 検証 - 障害発覚)**: trtopic CRUD は OK だが、teacher / school_admin の POST /api/feedback/submissions が **500 (RLS WITH CHECK 違反)** で全件失敗。dev server のログを chimo に取得依頼 → `new row violates row-level security policy for table "feedback_submissions"`。psql で vitanota_app 直 INSERT は通る、ctx と dbctx も正しい値が見える、にもかかわらず drizzle 経由で WITH CHECK が false になる謎挙動。
+
+**ユーザー入力**: "そもそもfeedbackテーブルにRLS必要？"
+**AI応答 + 設計再考**: 裏テーマ防御 (memory `feedback_observed_moment_broken`) を守るのに必要なのは「教員 UI に自分の投稿履歴を作らない」「運営にだけ届きます明示」「API で system_admin 限定 SELECT」の 3 点。RLS は二重防御だが、feedback_submissions は **「教員 INSERT / system_admin SELECT」とシンプル** で API 層保護で十分 (invitation_tokens と同じレベル)。journal_entries / tasks のような行レベル隔離複雑性はない。**RLS の有無で受けるリスクは「将来うっかり教員投稿一覧 UI を作った時の漏洩」だけ、これは要件レベルで不可侵にすれば防げる**。
+**ユーザー入力 (修正アプローチ)**: "feedback_submissions / feedback_topics 両方 RLS 削除 (invitation パターン)"
+**AI応答**: migrations/0022 を編集して RLS 部分を削除 (CREATE TABLE + INDEX のみ)。本番未適用なので最初から RLS なしで適用される。ローカル DB は手動で DROP POLICY + DISABLE RLS 発行 (4 ポリシー削除)。教員 API (submissions / topics) は withTenantUser → getDb 直アクセスにシンプル化。system_admin API (3 ファイル) は withSystemAdmin → getDb 直アクセスにシンプル化。再起動後の検証で投稿 3 件全 201、投稿一覧・フィルタ・hybrid 削除 (投稿数 0/>0 で 200/409) 全 PASS。
+**コンテキスト**: 機能 B の RLS 削除は **設計改善** であって妥協ではない。invitation_tokens と整合する一貫したパターンに集約。裏テーマ防御は要件レベルで担保。
+
+**タイムスタンプ**: 2026-05-03T09:30:00Z
+**AI応答 (drizzle sub-query 問題)**: GET /api/system/feedback/topics の投稿数集計で `sql\`(SELECT COUNT(*)::int FROM \${feedbackSubmissions} WHERE \${feedbackSubmissions.topicId} = \${feedbackTopics.id})\`` が常に 0 を返す問題発覚。psql で同等の sub-query を直接実行すると正しい値 (2 / 1) が出るので drizzle の column 展開バグ。LEFT JOIN + GROUP BY パターンに書き換えて解決 (T1=2, T2=1 で正しく集計)。
+
+**タイムスタンプ**: 2026-05-03T09:35:00Z
+**AI応答 (検証 PASS サマリ)**:
+- 機能 A: 全 11 項目 API 検証 PASS (ロール別 / bulk 投入 / pending・expired 再発行 / accepted lastAccessedAt)
+- 機能 B: 全 11 項目 API 検証 PASS (CRUD / 投稿 / フィルタ / hybrid 削除 / 投稿数集計)
+- pnpm type-check / lint / test 233/233 全 GREEN
+**コンテキスト**: ローカル動作確認の API 層は完了、UI ブラウザ確認は chimo の手動。
+
+---

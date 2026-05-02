@@ -4,6 +4,8 @@ import { signOut } from 'next-auth/react';
 import type { VitanotaSession } from '@/shared/types/auth';
 import { MyProfileModal } from '@/features/profile/components/MyProfileModal';
 import { AboutVitanotaModal } from '@/shared/components/AboutVitanotaModal';
+import { FeedbackFAB } from '@/features/feedback/components/FeedbackFAB';
+import { canUseTeacherFeatures } from '@/features/auth/lib/role-helpers';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +16,7 @@ export function Layout({ children, session }: LayoutProps) {
   const { name } = session.user;
   const [profileOpen, setProfileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const showFeedbackFab = canUseTeacherFeatures(session.user.roles);
 
   return (
     <div className="min-h-screen bg-vn-bg">
@@ -63,6 +66,8 @@ export function Layout({ children, session }: LayoutProps) {
 
       <MyProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
       <AboutVitanotaModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+      {showFeedbackFab && <FeedbackFAB />}
     </div>
   );
 }

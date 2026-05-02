@@ -256,7 +256,7 @@
 - [x] アプリケーション設計 — 完了 (2026-05-02)
 - [x] 機能 C コード生成 (タスク複製) — 完了 (2026-05-02、commit 4b79f6c)
 - [x] 機能 A コード生成 (一括招待 + 管理画面) — 完了 (2026-05-03、commit 042460e、type-check / lint / test 213/213 GREEN、ローカル動作確認待ち)
-- [/] 機能 B コード生成 (フィードバック) — 前半完了 (2026-05-03、schema + RLS + 教員 API + FAB UI、test 223/223 GREEN)
+- [x] 機能 B コード生成 (フィードバック) — 完了 (2026-05-03、test 233/233 GREEN)
   - [x] B-01: migration 0022 (feedback_topics + feedback_submissions + RLS + index)
   - [x] B-02: src/db/schema.ts に Drizzle 定義追加
   - [x] B-03: RLS DSL は既存パターンに合わせ migration の手書きを正本としスキップ (rls:check 通過)
@@ -264,5 +264,10 @@
   - [x] B-05: 教員用 API (GET /api/feedback/topics + POST /api/feedback/submissions)
   - [x] B-06: 教員用 UI (FAB + 投稿モーダル、teacher/school_admin のみ表示)
   - [x] B-07: ユニットテスト 前半 (Zod schema 7 + Layout FAB 3)
-  - [ ] B-08〜B-13: system_admin 側 (投稿一覧 / トピック CRUD API + UI + テスト)
+  - [x] B-08: GET /api/system/feedback (全投稿一覧 + テナント/トピックフィルタ)
+  - [x] B-09: GET/POST /api/system/feedback/topics (一覧 + 投稿数 + 新規)
+  - [x] B-10: PATCH/DELETE /api/system/feedback/topics/[id] (hybrid 削除: 投稿数 0 なら DELETE / >0 は 409)
+  - [x] B-11: pages/admin/feedback.tsx (投稿一覧 UI + フィルタ)
+  - [x] B-12: pages/admin/feedback/topics.tsx (CRUD UI + モーダル)
+  - [x] B-13: ユニットテスト 後半 (topic create / update Zod schema 10)
 - [ ] ビルド・統合テスト

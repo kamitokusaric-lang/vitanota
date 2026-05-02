@@ -1734,3 +1734,21 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 **コンテキスト**: 機能 B 前半 commit 準備完了。後半 (system_admin 側 API + UI + テスト) に続く。
 
 ---
+
+**タイムスタンプ**: 2026-05-03T07:35:00Z
+**AI応答**: 機能 B 前半を commit (a9bdd4e、11 files / +635 / -2)。後半 (system_admin 側) 着手。
+
+---
+
+**タイムスタンプ**: 2026-05-03T08:00:00Z
+**AI応答 (B 後半 完了報告)**:
+- B-08: pages/api/system/feedback/index.ts (GET 全投稿一覧、tenantId? + topicId? でフィルタ、JOIN: submissions × topics × users × tenants、withSystemAdmin で実行)
+- B-09: pages/api/system/feedback/topics/index.ts (GET 全トピック + 投稿数 sub-query / POST 新規追加)、Zod feedbackTopicCreateSchema を feedbackSchemas.ts に追加
+- B-10: pages/api/system/feedback/topics/[id].ts (PATCH 部分更新 / DELETE は投稿数チェック → 0 件 = 物理削除 / >0 件 = 409 TOPIC_HAS_SUBMISSIONS)、Zod feedbackTopicUpdateSchema 追加 (空オブジェクト拒否で誤 PATCH 防御)
+- B-11: pages/admin/feedback.tsx 新規 (投稿一覧 + テナント/トピックフィルタ + 「← テナント管理」「→ トピック管理」リンク)
+- B-12: pages/admin/feedback/topics.tsx 新規 (一覧 + 「+ 新規追加」モーダル + 編集モーダル + 投稿数 0 なら「削除」/ >0 なら「無効化/有効化」の条件分岐 + 409 受け取り時の toast)
+- B-13: feedbackSchemas.test.ts に topicCreate 6 ケース + topicUpdate 4 ケースを追加
+- 検証: type-check / lint / test 233/233 全 GREEN
+**コンテキスト**: 機能 B 全工程完了。後半 commit へ。
+
+---

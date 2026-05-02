@@ -1,6 +1,7 @@
 // system_admin 用テナント管理画面（US-S-001・US-S-002 実装）
 import { useState, useEffect } from 'react';
 import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 // system_admin は tenantId を持たないため withAuthSSR（tenantId 必須チェックあり）は使わない
@@ -172,14 +173,23 @@ export default function TenantsPage({ session }: TenantsPageProps) {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Button
-                            variant={tenant.status === 'active' ? 'danger' : 'secondary'}
-                            onClick={() => handleToggleStatus(tenant)}
-                            className="text-xs"
-                            data-testid={`tenant-toggle-${tenant.id}`}
-                          >
-                            {tenant.status === 'active' ? '停止' : '再開'}
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`/admin/invitations?tenantId=${tenant.id}`}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              data-testid={`tenant-invitations-link-${tenant.id}`}
+                            >
+                              招待管理
+                            </Link>
+                            <Button
+                              variant={tenant.status === 'active' ? 'danger' : 'secondary'}
+                              onClick={() => handleToggleStatus(tenant)}
+                              className="text-xs"
+                              data-testid={`tenant-toggle-${tenant.id}`}
+                            >
+                              {tenant.status === 'active' ? '停止' : '再開'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

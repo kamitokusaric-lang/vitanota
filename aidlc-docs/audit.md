@@ -1642,3 +1642,61 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 - タスク複数アサイン本実装 (M:N スキーマ化) — 5/7 説明会後の教員フィードバック次第で着手判断
 
 ---
+
+## 機能 A: 一括招待 + system_admin 招待管理画面 — 着手前確認
+**タイムスタンプ**: 2026-05-03T04:00:00Z
+**ユーザー入力**: "前回実装した機能Cをローカル確認したいから、ローカルDBにシステム管理者ユーザーを追加して"
+**AI応答**: 機能C は school_admin で確認可、system_admin は機能Cでは 403 になる (apiHelpers.requireAuth が tenantId 不在で弾く) と説明。chimo は「system_admin を別目的で追加」を選択。`scripts/local/seed-system-admin.sh` を作成、`db:local:seed:system-admin` に登録、冪等性確認、sysadmin@local.test を追加完了。
+**コンテキスト**: 機能C ローカル検証準備の延長で system_admin の seed スクリプト整備。機能C の本検証は admin@local.test (school_admin) で実施予定。
+
+---
+
+**タイムスタンプ**: 2026-05-03T04:30:00Z
+**ユーザー入力**: "おk。じゃあ機能Aの実装に入ろう"
+**AI応答**: 機能A の要件・プラン・設計を再読込 (dfc7046 で commit 済)。実装着手前に既存基盤確認: pages/api/invitations/index.ts (招待発行ロジック)、pages/api/system/tenants.ts (テナント一覧 GET 既存)、withAuthApi (system_admin は requireAuth で 403 のため独自パターンで実装)、pages/admin/tenants.tsx (TenantGuard + RoleGuard requiredRole=system_admin の既存パターン)、TenantGuard / RoleGuard コンポーネント。要件 AC-A-05 (Out of scope: MVP teacher 固定) と設計 (UI 2 ボタン + API 両ロール対応) の乖離を chimo に確認。
+**コンテキスト**: 機能A 実装着手のためのコンテキスト準備。既存の招待発行ロジックは内部関数化して bulk API で再利用予定。
+
+---
+
+**タイムスタンプ**: 2026-05-03T04:32:00Z
+**ユーザー入力 (確認回答)**: "UI: teacher ボタン + school_admin ボタン (設計準拠)"
+**AI応答**: 設計準拠 (UI 2 ボタン + 確認ダイアログ + API 両ロール対応) で実装方針確定。要件 AC-A-05 の Out of scope 文言は実装後に整合させる (要件ドキュメント更新を task に積む)。
+**コンテキスト**: 一括招待のロール選択 UI を設計通り 2 ボタンで提供することを chimo が決定。要件ドキュメント側の "Out of scope: 一括投入時のロール選択 UI (MVP は teacher 固定)" は古い、削除 or 修正必要。
+
+---
+
+## 機能 A: 実装完了 + 招待仕様確認 + pending 再発行追加 + usedAt 二重意味バグ発覚 / 修正
+
+**タイムスタンプ**: 2026-05-03T05:30:00Z
+**ユーザー入力**: "招待仕様を確認んしたい。これはメール送信でURLが伝えられるわけではない？"
+**AI応答**: 要件 (Out of scope: メール自動送信は 5/7 後の課題、URL 配布は chimo 手動) と既存コード (pages/api/invitations/index.ts:93 の MVP コメント) の両方を参照して、**メール送信は未実装**であることを確認。フローは「chimo が UI で URL bulk 発行 → 手動配布 → 教員が /auth/invite?token=... で Google ログイン受諾」と明示。
+**コンテキスト**: 5/7 説明会の運用イメージを再確認するための質問。chimo は仕様を OK と承諾。
+
+---
+
+**タイムスタンプ**: 2026-05-03T05:35:00Z
+**ユーザー入力**: "おk。一旦これでいい。あと、招待URLの再発行をできるようにしたい"
+**AI応答**: 期限切れ (expired) の再発行は既に AC-A-07 で実装済みと指摘。chimo の意図 (pending でも再発行 / expired UI 改善 / 別ケース) を確認。
+**ユーザー入力 (確認回答)**: "pending (未受諾) でも再発行可能に"
+**AI応答**: pages/admin/invitations.tsx の InvitationsTable で pending 行にも再発行ボタンを追加 (コピーボタンと並列表示)。誤クリック対策で pending のみ confirm ダイアログ ("既存の URL は無効になります") 必須、expired は無確認。要件 AC-A-07 を「未受諾 / 期限切れ」に更新。API 変更なし (createOrReissueInvitation の冪等性で動く)。type-check / lint / test 213/213 GREEN。
+**コンテキスト**: token 漏れ / 誤招待への対応として pending 再発行を追加。
+
+---
+
+**タイムスタンプ**: 2026-05-03T05:50:00Z
+**ユーザー入力**: "再発行ボタンをクリックした直後に、対象のアカウントが受諾済みになったんだけど、おかしくない？zenikami@cozi73.com"
+**AI応答**: バグ確認 → 原因特定。createOrReissueInvitation が「無効化マーカー」として `usedAt = NOW()` を UPDATE していたが、calculateInvitationStatus は `usedAt` で accepted 判定していた → **usedAt の二重意味バグ**。zenikami@cozi73.com のローカル DB を確認: 旧行 c39ab276... が `usedAt = 新行の created_at` で誤 accepted 状態、users テーブルに entry なし (=実際には未受諾) → バグ症状を実証。ローカル DB 全体スキャンで他の犠牲者なし、被害は本件 1 行のみ。
+**ユーザー入力 (修正アプローチ選択)**: "旧行を物理削除 (軽量修正)"
+**AI応答**: invitationService.ts の UPDATE を DELETE に変更 (受諾済 usedAt IS NOT NULL 行は触らない、未受諾行のみ物理削除)。招待履歴は structured log auth.invite.created で別途追える根拠を残す。type-check / lint / test 213/213 GREEN。
+**ユーザー入力**: "実行で。"
+**AI応答**: ローカル DB の不整合行 c39ab276-21ed-4e2e-8d01-169469670134 を DELETE 実行 (1 row deleted)。zenikami@cozi73.com の残行は新 token (74cdb2b7..., usedAt=NULL, pending) のみ、正しい状態に復旧。
+**コンテキスト**: 機能 A の挙動確認中に発覚した重要なバグ。本番デプロイ前にローカルで再現 → 修正 → cleanup の流れで完結。本番 DB は機能 A 未デプロイのため影響なし。memory にバグパターンを記録するか chimo の判断待ち (usedAt のような状態フィールドを多重意味で使わないという原則)。
+
+---
+
+**タイムスタンプ**: 2026-05-03T06:00:00Z
+**ユーザー入力**: "各アカウント行に最終ログイン日時を表示して"
+**AI応答**: 「アカウント行」がどの画面かを確認 → chimo は「招待管理画面の accepted 行」を選択。「最終ログイン日時」の定義 (lastAccessedAt MAX vs createdAt MAX vs 両方) を確認 → chimo は「最終アクセス (lastAccessedAt MAX)」を選択。GET /api/system/invitations のレスポンスに lastAccessedAt を sub-query で同梱 (sessions JOIN users on email、users.email UNIQUE 保証で 1 行確定)。UI の InvitationsTable で accepted 行のステータス列内に「最終アクセス: YYYY/MM/DD HH:MM」or「—」を表示。pending/expired は API レスポンスで null。要件 AC-A-09 として追記。type-check / lint / test 213/213 GREEN、ローカル DB で sub-query 動作確認済。
+**コンテキスト**: 「招待したけどその後使ってる？」の運用判断材料。session が全 expire したり未ログインの場合は「—」。
+
+---

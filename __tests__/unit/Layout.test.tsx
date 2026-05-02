@@ -67,4 +67,39 @@ describe('Layout', () => {
     // モーダルが開く
     expect(screen.getByTestId('modal-content')).toBeInTheDocument();
   });
+
+  it('teacher にはフィードバック FAB が表示される', () => {
+    render(
+      <Layout session={baseSession}>
+        <div />
+      </Layout>
+    );
+    expect(screen.getByTestId('feedback-fab')).toBeInTheDocument();
+  });
+
+  it('school_admin にもフィードバック FAB が表示される', () => {
+    const adminSession: VitanotaSession = {
+      ...baseSession,
+      user: { ...baseSession.user, roles: ['school_admin'] },
+    };
+    render(
+      <Layout session={adminSession}>
+        <div />
+      </Layout>
+    );
+    expect(screen.getByTestId('feedback-fab')).toBeInTheDocument();
+  });
+
+  it('system_admin にはフィードバック FAB を表示しない (運営側のため)', () => {
+    const sysadminSession: VitanotaSession = {
+      ...baseSession,
+      user: { ...baseSession.user, roles: ['system_admin'], tenantId: null, tenantStatus: null },
+    };
+    render(
+      <Layout session={sysadminSession}>
+        <div />
+      </Layout>
+    );
+    expect(screen.queryByTestId('feedback-fab')).toBeNull();
+  });
 });

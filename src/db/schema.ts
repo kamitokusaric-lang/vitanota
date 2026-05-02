@@ -426,6 +426,45 @@ export const journalWeeklySummaries = pgTable(
   }),
 );
 
+// ── feedback_topics (機能 B) ───────────────────────────────────
+// 運営マスタ (テナント横断)。教員が投稿時に選択するトピック。
+export const feedbackTopics = pgTable('feedback_topics', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar('title', { length: 100 }).notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── feedback_submissions (機能 B) ──────────────────────────────
+// 教員 → 運営の一方向投稿。RLS で SELECT は system_admin のみに制限。
+export const feedbackSubmissions = pgTable(
+  'feedback_submissions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => feedbackTopics.id, { onDelete: 'restrict' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantCreatedIdx: index('feedback_submissions_tenant_created_idx').on(
+      table.tenantId,
+      table.createdAt,
+    ),
+    topicIdx: index('feedback_submissions_topic_idx').on(table.topicId),
+  }),
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -443,3 +482,7 @@ export type UserTenantProfile = typeof userTenantProfiles.$inferSelect;
 export type NewUserTenantProfile = typeof userTenantProfiles.$inferInsert;
 export type JournalWeeklySummary = typeof journalWeeklySummaries.$inferSelect;
 export type NewJournalWeeklySummary = typeof journalWeeklySummaries.$inferInsert;
+export type FeedbackTopic = typeof feedbackTopics.$inferSelect;
+export type NewFeedbackTopic = typeof feedbackTopics.$inferInsert;
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+export type NewFeedbackSubmission = typeof feedbackSubmissions.$inferInsert;

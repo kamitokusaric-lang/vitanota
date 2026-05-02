@@ -1700,3 +1700,37 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 **コンテキスト**: 「招待したけどその後使ってる？」の運用判断材料。session が全 expire したり未ログインの場合は「—」。
 
 ---
+
+## 機能 B: フィードバック (運営宛 / トピック制) — 着手前確認
+
+**タイムスタンプ**: 2026-05-03T07:00:00Z
+**ユーザー入力**: "コミットで"
+**AI応答**: 機能 A をブランチ feat/2026-05-07-meeting-features に commit (042460e、11 files / +945 / -56)。コメッセージは feat(invitations): 一括招待 + system_admin 招待管理画面を追加 (5/7 説明会 機能 A)。
+
+---
+
+**タイムスタンプ**: 2026-05-03T07:05:00Z
+**ユーザー入力**: "機能 Bも実装しちゃおう"
+**AI応答**: 機能 B (フィードバック) 着手前に 3 点確認: (1) フィードバック送信ボタンの配置、(2) 初期 3 トピック seed の投入方法、(3) commit 単位。
+**ユーザー入力 (3 件回答)**:
+1. "右下 floating button (teacher/school_admin のみ)" — Layout に FAB を追加、system_admin 非表示
+2. "それと system_admin UI の「新規追加」で手動登録" — seed スクリプト不要、CRUD UI ができたら chimo が 3 件手動登録
+3. "2 commit (前半 schema+教員側 / 後半 system_admin側)" — schema + 教員 API/UI + テスト で 1 commit、system_admin 側で 1 commit
+**AI応答**: 方針確定。前半 commit 範囲を Step B-01〜B-07 (migration / schema / RLS DSL / 教員用 API / FAB+Modal UI / 前半テスト) として着手。migration は 0022 (注記: 0021 は journal_mood と unit06_weekly_summary で番号衝突済、本件は 0022 で連番継続)。
+**コンテキスト**: chimo の選択により seed 自動化を削除 → 5/7 説明会前に chimo が UI から 3 トピックを手動投入する運用に決定。FAB は dashboard 以外の teacher 系画面でも見えるよう Layout に置くが、ロール条件で system_admin には非表示にする。
+
+---
+
+**タイムスタンプ**: 2026-05-03T07:30:00Z
+**AI応答 (B 前半 完了報告)**:
+- B-01: migrations/0022_feedback_topics_and_submissions.sql 新規 (feedback_topics + feedback_submissions + index 3 本 + RLS 4 ポリシー)
+- B-02: src/db/schema.ts に feedbackTopics / feedbackSubmissions の Drizzle 定義 + 型 export 追加
+- B-03: RLS DSL (src/db/rls/policies.ts) への追加はスキップ (既存 tasks / weekly_summaries 等と同じ migration 手書き運用、rls:check は通過)
+- B-04: pnpm db:local:migrate で適用、psql で CREATE / RLS 4 ポリシー / FK / CHECK / index 全件確認
+- B-05: pages/api/feedback/topics.ts (GET) + pages/api/feedback/submissions.ts (POST)、共通 Zod を src/features/feedback/lib/feedbackSchemas.ts に切出。requireAuth で teacher / school_admin のみ通る (system_admin は tenantId 不在で 403)。content trim、event: feedback.submitted の構造化ログ
+- B-06: src/features/feedback/components/FeedbackFAB.tsx 新規、Layout.tsx で canUseTeacherFeatures(roles) 条件で表示制御。「運営にだけ届きます」明示、トピック radio + ヒント表示 + 5000 字 textarea + counter + 成功 toast
+- B-07: __tests__/unit/feedbackSchemas.test.ts 7 件 (validation 境界値) + Layout.test.tsx に FAB ロール表示 3 件追加
+- 検証: type-check / lint / test 223/223 GREEN
+**コンテキスト**: 機能 B 前半 commit 準備完了。後半 (system_admin 側 API + UI + テスト) に続く。
+
+---

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { signOut } from 'next-auth/react';
 import type { VitanotaSession } from '@/shared/types/auth';
+import { canUseTeacherFeatures } from '@/features/auth/lib/role-helpers';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -31,6 +32,8 @@ const NAV_ITEMS: NavItem[] = [
 export function AdminLayout({ children, session }: AdminLayoutProps) {
   const router = useRouter();
   const { email } = session.user;
+  // 兼務 (system_admin + teacher / school_admin) なら教員ダッシュボードへの切替リンクを出す
+  const canSwitchToTeacher = canUseTeacherFeatures(session.user.roles);
 
   // 「フィードバック」と「トピック管理」が両方マッチしないように長い方を優先
   const activePrefix = [...NAV_ITEMS]
@@ -76,6 +79,15 @@ export function AdminLayout({ children, session }: AdminLayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 text-[13px]">
+            {canSwitchToTeacher && (
+              <Link
+                href="/dashboard"
+                className="rounded-md border border-gray-600 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-400 hover:text-white"
+                data-testid="admin-nav-switch-to-dashboard"
+              >
+                ダッシュボードへ
+              </Link>
+            )}
             <span className="text-gray-400" data-testid="admin-nav-email">
               {email}
             </span>

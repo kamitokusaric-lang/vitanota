@@ -1782,3 +1782,25 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 **コンテキスト**: ローカル動作確認の API 層は完了、UI ブラウザ確認は chimo の手動。
 
 ---
+
+## 本番デプロイ + 兼務ナビ + orphan cleanup
+
+**タイムスタンプ**: 2026-05-03T09:00:00Z
+**ユーザー入力**: "コミット & 本番デプロイ"
+**AI応答**: feat ブランチを main に --no-ff でマージ + push (1ed075d)。GitHub Actions Deploy workflow が走り、Docker image build → ECR push → AppRunner update が 4m56s success。CI workflow (E2E Playwright) は既知の常時赤 (createTag 400 で 16 件失敗) のため無視。`aws lambda invoke db-migrator migrate` 実行 → applied: [] でスキップ → migrator Lambda 自体が古い deploy のままだったと判明。`pnpm cdk deploy vitanota-prod-app` で DbMigrator Lambda を更新 (38s, IAM/SG 変更なし、コード S3 key 差し替えのみ) → 再 invoke で applied: [0022_feedback_topics_and_submissions.sql] 成功。
+
+**タイムスタンプ**: 2026-05-03T09:20:00Z
+**ユーザー入力**: "ニセコ中学校の kamitokusari.c@cozi73.com が、システム管理者も兼務しているから、ニセコ中学校のダッシュボードに入れない"
+**AI応答**: index.tsx のリダイレクトが system_admin 含むと強制 /admin/tenants で、兼務ユーザーが切り替えできない問題と特定。chimo が「全テナント school_admin」案を一旦提示するも撤回、「ニセコ中学校に既に school_admin row はある、切り替えれるようにすればいい」と確定。AdminLayout に「ダッシュボードへ」リンク (canUseTeacherFeatures(roles) 時のみ)、Layout に「管理画面へ」リンク (canUseSystemAdminFeatures(roles) 時のみ) を追加。commit c1c3dbc + push、Deploy workflow が success。
+
+**タイムスタンプ**: 2026-05-03T09:30:00Z
+**ユーザー入力 (スクリーンショット付き)**: "ニセコ中学校の招待一覧に違和感がある。noguchi さんは一度も受諾してないのに、受諾済みが一件ある。kamitokusari さんは受諾済みが2件ある。データをクリーンにしたい"
+**AI応答**: 機能 A 実装直後に発覚した usedAt 二重意味バグ (createOrReissueInvitation で UPDATE usedAt=NOW() を無効化マーカーとしていた挙動、a9bdd4e 以前) で本番に残った orphan accepted 行と特定。db-migrator Lambda の `inspect` コマンドで本番 DB 状態確認:
+  - kamitokusari row1 (used_at=05:40:08) = 本物受諾 (user_tenant_roles と一致)
+  - noguchi row1 (used_at=05:45:03) = orphan (no role row)
+  - kamitokusari row2 (used_at=05:46:18) = orphan (duplicate accepted, rn=2)
+  - noguchi row2 (used_at=NULL) = pending (現在有効)
+handler.ts に新 command `cleanup-orphan-accepted-invitations` を追加 (dryRun + execute)。判定ロジックは (email, tenant_id, role) で used_at ASC 並べて 1 番目を本物、2 番目以降と user_tenant_roles 不在の受諾済を orphan とする。cdk deploy で Lambda 更新 → dryRun invoke で chimo に 2 件確認 → execute invoke で `deleted: 2` 成功。inspect 再実行で残り 2 行 (本物受諾 + 未受諾) のみ確認、本番招待一覧の違和感解消。
+**コンテキスト**: ローカルでの zenikami 1 件発見と同じ症状の本番版。修正コード (DELETE 化) のデプロイ前に発生した orphan を後追いで cleanup。今後は createOrReissueInvitation の DELETE 化 (commit 7ebdfec) で再発しない。
+
+---

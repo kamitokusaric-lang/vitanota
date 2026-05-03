@@ -19,9 +19,11 @@ interface MigrateEvent {
     | 'bootstrap-admin'
     | 'inspect'
     | 'demo-setup'
-    | 'seed-demo-posts';
+    | 'seed-demo-posts'
+    | 'cleanup-orphan-accepted-invitations';
   email?: string;
   name?: string;
+  dryRun?: boolean;
 }
 
 interface MigrationRow {
@@ -594,6 +596,73 @@ async function runSeedDemoPosts(): Promise<{
   }
 }
 
+/**
+ * usedAt 二重意味バグ (createOrReissueInvitation の修正前: usedAt を無効化マーカーとして
+ * UPDATE していた挙動) で本番に残った orphan accepted 招待行を cleanup する。
+ *
+ * 判定: (email, tenant_id, role) でグループ化、used_at ASC で並べたとき
+ *   - 1 番目の受諾済行 (= 本物受諾、user_tenant_roles を作った row) → keep
+ *   - 2 番目以降の受諾済行 → orphan (バグで誤化)
+ *   - user_tenant_roles に対応行が無いケースは全件 orphan
+ *
+ * dryRun=true なら SELECT のみ、false なら DELETE 実行。
+ */
+async function runCleanupOrphanAcceptedInvitations(
+  dryRun: boolean
+): Promise<{ dryRun: boolean; orphans: unknown[]; deleted: number }> {
+  const client = await connect();
+  try {
+    const orphansResult = await client.query(`
+      WITH ranked AS (
+        SELECT
+          it.id,
+          it.email,
+          it.tenant_id,
+          it.role,
+          it.used_at,
+          it.created_at,
+          t.slug AS tenant_slug,
+          (utr.user_id IS NOT NULL) AS has_role,
+          ROW_NUMBER() OVER (
+            PARTITION BY it.email, it.tenant_id, it.role
+            ORDER BY it.used_at ASC
+          ) AS rn
+        FROM invitation_tokens it
+        LEFT JOIN tenants t ON t.id = it.tenant_id
+        LEFT JOIN users u ON u.email = it.email
+        LEFT JOIN user_tenant_roles utr
+          ON utr.user_id = u.id
+          AND utr.tenant_id = it.tenant_id
+          AND utr.role = it.role
+        WHERE it.used_at IS NOT NULL
+      )
+      SELECT id, email, role, used_at, created_at, tenant_slug,
+        CASE
+          WHEN NOT has_role THEN 'no role row'
+          WHEN rn > 1 THEN 'duplicate accepted (rn=' || rn || ')'
+          ELSE 'real'
+        END AS verdict
+      FROM ranked
+      WHERE NOT has_role OR rn > 1
+      ORDER BY tenant_slug, email, used_at
+    `);
+
+    const orphans = orphansResult.rows;
+    if (dryRun || orphans.length === 0) {
+      return { dryRun: true, orphans, deleted: 0 };
+    }
+
+    const idsToDelete = (orphans as { id: string }[]).map((o) => o.id);
+    const deleteResult = await client.query(
+      `DELETE FROM invitation_tokens WHERE id = ANY($1::uuid[])`,
+      [idsToDelete]
+    );
+    return { dryRun: false, orphans, deleted: deleteResult.rowCount ?? 0 };
+  } finally {
+    await client.end();
+  }
+}
+
 export const handler = async (event: MigrateEvent) => {
   console.log(`vitanota-db-migrator invoked: ${event.command} (env=${ENV})`);
   try {
@@ -627,6 +696,10 @@ export const handler = async (event: MigrateEvent) => {
       }
       case 'seed-demo-posts': {
         const result = await runSeedDemoPosts();
+        return { statusCode: 200, body: JSON.stringify(result) };
+      }
+      case 'cleanup-orphan-accepted-invitations': {
+        const result = await runCleanupOrphanAcceptedInvitations(event.dryRun ?? true);
         return { statusCode: 200, body: JSON.stringify(result) };
       }
       default:

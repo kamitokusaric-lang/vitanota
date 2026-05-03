@@ -1,10 +1,16 @@
 import useSWR from 'swr';
 import type { Task } from '@/db/schema';
 
+export interface TaskTagSummary {
+  id: string;
+  name: string;
+}
+
 export type TaskWithOwner = Task & {
   ownerName: string | null;
   ownerNickname: string | null;
   commentCount: number;
+  tags: TaskTagSummary[];
 };
 
 interface TasksResponse {

@@ -1,32 +1,14 @@
 // カンバン上の個別タスクカード
-// readonly: 他人のタスク (閲覧のみ可、ステータス変更不可)
 // delegated: 自分が作成したが owner が他人のタスク (色違い表示、「あの先生に振ったやつ」を識別)
+// ステータス変更は (1) 編集モーダル の status select、または (2) 横方向ドラッグ&ドロップ で行う。
 import type { TaskWithOwner } from '../hooks/useTasks';
 
 interface TaskCardProps {
   task: TaskWithOwner;
   onEdit: (task: TaskWithOwner) => void;
-  onStatusChange: (id: string, status: 'todo' | 'in_progress' | 'done') => void;
-  readonly?: boolean;
   delegated?: boolean;
-}
-
-const STATUS_LABEL: Record<'todo' | 'in_progress' | 'done', string> = {
-  todo: '未着手',
-  in_progress: '進行中',
-  done: '完了',
-};
-
-const STATUS_STYLE: Record<'todo' | 'in_progress' | 'done', string> = {
-  todo: 'bg-gray-100 text-gray-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  done: 'bg-green-100 text-green-700',
-};
-
-function nextStatus(status: 'todo' | 'in_progress' | 'done') {
-  if (status === 'todo') return 'in_progress' as const;
-  if (status === 'in_progress') return 'done' as const;
-  return 'todo' as const;
+  onDragStart?: (taskId: string) => void;
+  onDragEnd?: () => void;
 }
 
 function formatDate(value: string | Date): string {
@@ -50,21 +32,34 @@ function isDueToday(value: string | Date): boolean {
 export function TaskCard({
   task,
   onEdit,
-  onStatusChange,
-  readonly = false,
   delegated = false,
+  onDragStart,
+  onDragEnd,
 }: TaskCardProps) {
+  const draggable = !!onDragStart;
   const cardClass = [
     'rounded-md border border-gray-200 bg-white p-3 text-sm shadow-sm transition-opacity',
     task.status === 'done' ? 'opacity-60' : '',
     // delegated (= 自分が振ったが他人が owner) は左側に amber のアクセントと淡い背景
     delegated ? 'border-l-4 border-l-amber-400 bg-amber-50/40' : '',
+    draggable ? 'cursor-grab active:cursor-grabbing' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <div className={cardClass} data-testid={`task-card-${task.id}`}>
+    <div
+      className={cardClass}
+      data-testid={`task-card-${task.id}`}
+      draggable={draggable}
+      onDragStart={(e) => {
+        if (!onDragStart) return;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/task-id', task.id);
+        onDragStart(task.id);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+    >
       <button
         type="button"
         onClick={() => onEdit(task)}
@@ -123,21 +118,21 @@ export function TaskCard({
             </span>
           )}
         </div>
-      </button>
-      <button
-        type="button"
-        disabled={readonly}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (readonly) return;
-          onStatusChange(task.id, nextStatus(task.status));
-        }}
-        className={`mt-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLE[task.status]} ${
-          readonly ? 'cursor-default opacity-80' : ''
-        }`}
-        data-testid={`task-card-status-${task.id}`}
-      >
-        {STATUS_LABEL[task.status]}
+        {task.tags.length > 0 && (
+          <div
+            className="mt-1.5 flex flex-wrap gap-1"
+            data-testid={`task-card-tags-${task.id}`}
+          >
+            {task.tags.map((tg) => (
+              <span
+                key={tg.id}
+                className="inline-flex rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"
+              >
+                #{tg.name}
+              </span>
+            ))}
+          </div>
+        )}
       </button>
     </div>
   );

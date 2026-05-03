@@ -6,6 +6,7 @@ import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import type { TaskCategory } from '@/db/schema';
 import type { Assignee } from '../hooks/useAssignees';
 import type { TaskWithOwner } from '../hooks/useTasks';
+import type { TaskTag } from '../hooks/useTaskTags';
 
 export interface TaskFormValues {
   categoryId: string;
@@ -15,6 +16,7 @@ export interface TaskFormValues {
   dueDate: string; // YYYY-MM-DD or ''
   status: 'todo' | 'in_progress' | 'done';
   initialComment: string; // create 時のみ使用、初回コメントとして追加される
+  tagIds: string[]; // 選択中のタグ id (タグ別表示・フィルタ用)
 }
 
 interface TaskFormProps {
@@ -29,6 +31,9 @@ interface TaskFormProps {
   // readonly=true: 他人のタスクを閲覧するモード。全フィールド disabled、
   // 保存・削除ボタン非表示、キャンセルは「閉じる」として機能する
   readonly?: boolean;
+  // タグ機能 (5/7 説明会向け拡張): 利用可能タグ + 作成 callback
+  taskTags?: TaskTag[];
+  onCreateTag?: (name: string) => Promise<TaskTag | null>;
   onSubmit: (values: TaskFormValues) => void;
   onCancel: () => void;
   onDelete?: () => void;
@@ -51,6 +56,8 @@ export function TaskForm({
   submitting,
   error,
   readonly = false,
+  taskTags,
+  onCreateTag,
   onSubmit,
   onCancel,
   onDelete,
@@ -63,7 +70,39 @@ export function TaskForm({
     dueDate: initial?.dueDate ?? '',
     status: initial?.status ?? 'todo',
     initialComment: '',
+    tagIds: initial?.tagIds ?? [],
   });
+  const [newTagName, setNewTagName] = useState('');
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [tagCreateError, setTagCreateError] = useState<string | null>(null);
+
+  function toggleTag(tagId: string) {
+    setValues((v) =>
+      v.tagIds.includes(tagId)
+        ? { ...v, tagIds: v.tagIds.filter((id) => id !== tagId) }
+        : { ...v, tagIds: [...v.tagIds, tagId] },
+    );
+  }
+
+  async function handleCreateTag() {
+    if (!onCreateTag) return;
+    const name = newTagName.trim();
+    if (!name) return;
+    setCreatingTag(true);
+    setTagCreateError(null);
+    try {
+      const created = await onCreateTag(name);
+      if (created) {
+        setValues((v) => ({ ...v, tagIds: [...v.tagIds, created.id] }));
+        setNewTagName('');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'タグ作成に失敗しました';
+      setTagCreateError(message);
+    } finally {
+      setCreatingTag(false);
+    }
+  }
 
   useEffect(() => {
     if (!values.categoryId && categories.length > 0) {
@@ -222,6 +261,72 @@ export function TaskForm({
         </div>
       )}
 
+      {/* タグ multi-select + インライン作成 (5/7 説明会向け拡張) */}
+      {taskTags !== undefined && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">
+            タグ (任意、イベント横断のグルーピング)
+          </label>
+          {taskTags.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {taskTags.map((tg) => {
+                const active = values.tagIds.includes(tg.id);
+                return (
+                  <button
+                    key={tg.id}
+                    type="button"
+                    disabled={readonly}
+                    onClick={() => toggleTag(tg.id)}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                      active
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                    } disabled:opacity-50`}
+                    data-testid={`task-form-tag-${tg.id}`}
+                  >
+                    #{tg.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {!readonly && onCreateTag && (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCreateTag();
+                  }
+                }}
+                placeholder="新しいタグ名 (例: 運動会)"
+                maxLength={100}
+                className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                data-testid="task-form-new-tag-name"
+                disabled={creatingTag}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCreateTag}
+                isLoading={creatingTag}
+                disabled={!newTagName.trim()}
+                className="text-xs"
+                data-testid="task-form-new-tag-create"
+              >
+                作成
+              </Button>
+            </div>
+          )}
+          {tagCreateError && (
+            <div className="mt-1 text-xs text-red-600">{tagCreateError}</div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 pt-2">
         <div>
           {mode === 'edit' && onDelete && !readonly && (
@@ -275,5 +380,6 @@ export function toFormInitial(task: TaskWithOwner): Partial<TaskFormValues> {
     description: task.description ?? '',
     dueDate: dueDateToInputValue(task.dueDate),
     status: task.status,
+    tagIds: task.tags.map((t) => t.id),
   };
 }

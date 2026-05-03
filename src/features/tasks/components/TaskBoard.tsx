@@ -8,7 +8,7 @@ import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
 import { useToast } from '@/shared/components/Toast';
-import { useTasks, type TaskWithOwner } from '../hooks/useTasks';
+import { useTasks, type TaskWithAssignees } from '../hooks/useTasks';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
 import { AssigneeFilter } from './AssigneeFilter';
@@ -25,8 +25,8 @@ import { TaskCommentSection } from './TaskCommentSection';
 type ModalState =
   | { kind: 'closed' }
   | { kind: 'create'; categoryId?: string }
-  | { kind: 'edit'; task: TaskWithOwner }
-  | { kind: 'duplicate'; sourceTask: TaskWithOwner };
+  | { kind: 'edit'; task: TaskWithAssignees }
+  | { kind: 'duplicate'; sourceTask: TaskWithAssignees };
 
 interface TaskBoardProps {
   selfUserId: string;
@@ -93,7 +93,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               categoryId: values.categoryId,
-              ownerUserId: row.ownerUserId,
+              assigneeUserIds: row.assigneeUserIds,
               title: row.title,
               description: row.description || undefined,
               dueDate: row.dueDate || undefined,
@@ -159,6 +159,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
           description: values.description || null,
           dueDate: values.dueDate || null,
           status: values.status,
+          assigneeUserIds: values.assigneeUserIds,
         }),
       });
       if (!res.ok) {
@@ -223,7 +224,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ownerUserId: values.ownerUserId,
+          assigneeUserIds: values.assigneeUserIds,
           categoryId: values.categoryId,
           title: values.title,
           description: values.description || null,
@@ -246,13 +247,18 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
       }
       await mutateTasks();
       closeModal();
-      const ownerLabel = (() => {
-        if (values.ownerUserId === selfUserId) return '自分';
-        const a = (assignees ?? []).find((x) => x.userId === values.ownerUserId);
-        return a?.name ?? '他の先生';
+      const assigneesLabel = (() => {
+        if (values.assigneeUserIds.length === 0) return '誰か';
+        const names = values.assigneeUserIds.map((uid) => {
+          if (uid === selfUserId) return '自分';
+          const a = (assignees ?? []).find((x) => x.userId === uid);
+          return a?.name ?? '他の先生';
+        });
+        if (names.length <= 3) return names.join(', ');
+        return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
       })();
       showToast(
-        `${ownerLabel}のタスクとして「${values.title}」を複製しました`,
+        `${assigneesLabel}のタスクとして「${values.title}」を複製しました`,
         'success',
       );
     } finally {
@@ -299,7 +305,9 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   const filteredTasks = tasks.filter((t) => {
     if (filterTagId && !t.tags.some((tg) => tg.id === filterTagId)) return false;
     if (filterOwner === selfUserId && !showDelegated) {
-      if (t.createdBy === selfUserId && t.ownerUserId !== selfUserId) return false;
+      // delegated = 自分が依頼したが assignees に自分が含まれない (= お願いした側)
+      const isMine = t.assignees.some((a) => a.userId === selfUserId);
+      if (t.createdBy === selfUserId && !isMine) return false;
     }
     return true;
   });
@@ -318,10 +326,10 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     : (() => {
         const usedIds = new Set(filteredTasks.map((t) => t.categoryId));
         // 「自分の今週やる」タスク数を集計、降順で並べる (tie は元の sortOrder)
-        // ownerUserId === selfUserId かつ status='todo' のものをカウント
+        // 自分が assignees に含まれる && status='todo' のものをカウント
         const todoCounts = new Map<string, number>();
         for (const t of filteredTasks) {
-          if (t.status === 'todo' && t.ownerUserId === selfUserId) {
+          if (t.status === 'todo' && t.assignees.some((a) => a.userId === selfUserId)) {
             todoCounts.set(t.categoryId, (todoCounts.get(t.categoryId) ?? 0) + 1);
           }
         }
@@ -342,7 +350,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
       })();
 
   // タスク → 行 id 配列
-  const assignTaskToRows = (t: TaskWithOwner): string[] => {
+  const assignTaskToRows = (t: TaskWithAssignees): string[] => {
     if (filterTagId) return [TAG_FILTERED_ROW_ID];
     return [t.categoryId];
   };
@@ -391,6 +399,8 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
         selfUserId={selfUserId}
         onEdit={(task) => setModal({ kind: 'edit', task })}
         onTaskDropStatus={handleDropStatus}
+        // 「全員」フィルタ時のみ自分のタスクを薄い黄色でハイライト
+        highlightMineTasks={filterOwner === undefined}
       />
 
       <Modal
@@ -421,11 +431,11 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
           modal.kind === 'edit' ? (
             <div className="flex items-center justify-between">
               <span>
-                {modal.task.ownerUserId !== selfUserId
-                  ? 'タスクを見る'
-                  : 'タスクの編集'}
+                {modal.task.assignees.some((a) => a.userId === selfUserId)
+                  ? 'タスクの編集'
+                  : 'タスクを見る'}
               </span>
-              {modal.task.ownerUserId === selfUserId && (
+              {modal.task.assignees.some((a) => a.userId === selfUserId) && (
                 <TaskEditKebabMenu
                   onDuplicate={() =>
                     modal.kind === 'edit' &&
@@ -452,7 +462,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
               selfUserId={selfUserId}
               submitting={submitting}
               error={formError}
-              readonly={modal.task.ownerUserId !== selfUserId}
+              readonly={!modal.task.assignees.some((a) => a.userId === selfUserId)}
               taskTags={taskTags ?? []}
               onCreateTag={handleCreateTag}
               onSubmit={(values) => handleUpdate(modal.task.id, values)}
@@ -480,7 +490,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             </p>
             <TaskForm
               mode="duplicate"
-              initial={{ ...toFormInitial(modal.sourceTask), ownerUserId: '' }}
+              initial={{ ...toFormInitial(modal.sourceTask), assigneeUserIds: [] }}
               categories={categories}
               assignees={assignees ?? []}
               canAssignToOthers

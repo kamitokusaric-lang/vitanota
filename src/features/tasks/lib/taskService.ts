@@ -1,14 +1,23 @@
 // タスク Service: 認可・入力変換を通して Repository を呼ぶ
-// teacher は owner=自分のタスクのみ作成・更新可 (RLS で担保)
+// 担当者は assignees (M:N) で管理。teacher は自分が assignee or createdBy のタスクのみ更新可 (RLS で担保)
 // school_admin は tenant 内の任意の教員にアサイン可
 import { and, eq, inArray } from 'drizzle-orm';
+import type { drizzle } from 'drizzle-orm/node-postgres';
 import { withTenantUser } from '@/shared/lib/db';
 import { pickDbRole, type AuthContext } from '@/features/journal/lib/apiHelpers';
-import { taskRepo, type TaskWithOwner } from './taskRepository';
+import { taskRepo, type TaskWithAssignees } from './taskRepository';
 import { taskCategoryRepo } from './taskCategoryRepository';
-import { TaskNotFoundError, InvalidTagReferenceError } from './errors';
-import { taskTags } from '@/db/schema';
+import {
+  TaskNotFoundError,
+  InvalidTagReferenceError,
+  InvalidAssigneeReferenceError,
+  EmptyAssigneeError,
+} from './errors';
+import * as schema from '@/db/schema';
+import { taskTags, userTenantRoles } from '@/db/schema';
 import type { Task, TaskCategory } from '@/db/schema';
+
+type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
 function parseDueDate(input: string | null | undefined): Date | null | undefined {
   if (input === undefined) return undefined;
@@ -18,7 +27,7 @@ function parseDueDate(input: string | null | undefined): Date | null | undefined
 
 export interface CreateTaskServiceInput {
   categoryId: string;
-  ownerUserId?: string;
+  assigneeUserIds: string[];
   title: string;
   description?: string;
   dueDate?: string;
@@ -30,13 +39,38 @@ export interface UpdateTaskServiceInput {
   description?: string | null;
   dueDate?: string | null;
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
+  assigneeUserIds?: string[];
+}
+
+async function validateAssigneesInTenant(
+  tx: DrizzleDb,
+  userIds: string[],
+  ctx: AuthContext,
+): Promise<void> {
+  if (userIds.length === 0) throw new EmptyAssigneeError();
+
+  const uniqueIds = Array.from(new Set(userIds));
+  const validRows = await tx
+    .select({ userId: userTenantRoles.userId })
+    .from(userTenantRoles)
+    .where(
+      and(
+        eq(userTenantRoles.tenantId, ctx.tenantId),
+        inArray(userTenantRoles.userId, uniqueIds),
+      ),
+    );
+  const validIds = new Set(validRows.map((r) => r.userId));
+  const invalidIds = uniqueIds.filter((id) => !validIds.has(id));
+  if (invalidIds.length > 0) {
+    throw new InvalidAssigneeReferenceError(invalidIds);
+  }
 }
 
 export class TaskService {
   async listTasks(
     ctx: AuthContext,
     filters?: { ownerUserId?: string; scope?: 'mine' },
-  ): Promise<TaskWithOwner[]> {
+  ): Promise<TaskWithAssignees[]> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return taskRepo.findAllByTenant(tx, ctx, filters);
     });
@@ -52,17 +86,15 @@ export class TaskService {
     params: CreateTaskServiceInput,
     ctx: AuthContext,
   ): Promise<Task> {
-    // 誰にアサインするかは teacher / school_admin とも自由 (chimo 仕様)
-    const ownerUserId = params.ownerUserId ?? ctx.userId;
-
     const due = parseDueDate(params.dueDate);
 
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      return taskRepo.create(
+      await validateAssigneesInTenant(tx, params.assigneeUserIds, ctx);
+
+      const created = await taskRepo.create(
         tx,
         {
           categoryId: params.categoryId,
-          ownerUserId,
           createdBy: ctx.userId,
           title: params.title,
           description: params.description,
@@ -70,6 +102,8 @@ export class TaskService {
         },
         ctx,
       );
+      await taskRepo.setAssigneesForTask(tx, created.id, params.assigneeUserIds, ctx);
+      return created;
     });
   }
 
@@ -84,6 +118,10 @@ export class TaskService {
       const existing = await taskRepo.findById(tx, id, ctx);
       if (!existing) throw new TaskNotFoundError();
 
+      if (params.assigneeUserIds !== undefined) {
+        await validateAssigneesInTenant(tx, params.assigneeUserIds, ctx);
+      }
+
       const updated = await taskRepo.update(
         tx,
         id,
@@ -97,6 +135,10 @@ export class TaskService {
         ctx,
       );
       if (!updated) throw new TaskNotFoundError();
+
+      if (params.assigneeUserIds !== undefined) {
+        await taskRepo.setAssigneesForTask(tx, id, params.assigneeUserIds, ctx);
+      }
       return updated;
     });
   }
@@ -108,12 +150,12 @@ export class TaskService {
     });
   }
 
-  // 元タスクから新規タスクを複製。ownerUserId は呼出側で必ず指定される。
+  // 元タスクから新規タスクを複製。assigneeUserIds は呼出側で必ず指定される。
   // status / completed_at / コメント は引き継がず、純粋な内容コピーのみ。
   async duplicateTask(
     sourceId: string,
     params: {
-      ownerUserId: string;
+      assigneeUserIds: string[];
       categoryId?: string;
       title?: string;
       description?: string | null;
@@ -127,6 +169,8 @@ export class TaskService {
       const source = await taskRepo.findById(tx, sourceId, ctx);
       if (!source) throw new TaskNotFoundError();
 
+      await validateAssigneesInTenant(tx, params.assigneeUserIds, ctx);
+
       const description =
         params.description !== undefined
           ? (params.description ?? undefined)
@@ -135,11 +179,10 @@ export class TaskService {
       const dueDate =
         due !== undefined ? (due ?? undefined) : (source.dueDate ?? undefined);
 
-      return taskRepo.create(
+      const created = await taskRepo.create(
         tx,
         {
           categoryId: params.categoryId ?? source.categoryId,
-          ownerUserId: params.ownerUserId,
           createdBy: ctx.userId,
           title: params.title ?? source.title,
           description,
@@ -147,6 +190,8 @@ export class TaskService {
         },
         ctx,
       );
+      await taskRepo.setAssigneesForTask(tx, created.id, params.assigneeUserIds, ctx);
+      return created;
     });
   }
 
@@ -180,6 +225,26 @@ export class TaskService {
       }
 
       await taskRepo.setTagsForTask(tx, taskId, tagIds, ctx);
+    });
+  }
+
+  /**
+   * タスクの assignee 割当を差分更新 (個別 API 用)
+   * 1. 対象タスクが同テナントに存在することを検証
+   * 2. userIds がすべて同テナントに所属することを検証 (1 件以上必須)
+   * 3. setAssigneesForTask で差分更新
+   */
+  async setTaskAssignees(
+    taskId: string,
+    userIds: string[],
+    ctx: AuthContext,
+  ): Promise<void> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      const task = await taskRepo.findById(tx, taskId, ctx);
+      if (!task) throw new TaskNotFoundError();
+
+      await validateAssigneesInTenant(tx, userIds, ctx);
+      await taskRepo.setAssigneesForTask(tx, taskId, userIds, ctx);
     });
   }
 }

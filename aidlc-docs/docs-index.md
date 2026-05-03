@@ -148,6 +148,7 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | [PROCESS] | [`audit.md`](audit.md) | 全ユーザー入力・AI 応答・決定の時系列ログ |
 | [PROCESS] | [`inception/plans/`](inception/plans/) | インセプション各ステージのプラン (execution-plan.md 等) |
 | [CURRENT] | [`inception/plans/2026-05-07-meeting-features-plan.md`](inception/plans/2026-05-07-meeting-features-plan.md) | 5/7 教員向け説明会向け機能追加の実装プラン (機能 A/B/C のステップチェックリスト + デプロイ + ロールバック手順) |
+| [CURRENT] | [`inception/plans/2026-05-07-multi-assignee-handoff.md`](inception/plans/2026-05-07-multi-assignee-handoff.md) | 5/7 説明会向け 複数アサイン本実装 (post-MVP 繰り上げ) — 引き継ぎノート (確定設計 / 既存 RLS パターン / MA-1〜11 詳細 / 次セッション開始手順) |
 | [PROCESS] | [`construction/plans/`](construction/plans/) | Unit 別の functional/nfr/infra/code 生成プラン (20 ファイル) |
 | [PROCESS] | `construction/unit-XX-*-questions.md` | 質問・回答の記録 |
 

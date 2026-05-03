@@ -1,9 +1,13 @@
 // POST /api/tasks/:id/duplicate - 元タスクから新規タスクを複製
-// status は 'todo' から開始、コメントは引き継がない
+// status は 'todo' から開始、コメントは引き継がない、assignees は body の assigneeUserIds で上書き
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '@/features/journal/lib/apiHelpers';
 import { taskService } from '@/features/tasks/lib/taskService';
-import { TaskNotFoundError } from '@/features/tasks/lib/errors';
+import {
+  TaskNotFoundError,
+  InvalidAssigneeReferenceError,
+  EmptyAssigneeError,
+} from '@/features/tasks/lib/errors';
 import { duplicateTaskSchema, taskIdParamSchema } from '@/features/tasks/schemas/task';
 import { logger } from '@/shared/lib/logger';
 
@@ -39,6 +43,16 @@ export default async function handler(
   } catch (err) {
     if (err instanceof TaskNotFoundError) {
       return res.status(404).json({ error: 'NOT_FOUND' });
+    }
+    if (err instanceof EmptyAssigneeError) {
+      return res.status(400).json({ error: 'EMPTY_ASSIGNEE', message: err.message });
+    }
+    if (err instanceof InvalidAssigneeReferenceError) {
+      return res.status(400).json({
+        error: 'INVALID_ASSIGNEE_REFERENCE',
+        message: err.message,
+        invalidIds: err.invalidIds,
+      });
     }
     logger.error({ event: 'tasks.duplicate.error', err, sourceId: id });
     return res.status(500).json({ error: 'INTERNAL_ERROR' });

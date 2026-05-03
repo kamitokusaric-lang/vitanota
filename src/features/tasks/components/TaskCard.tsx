@@ -1,12 +1,14 @@
 // カンバン上の個別タスクカード
-// delegated: 自分が作成したが owner が他人のタスク (色違い表示、「あの先生に振ったやつ」を識別)
+// delegated: 自分が作成したが assignees に自分が含まれないタスク (色違い表示、「あの先生に振ったやつ」を識別)
 // ステータス変更は (1) 編集モーダル の status select、または (2) 横方向ドラッグ&ドロップ で行う。
-import type { TaskWithOwner } from '../hooks/useTasks';
+import type { TaskAssigneeSummary, TaskWithAssignees } from '../hooks/useTasks';
 
 interface TaskCardProps {
-  task: TaskWithOwner;
-  onEdit: (task: TaskWithOwner) => void;
+  task: TaskWithAssignees;
+  onEdit: (task: TaskWithAssignees) => void;
   delegated?: boolean;
+  // 「全員」フィルタ時に自分のタスクを薄い黄色で識別するためのフラグ
+  mineHighlight?: boolean;
   onDragStart?: (taskId: string) => void;
   onDragEnd?: () => void;
 }
@@ -29,23 +31,47 @@ function isDueToday(value: string | Date): boolean {
   );
 }
 
+function displayName(a: TaskAssigneeSummary): string {
+  return a.nickname ?? a.name ?? '';
+}
+
+// 3 名以下は全員、4 名以上は「田中, 佐藤 +N」(最初の 2 名 + 残り件数)
+function formatAssignees(assignees: TaskAssigneeSummary[]): string {
+  if (assignees.length === 0) return '';
+  if (assignees.length <= 3) {
+    return assignees.map(displayName).filter(Boolean).join(', ');
+  }
+  const head = assignees.slice(0, 2).map(displayName).filter(Boolean).join(', ');
+  return `${head} +${assignees.length - 2}`;
+}
+
 export function TaskCard({
   task,
   onEdit,
   delegated = false,
+  mineHighlight = false,
   onDragStart,
   onDragEnd,
 }: TaskCardProps) {
   const draggable = !!onDragStart;
+  // 背景色の決定: delegated > mineHighlight > 通常 (delegated と mineHighlight は assignees の包含で排他)
+  const bgClass = delegated
+    ? 'bg-amber-50/40'
+    : mineHighlight
+      ? 'bg-yellow-50'
+      : 'bg-white';
   const cardClass = [
-    'rounded-md border border-gray-200 bg-white p-3 text-sm shadow-sm transition-opacity',
+    'rounded-md border border-gray-200 p-3 text-sm shadow-sm transition-opacity',
+    bgClass,
     task.status === 'done' ? 'opacity-60' : '',
-    // delegated (= 自分が振ったが他人が owner) は左側に amber のアクセントと淡い背景
-    delegated ? 'border-l-4 border-l-amber-400 bg-amber-50/40' : '',
+    // delegated (= 自分が振ったが assignees に自分が含まれない) は左側に amber のアクセント
+    delegated ? 'border-l-4 border-l-amber-400' : '',
     draggable ? 'cursor-grab active:cursor-grabbing' : '',
   ]
     .filter(Boolean)
     .join(' ');
+
+  const assigneesLabel = formatAssignees(task.assignees);
 
   return (
     <div
@@ -84,10 +110,10 @@ export function TaskCard({
           )}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          {(task.ownerNickname ?? task.ownerName) && (
+          {assigneesLabel && (
             <span>
               {delegated && <span className="text-amber-700">→ </span>}
-              {task.ownerNickname ?? task.ownerName}
+              {assigneesLabel}
             </span>
           )}
           {task.dueDate && (

@@ -1,8 +1,15 @@
-// タスク Repository: tasks テーブルへの CRUD
-// RLS で tenant 内 SELECT 全員 / INSERT・UPDATE・DELETE は owner or school_admin
+// タスク Repository: tasks テーブルへの CRUD と task_assignees (M:N) の管理
+// RLS で tenant 内 SELECT 全員 / UPDATE・DELETE は assignee or createdBy or school_admin
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { tasks, users, userTenantProfiles, taskTags, taskTagAssignments } from '@/db/schema';
+import {
+  tasks,
+  taskAssignees,
+  users,
+  userTenantProfiles,
+  taskTags,
+  taskTagAssignments,
+} from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { Task } from '@/db/schema';
 
@@ -15,7 +22,6 @@ export interface TaskContext {
 
 export interface CreateTaskParams {
   categoryId: string;
-  ownerUserId: string;
   createdBy: string;
   title: string;
   description?: string;
@@ -35,9 +41,14 @@ export interface TaskTagSummary {
   name: string;
 }
 
-export type TaskWithOwner = Task & {
-  ownerName: string | null;
-  ownerNickname: string | null;
+export interface TaskAssigneeSummary {
+  userId: string;
+  name: string | null;
+  nickname: string | null;
+}
+
+export type TaskWithAssignees = Task & {
+  assignees: TaskAssigneeSummary[];
   commentCount: number;
   tags: TaskTagSummary[];
 };
@@ -47,17 +58,36 @@ export class TaskRepository {
     tx: DrizzleDb,
     ctx: TaskContext,
     filters?: { ownerUserId?: string; scope?: 'mine' },
-  ): Promise<TaskWithOwner[]> {
+  ): Promise<TaskWithAssignees[]> {
     const conditions = [eq(tasks.tenantId, ctx.tenantId)];
     if (filters?.scope === 'mine') {
-      // 自分が owner または createdBy (scope='mine': アサイン元も含む)
+      // 自分が assignee に含まれる または createdBy=self (依頼中も拾うため)
+      const myAssignedTaskIds = tx
+        .select({ id: taskAssignees.taskId })
+        .from(taskAssignees)
+        .where(
+          and(
+            eq(taskAssignees.userId, ctx.userId),
+            eq(taskAssignees.tenantId, ctx.tenantId),
+          ),
+        );
       const scopeCondition = or(
-        eq(tasks.ownerUserId, ctx.userId),
+        inArray(tasks.id, myAssignedTaskIds),
         eq(tasks.createdBy, ctx.userId),
       );
       if (scopeCondition) conditions.push(scopeCondition);
     } else if (filters?.ownerUserId) {
-      conditions.push(eq(tasks.ownerUserId, filters.ownerUserId));
+      // 旧 ownerUserId フィルタ: 指定 user が assignees に含まれるタスクに変更
+      const filterAssignedTaskIds = tx
+        .select({ id: taskAssignees.taskId })
+        .from(taskAssignees)
+        .where(
+          and(
+            eq(taskAssignees.userId, filters.ownerUserId),
+            eq(taskAssignees.tenantId, ctx.tenantId),
+          ),
+        );
+      conditions.push(inArray(tasks.id, filterAssignedTaskIds));
     }
 
     const rows = await tx
@@ -65,7 +95,6 @@ export class TaskRepository {
         id: tasks.id,
         tenantId: tasks.tenantId,
         categoryId: tasks.categoryId,
-        ownerUserId: tasks.ownerUserId,
         createdBy: tasks.createdBy,
         title: tasks.title,
         description: tasks.description,
@@ -74,38 +103,103 @@ export class TaskRepository {
         completedAt: tasks.completedAt,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
-        ownerName: users.name,
-        ownerNickname: userTenantProfiles.nickname,
         commentCount: sql<number>`(SELECT COUNT(*)::int FROM task_comments WHERE task_comments.task_id = ${tasks.id})`,
       })
       .from(tasks)
-      .innerJoin(users, eq(users.id, tasks.ownerUserId))
-      .leftJoin(
-        userTenantProfiles,
-        and(
-          eq(userTenantProfiles.userId, tasks.ownerUserId),
-          eq(userTenantProfiles.tenantId, tasks.tenantId),
-        ),
-      )
       .where(and(...conditions))
       // 期限降順で下に (期限なしは最後)、同期限は作成順
       .orderBy(asc(tasks.dueDate), desc(tasks.createdAt));
 
     if (rows.length === 0) return [];
 
-    // タグを別クエリで取得して merge (drizzle の sub-query で GROUP BY 集約は罠あり)
-    const tagAssignments = await this.findTagsByTaskIds(
-      tx,
-      rows.map((r) => r.id),
-      ctx,
-    );
+    const taskIds = rows.map((r) => r.id);
+    const [assigneeRows, tagAssignments] = await Promise.all([
+      this.findAssigneesByTaskIds(tx, taskIds, ctx),
+      this.findTagsByTaskIds(tx, taskIds, ctx),
+    ]);
+
+    const assigneesMap = new Map<string, TaskAssigneeSummary[]>();
+    for (const a of assigneeRows) {
+      const arr = assigneesMap.get(a.taskId) ?? [];
+      arr.push({ userId: a.userId, name: a.name, nickname: a.nickname });
+      assigneesMap.set(a.taskId, arr);
+    }
+
     const tagsMap = new Map<string, TaskTagSummary[]>();
     for (const ta of tagAssignments) {
       const arr = tagsMap.get(ta.taskId) ?? [];
       arr.push({ id: ta.tagId, name: ta.tagName });
       tagsMap.set(ta.taskId, arr);
     }
-    return rows.map((r) => ({ ...r, tags: tagsMap.get(r.id) ?? [] }));
+
+    return rows.map((r) => ({
+      ...r,
+      assignees: assigneesMap.get(r.id) ?? [],
+      tags: tagsMap.get(r.id) ?? [],
+    }));
+  }
+
+  async findAssigneesByTaskIds(
+    tx: DrizzleDb,
+    taskIds: string[],
+    ctx: TaskContext,
+  ): Promise<
+    Array<{ taskId: string; userId: string; name: string | null; nickname: string | null }>
+  > {
+    if (taskIds.length === 0) return [];
+    const rows = await tx
+      .select({
+        taskId: taskAssignees.taskId,
+        userId: users.id,
+        name: users.name,
+        nickname: userTenantProfiles.nickname,
+      })
+      .from(taskAssignees)
+      .innerJoin(users, eq(users.id, taskAssignees.userId))
+      .leftJoin(
+        userTenantProfiles,
+        and(
+          eq(userTenantProfiles.userId, taskAssignees.userId),
+          eq(userTenantProfiles.tenantId, ctx.tenantId),
+        ),
+      )
+      .where(
+        and(
+          eq(taskAssignees.tenantId, ctx.tenantId),
+          inArray(taskAssignees.taskId, taskIds),
+        ),
+      )
+      .orderBy(asc(users.name));
+    return rows;
+  }
+
+  /**
+   * タスクの assignee 割当を差分更新 (既存全削除 → 新規 INSERT)
+   * - userIds は同テナント内の users.id を想定 (アプリ層で検証)
+   * - tenant_id は denormalize で同梱 (RLS が WITH CHECK で確認)
+   */
+  async setAssigneesForTask(
+    tx: DrizzleDb,
+    taskId: string,
+    userIds: string[],
+    ctx: TaskContext,
+  ): Promise<void> {
+    await tx
+      .delete(taskAssignees)
+      .where(
+        and(
+          eq(taskAssignees.taskId, taskId),
+          eq(taskAssignees.tenantId, ctx.tenantId),
+        ),
+      );
+    if (userIds.length === 0) return;
+    await tx.insert(taskAssignees).values(
+      userIds.map((userId) => ({
+        taskId,
+        userId,
+        tenantId: ctx.tenantId,
+      })),
+    );
   }
 
   async findTagsByTaskIds(
@@ -184,7 +278,6 @@ export class TaskRepository {
       .values({
         tenantId: ctx.tenantId,
         categoryId: params.categoryId,
-        ownerUserId: params.ownerUserId,
         createdBy: params.createdBy,
         title: params.title,
         description: params.description,

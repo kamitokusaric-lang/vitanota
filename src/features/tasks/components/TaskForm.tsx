@@ -1,16 +1,18 @@
 // タスク新規・編集フォーム (モーダル内で使用)
-// teacher は担当者フィールド非表示 (自分固定)、school_admin は選択可
-import { useState, useEffect } from 'react';
+// 担当者は M:N、自分 chip + 他教員 chip の multi-select で 1 名以上必須
+// teacher は担当者フィールド非表示 (自分固定)、school_admin は複数選択可
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import type { TaskCategory } from '@/db/schema';
 import type { Assignee } from '../hooks/useAssignees';
-import type { TaskWithOwner } from '../hooks/useTasks';
+import type { TaskWithAssignees } from '../hooks/useTasks';
 import type { TaskTag } from '../hooks/useTaskTags';
+import { AssigneePopoverInput } from './AssigneePopoverInput';
 
 export interface TaskFormValues {
   categoryId: string;
-  ownerUserId: string;
+  assigneeUserIds: string[];
   title: string;
   description: string;
   dueDate: string; // YYYY-MM-DD or ''
@@ -64,7 +66,9 @@ export function TaskForm({
 }: TaskFormProps) {
   const [values, setValues] = useState<TaskFormValues>({
     categoryId: initial?.categoryId ?? categories[0]?.id ?? '',
-    ownerUserId: initial?.ownerUserId ?? selfUserId,
+    // 複製モードは明示選択させる方針 (空配列で開く)。それ以外は initial があればそれ、なければ自分。
+    assigneeUserIds:
+      initial?.assigneeUserIds ?? (mode === 'duplicate' ? [] : [selfUserId]),
     title: initial?.title ?? '',
     description: initial?.description ?? '',
     dueDate: initial?.dueDate ?? '',
@@ -72,6 +76,24 @@ export function TaskForm({
     initialComment: '',
     tagIds: initial?.tagIds ?? [],
   });
+
+  function toggleAssignee(userId: string) {
+    setValues((v) =>
+      v.assigneeUserIds.includes(userId)
+        ? { ...v, assigneeUserIds: v.assigneeUserIds.filter((id) => id !== userId) }
+        : { ...v, assigneeUserIds: [...v.assigneeUserIds, userId] },
+    );
+  }
+
+  const assigneeCandidates = useMemo(
+    () => [
+      { userId: selfUserId, label: '自分' },
+      ...assignees
+        .filter((a) => a.userId !== selfUserId)
+        .map((a) => ({ userId: a.userId, label: a.name ?? a.email })),
+    ],
+    [assignees, selfUserId],
+  );
   const [newTagName, setNewTagName] = useState('');
   const [creatingTag, setCreatingTag] = useState(false);
   const [tagCreateError, setTagCreateError] = useState<string | null>(null);
@@ -337,32 +359,24 @@ export function TaskForm({
         </div>
 
         {canAssignToOthers && (
-          <div>
+          <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-medium text-gray-700">
-              担当者
+              担当者 (1 名以上、最大 3 名)
             </label>
-            <select
-              value={values.ownerUserId}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, ownerUserId: e.target.value }))
-              }
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
-              data-testid="task-form-owner"
-              required
+            <AssigneePopoverInput
+              candidates={assigneeCandidates}
+              selectedUserIds={values.assigneeUserIds}
+              onToggle={toggleAssignee}
               disabled={readonly}
-            >
-              {mode === 'duplicate' && (
-                <option value="">-- 担当者を選択 --</option>
-              )}
-              <option value={selfUserId}>自分</option>
-              {assignees
-                .filter((a) => a.userId !== selfUserId)
-                .map((a) => (
-                  <option key={a.userId} value={a.userId}>
-                    {a.name ?? a.email}
-                  </option>
-                ))}
-            </select>
+              invalid={values.assigneeUserIds.length === 0}
+              maxSelected={3}
+              testIdPrefix="task-form-assignees"
+            />
+            {values.assigneeUserIds.length === 0 && (
+              <div className="mt-1 text-xs text-red-600">
+                担当者を 1 名以上選択してください
+              </div>
+            )}
           </div>
         )}
 
@@ -427,7 +441,7 @@ export function TaskForm({
             disabled={
               submitting ||
               !values.title.trim() ||
-              (mode === 'duplicate' && !values.ownerUserId)
+              values.assigneeUserIds.length === 0
             }
             className="text-xs"
             data-testid="task-form-submit"
@@ -440,10 +454,10 @@ export function TaskForm({
   );
 }
 
-export function toFormInitial(task: TaskWithOwner): Partial<TaskFormValues> {
+export function toFormInitial(task: TaskWithAssignees): Partial<TaskFormValues> {
   return {
     categoryId: task.categoryId,
-    ownerUserId: task.ownerUserId,
+    assigneeUserIds: task.assignees.map((a) => a.userId),
     title: task.title,
     description: task.description ?? '',
     dueDate: dueDateToInputValue(task.dueDate),

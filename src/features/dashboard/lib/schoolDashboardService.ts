@@ -440,9 +440,12 @@ export async function getTeachersWorkload(
         days.day::text AS day,
         COUNT(tasks.id)::int AS open_count
       FROM days
+      LEFT JOIN task_assignees
+        ON task_assignees.user_id = ${teacher.userId}
+        AND task_assignees.tenant_id = ${tenantId}
       LEFT JOIN tasks
-        ON tasks.owner_user_id = ${teacher.userId}
-        AND tasks.tenant_id = ${tenantId}
+        ON tasks.id = task_assignees.task_id
+        AND tasks.tenant_id = task_assignees.tenant_id
         AND (tasks.created_at AT TIME ZONE 'Asia/Tokyo')::date <= days.day
         AND (
           tasks.completed_at IS NULL

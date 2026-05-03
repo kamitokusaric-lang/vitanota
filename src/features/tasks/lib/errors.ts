@@ -23,3 +23,21 @@ export class InvalidTagReferenceError extends Error {
     this.invalidIds = invalidIds;
   }
 }
+
+export class InvalidAssigneeReferenceError extends Error {
+  readonly code = 'INVALID_ASSIGNEE_REFERENCE';
+  readonly invalidIds: string[];
+  constructor(invalidIds: string[]) {
+    super('指定された担当者が見つかりません');
+    this.name = 'InvalidAssigneeReferenceError';
+    this.invalidIds = invalidIds;
+  }
+}
+
+export class EmptyAssigneeError extends Error {
+  readonly code = 'EMPTY_ASSIGNEE';
+  constructor(message = '担当者を 1 名以上選択してください') {
+    super(message);
+    this.name = 'EmptyAssigneeError';
+  }
+}

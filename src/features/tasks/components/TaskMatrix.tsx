@@ -6,7 +6,7 @@
 // 横方向 (異なる status 列への) ドラッグ&ドロップで status 変更可能。
 import { useMemo, useState } from 'react';
 import { TaskCard } from './TaskCard';
-import type { TaskWithOwner } from '../hooks/useTasks';
+import type { TaskWithAssignees } from '../hooks/useTasks';
 
 type StatusId = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
 
@@ -24,12 +24,14 @@ export interface MatrixGroup {
 }
 
 interface TaskMatrixProps {
-  tasks: TaskWithOwner[];
+  tasks: TaskWithAssignees[];
   rows: MatrixGroup[];
-  assignTaskToRows: (task: TaskWithOwner) => string[];
+  assignTaskToRows: (task: TaskWithAssignees) => string[];
   selfUserId: string;
-  onEdit: (task: TaskWithOwner) => void;
+  onEdit: (task: TaskWithAssignees) => void;
   onTaskDropStatus?: (taskId: string, newStatus: StatusId) => void;
+  // true のとき、自分が assignee のタスクを薄い黄色で識別 (「全員」フィルタ時に有効化)
+  highlightMineTasks?: boolean;
 }
 
 export function TaskMatrix({
@@ -39,6 +41,7 @@ export function TaskMatrix({
   selfUserId,
   onEdit,
   onTaskDropStatus,
+  highlightMineTasks = false,
 }: TaskMatrixProps) {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [hoverCell, setHoverCell] = useState<{ rowId: string; statusId: StatusId } | null>(null);
@@ -46,11 +49,11 @@ export function TaskMatrix({
 
   // grid[rowId][statusId] = tasks[]
   const grid = useMemo(() => {
-    const m = new Map<string, Map<StatusId, TaskWithOwner[]>>();
+    const m = new Map<string, Map<StatusId, TaskWithAssignees[]>>();
     for (const r of rows) {
       m.set(
         r.id,
-        new Map(STATUS_COLS.map((c) => [c.id, [] as TaskWithOwner[]])),
+        new Map(STATUS_COLS.map((c) => [c.id, [] as TaskWithAssignees[]])),
       );
     }
     for (const t of tasks) {
@@ -171,7 +174,7 @@ export function TaskMatrix({
                     ) : (
                       <div className="space-y-2">
                         {cellTasks.map((t) => {
-                          const isMine = t.ownerUserId === selfUserId;
+                          const isMine = t.assignees.some((a) => a.userId === selfUserId);
                           const delegated = !isMine && t.createdBy === selfUserId;
                           return (
                             <TaskCard
@@ -179,6 +182,7 @@ export function TaskMatrix({
                               task={t}
                               onEdit={onEdit}
                               delegated={delegated}
+                              mineHighlight={highlightMineTasks && isMine}
                               onDragStart={
                                 dndEnabled
                                   ? (taskId) => setDraggingTaskId(taskId)

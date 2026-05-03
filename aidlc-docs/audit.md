@@ -1783,6 +1783,28 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
 
 ---
 
+## 2026-05-03 続セッション: TaskBoard 刷新 + 複数アサイン本実装の繰り上げ着手
+
+**タイムスタンプ**: 2026-05-03T11:00:00Z
+**ユーザー入力 (要旨)**: 校長フィードバックを踏まえタスク管理を刷新したい (2 軸表示 / タグ / 一括追加 / DnD / status 5 段階) — 5/3-5 で実装、5/6 本番デプロイ。
+**AI応答 (要旨)**: ブランチ feat/2026-05-07-task-tag-board で実装、TaskBoard を全面刷新。commit df7653d で main マージ + 本番デプロイ。chimo のブラウザ確認で複数の UI 改善 (カテゴリ縦並び / レーン幅 / status ヘッダ sticky / カテゴリの今週やる順 / 編集モーダル kebab menu / タグ datalist→ chip サジェスト / タイトル 15 字 / etc.) を順次反映。中間 commit be561a3 で main + 本番デプロイ + migration 0025 (status enum 拡張) 適用。
+
+**タイムスタンプ**: 2026-05-03T11:55:00Z
+**ユーザー入力**: "やっぱり複数アサインしないと意味ないことに気づいた"
+**AI応答**: 機能C のタスク複製は妥協案、複数アサイン本実装に切り替えへ。3 件確認 (進捗管理 / スコープ / owner_user_id 扱い)。
+**ユーザー入力 (確定)**:
+- 進捗管理: 共通 status (1 つを全員で共有)
+- スコープ: 5/6 本番デプロイ、複製機能も残す
+- owner_user_id: 廃止 → task_assignees に一本化
+**AI応答**: ベースライン tag pre-multi-assignee-baseline 付与、新ブランチ feat/2026-05-07-multi-assignee 作成。MA-1〜MA-11 の作業計画を Task に登録。migration 0026_task_assignees.sql を作成 (task_assignees 新規 / 既存 owner_user_id 移行 / tasks の owner ベース RLS を assignee ベース tasks_member_update / tasks_member_delete に置換 / owner_user_id カラム DROP)。途中で chimo が「既存ポリシー名を推測で書いている」と気付き介入、grep で実在 RLS (tasks_owner_update / tasks_owner_delete = 0020 / tasks_owner_created_idx = 0014) を確認してから書き直し。
+
+**タイムスタンプ**: 2026-05-03T12:10:00Z
+**ユーザー入力**: "MA-1からは別セッションで進めるから、引き継ぎできるようにタスクを整理して"
+**AI応答**: aidlc-docs/inception/plans/2026-05-07-multi-assignee-handoff.md を作成し、(1) 確定設計、(2) 引き継ぎ時点の現状、(3) 既存 RLS パターン、(4) 各 MA タスクの詳細手順、(5) 注意点、(6) 既存 commit ライン、(7) 次セッション開始時のチェックリスト を網羅。docs-index.md にも CURRENT エントリを追加。TaskList の MA-1 description に migration 内容の概要を追記、TG-8 を completed に更新。
+**コンテキスト**: 別セッションでの引き継ぎ用。TaskList はセッション越えで保持されない可能性があるため、handoff.md を一次資料として参照させる構成。
+
+---
+
 ## 本番デプロイ + 兼務ナビ + orphan cleanup
 
 **タイムスタンプ**: 2026-05-03T09:00:00Z
@@ -1802,5 +1824,76 @@ chimo 側の実ブラウザ Google ログイン通し確認済。
   - noguchi row2 (used_at=NULL) = pending (現在有効)
 handler.ts に新 command `cleanup-orphan-accepted-invitations` を追加 (dryRun + execute)。判定ロジックは (email, tenant_id, role) で used_at ASC 並べて 1 番目を本物、2 番目以降と user_tenant_roles 不在の受諾済を orphan とする。cdk deploy で Lambda 更新 → dryRun invoke で chimo に 2 件確認 → execute invoke で `deleted: 2` 成功。inspect 再実行で残り 2 行 (本物受諾 + 未受諾) のみ確認、本番招待一覧の違和感解消。
 **コンテキスト**: ローカルでの zenikami 1 件発見と同じ症状の本番版。修正コード (DELETE 化) のデプロイ前に発生した orphan を後追いで cleanup。今後は createOrReissueInvitation の DELETE 化 (commit 7ebdfec) で再発しない。
+
+---
+
+## 5/7 説明会向け 複数アサイン本実装 - セッション再開
+
+**タイムスタンプ**: 2026-05-04T00:00:00Z
+**ユーザー入力**: "おはよー昨日の続きやる"
+**AI応答**: handoff plan (`aidlc-docs/inception/plans/2026-05-07-multi-assignee-handoff.md`) 確認、ブランチ `feat/2026-05-07-multi-assignee` 状態確認: 未 commit は `migrations/0026_task_assignees.sql` (新規) と handoff plan (新規) のみ、ローカル DB は 0025 まで適用済 (最終 = 0025_task_status_5_stages.sql)、tasks 4 件全て owner_user_id 持ち。MA-1 (migration 0026 ローカル適用) から再開。MA-1〜MA-11 を Task list に登録。
+**コンテキスト**: 5/3 引き継ぎ → 5/4 再開。MA-1 着手前の状態確認完了。
+
+---
+
+**タイムスタンプ**: 2026-05-04T00:05:00Z
+**ユーザー入力**: (継続作業)
+**AI応答**: MA-1 完了。`pnpm db:local:migrate` で 0026_task_assignees.sql を適用、INSERT 0 4 で 4 件の owner_user_id を task_assignees に移行完了。`\d task_assignees` で構造確認 (PK = (task_id, user_id)、複合 FK で task の tenant_id 一致強制、RLS forced + `task_assignees_tenant` policy 適用、user_tenant idx + task_id idx の 2 本)。`\d tasks` で owner_user_id カラム消滅 + tasks_owner_update/delete + tasks_owner_created_idx が DROP され、新 `tasks_member_update` / `tasks_member_delete` (createdBy=self OR assignee に self 含む) が適用済を確認。tasks 4 件 = task_assignees 4 件 で移行整合性 OK。
+**コンテキスト**: MA-1 完了、MA-2 (schema.ts) へ進む。
+
+---
+
+**タイムスタンプ**: 2026-05-04T00:15:00Z
+**ユーザー入力**: "全 assignee にカウント" (workload 集計の M:N 対応方針 confirm)
+**AI応答**: MA-2 着手中に grep で handoff plan 未記載の `src/features/dashboard/lib/schoolDashboardService.ts:444` (school_admin の学校エンゲージメント tab で表示する「教員別 open task 件数の日次推移」) が `tasks.owner_user_id = teacher.userId` を生 SQL で直参照していると発見。M:N 化により 1 タスクが複数 assignee に存在する時の集計仕様を chimo に確認 → 「全 assignee にカウント」に確定 (新仕様 = 1 タスクをみんなで進める と整合、school_admin に対しては「この先生が抱えてる仕事の量」が見える)。新タスク MA-12 を立てて、schoolDashboardService の生 SQL を `task_assignees` JOIN 経由に書き換えることに。
+**コンテキスト**: MA-2 schema.ts 改修途中で割込み確認 → 仕様確定 → MA-2 続行へ。
+
+---
+
+**タイムスタンプ**: 2026-05-04T00:50:00Z
+**ユーザー入力**: "同梱して 5 値に拡張" (taskStatusSchema 5 段階対応の同梱判断)
+**AI応答**: MA-6 着手中、`schemas/task.ts` の `taskStatusSchema` が `z.enum(['todo', 'in_progress', 'done'])` の 3 値のままで、be561a3 commit message にあった「Zod schema 全部 5 値対応」が漏れてた (実装は taskStatusEnum / TaskMatrix / TaskForm 内ローカルだけ 5 値、Zod は据え置きだった) と発見。本番で backlog/review への drag が API 400 で弾かれてる状態と推定。chimo 確認 → MA-6 に同梱して 5 値拡張で一括修正することに。
+**コンテキスト**: be561a3 のリグレッション fix を MA-6 に同梱、別 commit にしない判断。
+
+---
+
+**タイムスタンプ**: 2026-05-04T01:10:00Z
+**ユーザー入力**: "行内 chip group に inline 展開" (TaskBulkCreateForm の multi-select UI スタイル選択)
+**AI応答**: MA-9 着手中、各行の「担当者」セルを multi-select 化するスタイルを 2 案提示 (handoff plan 推奨 = popover dropdown vs 行内 inline chip group)。table 内の position: absolute popover は overflow-x-auto との相性悪・外クリック検知も増、複雑性高。chimo 選択 → 行内 chip group inline (案 B、preview 例: `[自分] [田中] [佐藤] [鈴木]` を flex-wrap で並べ、選択中は orange 塗りつぶし)。実装簡素化 + 一覧性優先。
+**コンテキスト**: handoff plan の推奨 (案 A) からは外れるが、UX と保守性の trade-off で chimo 判断。
+
+---
+
+**タイムスタンプ**: 2026-05-04T02:00:00Z
+**ユーザー入力**: (継続作業)
+**AI応答**: MA-2 〜 MA-12 の全コード改修完了:
+  - schema.ts: taskAssignees pgTable + 型 export 追加、tasks から ownerUserId と ownerCreatedIdx 削除
+  - taskRepository: TaskWithOwner → TaskWithAssignees rename、findAssigneesByTaskIds / setAssigneesForTask 追加、findAllByTenant の filter (scope=mine / ownerUserId) を sub-query inArray で M:N 対応、create から ownerUserId 削除
+  - taskService: CreateTaskServiceInput / UpdateTaskServiceInput を assigneeUserIds 配列に、validateAssigneesInTenant (userTenantRoles 経由で同テナント所属チェック) 追加、setTaskAssignees 個別 API メソッド追加、duplicateTask の assignees 上書き対応
+  - errors.ts: InvalidAssigneeReferenceError + EmptyAssigneeError 追加
+  - schemas/task.ts: createTaskSchema / updateTaskSchema / duplicateTaskSchema を assigneeUserIds 対応 + taskStatusSchema を 5 値拡張 (be561a3 漏れの fix 同梱)
+  - pages/api/tasks/index.ts / [id].ts / [id]/duplicate.ts: 新エラー型のハンドリング追加 (400 with invalidIds)
+  - useTasks.ts: TaskWithOwner → TaskWithAssignees rename + assignees 配列の型定義
+  - TaskCard: assignees 配列を 3 名以下全員 / 4 名以上「田中, 佐藤 +N」表示、delegated を assignees ベース判定
+  - TaskMatrix: isMine を assignees.some() に
+  - TaskForm: 担当者 select → chip group multi-select (自分 chip + 他教員 chip)、assigneeUserIds 必須 validation
+  - TaskBulkCreateForm: 各行を select → 行内 inline chip group multi-select に、validRow 判定に assigneeUserIds.length > 0 を追加
+  - TaskBoard: handleBulkCreate / handleUpdate / handleDuplicate を assigneeUserIds 配列で送信、依頼中フィルタ・自分の今週やるカウント・edit modal の readonly 判定を全て assignees ベースに、duplicate 時の toast label を複数名対応
+  - schoolDashboardService: workload 集計の生 SQL を tasks.owner_user_id 直参照から task_assignees JOIN に書き換え (1 タスク複数 assignee は全員にカウント、chimo 確認済)
+  - __tests__/unit/taskService.duplicate.test.ts: assignees 構造に書き換え、setAssigneesForTask 呼出 assert 追加、validateAssigneesInTenant の tx.select.from.where chain を mock で素通し
+検証: `pnpm type-check` 0 errors / `pnpm test` 239/239 passed / `pnpm lint` warning 1 件 (AboutVitanotaModal の既存 img 警告、今回の改修無関係)。
+**コンテキスト**: 全静的検証 GREEN、次は MA-11 後半 (ローカル dev server で実機動作確認) → 1 commit にまとめて main マージ + 本番デプロイ。
+
+---
+
+**タイムスタンプ**: 2026-05-04T02:30:00Z
+**ユーザー入力**: "あ、ごめん。私の選択が悪かったんだけど、複数アサイニーの選択をポップアップで先生選択するとinputボックスに表示されるようにして欲しい"
+**AI応答**: TaskBulkCreateForm の inline chip group 案を撤回 (chimo の前回選択は誘導が弱かった反省)、popover dropdown + input box (選択中 chip 並び) に変更。chimo に「TaskForm も統一する？」と再確認 → 「TaskBulkCreateForm と同じ popover input に統一」を選択 → 両方を新 component `AssigneePopoverInput` に置き換え。
+実装:
+  - `src/features/tasks/components/AssigneePopoverInput.tsx` 新規: input 風 box (選択中 chip + ×ボタン + ▼) と popover (チェックリスト)、外クリック / ESC で close、popover は `position: fixed` で getBoundingClientRect から座標計算 (table の overflow に切られない設計)
+  - TaskBulkCreateForm: 各行担当者セルを inline chip group → AssigneePopoverInput に置換、assigneeCandidates を component 上部で memoize
+  - TaskForm: 担当者 chip group → AssigneePopoverInput に置換 (canAssignToOthers=false 時は表示なしの既存挙動維持)
+検証: `pnpm type-check` 0 errors / `pnpm test` 239/239 passed。dev server 継続稼働中、chimo がブラウザ実機確認継続。
+**コンテキスト**: chimo の方針修正対応、handoff plan の MA-9 当初推奨案 (案 A popover) に戻す形に。inline chip 案 (前回選択) は撤回済。
 
 ---

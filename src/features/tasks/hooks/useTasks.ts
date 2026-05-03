@@ -6,15 +6,20 @@ export interface TaskTagSummary {
   name: string;
 }
 
-export type TaskWithOwner = Task & {
-  ownerName: string | null;
-  ownerNickname: string | null;
+export interface TaskAssigneeSummary {
+  userId: string;
+  name: string | null;
+  nickname: string | null;
+}
+
+export type TaskWithAssignees = Task & {
+  assignees: TaskAssigneeSummary[];
   commentCount: number;
   tags: TaskTagSummary[];
 };
 
 interface TasksResponse {
-  tasks: TaskWithOwner[];
+  tasks: TaskWithAssignees[];
 }
 
 const fetcher = async (url: string): Promise<TasksResponse> => {

@@ -343,9 +343,9 @@ export const taskCategories = pgTable(
 );
 
 // ── tasks ──────────────────────────────────────────────────────
-// owner_user_id = 担当者 (誰のタスクか)、created_by = 作成者
-// teacher: owner = 自分のタスクのみ INSERT / UPDATE (RLS)
-// school_admin: 任意の教員にアサイン可
+// 担当者は task_assignees (M:N) に一本化、created_by = 作成者
+// teacher: 自分が assignee に含まれる or createdBy=self のタスクを UPDATE / DELETE 可 (RLS)
+// school_admin: テナント内全タスク無条件
 export const tasks = pgTable(
   'tasks',
   {
@@ -354,9 +354,6 @@ export const tasks = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     categoryId: uuid('category_id').notNull(),
-    ownerUserId: uuid('owner_user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
@@ -377,10 +374,35 @@ export const tasks = pgTable(
       name: 'tasks_category_fk',
     }).onDelete('restrict'),
     tenantIdx: index('tasks_tenant_idx').on(table.tenantId),
-    ownerCreatedIdx: index('tasks_owner_created_idx').on(table.ownerUserId, table.createdAt),
     tenantStatusIdx: index('tasks_tenant_status_idx').on(table.tenantId, table.status),
     categoryIdx: index('tasks_category_idx').on(table.categoryId),
   })
+);
+
+// ── task_assignees (M:N) ───────────────────────────────────────
+// 1 タスクに複数担当者 (共通 status で進捗共有)。複合 FK で tenant 一致を物理保証。
+export const taskAssignees = pgTable(
+  'task_assignees',
+  {
+    taskId: uuid('task_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.taskId, table.userId] }),
+    taskFk: foreignKey({
+      columns: [table.taskId, table.tenantId],
+      foreignColumns: [tasks.id, tasks.tenantId],
+      name: 'task_assignees_task_fk',
+    }).onDelete('cascade'),
+    userTenantIdx: index('task_assignees_user_tenant_idx').on(table.userId, table.tenantId),
+    taskIdx: index('task_assignees_task_idx').on(table.taskId),
+  }),
 );
 
 // ── task_comments ───────────────────────────────────────────────
@@ -548,3 +570,5 @@ export type TaskTag = typeof taskTags.$inferSelect;
 export type NewTaskTag = typeof taskTags.$inferInsert;
 export type TaskTagAssignment = typeof taskTagAssignments.$inferSelect;
 export type NewTaskTagAssignment = typeof taskTagAssignments.$inferInsert;
+export type TaskAssignee = typeof taskAssignees.$inferSelect;
+export type NewTaskAssignee = typeof taskAssignees.$inferInsert;

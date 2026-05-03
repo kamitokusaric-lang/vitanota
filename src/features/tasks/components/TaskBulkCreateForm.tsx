@@ -3,18 +3,19 @@
 //
 // 上段: カテゴリ + タグ (全行共通)
 // 下段: 各行 (タイトル / 説明 / 期限 / 担当者 / コメント + × 削除) を横並びで複数追加
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import type { TaskCategory } from '@/db/schema';
 import type { Assignee } from '../hooks/useAssignees';
 import type { TaskTag } from '../hooks/useTaskTags';
+import { AssigneePopoverInput } from './AssigneePopoverInput';
 
 export interface BulkRowValues {
   title: string;
   description: string;
   dueDate: string; // YYYY-MM-DD or ''
-  ownerUserId: string;
+  assigneeUserIds: string[];
   initialComment: string;
 }
 
@@ -41,7 +42,7 @@ function emptyRow(selfUserId: string): BulkRowValues {
     title: '',
     description: '',
     dueDate: '',
-    ownerUserId: selfUserId,
+    assigneeUserIds: [selfUserId],
     initialComment: '',
   };
 }
@@ -60,6 +61,16 @@ export function TaskBulkCreateForm({
   const [categoryId, setCategoryId] = useState<string>(categories[0]?.id ?? '');
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [rows, setRows] = useState<BulkRowValues[]>([emptyRow(selfUserId)]);
+
+  const assigneeCandidates = useMemo(
+    () => [
+      { userId: selfUserId, label: '自分' },
+      ...assignees
+        .filter((a) => a.userId !== selfUserId)
+        .map((a) => ({ userId: a.userId, label: a.name ?? a.email })),
+    ],
+    [assignees, selfUserId],
+  );
 
   const [newTagName, setNewTagName] = useState('');
   const [creatingTag, setCreatingTag] = useState(false);
@@ -111,14 +122,29 @@ export function TaskBulkCreateForm({
     setRows((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
   }
 
+  function toggleRowAssignee(idx: number, userId: string) {
+    setRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== idx) return r;
+        return r.assigneeUserIds.includes(userId)
+          ? { ...r, assigneeUserIds: r.assigneeUserIds.filter((id) => id !== userId) }
+          : { ...r, assigneeUserIds: [...r.assigneeUserIds, userId] };
+      }),
+    );
+  }
+
+  // 担当者 0 名の行は無効。タイトルが空でも無効。
+  const isValidRow = (r: BulkRowValues) =>
+    r.title.trim().length > 0 && r.assigneeUserIds.length > 0;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const validRows = rows.filter((r) => r.title.trim().length > 0);
+    const validRows = rows.filter(isValidRow);
     if (validRows.length === 0) return;
     onSubmit({ categoryId, tagIds, rows: validRows });
   }
 
-  const validRowCount = rows.filter((r) => r.title.trim().length > 0).length;
+  const validRowCount = rows.filter(isValidRow).length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="task-bulk-create-form">
@@ -263,7 +289,7 @@ export function TaskBulkCreateForm({
               <th className="px-2 py-1 text-left">タイトル *</th>
               <th className="px-2 py-1 text-left">説明</th>
               <th className="px-2 py-1 text-left whitespace-nowrap">期限</th>
-              <th className="px-2 py-1 text-left whitespace-nowrap">担当者</th>
+              <th className="px-2 py-1 text-left whitespace-nowrap">担当者 (最大 3 名)</th>
               <th className="px-2 py-1 text-left">コメント</th>
               <th className="px-2 py-1" />
             </tr>
@@ -301,22 +327,15 @@ export function TaskBulkCreateForm({
                     data-testid={`bulk-form-row-${idx}-due-date`}
                   />
                 </td>
-                <td className="px-1 py-1 align-top whitespace-nowrap">
-                  <select
-                    value={row.ownerUserId}
-                    onChange={(e) => updateRow(idx, { ownerUserId: e.target.value })}
-                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-                    data-testid={`bulk-form-row-${idx}-owner`}
-                  >
-                    <option value={selfUserId}>自分</option>
-                    {assignees
-                      .filter((a) => a.userId !== selfUserId)
-                      .map((a) => (
-                        <option key={a.userId} value={a.userId}>
-                          {a.name ?? a.email}
-                        </option>
-                      ))}
-                  </select>
+                <td className="px-1 py-1 align-top">
+                  <AssigneePopoverInput
+                    candidates={assigneeCandidates}
+                    selectedUserIds={row.assigneeUserIds}
+                    onToggle={(userId) => toggleRowAssignee(idx, userId)}
+                    invalid={row.assigneeUserIds.length === 0}
+                    maxSelected={3}
+                    testIdPrefix={`bulk-form-row-${idx}-assignees`}
+                  />
                 </td>
                 <td className="px-1 py-1 align-top">
                   <input

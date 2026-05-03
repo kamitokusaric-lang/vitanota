@@ -4,6 +4,7 @@ const { mockTaskRepo, mockLogger } = vi.hoisted(() => ({
   mockTaskRepo: {
     findById: vi.fn(),
     create: vi.fn(),
+    setAssigneesForTask: vi.fn(),
   },
   mockLogger: {
     info: vi.fn(),
@@ -12,10 +13,24 @@ const { mockTaskRepo, mockLogger } = vi.hoisted(() => ({
   },
 }));
 
+// validateAssigneesInTenant 内の tx.select(...).from(...).where(...) を素通しさせるための tx mock
+// テスト中の assigneeUserIds はすべて valid 扱い (固定で `user-target` / `user-self` を valid とする)
+const mockTx = {
+  select: () => ({
+    from: () => ({
+      where: () =>
+        Promise.resolve([
+          { userId: 'user-target' },
+          { userId: 'user-self' },
+        ]),
+    }),
+  }),
+};
+
 vi.mock('@/shared/lib/db', () => ({
   withTenantUser: vi.fn(
     async (_tenantId: string, _userId: string, _role: string, fn: (tx: never) => unknown) =>
-      fn({} as never),
+      fn(mockTx as never),
   ),
 }));
 
@@ -40,7 +55,6 @@ const sourceTask = {
   id: 'task-source',
   tenantId: 'tenant-1',
   categoryId: 'cat-1',
-  ownerUserId: 'user-other',
   createdBy: 'user-other',
   title: '元タスク',
   description: '元の説明',
@@ -59,7 +73,7 @@ describe('TaskService.duplicateTask', () => {
     service = new TaskService();
   });
 
-  it('元タスクから複製: createdBy = 操作者、status は repo デフォルト (todo)', async () => {
+  it('元タスクから複製: createdBy = 操作者、status は repo デフォルト (todo)、assignees は body の指定で上書き', async () => {
     mockTaskRepo.findById.mockResolvedValue(sourceTask);
     mockTaskRepo.create.mockImplementation(async (_tx, params) => ({
       ...sourceTask,
@@ -71,20 +85,25 @@ describe('TaskService.duplicateTask', () => {
 
     const result = await service.duplicateTask(
       'task-source',
-      { ownerUserId: 'user-target' },
+      { assigneeUserIds: ['user-target'] },
       ctx,
     );
 
     expect(mockTaskRepo.create).toHaveBeenCalledWith(
-      {},
+      expect.anything(),
       expect.objectContaining({
         categoryId: 'cat-1',
-        ownerUserId: 'user-target',
         createdBy: 'user-self',
         title: '元タスク',
         description: '元の説明',
         dueDate: sourceTask.dueDate,
       }),
+      ctx,
+    );
+    expect(mockTaskRepo.setAssigneesForTask).toHaveBeenCalledWith(
+      expect.anything(),
+      'task-new',
+      ['user-target'],
       ctx,
     );
     expect(result.status).toBe('todo');
@@ -95,19 +114,20 @@ describe('TaskService.duplicateTask', () => {
     mockTaskRepo.findById.mockResolvedValue(null);
 
     await expect(
-      service.duplicateTask('task-missing', { ownerUserId: 'user-target' }, ctx),
+      service.duplicateTask('task-missing', { assigneeUserIds: ['user-target'] }, ctx),
     ).rejects.toThrow(TaskNotFoundError);
     expect(mockTaskRepo.create).not.toHaveBeenCalled();
+    expect(mockTaskRepo.setAssigneesForTask).not.toHaveBeenCalled();
   });
 
-  it('params で title / description / dueDate / categoryId を上書き可能', async () => {
+  it('params で title / description / dueDate / categoryId を上書き可能、assignees は複数指定可', async () => {
     mockTaskRepo.findById.mockResolvedValue(sourceTask);
     mockTaskRepo.create.mockResolvedValue({ ...sourceTask, id: 'task-new' });
 
     await service.duplicateTask(
       'task-source',
       {
-        ownerUserId: 'user-target',
+        assigneeUserIds: ['user-target', 'user-self'],
         title: '新タイトル',
         description: '新説明',
         dueDate: '2026-06-01',
@@ -117,15 +137,20 @@ describe('TaskService.duplicateTask', () => {
     );
 
     expect(mockTaskRepo.create).toHaveBeenCalledWith(
-      {},
+      expect.anything(),
       expect.objectContaining({
         categoryId: 'cat-2',
-        ownerUserId: 'user-target',
         createdBy: 'user-self',
         title: '新タイトル',
         description: '新説明',
         dueDate: new Date('2026-06-01T00:00:00Z'),
       }),
+      ctx,
+    );
+    expect(mockTaskRepo.setAssigneesForTask).toHaveBeenCalledWith(
+      expect.anything(),
+      'task-new',
+      ['user-target', 'user-self'],
       ctx,
     );
   });
@@ -136,12 +161,12 @@ describe('TaskService.duplicateTask', () => {
 
     await service.duplicateTask(
       'task-source',
-      { ownerUserId: 'user-target', description: null },
+      { assigneeUserIds: ['user-target'], description: null },
       ctx,
     );
 
     expect(mockTaskRepo.create).toHaveBeenCalledWith(
-      {},
+      expect.anything(),
       expect.objectContaining({
         description: undefined,
       }),

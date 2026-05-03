@@ -3,6 +3,9 @@
 // onEdit / onDelete いずれか指定時は右上に kebab メニュー (⋮) を表示
 import { useEffect, useRef, useState } from 'react';
 import type { EmotionTag } from '@/db/schema';
+import type { MoodLevel } from '@/features/journal/schemas/journal';
+import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
+import { IconTooltip } from '@/shared/components/IconTooltip';
 
 export interface EntryCardData {
   id: string;
@@ -10,6 +13,8 @@ export interface EntryCardData {
   content: string;
   createdAt: string | Date;
   isPublic?: boolean;  // マイ記録では必要、共有タイムラインでは undefined
+  // mood: 5 段階の気分 (絵文字表示用)。既存データは null、新規投稿は API 側で必須
+  mood?: MoodLevel | null;
   authorName?: string | null;  // JOIN 済みの投稿者名 (fallback)
   authorNickname?: string | null;  // nickname 優先表示
   tags?: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
@@ -39,6 +44,8 @@ export function EntryCard({
   onDelete,
 }: EntryCardProps) {
   const hasMenu = Boolean(onEdit || onDelete);
+  const MoodIcon = getMoodIcon(entry.mood);
+  const moodLabel = getMoodLabel(entry.mood);
 
   return (
     <article
@@ -55,6 +62,14 @@ export function EntryCard({
           <time dateTime={new Date(entry.createdAt).toISOString()}>
             {formatDate(entry.createdAt)}
           </time>
+          {MoodIcon && moodLabel && (
+            <IconTooltip
+              label={moodLabel}
+              testId={`entry-card-mood-${entry.id}`}
+            >
+              <MoodIcon size={14} className="text-gray-500" aria-hidden />
+            </IconTooltip>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {showPrivacyBadge && entry.isPublic === false && (

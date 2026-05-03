@@ -14,9 +14,11 @@ import {
   type MoodLevel,
 } from '@/features/journal/schemas/journal';
 import { pickRandomMoodPrompt } from '@/features/journal/lib/mood-prompts';
+import { MOOD_OPTIONS } from '@/features/journal/lib/mood-options';
 import { TagFilter } from './TagFilter';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
+import { IconTooltip } from '@/shared/components/IconTooltip';
 import type { EmotionTag, JournalEntry } from '@/db/schema';
 
 export interface EntrySaveResult {
@@ -37,75 +39,6 @@ interface EntryFormProps {
   onCancel?: () => void;
   compact?: boolean;
 }
-
-const MOOD_OPTIONS: Array<{
-  value: MoodLevel;
-  emoji: string;
-  label: string;
-  caption: string;
-  prompts: string[];
-}> = [
-  {
-    value: 'very_positive',
-    emoji: '😊',
-    label: 'とても良い',
-    caption: 'すごくいい感じでした',
-    prompts: [
-      'どんなことがよかった?',
-      '何が嬉しかった?',
-      '今日の良かったこと、一つあげるなら?',
-      '誰かに感謝したいこと、ある?',
-    ],
-  },
-  {
-    value: 'positive',
-    emoji: '🙂',
-    label: '良い',
-    caption: 'いい感じでした',
-    prompts: [
-      'いい感じだったこと、ちょっと教えて',
-      '今日、どんなことがスムーズだった?',
-      '落ち着いて過ごせた瞬間は?',
-      '少し嬉しかったこと、ある?',
-    ],
-  },
-  {
-    value: 'neutral',
-    emoji: '😐',
-    label: 'ふつう',
-    caption: 'ふつうでした',
-    prompts: [
-      '今日はどんな一日だった?',
-      'なんとなく印象に残ってることある?',
-      '今日、気になったこと書いておく?',
-      'ふと思い出すと、どんな一日?',
-    ],
-  },
-  {
-    value: 'negative',
-    emoji: '😥',
-    label: 'ちょっと大変',
-    caption: 'ちょっと大変でした',
-    prompts: [
-      '何が大変だった?',
-      'どこに引っかかった?',
-      '少し疲れた場面、どこだった?',
-      'うまくいかなかったこと、書いてみる?',
-    ],
-  },
-  {
-    value: 'very_negative',
-    emoji: '😣',
-    label: 'かなり大変',
-    caption: 'かなり大変でした',
-    prompts: [
-      'ちょっとつらかったことは?',
-      'いま、一番重いのはどれ?',
-      '誰かに聞いてほしいこと、ある?',
-      '無理してない?',
-    ],
-  },
-];
 
 function pickPromptFor(mood: MoodLevel): string {
   const opt = MOOD_OPTIONS.find((o) => o.value === mood);
@@ -279,39 +212,52 @@ export function EntryForm({
             aria-label="ムード選択"
             className="grid grid-cols-5 gap-2"
           >
-            {MOOD_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleMoodPick(opt.value)}
-                className={moodCardClass}
-                aria-label={opt.label}
-                data-testid={`entry-form-mood-${opt.value}`}
-              >
-                <span aria-hidden className="text-2xl leading-none">
-                  {opt.emoji}
-                </span>
-                <span className="text-[11px] leading-tight text-gray-600">
-                  {opt.label}
-                </span>
-              </button>
-            ))}
+            {MOOD_OPTIONS.map((opt) => {
+              const Icon = opt.Icon;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleMoodPick(opt.value)}
+                  className={`group relative ${moodCardClass}`}
+                  aria-label={opt.label}
+                  data-testid={`entry-form-mood-${opt.value}`}
+                >
+                  <Icon
+                    aria-hidden
+                    size={28}
+                    strokeWidth={1.75}
+                    className="text-gray-700"
+                  />
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                  >
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* compact expand: 絵文字 + 横並び textarea + 右上に選び直しボタン */}
+      {/* compact expand: アイコン + 横並び textarea + 右上に選び直しボタン */}
       {compact && step === 'expand' && selectedMoodOption && (
         <div className="mb-2">
           <div
             className="flex items-start gap-2"
             data-testid="entry-form-mood-label"
           >
-            <span
-              className="pt-1 text-lg"
-              aria-label={selectedMoodOption.label}
-            >
-              {selectedMoodOption.emoji}
+            <span className="mt-1 shrink-0">
+              <IconTooltip label={selectedMoodOption.label}>
+                <selectedMoodOption.Icon
+                  size={20}
+                  strokeWidth={1.75}
+                  className="text-gray-700"
+                  aria-hidden
+                />
+              </IconTooltip>
             </span>
             <textarea
               id="entry-form-content"

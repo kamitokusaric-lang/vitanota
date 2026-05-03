@@ -27,6 +27,10 @@ export const publicJournalEntrySchema = z
     tenantId: z.string().uuid(),
     userId: z.string().uuid(),
     content: z.string().openapi({ example: '今日の授業の振り返り' }),
+    mood: z
+      .enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative'])
+      .nullable()
+      .openapi({ example: 'positive' }),
     createdAt: z.string().datetime().openapi({ example: '2026-04-15T10:00:00Z' }),
     updatedAt: z.string().datetime().openapi({ example: '2026-04-15T10:00:00Z' }),
     // 意図的に isPublic を含めない（型レベルで is_public 漏えい防止）

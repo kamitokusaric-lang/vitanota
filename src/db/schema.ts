@@ -426,6 +426,54 @@ export const journalWeeklySummaries = pgTable(
   }),
 );
 
+// ── task_tags (5/7 説明会向け機能拡張) ─────────────────────────
+// イベント横断のタスク集約用タグ。テナント内で UNIQUE。
+export const taskTags = pgTable(
+  'task_tags',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantNameUnique: unique('uq_task_tags_tenant_name').on(table.tenantId, table.name),
+    tenantIdx: index('task_tags_tenant_idx').on(table.tenantId),
+  }),
+);
+
+// ── task_tag_assignments (M:N) ─────────────────────────────────
+// task_id × tag_id の交差テーブル、tenant_id を denormalize して RLS を効かせる
+export const taskTagAssignments = pgTable(
+  'task_tag_assignments',
+  {
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => taskTags.id, { onDelete: 'restrict' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.taskId, table.tagId] }),
+    tenantTagIdx: index('task_tag_assignments_tenant_tag_idx').on(
+      table.tenantId,
+      table.tagId,
+    ),
+    tagIdx: index('task_tag_assignments_tag_idx').on(table.tagId),
+  }),
+);
+
 // ── feedback_topics (機能 B) ───────────────────────────────────
 // 運営マスタ (テナント横断)。教員が投稿時に選択するトピック。
 export const feedbackTopics = pgTable('feedback_topics', {
@@ -486,3 +534,7 @@ export type FeedbackTopic = typeof feedbackTopics.$inferSelect;
 export type NewFeedbackTopic = typeof feedbackTopics.$inferInsert;
 export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
 export type NewFeedbackSubmission = typeof feedbackSubmissions.$inferInsert;
+export type TaskTag = typeof taskTags.$inferSelect;
+export type NewTaskTag = typeof taskTags.$inferInsert;
+export type TaskTagAssignment = typeof taskTagAssignments.$inferSelect;
+export type NewTaskTagAssignment = typeof taskTagAssignments.$inferInsert;

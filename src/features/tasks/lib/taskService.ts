@@ -1,11 +1,13 @@
 // タスク Service: 認可・入力変換を通して Repository を呼ぶ
 // teacher は owner=自分のタスクのみ作成・更新可 (RLS で担保)
 // school_admin は tenant 内の任意の教員にアサイン可
+import { and, eq, inArray } from 'drizzle-orm';
 import { withTenantUser } from '@/shared/lib/db';
 import { pickDbRole, type AuthContext } from '@/features/journal/lib/apiHelpers';
 import { taskRepo, type TaskWithOwner } from './taskRepository';
 import { taskCategoryRepo } from './taskCategoryRepository';
-import { TaskNotFoundError } from './errors';
+import { TaskNotFoundError, InvalidTagReferenceError } from './errors';
+import { taskTags } from '@/db/schema';
 import type { Task, TaskCategory } from '@/db/schema';
 
 function parseDueDate(input: string | null | undefined): Date | null | undefined {
@@ -145,6 +147,39 @@ export class TaskService {
         },
         ctx,
       );
+    });
+  }
+
+  /**
+   * タスクのタグ割当を差分更新 (既存全削除 → 新規 INSERT)
+   * 1. 対象タスクが同テナントに存在することを検証 (= findById)
+   * 2. tagIds がすべて同テナントの task_tags に属することを検証
+   * 3. setTagsForTask で差分更新
+   */
+  async setTaskTags(
+    taskId: string,
+    tagIds: string[],
+    ctx: AuthContext,
+  ): Promise<void> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      const task = await taskRepo.findById(tx, taskId, ctx);
+      if (!task) throw new TaskNotFoundError();
+
+      if (tagIds.length > 0) {
+        const validRows = await tx
+          .select({ id: taskTags.id })
+          .from(taskTags)
+          .where(
+            and(eq(taskTags.tenantId, ctx.tenantId), inArray(taskTags.id, tagIds)),
+          );
+        const validIds = new Set(validRows.map((r) => r.id));
+        const invalidIds = tagIds.filter((id) => !validIds.has(id));
+        if (invalidIds.length > 0) {
+          throw new InvalidTagReferenceError(invalidIds);
+        }
+      }
+
+      await taskRepo.setTagsForTask(tx, taskId, tagIds, ctx);
     });
   }
 }

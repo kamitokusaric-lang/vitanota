@@ -13,3 +13,13 @@ export class TaskCategoryNotFoundError extends Error {
     this.name = 'TaskCategoryNotFoundError';
   }
 }
+
+export class InvalidTagReferenceError extends Error {
+  readonly code = 'INVALID_TAG_REFERENCE';
+  readonly invalidIds: string[];
+  constructor(invalidIds: string[]) {
+    super('指定されたタグが見つかりません');
+    this.name = 'InvalidTagReferenceError';
+    this.invalidIds = invalidIds;
+  }
+}

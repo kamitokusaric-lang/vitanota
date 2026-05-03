@@ -296,6 +296,7 @@ export const journalEntryTags = pgTable(
 // ── public_journal_entries VIEW（SP-U02-04 Layer 4） ───────────
 // is_public=true エントリのみ露出、is_public 列は意図的に含めない
 // security_barrier で悪意あるサブクエリ経由の情報漏えいを防止
+// migration 0027 で mood 列を追加 (共有タイムラインでの絵文字表示用)
 export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
   qb
     .select({
@@ -303,6 +304,7 @@ export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
       tenantId: journalEntries.tenantId,
       userId: journalEntries.userId,
       content: journalEntries.content,
+      mood: journalEntries.mood,
       createdAt: journalEntries.createdAt,
       updatedAt: journalEntries.updatedAt,
     })

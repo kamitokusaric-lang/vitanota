@@ -49,6 +49,7 @@ export class PublicTimelineRepository {
         tenantId: publicJournalEntries.tenantId,
         userId: publicJournalEntries.userId,
         content: publicJournalEntries.content,
+        mood: publicJournalEntries.mood,
         createdAt: publicJournalEntries.createdAt,
         updatedAt: publicJournalEntries.updatedAt,
         authorName: users.name,

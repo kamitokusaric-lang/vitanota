@@ -14,7 +14,7 @@ export interface TaskFormValues {
   title: string;
   description: string;
   dueDate: string; // YYYY-MM-DD or ''
-  status: 'todo' | 'in_progress' | 'done';
+  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
   initialComment: string; // create 時のみ使用、初回コメントとして追加される
   tagIds: string[]; // 選択中のタグ id (タグ別表示・フィルタ用)
 }
@@ -84,10 +84,19 @@ export function TaskForm({
     );
   }
 
-  async function handleCreateTag() {
+  async function handleCreateOrToggleTag() {
     if (!onCreateTag) return;
     const name = newTagName.trim();
     if (!name) return;
+    // 既存タグ名と完全一致なら新規作成せず toggle (重複作成防止)
+    const existing = (taskTags ?? []).find((t) => t.name === name);
+    if (existing) {
+      if (!values.tagIds.includes(existing.id)) {
+        setValues((v) => ({ ...v, tagIds: [...v.tagIds, existing.id] }));
+      }
+      setNewTagName('');
+      return;
+    }
     setCreatingTag(true);
     setTagCreateError(null);
     try {
@@ -116,30 +125,169 @@ export function TaskForm({
     onSubmit(values);
   };
 
+  // タグ表示用 (selected を強調 + よく使われる top 10)
+  const top10Tags = (taskTags ?? [])
+    .slice()
+    .sort((a, b) => b.assignmentCount - a.assignmentCount)
+    .slice(0, 10);
+  const selectedTagObjects = (taskTags ?? []).filter((t) =>
+    values.tagIds.includes(t.id),
+  );
+  const popularUnselectedTags = top10Tags.filter(
+    (t) => !values.tagIds.includes(t.id),
+  );
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3" data-testid="task-form">
+    <form onSubmit={handleSubmit} className="space-y-4" data-testid="task-form">
       {error && <ErrorMessage message={error} />}
 
-      <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">
-          カテゴリ
-        </label>
-        <select
-          value={values.categoryId}
-          onChange={(e) => setValues((v) => ({ ...v, categoryId: e.target.value }))}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
-          data-testid="task-form-category"
-          required
-          disabled={readonly}
-        >
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+      {/* 上段: カテゴリ → タグ (新規作成モーダルと同じレイアウト) */}
+      <div className="space-y-3 rounded-md border border-vn-border bg-gray-50 p-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">
+            カテゴリ
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => {
+              const active = values.categoryId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={readonly}
+                  onClick={() => setValues((v) => ({ ...v, categoryId: c.id }))}
+                  className={`inline-flex rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-vn-accent text-white'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  } disabled:opacity-50`}
+                  data-testid={`task-form-category-${c.id}`}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {taskTags !== undefined && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              タグ (任意)
+            </label>
+            {/* 選択中のタグ (強調表示) */}
+            {selectedTagObjects.length > 0 && (
+              <div className="mb-2">
+                <div className="mb-1 text-[11px] text-gray-500">選択中:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedTagObjects.map((tg) => (
+                    <button
+                      key={tg.id}
+                      type="button"
+                      disabled={readonly}
+                      onClick={() => toggleTag(tg.id)}
+                      className="inline-flex items-center gap-1 rounded-full bg-purple-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                      data-testid={`task-form-tag-selected-${tg.id}`}
+                    >
+                      #{tg.name}
+                      {!readonly && <span className="text-purple-200">×</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* よく使われるタグ (未選択分のみ) */}
+            {popularUnselectedTags.length > 0 && (
+              <div className="mb-2">
+                <div className="mb-1 text-[11px] text-gray-500">よく使われる:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {popularUnselectedTags.map((tg) => (
+                    <button
+                      key={tg.id}
+                      type="button"
+                      disabled={readonly}
+                      onClick={() => toggleTag(tg.id)}
+                      className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 hover:bg-purple-200 disabled:opacity-50"
+                      data-testid={`task-form-tag-${tg.id}`}
+                    >
+                      #{tg.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!readonly && onCreateTag && (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    placeholder="新規タグ名 or 既存タグから選択 (例: 運動会)"
+                    maxLength={100}
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-xs"
+                    data-testid="task-form-new-tag-name"
+                    disabled={creatingTag}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCreateOrToggleTag}
+                    isLoading={creatingTag}
+                    disabled={!newTagName.trim()}
+                    className="text-xs"
+                    data-testid="task-form-new-tag-create"
+                  >
+                    {(taskTags ?? []).find((t) => t.name === newTagName.trim())
+                      ? '追加'
+                      : '作成'}
+                  </Button>
+                </div>
+                {(() => {
+                  const q = newTagName.trim();
+                  if (!q) return null;
+                  const suggestions = (taskTags ?? []).filter(
+                    (t) =>
+                      t.name !== q &&
+                      t.name.includes(q) &&
+                      !values.tagIds.includes(t.id),
+                  );
+                  if (suggestions.length === 0) return null;
+                  return (
+                    <div
+                      className="mt-1 flex flex-wrap items-center gap-1 text-xs"
+                      data-testid="task-form-tag-suggestions"
+                    >
+                      <span className="text-gray-500">もしかして:</span>
+                      {suggestions.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setValues((v) => ({
+                              ...v,
+                              tagIds: [...v.tagIds, t.id],
+                            }));
+                            setNewTagName('');
+                          }}
+                          className="rounded-full bg-purple-100 px-2 py-0.5 font-medium text-purple-700 hover:bg-purple-200"
+                        >
+                          #{t.name}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+            {tagCreateError && (
+              <div className="mt-1 text-xs text-red-600">{tagCreateError}</div>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* 下段: タイトル / 説明 / 期限 / 担当者 / ステータス */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-700">
           タイトル
@@ -148,8 +296,8 @@ export function TaskForm({
           type="text"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          maxLength={200}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+          maxLength={15}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
           data-testid="task-form-title"
           required
           disabled={readonly}
@@ -167,14 +315,14 @@ export function TaskForm({
           }
           rows={3}
           maxLength={2000}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
           data-testid="task-form-description"
           disabled={readonly}
         />
       </div>
 
-      <div className="flex gap-3">
-        <div className="flex-1">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">
             期限 (任意)
           </label>
@@ -182,14 +330,44 @@ export function TaskForm({
             type="date"
             value={values.dueDate}
             onChange={(e) => setValues((v) => ({ ...v, dueDate: e.target.value }))}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
             data-testid="task-form-due-date"
             disabled={readonly}
           />
         </div>
 
+        {canAssignToOthers && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              担当者
+            </label>
+            <select
+              value={values.ownerUserId}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, ownerUserId: e.target.value }))
+              }
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+              data-testid="task-form-owner"
+              required
+              disabled={readonly}
+            >
+              {mode === 'duplicate' && (
+                <option value="">-- 担当者を選択 --</option>
+              )}
+              <option value={selfUserId}>自分</option>
+              {assignees
+                .filter((a) => a.userId !== selfUserId)
+                .map((a) => (
+                  <option key={a.userId} value={a.userId}>
+                    {a.name ?? a.email}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+
         {mode === 'edit' && (
-          <div className="flex-1">
+          <div>
             <label className="mb-1 block text-xs font-medium text-gray-700">
               ステータス
             </label>
@@ -201,13 +379,15 @@ export function TaskForm({
                   status: e.target.value as TaskFormValues['status'],
                 }))
               }
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
               data-testid="task-form-status"
               disabled={readonly}
             >
-              <option value="todo">未着手</option>
-              <option value="in_progress">進行中</option>
-              <option value="done">完了</option>
+              <option value="backlog">未着手 (Backlog)</option>
+              <option value="todo">今週やる (ToDo)</option>
+              <option value="in_progress">進行中 (Doing)</option>
+              <option value="review">確認・調整中 (Review)</option>
+              <option value="done">完了 (Done)</option>
             </select>
           </div>
         )}
@@ -225,148 +405,36 @@ export function TaskForm({
             }
             rows={2}
             maxLength={2000}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
             data-testid="task-form-initial-comment"
           />
         </div>
       )}
 
-      {canAssignToOthers && (
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">
-            担当者
-          </label>
-          <select
-            value={values.ownerUserId}
-            onChange={(e) =>
-              setValues((v) => ({ ...v, ownerUserId: e.target.value }))
-            }
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
-            data-testid="task-form-owner"
-            required
-            disabled={readonly}
-          >
-            {mode === 'duplicate' && (
-              <option value="">-- 担当者を選択 --</option>
-            )}
-            <option value={selfUserId}>自分</option>
-            {assignees
-              .filter((a) => a.userId !== selfUserId)
-              .map((a) => (
-                <option key={a.userId} value={a.userId}>
-                  {a.name ?? a.email}
-                </option>
-              ))}
-          </select>
-        </div>
-      )}
-
-      {/* タグ multi-select + インライン作成 (5/7 説明会向け拡張) */}
-      {taskTags !== undefined && (
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">
-            タグ (任意、イベント横断のグルーピング)
-          </label>
-          {taskTags.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {taskTags.map((tg) => {
-                const active = values.tagIds.includes(tg.id);
-                return (
-                  <button
-                    key={tg.id}
-                    type="button"
-                    disabled={readonly}
-                    onClick={() => toggleTag(tg.id)}
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
-                      active
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                    } disabled:opacity-50`}
-                    data-testid={`task-form-tag-${tg.id}`}
-                  >
-                    #{tg.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {!readonly && onCreateTag && (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCreateTag();
-                  }
-                }}
-                placeholder="新しいタグ名 (例: 運動会)"
-                maxLength={100}
-                className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
-                data-testid="task-form-new-tag-name"
-                disabled={creatingTag}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleCreateTag}
-                isLoading={creatingTag}
-                disabled={!newTagName.trim()}
-                className="text-xs"
-                data-testid="task-form-new-tag-create"
-              >
-                作成
-              </Button>
-            </div>
-          )}
-          {tagCreateError && (
-            <div className="mt-1 text-xs text-red-600">{tagCreateError}</div>
-          )}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-2 pt-2">
-        <div>
-          {mode === 'edit' && onDelete && !readonly && (
-            <Button
-              variant="danger"
-              type="button"
-              onClick={onDelete}
-              className="text-xs"
-              disabled={submitting}
-              data-testid="task-form-delete"
-            >
-              削除
-            </Button>
-          )}
-        </div>
-        <div className="flex gap-2">
+      <div className="flex justify-end gap-2 pt-2">
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="text-xs"
+        >
+          閉じる
+        </Button>
+        {!readonly && (
           <Button
-            variant="secondary"
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
+            type="submit"
+            disabled={
+              submitting ||
+              !values.title.trim() ||
+              (mode === 'duplicate' && !values.ownerUserId)
+            }
             className="text-xs"
+            data-testid="task-form-submit"
           >
-            {readonly ? '閉じる' : 'キャンセル'}
+            {mode === 'create' ? '作成' : mode === 'duplicate' ? '複製' : '保存'}
           </Button>
-          {!readonly && (
-            <Button
-              type="submit"
-              disabled={
-                submitting ||
-                !values.title.trim() ||
-                (mode === 'duplicate' && !values.ownerUserId)
-              }
-              className="text-xs"
-              data-testid="task-form-submit"
-            >
-              {mode === 'create' ? '作成' : mode === 'duplicate' ? '複製' : '保存'}
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </form>
   );

@@ -15,7 +15,7 @@ export const createTaskSchema = z
   .object({
     categoryId: z.string().uuid(),
     ownerUserId: z.string().uuid().optional(),
-    title: z.string().trim().min(1, 'タイトルを入力してください').max(200),
+    title: z.string().trim().min(1, 'タイトルを入力してください').max(15, 'タイトルは 15 文字以内で入力してください'),
     description: z.string().max(2000).optional(),
     dueDate: dueDateString.optional(),
   })
@@ -26,7 +26,7 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export const updateTaskSchema = z
   .object({
     categoryId: z.string().uuid().optional(),
-    title: z.string().trim().min(1).max(200).optional(),
+    title: z.string().trim().min(1).max(15, 'タイトルは 15 文字以内で入力してください').optional(),
     description: z.string().max(2000).nullable().optional(),
     dueDate: dueDateString.nullable().optional(),
     status: taskStatusSchema.optional(),

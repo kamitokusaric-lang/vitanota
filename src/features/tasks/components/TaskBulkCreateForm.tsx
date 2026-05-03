@@ -71,9 +71,18 @@ export function TaskBulkCreateForm({
     );
   }
 
-  async function handleCreateTag() {
+  async function handleCreateOrToggleTag() {
     const name = newTagName.trim();
     if (!name) return;
+    // 既存タグ名と完全一致なら新規作成せず toggle 選択 (重複作成防止)
+    const existing = taskTags.find((t) => t.name === name);
+    if (existing) {
+      if (!tagIds.includes(existing.id)) {
+        setTagIds((prev) => [...prev, existing.id]);
+      }
+      setNewTagName('');
+      return;
+    }
     setCreatingTag(true);
     setTagCreateError(null);
     try {
@@ -115,81 +124,131 @@ export function TaskBulkCreateForm({
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="task-bulk-create-form">
       {error && <ErrorMessage message={error} />}
 
-      {/* 上段: カテゴリ + タグ (全行共通) */}
-      <div className="grid grid-cols-1 gap-4 rounded-md border border-vn-border bg-gray-50 p-3 md:grid-cols-2">
+      {/* 上段: カテゴリ → タグ (縦並び、全行共通) */}
+      <div className="space-y-3 rounded-md border border-vn-border bg-gray-50 p-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">
             カテゴリ (全行共通)
           </label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm"
-            data-testid="bulk-form-category"
-            required
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => {
+              const active = categoryId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoryId(c.id)}
+                  className={`inline-flex rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-vn-accent text-white'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                  data-testid={`bulk-form-category-${c.id}`}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">
-            タグ (全行共通、複数選択可)
+            タグ (任意)
           </label>
-          {taskTags.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {taskTags.map((tg) => {
-                const active = tagIds.includes(tg.id);
-                return (
-                  <button
-                    key={tg.id}
-                    type="button"
-                    onClick={() => toggleTag(tg.id)}
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
-                      active
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                    }`}
-                    data-testid={`bulk-form-tag-${tg.id}`}
-                  >
-                    #{tg.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {(() => {
+            // 表示するタグ: selected ∪ よく使われる top 10 (重複排除)
+            const top10 = [...taskTags]
+              .sort((a, b) => b.assignmentCount - a.assignmentCount)
+              .slice(0, 10);
+            const selectedTags = taskTags.filter((t) => tagIds.includes(t.id));
+            const seen = new Set<string>();
+            const displayed = [...selectedTags, ...top10].filter((t) => {
+              if (seen.has(t.id)) return false;
+              seen.add(t.id);
+              return true;
+            });
+            if (displayed.length === 0) return null;
+            return (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {displayed.map((tg) => {
+                  const active = tagIds.includes(tg.id);
+                  return (
+                    <button
+                      key={tg.id}
+                      type="button"
+                      onClick={() => toggleTag(tg.id)}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                        active
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                      }`}
+                      data-testid={`bulk-form-tag-${tg.id}`}
+                    >
+                      #{tg.name}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleCreateTag();
-                }
-              }}
-              placeholder="新しいタグ名 (例: 運動会)"
+              placeholder="新規タグ名 or 既存タグから選択 (例: 運動会)"
               maxLength={100}
-              className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-xs"
               data-testid="bulk-form-new-tag-name"
               disabled={creatingTag}
             />
             <Button
               type="button"
               variant="secondary"
-              onClick={handleCreateTag}
+              onClick={handleCreateOrToggleTag}
               isLoading={creatingTag}
               disabled={!newTagName.trim()}
               className="text-xs"
               data-testid="bulk-form-new-tag-create"
             >
-              作成
+              {taskTags.find((t) => t.name === newTagName.trim())
+                ? '追加'
+                : '作成'}
             </Button>
           </div>
+          {/* 部分一致サジェスト (datalist の前方一致だけだと「うん→運動会」が出ないため自前で) */}
+          {(() => {
+            const q = newTagName.trim();
+            if (!q) return null;
+            const suggestions = taskTags.filter(
+              (t) =>
+                t.name !== q && // 完全一致は「追加」ボタンで処理
+                t.name.includes(q) &&
+                !tagIds.includes(t.id),
+            );
+            if (suggestions.length === 0) return null;
+            return (
+              <div
+                className="mt-1 flex flex-wrap items-center gap-1 text-xs"
+                data-testid="bulk-form-tag-suggestions"
+              >
+                <span className="text-gray-500">もしかして:</span>
+                {suggestions.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setTagIds((prev) => [...prev, t.id]);
+                      setNewTagName('');
+                    }}
+                    className="rounded-full bg-purple-100 px-2 py-0.5 font-medium text-purple-700 hover:bg-purple-200"
+                  >
+                    #{t.name}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
           {tagCreateError && (
             <div className="mt-1 text-xs text-red-600">{tagCreateError}</div>
           )}
@@ -218,7 +277,7 @@ export function TaskBulkCreateForm({
                     value={row.title}
                     onChange={(e) => updateRow(idx, { title: e.target.value })}
                     placeholder="例: 児童席の配置"
-                    maxLength={200}
+                    maxLength={15}
                     className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
                     data-testid={`bulk-form-row-${idx}-title`}
                   />
@@ -288,6 +347,9 @@ export function TaskBulkCreateForm({
       </div>
 
       <div className="flex items-center justify-between">
+        <div className="text-xs text-gray-500">
+          有効な行: {validRowCount} / {rows.length}
+        </div>
         <Button
           type="button"
           variant="secondary"
@@ -297,9 +359,6 @@ export function TaskBulkCreateForm({
         >
           + 行を追加
         </Button>
-        <div className="text-xs text-gray-500">
-          有効な行: {validRowCount} / {rows.length}
-        </div>
       </div>
 
       <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">

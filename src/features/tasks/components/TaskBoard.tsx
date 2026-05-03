@@ -2,7 +2,7 @@
 // 4 カテゴリ (クラス業務/教科業務/イベント業務/事務業務 + 拡張) を横に並べる
 // 絞込・新規/編集モーダルはこのコンポーネントで管理
 // デフォルトは「自分」(= scope='mine'、assignee + requester 両方を含む)
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -40,6 +40,8 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   const [filterOwner, setFilterOwner] = useState<string | undefined>(selfUserId);
   // タグフィルタ (担当者フィルタと同じく single-select)
   const [filterTagId, setFilterTagId] = useState<string | undefined>(undefined);
+  // 「自分」フィルタ時、自分が依頼した (createdBy=self, owner!=self) タスクを表示するか
+  const [showDelegated, setShowDelegated] = useState(false);
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -261,7 +263,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   // 横方向ドラッグ&ドロップで status 変更
   const handleDropStatus = async (
     taskId: string,
-    newStatus: 'todo' | 'in_progress' | 'done',
+    newStatus: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done',
   ) => {
     const target = tasks?.find((t) => t.id === taskId);
     if (!target || target.status === newStatus) return;
@@ -291,9 +293,14 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     return null;
   }
 
-  // フィルタ適用後のタスク (タグフィルタのみ、担当者は API 側で適用済)
+  // フィルタ適用後のタスク
+  // - タグフィルタ: 該当タグを持つタスクのみ
+  // - 「自分」フィルタ時に showDelegated=false なら自分が依頼済 (createdBy=self, owner!=self) を除外
   const filteredTasks = tasks.filter((t) => {
     if (filterTagId && !t.tags.some((tg) => tg.id === filterTagId)) return false;
+    if (filterOwner === selfUserId && !showDelegated) {
+      if (t.createdBy === selfUserId && t.ownerUserId !== selfUserId) return false;
+    }
     return true;
   });
 
@@ -310,9 +317,28 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
       })()
     : (() => {
         const usedIds = new Set(filteredTasks.map((t) => t.categoryId));
+        // 「自分の今週やる」タスク数を集計、降順で並べる (tie は元の sortOrder)
+        // ownerUserId === selfUserId かつ status='todo' のものをカウント
+        const todoCounts = new Map<string, number>();
+        for (const t of filteredTasks) {
+          if (t.status === 'todo' && t.ownerUserId === selfUserId) {
+            todoCounts.set(t.categoryId, (todoCounts.get(t.categoryId) ?? 0) + 1);
+          }
+        }
         return categories
           .filter((c) => usedIds.has(c.id))
-          .map((c) => ({ id: c.id, label: c.name }));
+          .map((c) => ({
+            id: c.id,
+            label: c.name,
+            sortOrder: c.sortOrder,
+            todoCount: todoCounts.get(c.id) ?? 0,
+          }))
+          .sort((a, b) => {
+            const diff = b.todoCount - a.todoCount;
+            if (diff !== 0) return diff;
+            return a.sortOrder - b.sortOrder;
+          })
+          .map(({ id, label }) => ({ id, label }));
       })();
 
   // タスク → 行 id 配列
@@ -331,6 +357,17 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             assignees={assignees ?? []}
             selfUserId={selfUserId}
           />
+          {filterOwner === selfUserId && (
+            <label className="flex items-center gap-1 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={showDelegated}
+                onChange={(e) => setShowDelegated(e.target.checked)}
+                data-testid="task-board-show-delegated"
+              />
+              依頼中タスクも表示
+            </label>
+          )}
           <TagFilter
             value={filterTagId}
             onChange={setFilterTagId}
@@ -381,11 +418,28 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
         open={modal.kind === 'edit'}
         onClose={closeModal}
         title={
-          modal.kind === 'edit' && modal.task.ownerUserId !== selfUserId
-            ? 'タスクを見る'
-            : 'タスクの編集'
+          modal.kind === 'edit' ? (
+            <div className="flex items-center justify-between">
+              <span>
+                {modal.task.ownerUserId !== selfUserId
+                  ? 'タスクを見る'
+                  : 'タスクの編集'}
+              </span>
+              {modal.task.ownerUserId === selfUserId && (
+                <TaskEditKebabMenu
+                  onDuplicate={() =>
+                    modal.kind === 'edit' &&
+                    setModal({ kind: 'duplicate', sourceTask: modal.task })
+                  }
+                  onDelete={() =>
+                    modal.kind === 'edit' && handleDelete(modal.task.id)
+                  }
+                />
+              )}
+            </div>
+          ) : undefined
         }
-        maxWidth="max-w-lg"
+        maxWidth="max-w-xl"
       >
         {modal.kind === 'edit' && (
           <>
@@ -403,22 +457,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
               onCreateTag={handleCreateTag}
               onSubmit={(values) => handleUpdate(modal.task.id, values)}
               onCancel={closeModal}
-              onDelete={() => handleDelete(modal.task.id)}
             />
-            <div className="mt-2 border-t border-gray-100 pt-3">
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() =>
-                  modal.kind === 'edit' &&
-                  setModal({ kind: 'duplicate', sourceTask: modal.task })
-                }
-                className="text-xs"
-                data-testid="task-edit-duplicate-button"
-              >
-                このタスクを別の先生と共有する (複製)
-              </Button>
-            </div>
             <TaskCommentSection
               taskId={modal.task.id}
               selfUserId={selfUserId}
@@ -456,6 +495,69 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
           </>
         )}
       </Modal>
+    </div>
+  );
+}
+
+// 編集モーダル右上の 3 点リーダーメニュー (複製 / 削除)
+function TaskEditKebabMenu({
+  onDuplicate,
+  onDelete,
+}: {
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-md px-2 py-1 text-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+        aria-label="メニュー"
+        data-testid="task-edit-menu-button"
+      >
+        ⋮
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onDuplicate();
+            }}
+            className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            data-testid="task-edit-menu-duplicate"
+          >
+            タスクを複製
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+            data-testid="task-edit-menu-delete"
+          >
+            タスクを削除
+          </button>
+        </div>
+      )}
     </div>
   );
 }

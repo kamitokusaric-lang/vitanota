@@ -29,7 +29,7 @@ export interface UpdateTaskServiceInput {
   title?: string;
   description?: string | null;
   dueDate?: string | null;
-  status?: 'todo' | 'in_progress' | 'done';
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
 }
 
 export class TaskService {

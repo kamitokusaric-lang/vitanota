@@ -27,7 +27,7 @@ export interface UpdateTaskParams {
   title?: string;
   description?: string | null;
   dueDate?: Date | null;
-  status?: 'todo' | 'in_progress' | 'done';
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
 }
 
 export interface TaskTagSummary {

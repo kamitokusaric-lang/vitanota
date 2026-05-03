@@ -31,7 +31,15 @@ export const moodLevelEnum = pgEnum('mood_level', [
 ]);
 
 // Unit-05: タスク管理
-export const taskStatusEnum = pgEnum('task_status', ['todo', 'in_progress', 'done']);
+// 5 段階 (backlog / todo / in_progress / review / done) — UI 表示は
+// それぞれ「未着手 / 今週やる / 進行中 / 確認・調整中 / 完了」
+export const taskStatusEnum = pgEnum('task_status', [
+  'backlog',
+  'todo',
+  'in_progress',
+  'review',
+  'done',
+]);
 
 // ── tenants ────────────────────────────────────────────────────
 export const tenants = pgTable('tenants', {

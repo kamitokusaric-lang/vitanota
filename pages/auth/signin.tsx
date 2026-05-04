@@ -12,7 +12,8 @@
 // 設計詳細: aidlc-docs/construction/auth-externalization.md
 import type { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
+import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { getErrorMessage } from '@/features/auth/lib/error-messages';
 
@@ -110,7 +111,11 @@ export default function SignInPage({
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  // getSession(context) は内部で /api/auth/session を loopback fetch するため、
+  // CloudFront secret check と相性が悪い (middleware で 403 → JSON parse fail)。
+  // getServerSession は DB / JWT を直接読むため loopback fetch なし、ログ汚れも防ぐ。
+  const authOptions = await getAuthOptions();
+  const session = await getServerSession(context.req, context.res, authOptions);
   if (session) {
     return { redirect: { destination: '/', permanent: false } };
   }

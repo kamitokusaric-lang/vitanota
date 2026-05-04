@@ -149,6 +149,15 @@
 
 ## CI / テスト
 
+### 🟢 低: functions coverage threshold を 70% → 80% に戻す
+- **発見日**: 2026-05-04
+- **現状**: `vitest.config.ts` の coverage threshold を `functions: 70`、他 (lines / branches / statements) は 80% に設定。MVP 暫定で functions だけ甘くしてある
+- **未カバー箇所**:
+  - `src/features/tasks/lib/taskService.ts`: `duplicateTask` のみ test 済、`createTask / updateTask / deleteTask / listTasks / setTaskTags / setTaskAssignees` が未カバー
+  - `src/features/journal/lib/errors.ts` / `src/features/tasks/lib/errors.ts`: 各 Error class の constructor が未 test
+- **対策**: taskService の各 method にユニットテスト追加 → functions 80% に戻す
+- **着手判断**: 5/7 説明会後の安定期、coverage 厳守ポリシー復元
+
 ### 🔴 高: 統合テストの DB schema 追従 (main の CI が常時赤)
 - **発見日**: 2026-04-27
 - **現状**: `__tests__/integration/*.test.ts` (session-strategy / tenant-isolation 等) で `relation "tags" does not exist` エラー多発。`0016_tags_to_emotion_tags.sql` で `tags` → `emotion_tags` にリネームされて以降、統合テストが追従されていない

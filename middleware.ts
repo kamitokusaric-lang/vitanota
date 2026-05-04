@@ -21,14 +21,29 @@ const PROTECTED_PREFIXES = [
 // (internal fabric → localhost:3000)。CLOUDFRONT_SECRET チェックの例外扱い。
 const CLOUDFRONT_SECRET_EXEMPT = ['/api/health'];
 
+// Next.js が SSR 中に自分自身を loopback fetch する場合 (例: getSession() の
+// 内部実装が /api/auth/session を fetch する pattern)、host header は
+// localhost / 127.0.0.1 になる。これは外部からのアクセスではないので
+// CLOUDFRONT_SECRET チェックを skip する (skip しないと SSR が 403 を受けて
+// next-auth の CLIENT_FETCH_ERROR ログが出る)。
+function isLoopbackRequest(req: NextRequest): boolean {
+  const host = req.headers.get('host') ?? '';
+  return host.startsWith('localhost') || host.startsWith('127.0.0.1');
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // ── CloudFront 経由チェック ──
   // PLACEHOLDER の時期は ENV 未設定のためスキップ（移行期間の互換性）。
   // 本番で CLOUDFRONT_SECRET が設定されたら、例外パス以外で一致しないものは 403。
+  // loopback (SSR の自己 fetch) も exempt: 外部 attack 経路にならないため。
   const expectedSecret = process.env.CLOUDFRONT_SECRET;
-  if (expectedSecret && !CLOUDFRONT_SECRET_EXEMPT.includes(pathname)) {
+  if (
+    expectedSecret &&
+    !CLOUDFRONT_SECRET_EXEMPT.includes(pathname) &&
+    !isLoopbackRequest(req)
+  ) {
     const received = req.headers.get('x-cloudfront-secret');
     if (received !== expectedSecret) {
       return new NextResponse('Forbidden', { status: 403 });

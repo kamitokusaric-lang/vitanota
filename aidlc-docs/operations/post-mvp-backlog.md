@@ -161,6 +161,24 @@
 ### ✅ 完了: 統合テストの DB schema 追従 (2026-05-04 fix/ci-green ブランチで対応)
 - testDb.ts truncateAll の tags → emotion_tags 置換、session-leakage.test.ts の SELECT FROM tags → emotion_tags 置換、加えて移行中に tenant 越境の脆弱性 (security_invoker 未設定) を発見 → migration 0028 で hotfix
 
+### 🔴 高: E2E test (Playwright) 16 件の現行 UI / DB schema 追従
+- **発見日**: 2026-05-04 (fix/ci-green 着手中、ローカル実走 16 failed / 10 passed を確認)
+- **影響**: CI workflow の `E2E Tests (Playwright)` ジョブが常時赤。本番動作には影響しないが、回帰検出能力ゼロ。今後の UI / API 改修で何が壊れたか判別不能
+- **失敗内訳と原因** (16 件):
+  - **01-auth: 1 件** — `/journal` route 不在 (現行は `/`)。修正: 該当 test の goto 先を `/` に
+  - **02-journal-crud: 6 件** — `/journal/new` / `/journal/mine` route 不在。現行 UI は timeline (`/`) 上部に常駐する compact form (mood 絵文字選択 → expand → textarea) で投稿。修正: route 追従 + compact form の操作シーケンス (mood click → fill content → submit) に書き換え
+  - **03-timeline: 4 件** — `/journal/new` / `/journal/mine` route 不在 (同上)
+  - **04-tags: 5 件** — 全 test が beforeEach の createTag で 400 cascade fail。原因 2 つ: (a) `helpers/seed.ts` の createTag が `type` field を渡してるが現行 `_seed.ts` Zod に未定義 (silent ignore で実害ないが古い)、`category: params.category ?? null` の null fallback が `z.enum(['positive','negative','neutral'])` と非互換、(b) spec が `'授業準備'` (`type: 'context'`) タグを前提にしているが migration 0016 で `tags → emotion_tags` rename + emotion 専用化、context は廃止概念
+- **修正方針**:
+  1. `helpers/seed.ts` createTag: `type` field 削除、`category` を required に変更 (Zod と一致させる)
+  2. `04-tags.spec.ts`: '授業準備' タグ前提の test (`感情タグと業務タグが視覚的に区別される` 等) を削除 or emotion-only に書き換え
+  3. 02 / 03 / 04 spec の `/journal/new` / `/journal/mine` 前提を現行の compact form (`/`) に rewrite
+  4. 01-auth の `/journal` リダイレクト test を現行のリダイレクト先 (`/`) に追従
+  5. ローカルで `pnpm test:e2e` GREEN 確認、CI も GREEN 化
+- **工数**: 5-15 時間 (rewrite に近い、各 spec の手動操作シーケンス再構築 + selector 追従 + データ準備)
+- **着手判断**: 5/7 説明会後の安定期。CI required check 設定の検討も併せて
+- **passed 10 件 (現状動いてる)**: 01-auth 基本 3 / 05-multi-tenant 全件 / 06-is-public-leak 全件。これらは route 影響なしで通ってる、回帰防御線として機能
+
 ---
 
 ## 戦略的検討事項

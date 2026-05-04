@@ -55,3 +55,17 @@ reason = "glob の ReDoS (Regular Expression DoS)。build tool (drizzle-kit, esl
 [[IgnoredVulns]]
 id = "GHSA-4w7w-66w2-5vf9"
 reason = "vite dev server の問題。vitest 経由の transitive、vitanota は production で vite を使わない (next.js 内蔵 bundler を使用)。実効リスクなし"
+
+# ── 2026-05-04 追加 (Phase C 後の継続監視で検出) ────────────
+
+[[IgnoredVulns]]
+id = "GHSA-gh4j-gqv2-49f6"
+reason = "fast-xml-parser 5.5.8 (AWS SDK 経由 transitive: @aws-sdk/xml-builder → @aws-sdk/core → 各 client)。攻撃者制御の input が parser に到達する経路は AWS API response のみで、AWS API は信頼境界内 (IAM 認証済)。runtime には混入してるが実効リスクなし。AWS SDK 側の patch を待つ (CVE 修正済バージョンが SDK に取り込まれ次第 pnpm update で解消)"
+
+[[IgnoredVulns]]
+id = "GHSA-qx2v-qp2m-jg93"
+reason = "postcss 8.4.31 (Next.js 14.2.35 経由 transitive) + 8.5.9 (autoprefixer / tailwindcss / postcss-* 経由 devDependencies)。いずれも build-time only、production runtime に postcss は混入しない。攻撃者制御の input が postcss に到達する経路なし (vitanota の CSS は静的、user 入力を含まない)。Next.js 15 upgrade + Tailwind 4 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+reason = "uuid 8.3.2 (next-auth 4.24.13 経由 transitive)。next-auth の内部 token 生成等で使用。next-auth 5 (Auth.js) ではこの依存が更新済。Next.js 15 upgrade と合わせて next-auth 5 系へ移行で解消予定 (期限: 2026-06-30)。CSRF token は next-auth が管理し、vitanota は invitation token を crypto.randomBytes(32) で独自生成しているため uuid 弱点の影響を直接受けない"

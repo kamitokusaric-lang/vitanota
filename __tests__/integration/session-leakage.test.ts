@@ -137,8 +137,8 @@ describe('Suite 4: RLS fail-safe', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('tags table also returns zero without context', async () => {
-    const rows = await rawQuery(`SELECT * FROM tags`);
+  it('emotion_tags table also returns zero without context', async () => {
+    const rows = await rawQuery(`SELECT * FROM emotion_tags`);
     expect(rows).toHaveLength(0);
   });
 

@@ -1,0 +1,27 @@
+-- ============================================================
+-- 0028: public_journal_entries VIEW に security_invoker=true を設定
+--
+-- 背景: 統合テスト追従中 (2026-05-04) に tenant_isolation.test.ts の
+-- "tenantA cannot see tenantB public entry via VIEW" が fail。原因調査で
+-- 以下の rolbypassrls 連鎖が判明:
+--   - view definer = migration apply user = vitanota (super user、rolbypassrls=t)
+--   - security_invoker は default false (PostgreSQL 15+ でも同じ)
+--   - default では view 内の SELECT は definer 権限で実行
+--   - definer の rolbypassrls=true により journal_entries の RLS が bypass
+--   - app layer (publicTimelineRepository.findTimeline) は WHERE 無しで
+--     view を SELECT、tenant フィルタを RLS に完全依存
+--   - 結果: vitanota_app (rolbypassrls=f) が view 経由で SELECT すると
+--     全 tenant の is_public=true エントリが見える状態
+--
+-- 影響: 0005 で view 作成以降、本番でも理論上 tenant 越境して
+-- 共有タイムラインに別校の公開投稿が見える可能性があった。実害確認は
+-- 本番ログ調査が必要。教員同士の相互関心スコープ (memory:
+-- feedback_observed_moment_broken) は同テナント前提のため、別校データ
+-- が混入すると裏テーマ (テナント = 学校という閉じた場の意識) が崩れる。
+--
+-- 修正: security_invoker=true を SET。view 内の SELECT は invoker
+-- (vitanota_app) 権限で実行され、journal_entries の RLS が正しく
+-- app.tenant_id を参照して同テナント分のみ返す。
+-- ============================================================
+
+ALTER VIEW public_journal_entries SET (security_invoker = true);

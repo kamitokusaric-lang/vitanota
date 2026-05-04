@@ -117,11 +117,24 @@ export async function stopTestDb(): Promise<void> {
  */
 export async function truncateAll(_database: TestDb): Promise<void> {
   if (!migrationPool) throw new Error('Test DB not started');
+  // tenants → users CASCADE で関連テーブルは自動的に削除されるが、テーブル名の
+  // タイポやスキーマ変更追従漏れを早期に検出するため、関連テーブルも明示する。
+  // migration 0016 で tags → emotion_tags にリネーム済。
   await migrationPool.query(`
     TRUNCATE TABLE
       journal_entry_tags,
       journal_entries,
-      tags,
+      journal_weekly_summaries,
+      emotion_tags,
+      task_assignees,
+      task_tag_assignments,
+      task_tags,
+      task_comments,
+      tasks,
+      task_categories,
+      feedback_submissions,
+      feedback_topics,
+      user_tenant_profiles,
       sessions,
       verification_tokens,
       accounts,

@@ -1897,3 +1897,19 @@ handler.ts に新 command `cleanup-orphan-accepted-invitations` を追加 (dryRu
 **コンテキスト**: chimo の方針修正対応、handoff plan の MA-9 当初推奨案 (案 A popover) に戻す形に。inline chip 案 (前回選択) は撤回済。
 
 ---
+
+## 5/5 「明日やる 3 つ」確定 + AboutVitanotaModal スライド化
+
+**タイムスタンプ**: 2026-05-05T11:00:00Z
+**ユーザー入力**: "今日やることを教えて" / "昨日、明日やることとして3つメモしたものがあるはずだけど" / "明確にこれは今日やる３つよ、まずはスライドを入れることから始めよう"
+**AI応答**: 5/4 working tree 滞留中の `aidlc-docs/operations/post-mvp-backlog.md` 差分から、5/4 発見日で追加された機能拡張候補 3 項目 (機能拡張候補セクション冒頭) を発見し、これが「明日やる 3 つ」に該当することを chimo と確認。3 項目 = (1) 日々ノートタブに新着マーク (未読バッジ) (2) タスクボードの期間絞り込み (PeriodFilter) (3) 「vitanotaとは」モーダルにスライド (複数ページ) を入れる。1 番目の素材として chimo が `/Users/chimo/Work/vitanota_concept.pdf` (4 ページ) をアップロード。
+**コンテキスト**: 5/4 セッション後半の backlog 追記が「明日やる」予定だが「着手判断: 5/7 説明会後」と書かれていた齟齬は、chimo の判断切替 (説明会前 = 5/5・5/6 に入れる) で解消。
+
+---
+
+**タイムスタンプ**: 2026-05-05T11:30:00Z
+**ユーザー入力**: "すでにスライドがPDFであるから、それをスライド表示して欲しいだけよ" (overcomplicate 拒否) / "PDF をページ別 PNG に変換して自前スライダー" 選択 / "brew install poppler して私が一括変換" 許可 / "とてもいいね" (実機確認 OK)
+**AI応答**: 当初 chimo に複数案 (枚数 4/5/6・素材 lucide/画像/スクショ・ブランチ戦略) を AskUserQuestion で投げて拒否 → 既存 PDF 流用へ路線修正。`brew install poppler` で pdftoppm 導入、`pdftoppm -png -r 200 vitanota_concept.pdf public/concept/page` で 4 ページを `page-1.png`〜`page-4.png` (181KB〜556KB、計 1.5MB) に変換。`AboutVitanotaModal.tsx` を 1 枚画像 → 4 スライド構成に書き換え (左右 ChevronLeft/Right ボタン + 下部ドット + キーボード ← → + open のたび 1 枚目リセット + ESC は既存 Modal 任せ)。色は 5/4 chimo カラールール (tailwind.config.ts 未 commit 差分: 金 → 青 #4f46e5、グレー基調 + 青 1 点) に揃え `bg-vn-accent` 使用。旧 `/about-vitanota.png` は他参照ゼロ確認後 `git rm`。`pnpm type-check` 0 errors。dev server `Ready in 1510ms` 起動 → chimo 実機確認 OK。
+**コンテキスト**: タスク #1 完了。タスク #2 (新着マーク) / #3 (期間絞り込み) は同ブランチ `feat/2026-05-04-ui-polish` で継続予定。working tree には UI polish 作業の他 27 ファイル + 新規 2 ファイル (DayDivider/MoodPromptBar) が依然滞留中、commit 単位は要相談。
+
+---

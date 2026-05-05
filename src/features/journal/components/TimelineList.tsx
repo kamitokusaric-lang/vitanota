@@ -5,9 +5,10 @@
 // 渡さない (SWR v2.4.1 internalMutate が $inf$/$sub$ を skip する) ため、
 // 親 (TimelineTab) から revalidate を走らせるには useSWRInfinite 由来の
 // mutate を親に渡す必要がある。mutateRef にセットして親がそれを呼ぶ。
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import { Fragment, useEffect, useRef, type MutableRefObject } from 'react';
 import useSWRInfinite from 'swr/infinite';
 import { EntryCard, type EntryCardData } from './EntryCard';
+import { DayDivider, isSameLocalDay } from './DayDivider';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 
@@ -31,6 +32,8 @@ interface TimelineListProps {
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
   mutateRef?: MutableRefObject<TimelineMutate | null>;
+  // 表示する種別 (省略 or 全 3 種 含む = フィルタなし)。kind が空配列なら全件非表示。
+  kindFilter?: import('@/features/journal/schemas/journal').JournalEntryKind[];
 }
 
 export function TimelineList({
@@ -39,6 +42,7 @@ export function TimelineList({
   onEdit,
   onDelete,
   mutateRef,
+  kindFilter,
 }: TimelineListProps) {
   const { data, error, isLoading, isValidating, size, setSize, mutate } =
     useSWRInfinite<TimelineResponse>(
@@ -63,7 +67,23 @@ export function TimelineList({
   }, [mutate, mutateRef]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const entries = data?.flatMap((p) => p.entries) ?? [];
+  const allEntries = data?.flatMap((p) => p.entries) ?? [];
+  // kind filter 適用:
+  //   - kind が filter に含まれる → 表示
+  //   - filter に 'knowledge' が含まれる場合、reaction>0 の他種別 entry も表示
+  //     (= 他の人が「ナレッジ」と思った投稿は kind に関わらずナレッジ扱い)
+  const entries = kindFilter
+    ? allEntries.filter((e) => {
+        if (kindFilter.includes(e.kind ?? 'diary')) return true;
+        if (
+          kindFilter.includes('knowledge') &&
+          (e.knowledgeReactionCount ?? 0) > 0
+        ) {
+          return true;
+        }
+        return false;
+      })
+    : allEntries;
   const lastPage = data?.[data.length - 1];
   const reachedEnd = lastPage !== undefined && lastPage.entries.length < perPage;
   const isLoadingMore =
@@ -110,16 +130,58 @@ export function TimelineList({
   }
 
   return (
-    <div className="space-y-3" data-testid="timeline-list">
-      {entries.map((entry) => {
+    <div data-testid="timeline-list">
+      {entries.map((entry, idx) => {
+        const prev = idx > 0 ? entries[idx - 1] : null;
+        const showDivider =
+          !prev || !isSameLocalDay(entry.createdAt, prev.createdAt);
         const isMine = currentUserId !== undefined && entry.userId === currentUserId;
         return (
-          <EntryCard
-            key={entry.id}
-            entry={entry}
-            onEdit={isMine ? onEdit : undefined}
-            onDelete={isMine ? onDelete : undefined}
-          />
+          <Fragment key={entry.id}>
+            {showDivider && <DayDivider date={entry.createdAt} />}
+            <EntryCard
+              entry={entry}
+              onEdit={isMine ? onEdit : undefined}
+              onDelete={isMine ? onDelete : undefined}
+              onKnowledgeReactionToggle={
+                isMine
+                  ? undefined
+                  : async (e, next) => {
+                      // 楽観的更新: 即座に UI 反映 (revalidate=false)
+                      await mutate(
+                        (pages) =>
+                          pages?.map((page) => ({
+                            ...page,
+                            entries: page.entries.map((it) =>
+                              it.id === e.id
+                                ? {
+                                    ...it,
+                                    hasMyKnowledgeReaction: next,
+                                    knowledgeReactionCount:
+                                      (it.knowledgeReactionCount ?? 0) +
+                                      (next ? 1 : -1),
+                                  }
+                                : it,
+                            ),
+                          })),
+                        { revalidate: false },
+                      );
+                      // API 呼び出し。成功時は楽観的更新を信じて revalidate しない
+                      // (revalidate すると ETag 304 で cache 古い値が戻ってしまう問題回避)
+                      // エラー時のみ revalidate で正しい状態に戻す
+                      const url = `/api/private/journal/entries/${e.id}/knowledge-reaction`;
+                      try {
+                        const res = await fetch(url, {
+                          method: next ? 'POST' : 'DELETE',
+                        });
+                        if (!res.ok) await mutate();
+                      } catch {
+                        await mutate();
+                      }
+                    }
+              }
+            />
+          </Fragment>
         );
       })}
 

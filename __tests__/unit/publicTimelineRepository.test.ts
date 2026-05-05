@@ -43,7 +43,7 @@ describe('PublicTimelineRepository', () => {
       };
 
       const repo = new PublicTimelineRepository();
-      const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 });
+      const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 }, { tenantId: 't1', userId: 'u1' });
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ id: 'entry-1' });
@@ -55,7 +55,7 @@ describe('PublicTimelineRepository', () => {
       const mockTx = { select: vi.fn().mockReturnValue(chain) };
 
       const repo = new PublicTimelineRepository();
-      const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 });
+      const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 }, { tenantId: 't1', userId: 'u1' });
 
       expect(result).toEqual([]);
     });
@@ -77,7 +77,7 @@ describe('PublicTimelineRepository', () => {
       };
 
       const repo = new PublicTimelineRepository();
-      const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 });
+      const result = await repo.findTimeline(mockTx as never, { limit: 20, offset: 0 }, { tenantId: 't1', userId: 'u1' });
 
       expect(result[0].tags).toHaveLength(1);
       expect(result[0].tags[0]).toMatchObject({ id: 'tag1', name: '喜び', category: 'positive' });

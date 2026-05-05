@@ -1,11 +1,16 @@
-// エントリカード: 1件のエントリを表示する共通コンポーネント
-// 共有タイムライン・マイ記録の両方で使用
-// onEdit / onDelete いずれか指定時は右上に kebab メニュー (⋮) を表示
+// エントリ表示コンポーネント (共有タイムライン・マイ記録の両方で使用)
+// 設計方針 (2026-05-04 chimo): "カードをやめてログに戻す"。Linear 風の
+// 静かな hairline 区切り + hover で軽く反応 + 情報を足さない
+// onEdit / onDelete いずれか指定時は hover で kebab メニュー (⋮) を表示
 import { useEffect, useRef, useState } from 'react';
 import type { EmotionTag } from '@/db/schema';
-import type { MoodLevel } from '@/features/journal/schemas/journal';
+import type {
+  JournalEntryKind,
+  MoodLevel,
+} from '@/features/journal/schemas/journal';
+import { Lightbulb } from 'lucide-react';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
-import { IconTooltip } from '@/shared/components/IconTooltip';
+import { KindBadge } from './KindBadge';
 
 export interface EntryCardData {
   id: string;
@@ -15,9 +20,17 @@ export interface EntryCardData {
   isPublic?: boolean;  // マイ記録では必要、共有タイムラインでは undefined
   // mood: 5 段階の気分 (絵文字表示用)。既存データは null、新規投稿は API 側で必須
   mood?: MoodLevel | null;
+  // kind: 投稿種別 (migration 0030)。既存データは default 'diary'。
+  kind?: JournalEntryKind;
   authorName?: string | null;  // JOIN 済みの投稿者名 (fallback)
   authorNickname?: string | null;  // nickname 優先表示
+  // tags: kind=tweet 用 (emotion_tags)
   tags?: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
+  // knowledgeTags: kind=knowledge 用 (knowledge_tags、category なし)
+  knowledgeTags?: Array<{ id: string; name: string }>;
+  // ナレッジリアクション (= 他の教員が「これはナレッジ」と感じた数 + 自分が ON か)
+  knowledgeReactionCount?: number;
+  hasMyKnowledgeReaction?: boolean;
 }
 
 interface EntryCardProps {
@@ -25,13 +38,17 @@ interface EntryCardProps {
   showPrivacyBadge?: boolean;
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
+  // ナレッジリアクション切替 (他人の投稿のみ親から渡す。自分の投稿では undefined)
+  onKnowledgeReactionToggle?: (
+    entry: EntryCardData,
+    next: boolean,
+  ) => void | Promise<void>;
 }
 
-function formatDate(value: string | Date): string {
+// Day Divider と組み合わせて使うため時刻のみ表示 (H:mm)
+function formatTime(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
@@ -42,73 +59,123 @@ export function EntryCard({
   showPrivacyBadge = false,
   onEdit,
   onDelete,
+  onKnowledgeReactionToggle,
 }: EntryCardProps) {
   const hasMenu = Boolean(onEdit || onDelete);
   const MoodIcon = getMoodIcon(entry.mood);
   const moodLabel = getMoodLabel(entry.mood);
+  const author = entry.authorNickname ?? entry.authorName;
 
   return (
     <article
-      className="rounded-vn border border-vn-border bg-white p-4"
+      className="group border-b border-vn-border px-3 py-3"
       data-testid={`entry-card-${entry.id}`}
     >
-      <header className="mb-2 flex items-start justify-between gap-2 text-xs text-gray-500">
+      <header className="flex items-center justify-between gap-2 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          {(entry.authorNickname ?? entry.authorName) && (
-            <span data-testid={`entry-card-author-${entry.id}`}>
-              {entry.authorNickname ?? entry.authorName}
-            </span>
-          )}
           <time dateTime={new Date(entry.createdAt).toISOString()}>
-            {formatDate(entry.createdAt)}
+            {formatTime(entry.createdAt)}
           </time>
-          {MoodIcon && moodLabel && (
-            <IconTooltip
-              label={moodLabel}
-              testId={`entry-card-mood-${entry.id}`}
-            >
-              <MoodIcon size={14} className="text-gray-500" aria-hidden />
-            </IconTooltip>
+          {entry.kind && <KindBadge kind={entry.kind} />}
+          {MoodIcon && (
+            <MoodIcon
+              size={14}
+              className="text-gray-500"
+              aria-label={moodLabel ?? 'mood'}
+              data-testid={`entry-card-mood-${entry.id}`}
+            />
+          )}
+          {author && (
+            <>
+              <span aria-hidden className="text-gray-300">·</span>
+              <span data-testid={`entry-card-author-${entry.id}`}>
+                {author}
+              </span>
+            </>
           )}
         </div>
         <div className="flex items-center gap-2">
           {showPrivacyBadge && entry.isPublic === false && (
             <span
-              className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600"
+              className="text-[10px] text-gray-400"
               data-testid={`entry-card-private-${entry.id}`}
             >
-              自分だけに保存
+              自分のみ
             </span>
           )}
           {hasMenu && (
-            <EntryCardMenu
-              entry={entry}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
+            <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <EntryCardMenu
+                entry={entry}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            </div>
           )}
         </div>
       </header>
 
       <p
-        className="mb-3 whitespace-pre-wrap text-sm text-gray-900"
+        className="mt-1 whitespace-pre-wrap text-base text-gray-900"
         data-testid={`entry-card-content-${entry.id}`}
       >
         {entry.content}
       </p>
 
-      {entry.tags && entry.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {entry.tags.map((tag) => (
-            <span
-              key={tag.id}
-              className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] text-gray-600"
-            >
-              {tag.name}
-            </span>
-          ))}
-        </div>
-      )}
+      {(() => {
+        // kind 別にタグを表示: knowledge → knowledgeTags / それ以外 → tags (emotion_tags)
+        const displayTags =
+          entry.kind === 'knowledge' ? entry.knowledgeTags : entry.tags;
+        const hasTags = displayTags && displayTags.length > 0;
+        const showReaction = Boolean(onKnowledgeReactionToggle);
+        if (!hasTags && !showReaction) return null;
+        return (
+          <div
+            className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1"
+            data-testid={`entry-card-tags-${entry.id}`}
+          >
+            {hasTags &&
+              displayTags!.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="text-xs font-medium text-gray-500"
+                >
+                  #{tag.name}
+                </span>
+              ))}
+            {showReaction && (
+              <button
+                type="button"
+                onClick={() =>
+                  onKnowledgeReactionToggle!(
+                    entry,
+                    !entry.hasMyKnowledgeReaction,
+                  )
+                }
+                aria-pressed={entry.hasMyKnowledgeReaction ?? false}
+                aria-label="ナレッジ"
+                className={`group/reaction relative inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+                  entry.hasMyKnowledgeReaction
+                    ? 'bg-vn-accent/10 text-vn-accent'
+                    : 'bg-vn-muted-bg text-gray-500 hover:text-gray-700'
+                }`}
+                data-testid={`entry-card-knowledge-reaction-${entry.id}`}
+              >
+                <Lightbulb size={13} strokeWidth={1.75} aria-hidden />
+                {(entry.knowledgeReactionCount ?? 0) > 0 && (
+                  <span>{entry.knowledgeReactionCount}</span>
+                )}
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-within/reaction:opacity-100"
+                >
+                  ナレッジ
+                </span>
+              </button>
+            )}
+          </div>
+        );
+      })()}
     </article>
   );
 }

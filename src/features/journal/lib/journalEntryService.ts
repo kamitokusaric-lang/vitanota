@@ -38,9 +38,15 @@ export class JournalEntryService {
   ): Promise<JournalEntry> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       // タグ検証（クロステナント防止・アプリ層チェック）
-      // SP-U02-04 Layer 8 の複合 FK でも同じエラーになるが、より明示的なエラーを返す
+      // kind 別に参照する tag store を切り替え:
+      //   tweet     → emotion_tags
+      //   knowledge → knowledge_tags
+      //   diary     → tagIds 空 (Zod superRefine でガード済)
       if (params.tagIds.length > 0) {
-        const validIds = await tagRepo.findValidTagIds(tx, params.tagIds, ctx);
+        const validIds =
+          params.kind === 'knowledge'
+            ? await tagRepo.findValidKnowledgeTagIds(tx, params.tagIds, ctx)
+            : await tagRepo.findValidTagIds(tx, params.tagIds, ctx);
         const invalidIds = params.tagIds.filter((id) => !validIds.includes(id));
         if (invalidIds.length > 0) {
           logWarnEvent(
@@ -82,9 +88,12 @@ export class JournalEntryService {
     ctx: ServiceContext
   ): Promise<JournalEntry> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      // タグ更新時の検証
+      // タグ更新時の検証 (kind 別: knowledge=knowledge_tags / それ以外=emotion_tags)
       if (params.tagIds !== undefined && params.tagIds.length > 0) {
-        const validIds = await tagRepo.findValidTagIds(tx, params.tagIds, ctx);
+        const validIds =
+          params.kind === 'knowledge'
+            ? await tagRepo.findValidKnowledgeTagIds(tx, params.tagIds, ctx)
+            : await tagRepo.findValidTagIds(tx, params.tagIds, ctx);
         const invalidIds = params.tagIds.filter((id) => !validIds.includes(id));
         if (invalidIds.length > 0) {
           throw new InvalidTagReferenceError(invalidIds);

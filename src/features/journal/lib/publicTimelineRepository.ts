@@ -8,12 +8,15 @@ import {
   publicJournalEntries,
   journalEntryTags,
   emotionTags,
+  journalEntryKnowledgeTags,
+  knowledgeTags,
   users,
   userTenantProfiles,
 } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { EmotionTag } from '@/db/schema';
 import type { PublicJournalEntry } from '@/shared/types/brand';
+import { attachReactions } from './privateJournalRepository';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -26,6 +29,9 @@ export type PublicEntryWithTags = PublicJournalEntry & {
   authorName: string | null;
   authorNickname: string | null;
   tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
+  knowledgeTags: Array<{ id: string; name: string }>;
+  knowledgeReactionCount: number;
+  hasMyKnowledgeReaction: boolean;
 };
 
 export interface TimelineResult {
@@ -41,7 +47,8 @@ export class PublicTimelineRepository {
    */
   async findTimeline(
     tx: DrizzleDb,
-    opts: TimelineOptions
+    opts: TimelineOptions,
+    ctx: { tenantId: string; userId: string },
   ): Promise<PublicEntryWithTags[]> {
     const rows = await tx
       .select({
@@ -50,6 +57,7 @@ export class PublicTimelineRepository {
         userId: publicJournalEntries.userId,
         content: publicJournalEntries.content,
         mood: publicJournalEntries.mood,
+        kind: publicJournalEntries.kind,
         createdAt: publicJournalEntries.createdAt,
         updatedAt: publicJournalEntries.updatedAt,
         authorName: users.name,
@@ -73,9 +81,11 @@ export class PublicTimelineRepository {
     >;
     if (entries.length === 0) return [];
 
-    // タグを別クエリで取得して付与
+    // タグを別クエリで取得して付与 (emotion_tags + knowledge_tags 両方)
     const entryIds = entries.map((e) => e.id);
-    const tagRows = await tx
+
+    // emotion_tags (kind=tweet 用)
+    const emotionRows = await tx
       .select({
         entryId: journalEntryTags.entryId,
         tagId: emotionTags.id,
@@ -86,14 +96,44 @@ export class PublicTimelineRepository {
       .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
       .where(inArray(journalEntryTags.entryId, entryIds));
 
-    const tagMap = new Map<string, Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>>();
-    for (const row of tagRows) {
-      const list = tagMap.get(row.entryId) ?? [];
+    const emotionMap = new Map<
+      string,
+      Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>
+    >();
+    for (const row of emotionRows) {
+      const list = emotionMap.get(row.entryId) ?? [];
       list.push({ id: row.tagId, name: row.tagName, category: row.tagCategory });
-      tagMap.set(row.entryId, list);
+      emotionMap.set(row.entryId, list);
     }
 
-    return entries.map((e) => ({ ...e, tags: tagMap.get(e.id) ?? [] }));
+    // knowledge_tags (kind=knowledge 用)
+    const knowledgeRows = await tx
+      .select({
+        entryId: journalEntryKnowledgeTags.journalEntryId,
+        tagId: knowledgeTags.id,
+        tagName: knowledgeTags.name,
+      })
+      .from(journalEntryKnowledgeTags)
+      .innerJoin(
+        knowledgeTags,
+        eq(knowledgeTags.id, journalEntryKnowledgeTags.knowledgeTagId),
+      )
+      .where(inArray(journalEntryKnowledgeTags.journalEntryId, entryIds));
+
+    const knowledgeMap = new Map<string, Array<{ id: string; name: string }>>();
+    for (const row of knowledgeRows) {
+      const list = knowledgeMap.get(row.entryId) ?? [];
+      list.push({ id: row.tagId, name: row.tagName });
+      knowledgeMap.set(row.entryId, list);
+    }
+
+    const withTags = entries.map((e) => ({
+      ...e,
+      tags: emotionMap.get(e.id) ?? [],
+      knowledgeTags: knowledgeMap.get(e.id) ?? [],
+    }));
+
+    return attachReactions(tx, withTags, ctx);
   }
 
   /**

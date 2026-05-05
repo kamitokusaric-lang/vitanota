@@ -34,7 +34,11 @@ export default async function handler(
 
   try {
     const entries = await withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      return publicTimelineRepo.findTimeline(tx, { limit: perPage, offset });
+      return publicTimelineRepo.findTimeline(
+        tx,
+        { limit: perPage, offset },
+        { tenantId: ctx.tenantId, userId: ctx.userId },
+      );
     });
 
     // PP-U02-02: エッジキャッシュ対象（CloudFront ホワイトリスト方式）

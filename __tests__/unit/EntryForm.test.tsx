@@ -260,9 +260,7 @@ describe('EntryForm - compact mode', () => {
     const placeholder = textarea.getAttribute('placeholder');
     expect([
       'いい感じだったこと、ちょっと教えて',
-      '今日、どんなことがスムーズだった?',
-      '落ち着いて過ごせた瞬間は?',
-      '少し嬉しかったこと、ある?',
+      '誰かに感謝したいこと、ある?',
     ]).toContain(placeholder);
   });
 

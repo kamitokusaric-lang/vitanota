@@ -7,6 +7,7 @@
 //   - 教員 / school_admin から他者投稿は API 層で system_admin 限定 SELECT
 //   - 自分の投稿履歴も UI に出さない (送信したら確定、編集不可)
 import { useEffect, useState } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
 import { useToast } from '@/shared/components/Toast';
@@ -25,15 +26,24 @@ export function FeedbackFAB() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-vn-accent text-2xl text-white shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-vn-accent focus:ring-offset-2"
-        aria-label="フィードバックを送る"
-        data-testid="feedback-fab"
-      >
-        💬
-      </button>
+      <div className="group fixed bottom-6 right-6 z-30">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-vn-border bg-vn-muted-bg text-gray-700 shadow-sm transition-colors hover:bg-vn-border focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+          aria-label="フィードバックを送る"
+          data-testid="feedback-fab"
+        >
+          <MessageSquare size={22} strokeWidth={1.75} aria-hidden />
+        </button>
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute right-full top-1/2 z-10 mr-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+          data-testid="feedback-fab-tooltip"
+        >
+          フィードバック待ってます
+        </span>
+      </div>
       <FeedbackModal open={open} onClose={() => setOpen(false)} />
     </>
   );

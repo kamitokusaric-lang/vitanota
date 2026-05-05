@@ -7,6 +7,8 @@ import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
 import { EntryForm } from '@/features/journal/components/EntryForm';
+import { KIND_META } from '@/features/journal/components/KindBadge';
+import type { JournalEntryKind } from '@/features/journal/schemas/journal';
 import {
   MyJournalList,
   type MyJournalMutate,
@@ -27,7 +29,10 @@ type ModalState =
   | { kind: 'confirm-delete'; entryId: string };
 
 interface EntryDetailResponse {
-  entry: JournalEntry & { tags?: Array<{ id: string }> };
+  entry: JournalEntry & {
+    tags?: Array<{ id: string }>;
+    knowledgeTags?: Array<{ id: string }>;
+  };
 }
 
 const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
@@ -40,10 +45,21 @@ interface TimelineTabProps {
   session: VitanotaSession;
 }
 
+const KIND_FILTER_OPTIONS: JournalEntryKind[] = ['knowledge', 'diary', 'tweet'];
+
 export function TimelineTab({ session }: TimelineTabProps) {
   const currentUserId = session.user.userId;
-  const [mode, setMode] = useState<TimelineMode>('personal');
+  const [mode, setMode] = useState<TimelineMode>('staffroom');
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
+  // kind 絞り込み: 初期は全 3 種 ON (= フィルタなしと等価)
+  const [kindFilter, setKindFilter] =
+    useState<JournalEntryKind[]>(KIND_FILTER_OPTIONS);
+
+  const toggleKindFilter = (k: JournalEntryKind) => {
+    setKindFilter((prev) =>
+      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k],
+    );
+  };
 
   // 子コンポーネント (useSWRInfinite 保有) の mutate を ref で受け取る。
   // global mutate の matcher 関数は SWR v2 で `$inf$` キーが skip されるため、
@@ -58,10 +74,6 @@ export function TimelineTab({ session }: TimelineTabProps) {
       timelineMutateRef.current?.(),
       myJournalMutateRef.current?.(),
     ]);
-  };
-
-  const handleCreateSuccess = async () => {
-    await refreshLists();
   };
 
   const handleModalSuccess = async () => {
@@ -79,43 +91,86 @@ export function TimelineTab({ session }: TimelineTabProps) {
 
   return (
     <div className="space-y-4" data-testid="timeline-tab">
-      {/* 投稿欄は nav (h-16 = 64px) の真下に sticky */}
-      <div className="sticky top-16 z-[5] -mx-6 bg-vn-bg px-6 pb-3 pt-3 lg:-mx-10 lg:px-10">
-        <EntryForm mode="create" compact onSuccess={handleCreateSuccess} />
-      </div>
+      {/* 投稿入口は dashboard 上部の MoodPromptBar に統合済 (重複防止のため
+          このタブ内には EntryForm を置かない) */}
 
-      {/* 子タブ: 自分のタイムライン / 職員室タイムライン */}
+      {/* 子タブ: 職員室タイムライン / 自分のタイムライン */}
       <div role="tablist" className="flex gap-1 border-b border-vn-border">
-        <SubTab
-          active={mode === 'personal'}
-          onClick={() => setMode('personal')}
-          testId="timeline-subtab-personal"
-        >
-          自分のタイムライン
-        </SubTab>
         <SubTab
           active={mode === 'staffroom'}
           onClick={() => setMode('staffroom')}
           testId="timeline-subtab-staffroom"
         >
-          職員室タイムライン
+          職員室ノート
+        </SubTab>
+        <SubTab
+          active={mode === 'personal'}
+          onClick={() => setMode('personal')}
+          testId="timeline-subtab-personal"
+        >
+          マイノート
+        </SubTab>
+        <SubTab
+          active={false}
+          onClick={() => {}}
+          disabled
+          testId="timeline-subtab-report"
+        >
+          マイレポート
         </SubTab>
       </div>
 
-      {mode === 'staffroom' ? (
-        <TimelineList
-          currentUserId={currentUserId}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          mutateRef={timelineMutateRef}
-        />
-      ) : (
-        <MyJournalList
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          mutateRef={myJournalMutateRef}
-        />
-      )}
+      {/* kind 絞り込み chip (3 種別を multi-select でトグル) */}
+      <div
+        className="flex items-center gap-2 px-3"
+        role="group"
+        aria-label="種別で絞り込み"
+        data-testid="timeline-kind-filter"
+      >
+        <span className="text-xs text-gray-500">表示:</span>
+        {KIND_FILTER_OPTIONS.map((k) => {
+          const { Icon, label } = KIND_META[k];
+          const active = kindFilter.includes(k);
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => toggleKindFilter(k)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                active
+                  ? 'bg-vn-accent/10 text-vn-accent'
+                  : 'bg-vn-muted-bg text-gray-400 hover:text-gray-600'
+              }`}
+              data-testid={`timeline-kind-filter-${k}`}
+            >
+              <Icon size={11} strokeWidth={1.75} aria-hidden />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 投稿リスト本体: ページ #fafafa の中に #ffffff の "面" を浮かせる
+          (border / shadow は使わない — chimo 指針 "面で分ける、箱で区切らない") */}
+      <div className="bg-vn-surface">
+        {mode === 'staffroom' ? (
+          <TimelineList
+            currentUserId={currentUserId}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            mutateRef={timelineMutateRef}
+            kindFilter={kindFilter}
+          />
+        ) : (
+          <MyJournalList
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            mutateRef={myJournalMutateRef}
+            kindFilter={kindFilter}
+          />
+        )}
+      </div>
 
       <Modal
         open={modal.kind === 'edit'}
@@ -153,24 +208,37 @@ interface SubTabProps {
   onClick: () => void;
   children: React.ReactNode;
   testId?: string;
+  disabled?: boolean;
 }
 
-function SubTab({ active, onClick, children, testId }: SubTabProps) {
+function SubTab({
+  active,
+  onClick,
+  children,
+  testId,
+  disabled = false,
+}: SubTabProps) {
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
+      disabled={disabled}
       onClick={onClick}
       data-testid={testId}
       className={[
         'px-4 py-2 text-sm font-medium transition-colors',
-        active
-          ? 'border-b-2 border-vn-accent text-gray-900'
-          : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900',
+        disabled
+          ? 'cursor-not-allowed text-gray-300'
+          : active
+            ? 'border-b-2 border-gray-900 text-gray-900'
+            : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900',
       ].join(' ')}
     >
       {children}
+      {disabled && (
+        <span className="ml-1 text-xs text-gray-400">(準備中)</span>
+      )}
     </button>
   );
 }
@@ -202,13 +270,22 @@ function EditEntryModalBody({
     return <ErrorMessage message="エントリの取得に失敗しました" />;
   }
 
+  // edit 時の kind 別 tagIds 振り分け:
+  //   knowledge → knowledgeTags / それ以外 → tags (emotion_tags)
+  const tagIds =
+    data.entry.kind === 'knowledge'
+      ? data.entry.knowledgeTags?.map((t) => t.id) ?? []
+      : data.entry.tags?.map((t) => t.id) ?? [];
+
   return (
     <EntryForm
       mode="edit"
+      kind={data.entry.kind}
       initialData={{
         id: data.entry.id,
+        kind: data.entry.kind,
         content: data.entry.content,
-        tagIds: data.entry.tags?.map((t) => t.id) ?? [],
+        tagIds,
         isPublic: data.entry.isPublic,
         mood: data.entry.mood,
       }}

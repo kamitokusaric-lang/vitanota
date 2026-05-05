@@ -4,9 +4,10 @@
 // 投稿即時反映: 親 (TimelineTab) から revalidate を走らせるため、
 // useSWRInfinite 由来の mutate を mutateRef で親に expose する
 // (詳細は TimelineList.tsx の冒頭コメント参照)
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import { Fragment, useEffect, useRef, type MutableRefObject } from 'react';
 import useSWRInfinite from 'swr/infinite';
 import { EntryCard, type EntryCardData } from './EntryCard';
+import { DayDivider, isSameLocalDay } from './DayDivider';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 
@@ -29,6 +30,8 @@ interface MyJournalListProps {
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
   mutateRef?: MutableRefObject<MyJournalMutate | null>;
+  // 表示する種別 (省略 or 全 3 種 含む = フィルタなし)
+  kindFilter?: import('@/features/journal/schemas/journal').JournalEntryKind[];
 }
 
 export function MyJournalList({
@@ -36,6 +39,7 @@ export function MyJournalList({
   onEdit,
   onDelete,
   mutateRef,
+  kindFilter,
 }: MyJournalListProps) {
   const { data, error, isLoading, isValidating, size, setSize, mutate } =
     useSWRInfinite<MyJournalResponse>(
@@ -56,7 +60,20 @@ export function MyJournalList({
   }, [mutate, mutateRef]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const entries = data?.flatMap((p) => p.entries) ?? [];
+  const allEntries = data?.flatMap((p) => p.entries) ?? [];
+  // kind filter 適用 (knowledge filter ON 時は reaction>0 entry も含める)
+  const entries = kindFilter
+    ? allEntries.filter((e) => {
+        if (kindFilter.includes(e.kind ?? 'diary')) return true;
+        if (
+          kindFilter.includes('knowledge') &&
+          (e.knowledgeReactionCount ?? 0) > 0
+        ) {
+          return true;
+        }
+        return false;
+      })
+    : allEntries;
   const lastPage = data?.[data.length - 1];
   const reachedEnd = lastPage !== undefined && lastPage.entries.length < perPage;
   const isLoadingMore =
@@ -103,16 +120,23 @@ export function MyJournalList({
   }
 
   return (
-    <div className="space-y-3" data-testid="my-journal-list">
-      {entries.map((entry) => (
-        <EntryCard
-          key={entry.id}
-          entry={entry}
-          showPrivacyBadge
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
+    <div data-testid="my-journal-list">
+      {entries.map((entry, idx) => {
+        const prev = idx > 0 ? entries[idx - 1] : null;
+        const showDivider =
+          !prev || !isSameLocalDay(entry.createdAt, prev.createdAt);
+        return (
+          <Fragment key={entry.id}>
+            {showDivider && <DayDivider date={entry.createdAt} />}
+            <EntryCard
+              entry={entry}
+              showPrivacyBadge
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          </Fragment>
+        );
+      })}
 
       {!reachedEnd && (
         <div

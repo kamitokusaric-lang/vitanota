@@ -88,14 +88,15 @@ export function TaskMatrix({
 
   return (
     <div data-testid="task-matrix">
-      {/* status ヘッダ (sticky で常に見える) */}
+      {/* status ヘッダ (sticky で常に見える、nav h-16 の下にピン)
+          chimo 強弱再設計: カラム見出しは "ガイド" 扱いで弱く (13px / 500 / #777) */}
       <div
-        className="sticky top-0 z-10 mb-2 grid grid-cols-5 gap-2 bg-vn-bg/95 py-2 backdrop-blur"
+        className="sticky top-16 z-10 mb-2 grid grid-cols-5 gap-4 bg-vn-bg/95 py-2 backdrop-blur"
       >
         {STATUS_COLS.map((c) => (
           <div
             key={c.id}
-            className="px-2 text-sm font-semibold text-gray-700"
+            className="border-b-2 border-gray-900 px-2 pb-2 text-center text-[13px] font-semibold text-gray-700"
             data-testid={`matrix-col-${c.id}`}
           >
             {c.label}
@@ -103,17 +104,19 @@ export function TaskMatrix({
         ))}
       </div>
 
-      {/* 各 row (カテゴリ or タグ) を独立 Kanban として縦に積む */}
-      <div className="space-y-4">
+      {/* 各 row (カテゴリ or タグ) を独立 Kanban として縦に積む
+          chimo 強弱再設計: セクション見出しは "ちょい目立つ" 程度に下げる
+          (16px / 600 / #222)、件数は補助 (13px / 400 / #999) */}
+      <div className="space-y-10">
         {rows.map((row) => (
           <section key={row.id} data-testid={`matrix-row-${row.id}`}>
-            <h3 className="mb-2 border-b border-vn-border pb-1 text-base font-semibold text-gray-800">
+            <h3 className="mb-3 text-base font-semibold text-gray-900">
               {row.label}
-              <span className="ml-2 text-xs font-normal text-gray-400">
+              <span className="ml-2 text-[13px] font-normal text-gray-400">
                 ({rowCounts.get(row.id) ?? 0})
               </span>
             </h3>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-4">
               {STATUS_COLS.map((c) => {
                 const cellTasks = grid.get(row.id)?.get(c.id) ?? [];
                 const isDropTarget =
@@ -125,9 +128,10 @@ export function TaskMatrix({
                   <div
                     key={c.id}
                     className={[
-                      'min-h-[60px] rounded-vn border bg-vn-bg p-2 transition-colors',
+                      // chimo: 各セル (status × category) に薄い外枠
+                      'min-h-[88px] rounded-[10px] border p-2 transition-colors',
                       isDropTarget
-                        ? 'border-vn-accent bg-orange-50/60'
+                        ? 'border-vn-accent bg-vn-muted-bg'
                         : 'border-vn-border',
                     ].join(' ')}
                     data-testid={`matrix-cell-${row.id}-${c.id}`}
@@ -170,7 +174,7 @@ export function TaskMatrix({
                     }
                   >
                     {cellTasks.length === 0 ? (
-                      <div className="py-3 text-center text-xs text-gray-300">—</div>
+                      <div className="py-6"></div>
                     ) : (
                       <div className="space-y-2">
                         {cellTasks.map((t) => {

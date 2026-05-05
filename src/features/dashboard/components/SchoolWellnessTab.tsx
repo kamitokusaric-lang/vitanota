@@ -64,8 +64,8 @@ export function SchoolWellnessTab({
       className="space-y-6"
       data-testid="school-wellness-tab"
     >
-      {/* サマリ行 (タグ別分析は amber 系) */}
-      <div className="flex flex-wrap items-center gap-6 rounded-vn border border-amber-200 bg-amber-50 px-5 py-4">
+      {/* サマリ行 (chimo: 白ベース + 左に青 1 本のアクセント、黄色は廃止) */}
+      <div className="flex flex-wrap items-center gap-6 rounded-vn border border-vn-border border-l-4 border-l-vn-accent bg-vn-surface px-5 py-4">
         <div className="flex flex-col">
           <span className="text-[11px] text-gray-500">今期の投稿数</span>
           <span className="text-xl font-semibold text-gray-900">

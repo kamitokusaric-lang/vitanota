@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { TrendArrow } from './TrendArrow';
+import { getMoodIcon } from '@/features/journal/lib/mood-options';
 import type {
   MoodDay,
   MoodLevel,
@@ -23,13 +24,15 @@ const fetcher = async (url: string): Promise<SchoolMoodAnalysisData> => {
   return res.json();
 };
 
-// mood の色 (very_positive = 緑, very_negative = 赤、中立はグレー)
-const MOOD_META: Record<MoodLevel, { emoji: string; label: string; color: string }> = {
-  very_positive: { emoji: '😊', label: 'とても良い', color: '#16a34a' },
-  positive:      { emoji: '🙂', label: '良い',       color: '#86efac' },
-  neutral:       { emoji: '😐', label: 'ふつう',     color: '#94a3b8' },
-  negative:      { emoji: '😥', label: 'ちょっと大変', color: '#fca5a5' },
-  very_negative: { emoji: '😣', label: 'かなり大変', color: '#dc2626' },
+// mood 色 (chimo 指針 2026-05-04): 低彩度・薄め・同明度で統一。
+// 凡例 (chip) は薄め、グラフバー (bar) は少しだけ濃く差をつける。
+// 表示アイコンは getMoodIcon (lucide-react、emoji 廃止)
+const MOOD_META: Record<MoodLevel, { label: string; chip: string; bar: string }> = {
+  very_positive: { label: 'とても良い', chip: '#a7f3d0', bar: '#6ee7b7' }, // 薄ミント
+  positive:      { label: '良い',       chip: '#bae6fd', bar: '#7dd3fc' }, // 薄水色
+  neutral:       { label: 'ふつう',     chip: '#d4d4d8', bar: '#a1a1aa' }, // ニュートラルグレー
+  negative:      { label: 'ちょっと大変', chip: '#fed7aa', bar: '#fdba74' }, // 薄オレンジ
+  very_negative: { label: 'かなり大変', chip: '#fecaca', bar: '#fca5a5' }, // 薄赤
 };
 
 const MOOD_ORDER: MoodLevel[] = [
@@ -152,10 +155,10 @@ function StackedMoodBars({
                     y={yCursor}
                     width={barWidth}
                     height={h}
-                    fill={MOOD_META[m].color}
+                    fill={MOOD_META[m].bar}
                   >
                     <title>
-                      {`${formatDay(d.day)} ${MOOD_META[m].emoji} ${MOOD_META[m].label}: ${v} 件`}
+                      {`${formatDay(d.day)} ${MOOD_META[m].label}: ${v} 件`}
                     </title>
                   </rect>
                 );
@@ -178,17 +181,7 @@ function StackedMoodBars({
         ))}
       </g>
 
-      {/* 凡例 (絵文字と色のみ、ラベルなし) */}
-      <g transform={`translate(${margin.left}, ${height - 10})`}>
-        {MOOD_ORDER.map((m, i) => (
-          <g key={m} transform={`translate(${i * 50}, 0)`}>
-            <rect x={0} y={-6} width={12} height={10} fill={MOOD_META[m].color} />
-            <text x={16} y={4} fontSize={14}>
-              {MOOD_META[m].emoji}
-            </text>
-          </g>
-        ))}
-      </g>
+      {/* SVG 内凡例は廃止 (サマリ行の HTML 凡例で兼ねるため重複削除) */}
     </svg>
     </div>
   );
@@ -219,8 +212,8 @@ export function SchoolMoodAnalysisTab({
 
   return (
     <div className="space-y-6" data-testid="school-mood-analysis-tab">
-      {/* サマリ行 (ムード別分析は blue 系) */}
-      <div className="flex flex-wrap items-center gap-6 rounded-vn border border-blue-200 bg-blue-50 px-5 py-4">
+      {/* サマリ行 (chimo: 白ベース + 左に青 1 本のアクセント) */}
+      <div className="flex flex-wrap items-center gap-6 rounded-vn border border-vn-border border-l-4 border-l-vn-accent bg-vn-surface px-5 py-4">
         <div className="flex flex-col">
           <span className="text-[11px] text-gray-500">今期ムード付き投稿</span>
           <span className="text-xl font-semibold text-gray-900">
@@ -239,20 +232,34 @@ export function SchoolMoodAnalysisTab({
           />
         </div>
         <div className="flex flex-wrap gap-4">
-          {MOOD_ORDER.map((m) => (
-            <div
-              key={m}
-              className="flex items-center gap-1.5"
-              title={MOOD_META[m].label}
-            >
-              <span className="text-lg leading-none">
-                {MOOD_META[m].emoji}
-              </span>
-              <span className="text-sm font-semibold text-gray-800">
-                {data.totalByMood[m]}
-              </span>
-            </div>
-          ))}
+          {MOOD_ORDER.map((m) => {
+            const Icon = getMoodIcon(m);
+            return (
+              <div
+                key={m}
+                className="flex items-center gap-1.5"
+                title={MOOD_META[m].label}
+              >
+                {/* 凡例: chip サイズ 10px / radius 3px、薄色でバーと対応 */}
+                <span
+                  aria-hidden
+                  className="inline-block h-2.5 w-2.5 rounded-[3px]"
+                  style={{ backgroundColor: MOOD_META[m].chip }}
+                />
+                {Icon && (
+                  <Icon
+                    size={18}
+                    strokeWidth={1.75}
+                    className="text-gray-700"
+                    aria-label={MOOD_META[m].label}
+                  />
+                )}
+                <span className="text-sm font-semibold text-gray-800">
+                  {data.totalByMood[m]}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 

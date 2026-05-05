@@ -73,7 +73,9 @@ export function Layout({ children, session }: LayoutProps) {
           </div>
         </div>
       </nav>
-      <main className="mx-auto max-w-[1040px] px-6 pt-24 pb-20 lg:px-10">{children}</main>
+      <main className="mx-auto max-w-[1040px] px-6 pb-20 pt-[104px] lg:px-10">
+        {children}
+      </main>
 
       <MyProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
       <AboutVitanotaModal open={aboutOpen} onClose={() => setAboutOpen(false)} />

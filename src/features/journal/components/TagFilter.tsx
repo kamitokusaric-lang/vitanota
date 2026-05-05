@@ -63,34 +63,21 @@ export function TagFilter({
     <div data-testid="tag-filter">
       {sortedTags.length > 0 ? (
         <div
-          className="space-y-3"
+          className="flex flex-wrap gap-2"
           data-testid="entry-form-emotion-tags"
         >
-          {CATEGORY_ORDER.map((cat) => {
-            const group = groups[cat];
-            if (!group || group.length === 0) return null;
+          {sortedTags.map((tag) => {
+            const isSelected = selectedTagIds.includes(tag.id);
             return (
-              <div key={cat}>
-                <p className="mb-1 text-xs font-medium text-gray-500">
-                  {CATEGORY_LABEL[cat]}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {group.map((tag) => {
-                    const isSelected = selectedTagIds.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => toggleTag(tag.id)}
-                        className={getTagStyle(isSelected)}
-                        data-testid={`tag-filter-${tag.id}`}
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => toggleTag(tag.id)}
+                className={getTagStyle(isSelected)}
+                data-testid={`tag-filter-${tag.id}`}
+              >
+                {tag.name}
+              </button>
             );
           })}
         </div>

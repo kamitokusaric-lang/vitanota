@@ -24,7 +24,6 @@ export const MOOD_OPTIONS: MoodOption[] = [
       'どんなことがよかった?',
       '何が嬉しかった?',
       '今日の良かったこと、一つあげるなら?',
-      '誰かに感謝したいこと、ある?',
     ],
   },
   {
@@ -35,9 +34,7 @@ export const MOOD_OPTIONS: MoodOption[] = [
     caption: 'いい感じでした',
     prompts: [
       'いい感じだったこと、ちょっと教えて',
-      '今日、どんなことがスムーズだった?',
-      '落ち着いて過ごせた瞬間は?',
-      '少し嬉しかったこと、ある?',
+      '誰かに感謝したいこと、ある?',
     ],
   },
   {
@@ -60,8 +57,6 @@ export const MOOD_OPTIONS: MoodOption[] = [
     label: 'ちょっと大変',
     caption: 'ちょっと大変でした',
     prompts: [
-      '何が大変だった?',
-      'どこに引っかかった?',
       '少し疲れた場面、どこだった?',
       'うまくいかなかったこと、書いてみる?',
     ],
@@ -74,7 +69,6 @@ export const MOOD_OPTIONS: MoodOption[] = [
     caption: 'かなり大変でした',
     prompts: [
       'ちょっとつらかったことは?',
-      'いま、一番重いのはどれ?',
       '誰かに聞いてほしいこと、ある?',
       '無理してない?',
     ],
@@ -106,4 +100,14 @@ export function getMoodIcon(
 
 export function getMoodLabel(mood: MoodLevel | null | undefined): string | null {
   return getMoodOption(mood)?.label ?? null;
+}
+
+// 選んだ mood に紐づく問いかけ文 (mood ごとに 4 つ用意済) からランダムに 1 件
+// 例: positive → "いい感じだったこと、ちょっと教えて" / "今日、どんなことがスムーズだった?" 等
+export function pickRandomPromptFor(
+  mood: MoodLevel | null | undefined,
+): string {
+  const opt = getMoodOption(mood);
+  if (!opt || opt.prompts.length === 0) return '';
+  return opt.prompts[Math.floor(Math.random() * opt.prompts.length)];
 }

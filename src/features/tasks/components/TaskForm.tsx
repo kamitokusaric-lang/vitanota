@@ -1,7 +1,7 @@
 // タスク新規・編集フォーム (モーダル内で使用)
 // 担当者は M:N、自分 chip + 他教員 chip の multi-select で 1 名以上必須
 // teacher は担当者フィールド非表示 (自分固定)、school_admin は複数選択可
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import type { TaskCategory } from '@/db/schema';
@@ -9,6 +9,7 @@ import type { Assignee } from '../hooks/useAssignees';
 import type { TaskWithAssignees } from '../hooks/useTasks';
 import type { TaskTag } from '../hooks/useTaskTags';
 import { AssigneePopoverInput } from './AssigneePopoverInput';
+import { TagPicker, type TagPickerHandle } from '@/shared/components/TagPicker';
 
 export interface TaskFormValues {
   categoryId: string;
@@ -94,10 +95,6 @@ export function TaskForm({
     ],
     [assignees, selfUserId],
   );
-  const [newTagName, setNewTagName] = useState('');
-  const [creatingTag, setCreatingTag] = useState(false);
-  const [tagCreateError, setTagCreateError] = useState<string | null>(null);
-
   function toggleTag(tagId: string) {
     setValues((v) =>
       v.tagIds.includes(tagId)
@@ -106,58 +103,31 @@ export function TaskForm({
     );
   }
 
-  async function handleCreateOrToggleTag() {
-    if (!onCreateTag) return;
-    const name = newTagName.trim();
-    if (!name) return;
-    // 既存タグ名と完全一致なら新規作成せず toggle (重複作成防止)
-    const existing = (taskTags ?? []).find((t) => t.name === name);
-    if (existing) {
-      if (!values.tagIds.includes(existing.id)) {
-        setValues((v) => ({ ...v, tagIds: [...v.tagIds, existing.id] }));
-      }
-      setNewTagName('');
-      return;
-    }
-    setCreatingTag(true);
-    setTagCreateError(null);
-    try {
-      const created = await onCreateTag(name);
-      if (created) {
-        setValues((v) => ({ ...v, tagIds: [...v.tagIds, created.id] }));
-        setNewTagName('');
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'タグ作成に失敗しました';
-      setTagCreateError(message);
-    } finally {
-      setCreatingTag(false);
-    }
-  }
-
   useEffect(() => {
     if (!values.categoryId && categories.length > 0) {
       setValues((v) => ({ ...v, categoryId: categories[0].id }));
     }
   }, [categories, values.categoryId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const tagPickerRef = useRef<TagPickerHandle>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!values.title.trim()) return;
-    onSubmit(values);
+    // TagPicker の input に保留中の文字があれば、submit 直前に作成 + 紐付け
+    // (= 「作成」ボタンを押し忘れた場合の救済)
+    let finalValues = values;
+    if (tagPickerRef.current) {
+      const flushed = await tagPickerRef.current.flushPending();
+      if (flushed && !values.tagIds.includes(flushed.id)) {
+        finalValues = {
+          ...values,
+          tagIds: [...values.tagIds, flushed.id],
+        };
+      }
+    }
+    onSubmit(finalValues);
   };
-
-  // タグ表示用 (selected を強調 + よく使われる top 10)
-  const top10Tags = (taskTags ?? [])
-    .slice()
-    .sort((a, b) => b.assignmentCount - a.assignmentCount)
-    .slice(0, 10);
-  const selectedTagObjects = (taskTags ?? []).filter((t) =>
-    values.tagIds.includes(t.id),
-  );
-  const popularUnselectedTags = top10Tags.filter(
-    (t) => !values.tagIds.includes(t.id),
-  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-testid="task-form">
@@ -193,119 +163,17 @@ export function TaskForm({
         </div>
 
         {taskTags !== undefined && (
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">
-              タグ (任意)
-            </label>
-            {/* 選択中のタグ (強調表示) */}
-            {selectedTagObjects.length > 0 && (
-              <div className="mb-2">
-                <div className="mb-1 text-[11px] text-gray-500">選択中:</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedTagObjects.map((tg) => (
-                    <button
-                      key={tg.id}
-                      type="button"
-                      disabled={readonly}
-                      onClick={() => toggleTag(tg.id)}
-                      className="inline-flex items-center gap-1 rounded-full bg-purple-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-                      data-testid={`task-form-tag-selected-${tg.id}`}
-                    >
-                      #{tg.name}
-                      {!readonly && <span className="text-purple-200">×</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* よく使われるタグ (未選択分のみ) */}
-            {popularUnselectedTags.length > 0 && (
-              <div className="mb-2">
-                <div className="mb-1 text-[11px] text-gray-500">よく使われる:</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {popularUnselectedTags.map((tg) => (
-                    <button
-                      key={tg.id}
-                      type="button"
-                      disabled={readonly}
-                      onClick={() => toggleTag(tg.id)}
-                      className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 hover:bg-purple-200 disabled:opacity-50"
-                      data-testid={`task-form-tag-${tg.id}`}
-                    >
-                      #{tg.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {!readonly && onCreateTag && (
-              <>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="新規タグ名 or 既存タグから選択 (例: 運動会)"
-                    maxLength={100}
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-xs"
-                    data-testid="task-form-new-tag-name"
-                    disabled={creatingTag}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleCreateOrToggleTag}
-                    isLoading={creatingTag}
-                    disabled={!newTagName.trim()}
-                    className="text-xs"
-                    data-testid="task-form-new-tag-create"
-                  >
-                    {(taskTags ?? []).find((t) => t.name === newTagName.trim())
-                      ? '追加'
-                      : '作成'}
-                  </Button>
-                </div>
-                {(() => {
-                  const q = newTagName.trim();
-                  if (!q) return null;
-                  const suggestions = (taskTags ?? []).filter(
-                    (t) =>
-                      t.name !== q &&
-                      t.name.includes(q) &&
-                      !values.tagIds.includes(t.id),
-                  );
-                  if (suggestions.length === 0) return null;
-                  return (
-                    <div
-                      className="mt-1 flex flex-wrap items-center gap-1 text-xs"
-                      data-testid="task-form-tag-suggestions"
-                    >
-                      <span className="text-gray-500">もしかして:</span>
-                      {suggestions.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => {
-                            setValues((v) => ({
-                              ...v,
-                              tagIds: [...v.tagIds, t.id],
-                            }));
-                            setNewTagName('');
-                          }}
-                          className="rounded-full bg-purple-100 px-2 py-0.5 font-medium text-purple-700 hover:bg-purple-200"
-                        >
-                          #{t.name}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </>
-            )}
-            {tagCreateError && (
-              <div className="mt-1 text-xs text-red-600">{tagCreateError}</div>
-            )}
-          </div>
+          <TagPicker
+            ref={tagPickerRef}
+            selectedTagIds={values.tagIds}
+            onToggle={toggleTag}
+            availableTags={taskTags}
+            onCreateTag={onCreateTag}
+            readonly={readonly}
+            testIdPrefix="task-form"
+            label="タグ (任意)"
+            inputPlaceholder="新規タグ名 or 既存タグから選択 (例: 運動会)"
+          />
         )}
       </div>
 

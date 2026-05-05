@@ -30,6 +30,13 @@ export const moodLevelEnum = pgEnum('mood_level', [
   'very_negative',
 ]);
 
+// 投稿種別 (diary: 日々ノート / knowledge: ナレッジ共有 / tweet: つぶやき)
+export const journalEntryKindEnum = pgEnum('journal_entry_kind', [
+  'diary',
+  'knowledge',
+  'tweet',
+]);
+
 // Unit-05: タスク管理
 // 5 段階 (backlog / todo / in_progress / review / done) — UI 表示は
 // それぞれ「未着手 / 今週やる / 進行中 / 確認・調整中 / 完了」
@@ -215,6 +222,10 @@ export const journalEntries = pgTable(
     isPublic: boolean('is_public').notNull().default(true),
     // 新規投稿では必須 (API 側で要求)、既存データは NULL のまま (migration 0021)
     mood: moodLevelEnum('mood'),
+    // 投稿種別 (migration 0030)。既存データは default 'diary'。
+    // mood は kind='diary' のみ NOT NULL、emotion_tags は kind='tweet' のみ付与可
+    // (制約は API/Zod レベルで担保、DB CHECK は付けない)。
+    kind: journalEntryKindEnum('kind').notNull().default('diary'),
     // マスキング済み本文 (AI 入力用、新規投稿は API 側で生成、既存データは backfill で埋める)
     contentMasked: text('content_masked'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -296,7 +307,7 @@ export const journalEntryTags = pgTable(
 // ── public_journal_entries VIEW（SP-U02-04 Layer 4） ───────────
 // is_public=true エントリのみ露出、is_public 列は意図的に含めない
 // security_barrier で悪意あるサブクエリ経由の情報漏えいを防止
-// migration 0027 で mood 列を追加 (共有タイムラインでの絵文字表示用)
+// migration 0027 で mood 列を追加、0032 で kind 列を追加 (種別バッジ用)
 export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
   qb
     .select({
@@ -305,6 +316,7 @@ export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
       userId: journalEntries.userId,
       content: journalEntries.content,
       mood: journalEntries.mood,
+      kind: journalEntries.kind,
       createdAt: journalEntries.createdAt,
       updatedAt: journalEntries.updatedAt,
     })
@@ -503,6 +515,86 @@ export const taskTagAssignments = pgTable(
       table.tagId,
     ),
     tagIdx: index('task_tag_assignments_tag_idx').on(table.tagId),
+  }),
+);
+
+// ── knowledge_tags (migration 0031) ────────────────────────────
+// ナレッジ共有用タグ (kind='knowledge' の journal_entries に任意付与)。
+// 構造・運用は task_tags と同じ (テナント内全員 CRUD 可)。
+export const knowledgeTags = pgTable(
+  'knowledge_tags',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantNameUnique: unique('uq_knowledge_tags_tenant_name').on(
+      table.tenantId,
+      table.name,
+    ),
+    tenantIdx: index('knowledge_tags_tenant_idx').on(table.tenantId),
+  }),
+);
+
+// ── journal_entry_knowledge_tags (M:N 中間) ────────────────────
+export const journalEntryKnowledgeTags = pgTable(
+  'journal_entry_knowledge_tags',
+  {
+    journalEntryId: uuid('journal_entry_id')
+      .notNull()
+      .references(() => journalEntries.id, { onDelete: 'cascade' }),
+    knowledgeTagId: uuid('knowledge_tag_id')
+      .notNull()
+      .references(() => knowledgeTags.id, { onDelete: 'restrict' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.journalEntryId, table.knowledgeTagId] }),
+    tenantTagIdx: index('journal_entry_knowledge_tags_tenant_tag_idx').on(
+      table.tenantId,
+      table.knowledgeTagId,
+    ),
+    tagIdx: index('journal_entry_knowledge_tags_tag_idx').on(table.knowledgeTagId),
+  }),
+);
+
+// ── journal_knowledge_reactions (migration 0033) ───────────────
+// 投稿に対する「ナレッジリアクション」。1 ユーザー × 1 投稿 で 1 リアクション。
+// 自分の投稿への reaction は API 層で 403 (DB 制約なし)。
+export const journalKnowledgeReactions = pgTable(
+  'journal_knowledge_reactions',
+  {
+    journalEntryId: uuid('journal_entry_id')
+      .notNull()
+      .references(() => journalEntries.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.journalEntryId, table.userId] }),
+    entryIdx: index('journal_knowledge_reactions_entry_idx').on(
+      table.journalEntryId,
+    ),
+    tenantUserIdx: index('journal_knowledge_reactions_tenant_user_idx').on(
+      table.tenantId,
+      table.userId,
+    ),
   }),
 );
 

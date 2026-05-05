@@ -357,7 +357,8 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
 
   return (
     <div data-testid="task-board">
-      <div className="mb-4 flex items-center justify-between">
+      {/* chimo: フィルター下〜ボード 32px */}
+      <div className="mb-8 flex items-center justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <AssigneeFilter
             value={filterOwner}
@@ -366,7 +367,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             selfUserId={selfUserId}
           />
           {filterOwner === selfUserId && (
-            <label className="flex items-center gap-1 text-xs text-gray-600">
+            <label className="flex items-center gap-1 text-[13px] text-gray-600">
               <input
                 type="checkbox"
                 checked={showDelegated}
@@ -382,14 +383,14 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             tags={taskTags ?? []}
           />
         </div>
-        <Button
+        <button
           type="button"
           onClick={() => setModal({ kind: 'create' })}
-          className="text-xs"
+          className="inline-flex items-center rounded-md bg-vn-accent px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-vn-accent/40"
           data-testid="task-board-new-button"
         >
           + 新規タスク
-        </Button>
+        </button>
       </div>
 
       <TaskMatrix

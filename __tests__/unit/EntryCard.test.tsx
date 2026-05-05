@@ -108,7 +108,8 @@ describe('EntryCard', () => {
         })}
       />
     );
-    expect(screen.getByText('うれしい')).toBeTruthy();
-    expect(screen.getByText('気づき')).toBeTruthy();
+    // 新仕様: タグは "#name" 形式でレンダーされる
+    expect(screen.getByText('#うれしい')).toBeTruthy();
+    expect(screen.getByText('#気づき')).toBeTruthy();
   });
 });

@@ -113,28 +113,28 @@ export function SchoolWellnessChart({
             y={barAreaTop + barAreaH - barHFor(d.total)}
             width={20}
             height={Math.max(barHFor(d.total), d.total > 0 ? 2 : 0)}
-            fill="#d4d4d0"
+            fill="#a1a1aa"
           >
             <title>{`${formatDay(d.day)}: 投稿 ${d.total} 件`}</title>
           </rect>
         ))}
 
-        {/* ニュートラル線 (薄め・点線) */}
+        {/* ニュートラル線 (薄め・点線、chimo: 低彩度に統一) */}
         <path
           d={linePath('neutral')}
           fill="none"
-          stroke="#94a3b8"
+          stroke="#d4d4d8"
           strokeWidth={2}
           strokeDasharray="4 3"
-          opacity={0.7}
+          opacity={0.8}
         />
 
-        {/* ポジ線 */}
+        {/* ポジ線 (chimo: 薄ミント) */}
         <path
           d={linePath('positive')}
           fill="none"
-          stroke="#16a34a"
-          strokeWidth={2.5}
+          stroke="#86efac"
+          strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -143,8 +143,8 @@ export function SchoolWellnessChart({
             key={`p-${i}`}
             cx={xFor(i)}
             cy={yFor(d.positive)}
-            r={4}
-            fill="#16a34a"
+            r={3.5}
+            fill="#86efac"
             stroke="#fff"
             strokeWidth={1}
           >
@@ -152,12 +152,12 @@ export function SchoolWellnessChart({
           </circle>
         ))}
 
-        {/* ネガ線 */}
+        {/* ネガ線 (chimo: 薄赤) */}
         <path
           d={linePath('negative')}
           fill="none"
-          stroke="#dc2626"
-          strokeWidth={2.5}
+          stroke="#fca5a5"
+          strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -166,8 +166,8 @@ export function SchoolWellnessChart({
             key={`n-${i}`}
             cx={xFor(i)}
             cy={yFor(d.negative)}
-            r={4}
-            fill="#dc2626"
+            r={3.5}
+            fill="#fca5a5"
             stroke="#fff"
             strokeWidth={1}
           >
@@ -175,14 +175,14 @@ export function SchoolWellnessChart({
           </circle>
         ))}
 
-        {/* X 軸 日付ラベル */}
+        {/* X 軸 日付ラベル (chimo: 軸の存在感を消す、12px / #a1a1aa) */}
         {emotionTrend.map((d, i) => (
           <text
             key={`x-${i}`}
             x={xFor(i)}
             y={innerH + 14}
-            fontSize={11}
-            fill="#555"
+            fontSize={12}
+            fill="#a1a1aa"
             textAnchor="middle"
           >
             {formatDay(d.day)}
@@ -190,18 +190,18 @@ export function SchoolWellnessChart({
         ))}
       </g>
 
-      {/* 凡例 (下部) */}
-      <g transform={`translate(${margin.left}, ${height - 14})`} fontSize={11} fill="#333">
-        <circle cx={6} cy={0} r={4} fill="#16a34a" />
+      {/* 凡例 (下部、chimo: 12px / #555、グラフ色と完全一致) */}
+      <g transform={`translate(${margin.left}, ${height - 14})`} fontSize={12} fill="#555">
+        <circle cx={6} cy={0} r={4} fill="#86efac" />
         <text x={16} y={4}>ポジ</text>
 
-        <circle cx={72} cy={0} r={4} fill="#dc2626" />
+        <circle cx={72} cy={0} r={4} fill="#fca5a5" />
         <text x={82} y={4}>ネガ</text>
 
-        <line x1={140} y1={0} x2={160} y2={0} stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 3" opacity={0.7} />
+        <line x1={140} y1={0} x2={160} y2={0} stroke="#d4d4d8" strokeWidth={2} strokeDasharray="4 3" opacity={0.8} />
         <text x={164} y={4}>ニュートラル</text>
 
-        <rect x={250} y={-5} width={12} height={10} fill="#d4d4d0" />
+        <rect x={250} y={-5} width={12} height={10} fill="#a1a1aa" />
         <text x={266} y={4}>総投稿数</text>
       </g>
     </svg>

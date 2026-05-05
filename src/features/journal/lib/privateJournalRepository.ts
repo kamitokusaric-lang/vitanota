@@ -4,9 +4,16 @@
 //
 // SP-U02-03: 所有者検証は API 層の明示 WHERE 句 + RLS の WITH CHECK で二重防御
 // R1 対策: 全メソッドがトランザクションを第一引数で受け取り、withTenantUser 内で呼ばれる前提
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { journalEntries, journalEntryTags, emotionTags } from '@/db/schema';
+import {
+  journalEntries,
+  journalEntryTags,
+  emotionTags,
+  journalEntryKnowledgeTags,
+  knowledgeTags,
+  journalKnowledgeReactions,
+} from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { JournalEntry, EmotionTag } from '@/db/schema';
 
@@ -24,18 +31,24 @@ export type MoodLevel =
   | 'negative'
   | 'very_negative';
 
+export type JournalEntryKind = 'diary' | 'knowledge' | 'tweet';
+
 export interface CreateEntryParams {
+  // kind は次ステップで repository INSERT に組み込む。今は受け取るのみ (DB default 'diary')。
+  kind?: JournalEntryKind;
   content: string;
   tagIds: string[];
   isPublic: boolean;
-  mood: MoodLevel;
+  // mood は kind='diary' のみ必須 (Zod superRefine で担保)、それ以外で null/undefined
+  mood?: MoodLevel | null;
 }
 
 export interface UpdateEntryParams {
+  kind?: JournalEntryKind;
   content?: string;
   tagIds?: string[];
   isPublic?: boolean;
-  mood?: MoodLevel;
+  mood?: MoodLevel | null;
 }
 
 export interface PaginationOptions {
@@ -45,16 +58,67 @@ export interface PaginationOptions {
 
 export type EntryWithTags = JournalEntry & {
   tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
+  knowledgeTags: Array<{ id: string; name: string }>;
+  knowledgeReactionCount: number;
+  hasMyKnowledgeReaction: boolean;
 };
+
+// reaction の count + 自分の有無 を merge
+// public/private 両方で使うため export
+export async function attachReactions<T extends { id: string }>(
+  tx: DrizzleDb,
+  entries: T[],
+  ctx: Context,
+): Promise<Array<T & {
+  knowledgeReactionCount: number;
+  hasMyKnowledgeReaction: boolean;
+}>> {
+  if (entries.length === 0) return [];
+  const entryIds = entries.map((e) => e.id);
+
+  // entry 別の count
+  const countRows = await tx
+    .select({
+      entryId: journalKnowledgeReactions.journalEntryId,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(journalKnowledgeReactions)
+    .where(inArray(journalKnowledgeReactions.journalEntryId, entryIds))
+    .groupBy(journalKnowledgeReactions.journalEntryId);
+
+  const countMap = new Map<string, number>();
+  for (const row of countRows) countMap.set(row.entryId, row.count);
+
+  // 自分が ON にしてる entry
+  const myRows = await tx
+    .select({ entryId: journalKnowledgeReactions.journalEntryId })
+    .from(journalKnowledgeReactions)
+    .where(
+      and(
+        eq(journalKnowledgeReactions.userId, ctx.userId),
+        inArray(journalKnowledgeReactions.journalEntryId, entryIds),
+      ),
+    );
+  const mySet = new Set<string>(myRows.map((r) => r.entryId));
+
+  return entries.map((e) => ({
+    ...e,
+    knowledgeReactionCount: countMap.get(e.id) ?? 0,
+    hasMyKnowledgeReaction: mySet.has(e.id),
+  }));
+}
 
 async function attachTags(
   tx: DrizzleDb,
-  entries: JournalEntry[]
+  entries: JournalEntry[],
+  ctx: Context,
 ): Promise<EntryWithTags[]> {
   if (entries.length === 0) return [];
 
   const entryIds = entries.map((e) => e.id);
-  const rows = await tx
+
+  // emotion_tags (kind=tweet 用)
+  const emotionRows = await tx
     .select({
       entryId: journalEntryTags.entryId,
       tagId: emotionTags.id,
@@ -65,14 +129,44 @@ async function attachTags(
     .innerJoin(emotionTags, eq(emotionTags.id, journalEntryTags.tagId))
     .where(inArray(journalEntryTags.entryId, entryIds));
 
-  const tagMap = new Map<string, Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>>();
-  for (const row of rows) {
-    const list = tagMap.get(row.entryId) ?? [];
+  const emotionMap = new Map<
+    string,
+    Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>
+  >();
+  for (const row of emotionRows) {
+    const list = emotionMap.get(row.entryId) ?? [];
     list.push({ id: row.tagId, name: row.tagName, category: row.tagCategory });
-    tagMap.set(row.entryId, list);
+    emotionMap.set(row.entryId, list);
   }
 
-  return entries.map((e) => ({ ...e, tags: tagMap.get(e.id) ?? [] }));
+  // knowledge_tags (kind=knowledge 用)
+  const knowledgeRows = await tx
+    .select({
+      entryId: journalEntryKnowledgeTags.journalEntryId,
+      tagId: knowledgeTags.id,
+      tagName: knowledgeTags.name,
+    })
+    .from(journalEntryKnowledgeTags)
+    .innerJoin(
+      knowledgeTags,
+      eq(knowledgeTags.id, journalEntryKnowledgeTags.knowledgeTagId),
+    )
+    .where(inArray(journalEntryKnowledgeTags.journalEntryId, entryIds));
+
+  const knowledgeMap = new Map<string, Array<{ id: string; name: string }>>();
+  for (const row of knowledgeRows) {
+    const list = knowledgeMap.get(row.entryId) ?? [];
+    list.push({ id: row.tagId, name: row.tagName });
+    knowledgeMap.set(row.entryId, list);
+  }
+
+  const withTags = entries.map((e) => ({
+    ...e,
+    tags: emotionMap.get(e.id) ?? [],
+    knowledgeTags: knowledgeMap.get(e.id) ?? [],
+  }));
+
+  return attachReactions(tx, withTags, ctx);
 }
 
 export class PrivateJournalRepository {
@@ -94,17 +188,33 @@ export class PrivateJournalRepository {
         content: params.content,
         isPublic: params.isPublic,
         mood: params.mood,
+        kind: params.kind ?? 'diary',
       })
       .returning();
 
     if (params.tagIds.length > 0) {
-      await tx.insert(journalEntryTags).values(
-        params.tagIds.map((tagId) => ({
-          tenantId: ctx.tenantId,
-          entryId: entry.id,
-          tagId,
-        }))
-      );
+      // kind 別に振り分け:
+      //   tweet     → emotion_tags (既存 journal_entry_tags)
+      //   knowledge → knowledge_tags (journal_entry_knowledge_tags)
+      //   diary     → Zod superRefine でガード済 (この分岐に到達しない)
+      if (params.kind === 'knowledge') {
+        await tx.insert(journalEntryKnowledgeTags).values(
+          params.tagIds.map((tagId) => ({
+            tenantId: ctx.tenantId,
+            journalEntryId: entry.id,
+            knowledgeTagId: tagId,
+          })),
+        );
+      } else {
+        // kind=tweet または未指定 (default 'diary' だが Zod でタグ禁止)
+        await tx.insert(journalEntryTags).values(
+          params.tagIds.map((tagId) => ({
+            tenantId: ctx.tenantId,
+            entryId: entry.id,
+            tagId,
+          }))
+        );
+      }
     }
 
     return entry;
@@ -144,20 +254,40 @@ export class PrivateJournalRepository {
 
     if (!entry) return null;
 
-    // タグ更新: 既存を全 DELETE → 新規を一括 INSERT
+    // タグ更新: kind 別に既存を全 DELETE → 新規を一括 INSERT
+    //   knowledge → journal_entry_knowledge_tags
+    //   tweet     → journal_entry_tags (emotion_tags)
+    //   diary     → tagIds 空 (Zod でガード済) なので分岐不要
     if (params.tagIds !== undefined) {
-      await tx
-        .delete(journalEntryTags)
-        .where(eq(journalEntryTags.entryId, id));
+      if (params.kind === 'knowledge') {
+        await tx
+          .delete(journalEntryKnowledgeTags)
+          .where(eq(journalEntryKnowledgeTags.journalEntryId, id));
 
-      if (params.tagIds.length > 0) {
-        await tx.insert(journalEntryTags).values(
-          params.tagIds.map((tagId) => ({
-            tenantId: ctx.tenantId,
-            entryId: id,
-            tagId,
-          }))
-        );
+        if (params.tagIds.length > 0) {
+          await tx.insert(journalEntryKnowledgeTags).values(
+            params.tagIds.map((tagId) => ({
+              tenantId: ctx.tenantId,
+              journalEntryId: id,
+              knowledgeTagId: tagId,
+            })),
+          );
+        }
+      } else {
+        // tweet (or kind 未指定 = diary フォールバック)
+        await tx
+          .delete(journalEntryTags)
+          .where(eq(journalEntryTags.entryId, id));
+
+        if (params.tagIds.length > 0) {
+          await tx.insert(journalEntryTags).values(
+            params.tagIds.map((tagId) => ({
+              tenantId: ctx.tenantId,
+              entryId: id,
+              tagId,
+            }))
+          );
+        }
       }
     }
 
@@ -206,7 +336,7 @@ export class PrivateJournalRepository {
       .limit(1);
 
     if (!entry) return null;
-    const [withTags] = await attachTags(tx, [entry]);
+    const [withTags] = await attachTags(tx, [entry], ctx);
     return withTags;
   }
 
@@ -232,7 +362,7 @@ export class PrivateJournalRepository {
       .limit(opts.limit)
       .offset(opts.offset);
 
-    return attachTags(tx, rows);
+    return attachTags(tx, rows, ctx);
   }
 }
 

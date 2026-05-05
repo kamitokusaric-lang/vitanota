@@ -83,7 +83,7 @@ function WorkloadSparkline({ data }: { data: WorkloadDay[] }) {
           <path
             d={pathD}
             fill="none"
-            stroke="#d97706"
+            stroke="#9ca3af"
             strokeWidth={2.5}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -94,7 +94,7 @@ function WorkloadSparkline({ data }: { data: WorkloadDay[] }) {
               cx={xFor(i)}
               cy={yFor(d.openCount)}
               r={i === n - 1 ? 3.5 : 2.5}
-              fill="#d97706"
+              fill="#9ca3af"
               stroke="#fff"
               strokeWidth={1}
             >

@@ -4,7 +4,7 @@
 // context タグは task_categories に役割を移譲済み (0016)
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
-import { emotionTags, journalEntryTags } from '@/db/schema';
+import { emotionTags, journalEntryTags, knowledgeTags } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { EmotionTag } from '@/db/schema';
 
@@ -128,6 +128,25 @@ export class TagRepository {
         and(
           eq(emotionTags.tenantId, ctx.tenantId),
           inArray(emotionTags.id, tagIds)
+        )
+      );
+    return rows.map((r) => r.id);
+  }
+
+  // ナレッジタグの検証 (kind='knowledge' で使用)
+  async findValidKnowledgeTagIds(
+    tx: DrizzleDb,
+    tagIds: string[],
+    ctx: Context
+  ): Promise<string[]> {
+    if (tagIds.length === 0) return [];
+    const rows = await tx
+      .select({ id: knowledgeTags.id })
+      .from(knowledgeTags)
+      .where(
+        and(
+          eq(knowledgeTags.tenantId, ctx.tenantId),
+          inArray(knowledgeTags.id, tagIds)
         )
       );
     return rows.map((r) => r.id);

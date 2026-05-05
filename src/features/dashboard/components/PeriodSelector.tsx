@@ -28,8 +28,8 @@ export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
             className={[
               'rounded-full px-3 py-1 text-xs font-medium transition-colors',
               value === k
-                ? 'bg-blue-600 text-white'
-                : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50',
+                ? 'bg-gray-900 text-white'
+                : 'border border-vn-border bg-white text-gray-600 hover:bg-vn-muted-bg',
             ].join(' ')}
             data-testid={`period-selector-${k}`}
           >

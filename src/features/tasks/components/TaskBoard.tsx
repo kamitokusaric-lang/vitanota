@@ -12,7 +12,10 @@ import { useTasks, type TaskWithAssignees } from '../hooks/useTasks';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
 import { AssigneeFilter } from './AssigneeFilter';
+import { CategoryFilter } from './CategoryFilter';
 import { TagFilter } from './TagFilter';
+import { PeriodFilter, type PeriodValue } from './PeriodFilter';
+import { getCurrentWeek } from '../lib/periodCalc';
 import { TaskMatrix, type MatrixGroup } from './TaskMatrix';
 import {
   TaskBulkCreateForm,
@@ -38,21 +41,34 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   //   filterOwner === <他ユーザーID> → ownerUserId 指定 (その人が assignee のもののみ)
   //   filterOwner === undefined → 全員
   const [filterOwner, setFilterOwner] = useState<string | undefined>(selfUserId);
-  // タグフィルタ (担当者フィルタと同じく single-select)
-  const [filterTagId, setFilterTagId] = useState<string | undefined>(undefined);
+  // タグフィルタ (multi-select、空配列 = 全タグ、OR 条件)
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
+  // カテゴリフィルタ (multi-select、空配列 = 全カテゴリ、OR 条件)
+  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
   // 「自分」フィルタ時、自分が依頼した (createdBy=self, owner!=self) タスクを表示するか
   const [showDelegated, setShowDelegated] = useState(false);
+  // 期間フィルタ (default = 今週 + null + 期限切れ未完了 / range = 純粋 due_date 範囲)
+  const [period, setPeriod] = useState<PeriodValue>({ mode: 'default' });
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  // useTasks に渡す dateFilter: default mode はクライアントで「今週」を計算してサーバーに渡す
+  const dateFilter = useMemo(() => {
+    if (period.mode === 'default') {
+      const { weekStart, weekEnd } = getCurrentWeek();
+      return { mode: 'default' as const, weekStart, weekEnd };
+    }
+    return period;
+  }, [period]);
+
   const taskQueryOptions =
     filterOwner === selfUserId
-      ? ({ scope: 'mine' } as const)
+      ? ({ scope: 'mine', dateFilter } as const)
       : filterOwner
-        ? { ownerUserId: filterOwner }
-        : {};
+        ? { ownerUserId: filterOwner, dateFilter }
+        : { dateFilter };
   const {
     tasks: rawTasks,
     error: tasksError,
@@ -299,11 +315,15 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     return null;
   }
 
-  // フィルタ適用後のタスク
-  // - タグフィルタ: 該当タグを持つタスクのみ
+  // フィルタ適用後のタスク (タグ/カテゴリは OR 条件)
+  // - カテゴリフィルタ: 選択カテゴリのいずれかに属するタスクのみ
+  // - タグフィルタ: 選択タグのいずれかを持つタスクのみ
   // - 「自分」フィルタ時に showDelegated=false なら自分が依頼済 (createdBy=self, owner!=self) を除外
+  const categoryFilterSet = new Set(filterCategoryIds);
+  const tagFilterSet = new Set(filterTagIds);
   const filteredTasks = tasks.filter((t) => {
-    if (filterTagId && !t.tags.some((tg) => tg.id === filterTagId)) return false;
+    if (categoryFilterSet.size > 0 && !categoryFilterSet.has(t.categoryId)) return false;
+    if (tagFilterSet.size > 0 && !t.tags.some((tg) => tagFilterSet.has(tg.id))) return false;
     if (filterOwner === selfUserId && !showDelegated) {
       // delegated = 自分が依頼したが assignees に自分が含まれない (= お願いした側)
       const isMine = t.assignees.some((a) => a.userId === selfUserId);
@@ -312,76 +332,68 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     return true;
   });
 
-  // 縦軸 (横軸は status × 3 固定):
-  //   - タグ絞込中: カテゴリでグルーピングせず 1 行に集約 (label = タグ名)
-  //   - タグ絞込なし: タスクがあるカテゴリのみ並べる (0 件カテゴリは隠す)
-  const TAG_FILTERED_ROW_ID = '__tag_filtered__';
-  const rows: MatrixGroup[] = filterTagId
-    ? (() => {
-        const tag = (taskTags ?? []).find((t) => t.id === filterTagId);
-        return tag
-          ? [{ id: TAG_FILTERED_ROW_ID, label: `#${tag.name}` }]
-          : [];
-      })()
-    : (() => {
-        const usedIds = new Set(filteredTasks.map((t) => t.categoryId));
-        // 「自分の今週やる」タスク数を集計、降順で並べる (tie は元の sortOrder)
-        // 自分が assignees に含まれる && status='todo' のものをカウント
-        const todoCounts = new Map<string, number>();
-        for (const t of filteredTasks) {
-          if (t.status === 'todo' && t.assignees.some((a) => a.userId === selfUserId)) {
-            todoCounts.set(t.categoryId, (todoCounts.get(t.categoryId) ?? 0) + 1);
+  // 縦軸 (横軸は status × 3 固定): 常にカテゴリ軸で grouping
+  //   - カテゴリ絞込中: 選択カテゴリの行のみ表示 (sortOrder 順)
+  //   - カテゴリ絞込なし: タスクがあるカテゴリのみ並べる (0 件カテゴリは隠す)
+  // タグ filter は task の絞り込み条件としてのみ作用し、行構造には影響しない
+  const rows: MatrixGroup[] =
+    categoryFilterSet.size > 0
+      ? categories
+          .filter((c) => categoryFilterSet.has(c.id))
+          .map((c) => ({ id: c.id, label: c.name }))
+      : (() => {
+          const usedIds = new Set(filteredTasks.map((t) => t.categoryId));
+          // 「自分の今週やる」タスク数を集計、降順で並べる (tie は元の sortOrder)
+          // 自分が assignees に含まれる && status='todo' のものをカウント
+          const todoCounts = new Map<string, number>();
+          for (const t of filteredTasks) {
+            if (t.status === 'todo' && t.assignees.some((a) => a.userId === selfUserId)) {
+              todoCounts.set(t.categoryId, (todoCounts.get(t.categoryId) ?? 0) + 1);
+            }
           }
-        }
-        return categories
-          .filter((c) => usedIds.has(c.id))
-          .map((c) => ({
-            id: c.id,
-            label: c.name,
-            sortOrder: c.sortOrder,
-            todoCount: todoCounts.get(c.id) ?? 0,
-          }))
-          .sort((a, b) => {
-            const diff = b.todoCount - a.todoCount;
-            if (diff !== 0) return diff;
-            return a.sortOrder - b.sortOrder;
-          })
-          .map(({ id, label }) => ({ id, label }));
-      })();
+          return categories
+            .filter((c) => usedIds.has(c.id))
+            .map((c) => ({
+              id: c.id,
+              label: c.name,
+              sortOrder: c.sortOrder,
+              todoCount: todoCounts.get(c.id) ?? 0,
+            }))
+            .sort((a, b) => {
+              const diff = b.todoCount - a.todoCount;
+              if (diff !== 0) return diff;
+              return a.sortOrder - b.sortOrder;
+            })
+            .map(({ id, label }) => ({ id, label }));
+        })();
 
-  // タスク → 行 id 配列
-  const assignTaskToRows = (t: TaskWithAssignees): string[] => {
-    if (filterTagId) return [TAG_FILTERED_ROW_ID];
-    return [t.categoryId];
-  };
+  // タスク → 行 id 配列 (常にカテゴリ軸)
+  const assignTaskToRows = (t: TaskWithAssignees): string[] => [t.categoryId];
 
   return (
     <div data-testid="task-board">
-      {/* chimo: フィルター下〜ボード 32px */}
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+      {/* Linear 風 filter row: chip 4 つを左寄せ + 右端に新規ボタン */}
+      <div className="mb-8 flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <AssigneeFilter
             value={filterOwner}
             onChange={setFilterOwner}
             assignees={assignees ?? []}
             selfUserId={selfUserId}
+            showDelegated={showDelegated}
+            onShowDelegatedChange={setShowDelegated}
           />
-          {filterOwner === selfUserId && (
-            <label className="flex items-center gap-1 text-[13px] text-gray-600">
-              <input
-                type="checkbox"
-                checked={showDelegated}
-                onChange={(e) => setShowDelegated(e.target.checked)}
-                data-testid="task-board-show-delegated"
-              />
-              依頼中タスクも表示
-            </label>
-          )}
+          <CategoryFilter
+            value={filterCategoryIds}
+            onChange={setFilterCategoryIds}
+            categories={categories}
+          />
           <TagFilter
-            value={filterTagId}
-            onChange={setFilterTagId}
+            value={filterTagIds}
+            onChange={setFilterTagIds}
             tags={taskTags ?? []}
           />
+          <PeriodFilter value={period} onChange={setPeriod} />
         </div>
         <button
           type="button"

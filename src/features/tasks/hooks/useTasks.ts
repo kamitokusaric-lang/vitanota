@@ -28,11 +28,33 @@ const fetcher = async (url: string): Promise<TasksResponse> => {
   return res.json();
 };
 
-export function useTasks(filters?: { ownerUserId?: string; scope?: 'mine' }) {
+// 期間フィルタ:
+//   default: 今やるべきもの 3 点セット (今週 + null + 期限切れ未完了)
+//   range:   純粋に due_date が from〜to のもののみ
+export type TaskDateFilter =
+  | { mode: 'default'; weekStart: string; weekEnd: string }
+  | { mode: 'range'; from: string; to: string };
+
+export interface UseTasksFilters {
+  ownerUserId?: string;
+  scope?: 'mine';
+  dateFilter?: TaskDateFilter;
+}
+
+export function useTasks(filters?: UseTasksFilters) {
   const params = new URLSearchParams();
   if (filters?.scope) params.set('scope', filters.scope);
   if (filters?.ownerUserId && !filters.scope) {
     params.set('ownerUserId', filters.ownerUserId);
+  }
+  if (filters?.dateFilter?.mode === 'default') {
+    params.set('mode', 'default');
+    params.set('weekStart', filters.dateFilter.weekStart);
+    params.set('weekEnd', filters.dateFilter.weekEnd);
+  } else if (filters?.dateFilter?.mode === 'range') {
+    params.set('mode', 'range');
+    params.set('from', filters.dateFilter.from);
+    params.set('to', filters.dateFilter.to);
   }
   const qs = params.toString() ? `?${params.toString()}` : '';
   const { data, error, isLoading, mutate } = useSWR(

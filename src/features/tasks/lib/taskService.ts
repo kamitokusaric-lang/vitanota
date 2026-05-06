@@ -5,7 +5,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import { withTenantUser } from '@/shared/lib/db';
 import { pickDbRole, type AuthContext } from '@/features/journal/lib/apiHelpers';
-import { taskRepo, type TaskWithAssignees } from './taskRepository';
+import { taskRepo, type TaskDateFilter, type TaskWithAssignees } from './taskRepository';
 import { taskCategoryRepo } from './taskCategoryRepository';
 import {
   TaskNotFoundError,
@@ -69,7 +69,7 @@ async function validateAssigneesInTenant(
 export class TaskService {
   async listTasks(
     ctx: AuthContext,
-    filters?: { ownerUserId?: string; scope?: 'mine' },
+    filters?: { ownerUserId?: string; scope?: 'mine'; dateFilter?: TaskDateFilter },
   ): Promise<TaskWithAssignees[]> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return taskRepo.findAllByTenant(tx, ctx, filters);

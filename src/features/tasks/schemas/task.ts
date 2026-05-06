@@ -67,9 +67,29 @@ export type DuplicateTaskInput = z.infer<typeof duplicateTaskSchema>;
 
 // scope='mine': self が assignees に含まれる OR createdBy=self (タスクボードの「自分」フィルタ用)
 // ownerUserId=X (互換): X が assignees に含まれるタスク
+//
+// 期間フィルタ:
+//   mode 未指定 → 期間フィルタなし (全件、旧互換)
+//   mode='default' → 3 点セット: 今週 due_date + null + 期限切れ未完了 (weekStart/weekEnd 必須、月曜〜日曜)
+//   mode='range'   → 純粋に due_date が from〜to のもののみ (from/to 必須)
 export const listTasksQuerySchema = z
   .object({
     ownerUserId: z.string().uuid().optional(),
     scope: z.enum(['mine']).optional(),
+    mode: z.enum(['default', 'range']).optional(),
+    weekStart: dueDateString.optional(),
+    weekEnd: dueDateString.optional(),
+    from: dueDateString.optional(),
+    to: dueDateString.optional(),
   })
+  .refine(
+    (q) => q.mode !== 'default' || (!!q.weekStart && !!q.weekEnd),
+    { message: 'mode=default は weekStart と weekEnd が必須です' },
+  )
+  .refine(
+    (q) => q.mode !== 'range' || (!!q.from && !!q.to),
+    { message: 'mode=range は from と to が必須です' },
+  )
   .openapi('ListTasksQuery');
+
+export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

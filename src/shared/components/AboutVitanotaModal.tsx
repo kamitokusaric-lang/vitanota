@@ -7,6 +7,7 @@ const SLIDES = [
   '/concept/page-2.png',
   '/concept/page-3.png',
   '/concept/page-4.png',
+  '/concept/page-5.png',
 ];
 
 interface AboutVitanotaModalProps {

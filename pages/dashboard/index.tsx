@@ -58,7 +58,7 @@ export default function DashboardPage({ session }: DashboardPageProps) {
 
   const modalTitleByKind: Record<JournalEntryKind, string> = {
     diary: '今の気分を選んでください',
-    knowledge: 'ナレッジ共有',
+    knowledge: 'ナレッジノート',
     tweet: '軽いつぶやき',
   };
 

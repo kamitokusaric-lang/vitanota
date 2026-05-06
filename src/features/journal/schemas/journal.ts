@@ -15,7 +15,7 @@ export type MoodLevel = z.infer<typeof moodLevelSchema>;
 
 // 投稿種別 (migration 0030)
 //   diary     : 日々ノート (mood 必須 + content 1000字、タグ不可)
-//   knowledge : ナレッジ共有 (content 1000字 + knowledge_tags 任意)
+//   knowledge : ナレッジノート (content 1000字 + knowledge_tags 任意)
 //   tweet     : つぶやき (content 200字 + emotion_tags 任意)
 export const journalEntryKindSchema = z
   .enum(['diary', 'knowledge', 'tweet'])

@@ -30,7 +30,7 @@ export const moodLevelEnum = pgEnum('mood_level', [
   'very_negative',
 ]);
 
-// 投稿種別 (diary: 日々ノート / knowledge: ナレッジ共有 / tweet: つぶやき)
+// 投稿種別 (diary: 日々ノート / knowledge: ナレッジノート / tweet: つぶやき)
 export const journalEntryKindEnum = pgEnum('journal_entry_kind', [
   'diary',
   'knowledge',
@@ -519,7 +519,7 @@ export const taskTagAssignments = pgTable(
 );
 
 // ── knowledge_tags (migration 0031) ────────────────────────────
-// ナレッジ共有用タグ (kind='knowledge' の journal_entries に任意付与)。
+// ナレッジノート用タグ (kind='knowledge' の journal_entries に任意付与)。
 // 構造・運用は task_tags と同じ (テナント内全員 CRUD 可)。
 export const knowledgeTags = pgTable(
   'knowledge_tags',

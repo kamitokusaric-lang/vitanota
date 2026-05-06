@@ -1,4 +1,4 @@
-// 投稿入口: 3 種別アイコン (今日の日誌 / ナレッジ共有 / 軽いつぶやき)。
+// 投稿入口: 3 種別アイコン (今日の日誌 / ナレッジノート / 軽いつぶやき)。
 // 設計指針 (2026-05-04 chimo): "UI を作る" でなく "反応を置く"。塗り潰し
 // しない / サイズ変えない、静かに存在する形に倒す。
 // アイコンクリックで onPick (呼び出し側でそれぞれの Modal を開く想定)。
@@ -15,7 +15,7 @@ interface KindOption {
 
 const KIND_OPTIONS: KindOption[] = [
   { value: 'diary', label: '今日の日誌', Icon: Pencil },
-  { value: 'knowledge', label: 'ナレッジ共有', Icon: Lightbulb },
+  { value: 'knowledge', label: 'ナレッジノート', Icon: Lightbulb },
   { value: 'tweet', label: '軽いつぶやき', Icon: MessageCircle },
 ];
 

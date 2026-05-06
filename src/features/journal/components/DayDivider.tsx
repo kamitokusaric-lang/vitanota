@@ -1,5 +1,6 @@
-// 日付グループの divider (Linear 風の "時間の流れ" を表現)
+// 日付グループの divider (Linear Updates 風の "時間の流れ" を表現)
 // 設計方針 (2026-05-04 chimo): 上 24px / 下 8px の余白、12px グレー
+// scroll で sticky 固定 (Linear 流): 親が overflow 制限していなければ body 基準で動作
 import { memo } from 'react';
 
 interface DayDividerProps {
@@ -54,7 +55,7 @@ function dayLabelOf(value: string | Date): string {
 export const DayDivider = memo(function DayDivider({ date }: DayDividerProps) {
   return (
     <div
-      className="px-3 pt-6 pb-2 text-sm font-semibold text-gray-500"
+      className="sticky top-16 z-10 -mx-3 bg-vn-surface/95 px-3 pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 backdrop-blur supports-[backdrop-filter]:bg-vn-surface/80"
       data-testid="day-divider"
     >
       {dayLabelOf(date)}

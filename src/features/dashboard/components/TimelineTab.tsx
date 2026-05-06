@@ -120,7 +120,7 @@ export function TimelineTab({ session }: TimelineTabProps) {
         </SubTab>
       </div>
 
-      {/* kind 絞り込み chip (3 種別を multi-select でトグル) */}
+      {/* kind 絞り込み chip (3 種別を multi-select でトグル、Linear 風 styling) */}
       <div
         className="flex items-center gap-2 px-3"
         role="group"
@@ -137,13 +137,14 @@ export function TimelineTab({ session }: TimelineTabProps) {
               type="button"
               onClick={() => toggleKindFilter(k)}
               aria-pressed={active}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
                 active
-                  ? 'bg-vn-accent/10 text-vn-accent'
-                  : 'bg-vn-muted-bg text-gray-400 hover:text-gray-600'
+                  ? 'border-vn-accent/40 bg-vn-accent/10 text-vn-accent'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
               data-testid={`timeline-kind-filter-${k}`}
             >
+              {active && <span className="text-[10px] leading-none">✓</span>}
               <Icon size={11} strokeWidth={1.75} aria-hidden />
               {label}
             </button>

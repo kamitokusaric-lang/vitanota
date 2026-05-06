@@ -4,8 +4,8 @@
 //   - タスクボード: デフォルト「自分」フィルタ、期限早い順、今日期限赤マーク
 //   - 日々ノート: 投稿フォーム sticky + 子タブ「みんなの投稿 / わたしの投稿」
 //   - 学校全体の温度 (school_admin のみ)
-// 全タブ共通: ヘッダー直下に MoodPromptBar (どんな1日? + 5 mood アイコン)。
-// アイコンクリックで Modal が開き、EntryForm に mood pre-set 状態で投稿できる
+// 全タブ共通: ヘッダー直下に PhilosophyGreeting (哲学格言 + 投稿入口の 3 種別アイコン)。
+// アイコンクリックで Modal が開き、EntryForm に kind pre-set 状態で投稿できる
 import { useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
@@ -15,10 +15,10 @@ import { Layout } from '@/shared/components/Layout';
 import { Modal } from '@/shared/components/Modal';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TimelineTab } from '@/features/dashboard/components/TimelineTab';
+import { PhilosophyGreeting } from '@/features/dashboard/components/PhilosophyGreeting';
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
-import { MoodPromptBar } from '@/features/journal/components/MoodPromptBar';
 import {
   getMoodIcon,
   getMoodLabel,
@@ -47,7 +47,7 @@ export default function DashboardPage({ session }: DashboardPageProps) {
   const isAdmin = canUseAdminFeatures(session.user.roles);
   const { mutate: globalMutate } = useSWRConfig();
 
-  // MoodPromptBar 経由の投稿モーダル状態 (kind 別に Modal を切替)
+  // 投稿入口 (PhilosophyGreeting 内の 3 アイコン) 経由のモーダル状態 (kind 別に Modal を切替)
   const [entryModal, setEntryModal] = useState<
     { open: false } | { open: true; kind: JournalEntryKind }
   >({ open: false });
@@ -109,9 +109,9 @@ export default function DashboardPage({ session }: DashboardPageProps) {
       <RoleGuard session={session} requiredRole="teacher">
         <Layout session={session}>
           <div className="pb-6" data-testid="dashboard-page">
-            {/* mood 投稿入口は in-flow で左寄せ、Tabs の上に置く
-                (chimo: "見せる" でなく "使う" UI、会話 → 行動を縦に流す) */}
-            <MoodPromptBar onPick={handleKindPick} />
+            {/* 哲学格言セクション (静かに読む UI、明朝 + 上下余白 + フェードイン)
+                3 アイコンの投稿入口もこのセクションに内包 (格言 → author → アイコン) */}
+            <PhilosophyGreeting onPick={handleKindPick} />
             <Tabs tabs={mainTabs} defaultTabId="tasks" queryParam="tab" />
           </div>
 

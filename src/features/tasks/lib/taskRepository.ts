@@ -53,11 +53,19 @@ export type TaskWithAssignees = Task & {
   tags: TaskTagSummary[];
 };
 
+// 期間フィルタ:
+//   default: 「今やるべきもの」3 点セット (今週 due_date + null + 期限切れ未完了)
+//   range:   純粋に due_date が from〜to のもののみ (null は除外)
+//   未指定:  期間フィルタなし (全件)
+export type TaskDateFilter =
+  | { mode: 'default'; weekStart: string; weekEnd: string }
+  | { mode: 'range'; from: string; to: string };
+
 export class TaskRepository {
   async findAllByTenant(
     tx: DrizzleDb,
     ctx: TaskContext,
-    filters?: { ownerUserId?: string; scope?: 'mine' },
+    filters?: { ownerUserId?: string; scope?: 'mine'; dateFilter?: TaskDateFilter },
   ): Promise<TaskWithAssignees[]> {
     const conditions = [eq(tasks.tenantId, ctx.tenantId)];
     if (filters?.scope === 'mine') {
@@ -88,6 +96,19 @@ export class TaskRepository {
           ),
         );
       conditions.push(inArray(tasks.id, filterAssignedTaskIds));
+    }
+
+    // 期間フィルタ (due_date への絞込)
+    // due_date は PostgreSQL DATE 型。column の TS 型は Date なので、string と比較するため
+    // sql template で ::date キャストを明示する (timezone shift 事故予防)
+    if (filters?.dateFilter?.mode === 'default') {
+      const { weekStart, weekEnd } = filters.dateFilter;
+      const inThisWeek = sql`${tasks.dueDate} >= ${weekStart}::date AND ${tasks.dueDate} <= ${weekEnd}::date`;
+      const overdueUnfinished = sql`${tasks.dueDate} < ${weekStart}::date AND ${tasks.status} <> 'done'`;
+      conditions.push(sql`(${inThisWeek} OR ${tasks.dueDate} IS NULL OR ${overdueUnfinished})`);
+    } else if (filters?.dateFilter?.mode === 'range') {
+      const { from, to } = filters.dateFilter;
+      conditions.push(sql`${tasks.dueDate} >= ${from}::date AND ${tasks.dueDate} <= ${to}::date`);
     }
 
     const rows = await tx

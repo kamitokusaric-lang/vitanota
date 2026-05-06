@@ -25,7 +25,19 @@ export default async function handler(
         message: parsed.error.errors[0]?.message ?? '不正なクエリ',
       });
     }
-    const tasks = await taskService.listTasks(ctx, parsed.data);
+    // schema → service 用 filters 形式に整形 (dateFilter を mode 別の判別共用体にまとめる)
+    const q = parsed.data;
+    const dateFilter =
+      q.mode === 'default' && q.weekStart && q.weekEnd
+        ? ({ mode: 'default', weekStart: q.weekStart, weekEnd: q.weekEnd } as const)
+        : q.mode === 'range' && q.from && q.to
+          ? ({ mode: 'range', from: q.from, to: q.to } as const)
+          : undefined;
+    const tasks = await taskService.listTasks(ctx, {
+      ownerUserId: q.ownerUserId,
+      scope: q.scope,
+      dateFilter,
+    });
     return res.status(200).json({ tasks });
   }
 

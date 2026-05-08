@@ -15,7 +15,7 @@ import { AssigneeFilter } from './AssigneeFilter';
 import { CategoryFilter } from './CategoryFilter';
 import { TagFilter } from './TagFilter';
 import { PeriodFilter, type PeriodValue } from './PeriodFilter';
-import { getCurrentWeek } from '../lib/periodCalc';
+import { getToday } from '../lib/periodCalc';
 import { TaskMatrix, type MatrixGroup } from './TaskMatrix';
 import {
   TaskBulkCreateForm,
@@ -54,11 +54,15 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  // useTasks に渡す dateFilter: default mode はクライアントで「今週」を計算してサーバーに渡す
+  // useTasks に渡す dateFilter: default mode は「今日以降 + 期限なし + 期限切れ未完了」
+  // 内部的には range の上限を遠未来に倒すことで API 側 default ロジックを流用している
   const dateFilter = useMemo(() => {
     if (period.mode === 'default') {
-      const { weekStart, weekEnd } = getCurrentWeek();
-      return { mode: 'default' as const, weekStart, weekEnd };
+      return {
+        mode: 'default' as const,
+        weekStart: getToday(),
+        weekEnd: '2099-12-31',
+      };
     }
     return period;
   }, [period]);

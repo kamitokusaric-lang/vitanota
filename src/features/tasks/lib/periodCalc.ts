@@ -24,6 +24,11 @@ export function getCurrentWeek(now: Date = new Date()): { weekStart: string; wee
   return weekRangeMondaySunday(now);
 }
 
+// 「今日以降」フィルタ用の today (ローカル日付の YYYY-MM-DD)
+export function getToday(now: Date = new Date()): string {
+  return toYmd(now);
+}
+
 export function getLastWeek(now: Date = new Date()): { from: string; to: string } {
   const lastWeekBase = new Date(now);
   lastWeekBase.setDate(now.getDate() - 7);

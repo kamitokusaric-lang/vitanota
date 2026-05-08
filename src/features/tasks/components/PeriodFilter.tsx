@@ -1,7 +1,7 @@
 // タスクボードの期間フィルタ (chip + popover 形式)
 // trigger は現在のフィルタを表す chip。クリックで popover が開き、preset とカスタム範囲を選べる
-// 「今週」プリセットは無し (= 初期表示モードが今週相当の役割を担当)
-// 「初期表示に戻す」で default mode (今週 + null + 期限切れ未完了) に戻る
+// default mode = 「今日以降 + 期限なし + 期限切れ未完了」(初期表示)
+// 「今週」「先週」「来週」「今月」「先月」は range mode の preset として並ぶ
 import {
   useEffect,
   useLayoutEffect,
@@ -12,6 +12,7 @@ import {
 } from 'react';
 import {
   getCurrentMonth,
+  getCurrentWeek,
   getLastMonth,
   getLastWeek,
   getNextWeek,
@@ -21,7 +22,12 @@ export type PeriodValue =
   | { mode: 'default' }
   | { mode: 'range'; from: string; to: string };
 
-type Preset = 'last_week' | 'next_week' | 'current_month' | 'last_month';
+type Preset =
+  | 'current_week'
+  | 'last_week'
+  | 'next_week'
+  | 'current_month'
+  | 'last_month';
 
 interface PeriodFilterProps {
   value: PeriodValue;
@@ -43,7 +49,9 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
 
   const presets = useMemo(() => {
     const now = new Date();
+    const cw = getCurrentWeek(now);
     return {
+      current_week: { from: cw.weekStart, to: cw.weekEnd },
       last_week: getLastWeek(now),
       next_week: getNextWeek(now),
       current_month: getCurrentMonth(now),
@@ -54,6 +62,7 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
   const matchedPreset: Preset | null = (() => {
     if (value.mode !== 'range') return null;
     const { from, to } = value;
+    if (presets.current_week.from === from && presets.current_week.to === to) return 'current_week';
     if (presets.last_week.from === from && presets.last_week.to === to) return 'last_week';
     if (presets.next_week.from === from && presets.next_week.to === to) return 'next_week';
     if (presets.current_month.from === from && presets.current_month.to === to) return 'current_month';
@@ -63,7 +72,8 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
 
   // chip ラベル
   const chipLabel = (() => {
-    if (value.mode === 'default') return '今週';
+    if (value.mode === 'default') return '今日以降';
+    if (matchedPreset === 'current_week') return '今週';
     if (matchedPreset === 'last_week') return '先週';
     if (matchedPreset === 'next_week') return '来週';
     if (matchedPreset === 'current_month') return '今月';
@@ -121,7 +131,8 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
   const customTo = value.mode === 'range' ? value.to : new Date().toISOString().slice(0, 10);
 
   const presetItems: Array<{ key: 'default' | Preset; label: string; isActive: boolean }> = [
-    { key: 'default', label: '今週 (初期表示)', isActive: value.mode === 'default' },
+    { key: 'default', label: '今日以降 (初期表示)', isActive: value.mode === 'default' },
+    { key: 'current_week', label: '今週', isActive: matchedPreset === 'current_week' },
     { key: 'last_week', label: '先週', isActive: matchedPreset === 'last_week' },
     { key: 'next_week', label: '来週', isActive: matchedPreset === 'next_week' },
     { key: 'current_month', label: '今月', isActive: matchedPreset === 'current_month' },

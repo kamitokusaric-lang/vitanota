@@ -1,6 +1,6 @@
-// 「開発者から」セクションのお知らせデータ (静的)
-// 新しいお知らせを出すときは、配列に entry を追加するだけで dashboard 上部に反映される
-// (公開日が最新のものを 1 件だけ表示する)
+// 「開発者から」widget のお知らせデータ (静的)
+// 新しいお知らせを出すときは、配列に entry を追加するだけで widget に反映される。
+// 履歴も上下ナビで遡れるので、過去 entry は削除せずに残す。
 
 export interface Announcement {
   id: string;
@@ -10,6 +10,13 @@ export interface Announcement {
 }
 
 export const announcements: Announcement[] = [
+  {
+    id: '2026-05-09-self-task-redline',
+    date: '2026-05-09',
+    title:
+      'タスクを全員分表示した時、自分のタスクカードの左横に赤線がつくように変更しました。',
+    body: [],
+  },
   {
     id: '2026-05-08-assignee-scroll',
     date: '2026-05-08',
@@ -21,7 +28,7 @@ export const announcements: Announcement[] = [
   },
 ];
 
-export function getLatestAnnouncement(): Announcement | null {
-  if (announcements.length === 0) return null;
-  return [...announcements].sort((a, b) => b.date.localeCompare(a.date))[0];
+// 新しい順 (date 降順) に整列して返す。先頭が最新。
+export function getAnnouncementsSorted(): Announcement[] {
+  return [...announcements].sort((a, b) => b.date.localeCompare(a.date));
 }

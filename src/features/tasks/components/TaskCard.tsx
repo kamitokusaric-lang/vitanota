@@ -7,7 +7,7 @@ interface TaskCardProps {
   task: TaskWithAssignees;
   onEdit: (task: TaskWithAssignees) => void;
   delegated?: boolean;
-  // 「全員」フィルタ時に自分のタスクを薄い黄色で識別するためのフラグ
+  // 「全員」フィルタ時に自分のタスクを薄い黄色 + 左の赤ラインで識別するためのフラグ
   mineHighlight?: boolean;
   onDragStart?: (taskId: string) => void;
   onDragEnd?: () => void;
@@ -67,6 +67,8 @@ export function TaskCard({
     task.status === 'done' ? 'opacity-60' : '',
     // delegated (= 自分が振ったが assignees に自分が含まれない) は左側に amber のアクセント
     delegated ? 'border-l-4 border-l-amber-400' : '',
+    // 「全員」フィルタ時に自分のタスクは左側に赤のアクセント
+    mineHighlight ? 'border-l-4 border-l-vn-red' : '',
     draggable ? 'cursor-grab active:cursor-grabbing' : '',
   ]
     .filter(Boolean)

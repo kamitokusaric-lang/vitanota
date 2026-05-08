@@ -5,6 +5,7 @@ import type { VitanotaSession } from '@/shared/types/auth';
 import { MyProfileModal } from '@/features/profile/components/MyProfileModal';
 import { AboutVitanotaModal } from '@/shared/components/AboutVitanotaModal';
 import { FeedbackFAB } from '@/features/feedback/components/FeedbackFAB';
+import { DeveloperNoticeWidget } from '@/features/dashboard/components/DeveloperNoticeWidget';
 import { canUseTeacherFeatures, canUseSystemAdminFeatures } from '@/features/auth/lib/role-helpers';
 
 interface LayoutProps {
@@ -81,6 +82,7 @@ export function Layout({ children, session }: LayoutProps) {
       <AboutVitanotaModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {showFeedbackFab && <FeedbackFAB />}
+      <DeveloperNoticeWidget />
     </div>
   );
 }

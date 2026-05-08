@@ -416,7 +416,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
         selfUserId={selfUserId}
         onEdit={(task) => setModal({ kind: 'edit', task })}
         onTaskDropStatus={handleDropStatus}
-        // 「全員」フィルタ時のみ自分のタスクを薄い黄色でハイライト
+        // 「全員」フィルタ時のみ自分のタスクを薄い黄色 + カード左の赤ラインでハイライト
         highlightMineTasks={filterOwner === undefined}
       />
 

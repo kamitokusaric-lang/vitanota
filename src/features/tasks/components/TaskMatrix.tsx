@@ -30,7 +30,7 @@ interface TaskMatrixProps {
   selfUserId: string;
   onEdit: (task: TaskWithAssignees) => void;
   onTaskDropStatus?: (taskId: string, newStatus: StatusId) => void;
-  // true のとき、自分が assignee のタスクを薄い黄色で識別 (「全員」フィルタ時に有効化)
+  // true のとき、自分が assignee のタスクを薄い黄色 + カード左の赤ラインで識別 (「全員」フィルタ時に有効化)
   highlightMineTasks?: boolean;
 }
 

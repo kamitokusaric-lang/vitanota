@@ -16,6 +16,7 @@ import { Modal } from '@/shared/components/Modal';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TimelineTab } from '@/features/dashboard/components/TimelineTab';
 import { PhilosophyGreeting } from '@/features/dashboard/components/PhilosophyGreeting';
+import { DeveloperNotice } from '@/features/dashboard/components/DeveloperNotice';
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
@@ -109,6 +110,8 @@ export default function DashboardPage({ session }: DashboardPageProps) {
       <RoleGuard session={session} requiredRole="teacher">
         <Layout session={session}>
           <div className="pb-6" data-testid="dashboard-page">
+            {/* 開発者からの最新お知らせ (announcements.ts の最新 1 件) */}
+            <DeveloperNotice />
             {/* 哲学格言セクション (静かに読む UI、明朝 + 上下余白 + フェードイン)
                 3 アイコンの投稿入口もこのセクションに内包 (格言 → author → アイコン) */}
             <PhilosophyGreeting onPick={handleKindPick} />

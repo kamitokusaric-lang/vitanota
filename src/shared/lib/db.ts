@@ -10,6 +10,42 @@ import * as schema from '@/db/schema';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
+// pg.Pool の subclass。pool.connect() の失敗経路では pool.on('connect') が発火しないため
+// 失敗時に IAM token のメタ情報を構造化ログに残せない。それを救済するための薄いラッパ。
+// drizzle は this.client.connect() を直接叩く実装 (drizzle-orm/node-postgres/session.cjs)
+// なので、subclass の connect() を override すれば transaction 経路も透過的に拾える。
+//
+// Phase 4 (D-passive: client max age 強制) を将来的に追加する場合、同 subclass の
+// connect() に age 判定 + 再取得ループを足すことで段階的に拡張できる。
+export class ObservablePool extends Pool {
+  override async connect(): Promise<PoolClient> {
+    const meta = getCurrentTokenMeta();
+    const startedAt = Date.now();
+    try {
+      return await super.connect();
+    } catch (err) {
+      const tokenAge = meta ? Date.now() - meta.createdAt : null;
+      const errCode = (err as { code?: string }).code;
+      const errMessage = err instanceof Error ? err.message : String(err);
+      logger.error(
+        {
+          event: 'db.client.connect.failed',
+          token_generation_id: meta?.generationId,
+          token_age_at_connect_ms: tokenAge,
+          connect_duration_ms: Date.now() - startedAt,
+          err_code: errCode,
+          err_message: errMessage,
+          pool_total: this.totalCount,
+          pool_idle: this.idleCount,
+          pool_waiting: this.waitingCount,
+        },
+        'pool.connect() failed',
+      );
+      throw err;
+    }
+  }
+}
+
 let pool: Pool | null = null;
 
 function getPool(): Pool {
@@ -23,7 +59,7 @@ function getPool(): Pool {
     ? process.env.DB_PASSWORD
     : () => getDbAuthToken();
 
-  pool = new Pool({
+  pool = new ObservablePool({
     host: process.env.RDS_PROXY_ENDPOINT,
     port: 5432,
     user: process.env.DB_USER,

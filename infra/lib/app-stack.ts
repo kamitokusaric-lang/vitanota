@@ -344,19 +344,28 @@ export class AppStack extends cdk.Stack {
       }),
     });
 
-    // db.client.connect 構造化ログから token_age / pool_client_id を確認するクエリ。
-    // Phase 1 (A: 観測強化) で出力したフィールドを集計し H5 仮説の確認に使う。
+    // db.client.connect / db.client.connect.failed 構造化ログから token_age を集計し
+    // H5 (stale retention: 8〜15min 台が多数) と H4 (credential rotation: ms 台が多数) を
+    // 分けるための本命クエリ。Phase 1 (成功時) + Phase 1.5 (失敗時) の双方を拾う。
     new logs.QueryDefinition(this, 'DbClientConnectAgeQuery', {
       queryDefinitionName: `${prefix}/db-client-connect-age`,
       logGroups: [appRunnerLogGroup],
       queryString: new logs.QueryString({
         fields: [
           '@timestamp',
+          'event',
           'pool_client_id',
           'token_generation_id',
           'token_age_at_connect_ms',
+          'connect_duration_ms',
+          'err_code',
+          'pool_total',
+          'pool_idle',
+          'pool_waiting',
         ],
-        filterStatements: ['event = "db.client.connect"'],
+        filterStatements: [
+          'event = "db.client.connect" or event = "db.client.connect.failed"',
+        ],
         sort: '@timestamp desc',
         limit: 500,
       }),

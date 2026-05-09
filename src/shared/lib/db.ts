@@ -10,6 +10,69 @@ import * as schema from '@/db/schema';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
+// pg-pool は public API として callback 形式 (`pool.connect(cb)`) を持ち、
+// さらに pg-pool 内部 (index.js 449 付近、pool.query() のショートカット実装) で
+// `this.connect((err, client) => ...)` と self-call する経路を持つ。
+// Promise 専用の override にすると internal callback が永久に呼ばれず、
+// その経路を踏んだリクエストが forever pending → CloudFront 30s で 504 になる。
+// (5/9 14:14 deploy 直後の本番 504 で確認済み・即 revert 済み)
+//
+// よって両形式を正しく forward するシグネチャで定義し直す。
+// drizzle.transaction 経路は promise 形式しか叩かないが、内部経路の保険を取る。
+type PgConnectCallback = (
+  err: Error | undefined,
+  client: PoolClient | undefined,
+  done: (release?: unknown) => void,
+) => void;
+
+export class ObservablePool extends Pool {
+  override connect(): Promise<PoolClient>;
+  override connect(cb: PgConnectCallback): void;
+  override connect(cb?: PgConnectCallback): Promise<PoolClient> | void {
+    const meta = getCurrentTokenMeta();
+    const startedAt = Date.now();
+
+    const logFailure = (err: unknown) => {
+      const tokenAge = meta ? Date.now() - meta.createdAt : null;
+      const errCode = (err as { code?: string }).code;
+      const errMessage = err instanceof Error ? err.message : String(err);
+      logger.error(
+        {
+          event: 'db.client.connect.failed',
+          token_generation_id: meta?.generationId,
+          token_age_at_connect_ms: tokenAge,
+          connect_duration_ms: Date.now() - startedAt,
+          err_code: errCode,
+          err_message: errMessage,
+          pool_total: this.totalCount,
+          pool_idle: this.idleCount,
+          pool_waiting: this.waitingCount,
+        },
+        'pool.connect() failed',
+      );
+    };
+
+    if (cb) {
+      // callback 形式: super.connect も callback で呼び、cb をそのまま forward する。
+      // ここを忘れると pg-pool 内部 self-call が握り潰されて pending リクエストが残る。
+      super.connect((err, client, done) => {
+        if (err) logFailure(err);
+        cb(err, client, done);
+      });
+      return;
+    }
+
+    return (async () => {
+      try {
+        return await super.connect();
+      } catch (err) {
+        logFailure(err);
+        throw err;
+      }
+    })();
+  }
+}
+
 let pool: Pool | null = null;
 
 function getPool(): Pool {
@@ -23,7 +86,7 @@ function getPool(): Pool {
     ? process.env.DB_PASSWORD
     : () => getDbAuthToken();
 
-  pool = new Pool({
+  pool = new ObservablePool({
     host: process.env.RDS_PROXY_ENDPOINT,
     port: 5432,
     user: process.env.DB_USER,

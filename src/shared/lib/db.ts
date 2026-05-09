@@ -1,9 +1,10 @@
 // PP-01: Drizzle シングルトン + withTenant パターン
 // App Runner はコンテナを再利用するため接続プールが維持される
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { sql } from 'drizzle-orm';
-import { getDbAuthToken } from './db-auth';
+import { randomUUID } from 'node:crypto';
+import { getDbAuthToken, getCurrentTokenMeta } from './db-auth';
 import { logger } from './logger';
 import * as schema from '@/db/schema';
 
@@ -38,6 +39,36 @@ function getPool(): Pool {
 
   pool.on('error', (err) => {
     logger.error({ event: 'db.pool.error', err }, 'Unexpected DB pool error');
+  });
+
+  // 観測 A: client の生成と認証に使った IAM token のメタデータを attach する。
+  // PAM auth failed 調査で「stale な token を保持した client が pool 内に残るか」を
+  // 識別するため、後段（Phase 4 D-passive）の age 判定にも使う。
+  pool.on('connect', (client) => {
+    const now = Date.now();
+    const meta = getCurrentTokenMeta();
+    const augmented = client as PoolClient & {
+      __clientId?: string;
+      __createdAt?: number;
+      __tokenGenerationId?: string;
+      __tokenCreatedAt?: number;
+    };
+    augmented.__clientId = randomUUID();
+    augmented.__createdAt = now;
+    if (meta) {
+      augmented.__tokenGenerationId = meta.generationId;
+      augmented.__tokenCreatedAt = meta.createdAt;
+    }
+
+    logger.info(
+      {
+        event: 'db.client.connect',
+        pool_client_id: augmented.__clientId,
+        token_generation_id: meta?.generationId,
+        token_age_at_connect_ms: meta ? now - meta.createdAt : null,
+      },
+      'New DB pool client connected',
+    );
   });
 
   logger.info({ event: 'db.pool.created' }, 'DB connection pool created');

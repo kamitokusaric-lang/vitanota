@@ -4,7 +4,12 @@ import { Signer } from '@aws-sdk/rds-signer';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger';
 
-const IAM_TOKEN_TTL_MS = 12 * 60 * 1000; // 12分（IAM トークン有効期限 15分の前にリフレッシュ）
+// IAM トークンは仕様上 RDS 側 TTL 15 分。ただし 5/9 観測 (`db.client.connect.failed` の
+// token_age_at_connect_ms が 11.3 分台に集中) により、実効 TTL は 11 分前後で reject 開始
+// することが判明 (H5 stale retention 確定)。cache TTL 12 分では「賞味期限切れ token を
+// 抱えた pool client」が pool 内に残り、新規 PAM 認証要求で reject される波の引き金になっていた。
+// 8 分に短縮し、RDS 実効 TTL ~11 分に対し 3 分以上のマージンを確保する。
+const IAM_TOKEN_TTL_MS = 8 * 60 * 1000;
 
 interface TokenCache {
   token: string;

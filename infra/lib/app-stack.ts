@@ -6,6 +6,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as apprunner from 'aws-cdk-lib/aws-apprunner';
@@ -287,10 +288,79 @@ export class AppStack extends cdk.Stack {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
     }).addAlarmAction(alarmAction);
 
-    // 4. 認証エラー — CloudWatch Logs メトリクスフィルタ経由
-    // App Runner のログが CloudWatch に自動転送される前提
-    // Phase 1 ではカスタムメトリクスの設定が複雑なため、5xx アラームで代替
-    // → Phase 2 で CloudWatch Logs Insights のクエリベースアラームに置換
+    // 4. PAM 認証失敗 (RDS IAM トークン関連の異常検知)
+    //   2026-05-07 の本番障害（PAM auth failed の波 2 回）後に追加。
+    //   App Runner application LogGroup を参照し、`PAM authentication failed` 文字列を
+    //   含むログイベント数を 1 分粒度でメトリクス化。NextAuth DrizzleAdapter 経由の
+    //   util.inspect 形式 (非 JSON) と pino 構造化ログのいずれにも literal で一致する。
+    //   閾値 5/min は当該障害観測値（第一波 約 14/min・第二波 約 84/min）から逆算。
+    const appRunnerLogGroup = logs.LogGroup.fromLogGroupName(
+      this,
+      'AppRunnerApplicationLogGroup',
+      `/aws/apprunner/${prefix}-app/${service.attrServiceId}/application`
+    );
+
+    const pamAuthFailedMetric = new logs.MetricFilter(this, 'PamAuthFailedFilter', {
+      logGroup: appRunnerLogGroup,
+      filterPattern: logs.FilterPattern.literal('"PAM authentication failed"'),
+      metricNamespace: `${prefix}/auth`,
+      metricName: 'PamAuthFailedCount',
+      metricValue: '1',
+      defaultValue: 0,
+    });
+
+    new cloudwatch.Alarm(this, 'PamAuthFailedAlarm', {
+      alarmName: `${prefix}-pam-auth-failed`,
+      alarmDescription: 'RDS IAM token 関連と思われる PAM 認証失敗バーストを検知',
+      metric: pamAuthFailedMetric.metric({
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(1),
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alarmAction);
+
+    // ── Insights Saved Queries (PAM 障害解析用) ──
+    // 波が再発した際に Console から 1 クリックで実行できるよう保存する。
+    new logs.QueryDefinition(this, 'PamFailedTimelineQuery', {
+      queryDefinitionName: `${prefix}/pam-failed-timeline`,
+      logGroups: [appRunnerLogGroup],
+      queryString: new logs.QueryString({
+        fields: ['@timestamp', '@logStream', '@message'],
+        filterStatements: ['@message like /PAM authentication failed/'],
+        sort: '@timestamp asc',
+        limit: 500,
+      }),
+    });
+
+    new logs.QueryDefinition(this, 'PamFailedRatePerMinuteQuery', {
+      queryDefinitionName: `${prefix}/pam-failed-rate-per-min`,
+      logGroups: [appRunnerLogGroup],
+      queryString: new logs.QueryString({
+        filterStatements: ['@message like /PAM authentication failed/'],
+        statsStatements: ['count() by bin(1m)'],
+      }),
+    });
+
+    // db.client.connect 構造化ログから token_age / pool_client_id を確認するクエリ。
+    // Phase 1 (A: 観測強化) で出力したフィールドを集計し H5 仮説の確認に使う。
+    new logs.QueryDefinition(this, 'DbClientConnectAgeQuery', {
+      queryDefinitionName: `${prefix}/db-client-connect-age`,
+      logGroups: [appRunnerLogGroup],
+      queryString: new logs.QueryString({
+        fields: [
+          '@timestamp',
+          'pool_client_id',
+          'token_generation_id',
+          'token_age_at_connect_ms',
+        ],
+        filterStatements: ['event = "db.client.connect"'],
+        sort: '@timestamp desc',
+        limit: 500,
+      }),
+    });
 
     // 5. WAF ブロック数
     new cloudwatch.Alarm(this, 'WafBlockedAlarm', {

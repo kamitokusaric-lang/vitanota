@@ -48,8 +48,11 @@
 | [CURRENT] | [`inception/requirements/cost-estimate.md`](inception/requirements/cost-estimate.md) | 開発費・月次コスト試算 |
 | [CURRENT] | [`inception/requirements/security-review.md`](inception/requirements/security-review.md) | セキュリティ要件レビュー |
 | [CURRENT] | [`inception/requirements/2026-05-07-meeting-features.md`](inception/requirements/2026-05-07-meeting-features.md) | 5/7 教員向け説明会向け機能追加要件 (招待管理 / フィードバック / タスク複製) |
+| [CURRENT] | [`inception/requirements/2026-05-11-ai-chat-extraction.md`](inception/requirements/2026-05-11-ai-chat-extraction.md) | **AI 連携第一弾**: チャット → タスク + 日誌ネタ抽出要件 (Unit-05、フローティング + インラインバブル + モバイルファースト + 揮発履歴 + Bedrock) |
+| [CURRENT] | [`inception/requirements/2026-05-11-ai-chat-extraction-questions.md`](inception/requirements/2026-05-11-ai-chat-extraction-questions.md) | 上記要件の clarifying questions 記録 (mood UI / セッション境界 / AI 送信先) |
 | [CURRENT] | [`inception/user-stories/personas.md`](inception/user-stories/personas.md) | 3 ペルソナ (教員 / 校長 / システム管理者) |
-| [CURRENT] | [`inception/user-stories/stories.md`](inception/user-stories/stories.md) | 24 ストーリー + MoSCoW |
+| [CURRENT] | [`inception/user-stories/stories.md`](inception/user-stories/stories.md) | 24 ストーリー + MoSCoW (EPIC-T-01〜T-06) |
+| [CURRENT] | [`inception/user-stories/2026-05-11-ai-chat-extraction-stories.md`](inception/user-stories/2026-05-11-ai-chat-extraction-stories.md) | **EPIC-T-07 AI チャット抽出** (6 ストーリー、US-T-070〜075、Must 3 / Should 2 / Could 1) |
 
 ## 🏛️ アプリケーション設計（俯瞰）
 
@@ -65,6 +68,7 @@
 | [CURRENT] | [`inception/application-design/unit-of-work-story-map.md`](inception/application-design/unit-of-work-story-map.md) | Unit ↔ Story マッピング |
 | [CURRENT] | [`construction/sequence-diagrams.md`](construction/sequence-diagrams.md) | 主要シーケンス図 |
 | [CURRENT] | [`inception/application-design/2026-05-07-meeting-features-design.md`](inception/application-design/2026-05-07-meeting-features-design.md) | 5/7 教員向け説明会向け機能の設計 (DB スキーマ + RLS + 画面構成 + API シグネチャ) |
+| [CURRENT] | [`inception/application-design/2026-05-11-ai-chat-extraction-design.md`](inception/application-design/2026-05-11-ai-chat-extraction-design.md) | **AI 連携第一弾アプリケーション設計** (Unit-05): コンポーネント階層 / 画面 ASCII / Hooks / Services / API シグネチャ / DB 差分 / データフロー / 踏み絵防御保証 |
 
 ## 🧩 Unit 別設計（実装詳細）
 
@@ -87,6 +91,7 @@
 | Unit-02 | 日誌・感情記録コア (sessions 含む) | [`construction/unit-02/`](construction/unit-02/) |
 | Unit-03 | 教員ダッシュボード・タグ | [`construction/unit-03/`](construction/unit-03/) |
 | Unit-04 | 管理者ダッシュボード・アラート | [`construction/unit-04/`](construction/unit-04/) |
+| **Unit-05** | **AI 連携 (チャット抽出第一弾)** | [`construction/unit-05/`](construction/unit-05/) — 2026-05-11 新設、まず functional-design 4 ファイル |
 
 **Unit-02 に関しては特筆すべきファイル**:
 - [`unit-02/code/api-contracts.md`](construction/unit-02/code/api-contracts.md) — API 契約
@@ -118,6 +123,7 @@
 
 | 状態 | ファイル | 役割 |
 |---|---|---|
+| [CURRENT] | [`inception/requirements/2026-05-11-ai-chat-extraction.md`](inception/requirements/2026-05-11-ai-chat-extraction.md) | **AI 連携第一弾要件 (2026-05-11)**: チャット → タスク + 日誌ネタ抽出 (Unit-05) — Bedrock 経由 Claude、踏み絵全項目合格、生死線 A・B を 1 機能で同時救出設計 |
 | [LEGACY] | [`construction/weekly-summary-design.md`](construction/weekly-summary-design.md) | 週次レポート機能設計。**2026-04-27 に Anthropic 接続を全面撤回・凍結**。実装コード・CFN リソース・Secret は削除済み。DB スキーマのみ残置。AI 再開時の参照用 |
 
 ## 🛠️ 運用 / ロールアウト
@@ -149,6 +155,9 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | [PROCESS] | [`inception/plans/`](inception/plans/) | インセプション各ステージのプラン (execution-plan.md 等) |
 | [CURRENT] | [`inception/plans/2026-05-07-meeting-features-plan.md`](inception/plans/2026-05-07-meeting-features-plan.md) | 5/7 教員向け説明会向け機能追加の実装プラン (機能 A/B/C のステップチェックリスト + デプロイ + ロールバック手順) |
 | [CURRENT] | [`inception/plans/2026-05-07-multi-assignee-handoff.md`](inception/plans/2026-05-07-multi-assignee-handoff.md) | 5/7 説明会向け 複数アサイン本実装 (post-MVP 繰り上げ) — 引き継ぎノート (確定設計 / 既存 RLS パターン / MA-1〜11 詳細 / 次セッション開始手順) |
+| [CURRENT] | [`inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md`](inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md) | AI 連携第一弾のユーザーストーリー実行判定アセスメント (High Priority 4 項目該当、Execute: Yes) |
+| [CURRENT] | [`inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md`](inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md) | AI 連携第一弾のストーリー生成プラン (chimo 合意済み方針 + ストーリー一覧 + INVEST チェックリスト) |
+| [CURRENT] | [`inception/plans/2026-05-11-ai-chat-extraction-plan.md`](inception/plans/2026-05-11-ai-chat-extraction-plan.md) | **AI 連携第一弾の実装プラン** (Unit-05、Mermaid 可視化 + Phase 0-7 段階的着手 + ブランチ戦略 + ロールバック手順) |
 | [PROCESS] | [`construction/plans/`](construction/plans/) | Unit 別の functional/nfr/infra/code 生成プラン (20 ファイル) |
 | [PROCESS] | `construction/unit-XX-*-questions.md` | 質問・回答の記録 |
 

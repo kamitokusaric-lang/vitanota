@@ -1913,3 +1913,535 @@ handler.ts に新 command `cleanup-orphan-accepted-invitations` を追加 (dryRu
 **コンテキスト**: タスク #1 完了。タスク #2 (新着マーク) / #3 (期間絞り込み) は同ブランチ `feat/2026-05-04-ui-polish` で継続予定。working tree には UI polish 作業の他 27 ファイル + 新規 2 ファイル (DayDivider/MoodPromptBar) が依然滞留中、commit 単位は要相談。
 
 ---
+
+## 2026-05-11 セッション: AI 連携機能 (Unit-05) 着手
+
+**タイムスタンプ**: 2026-05-11T00:00:00Z (セッション開始)
+**ユーザー入力 (初回・完全な生入力)**: "とりあえずローンチを終えて重大なバグも潰したね。ここからは、"現場で使ってもらえる機能"を探していきたい。まずは、AIとの連携を深めたい。"
+**AI応答**: ハルヒ persona 維持。AI 連携の方向性議論を開始。最上位踏み絵 (AI が教員を観測する側に回ると壊れる) を最初に確認する方針提示。AskUserQuestion で「教員のどのアクションを助ける方向で攻めるか」を提示するも chimo から先に「タスクのリマインド」「日誌の週次ふりかえり」の 2 機能アイデア提示。
+**コンテキスト**: vitanota ローンチ後の機能拡張フェーズへ移行。
+
+---
+
+**タイムスタンプ**: 2026-05-11T00:10:00Z
+**ユーザー入力**: "AIと連携してやりたいことが二つある。一つは、タスクのリマインドと抱えすぎのお知らせ。もうひとつは、日誌の週次ふりかえり"
+**AI応答**: 両機能ともに踏み絵で割れる急所「AI 出力の宛先」を確認する必要性を提示。校長が「抱えすぎ」「週次ふりかえり」を見られた瞬間に教員が嘘データ化するリスクを説明。AskUserQuestion で宛先 3 択 (本人だけ / 本人+本人許可相手 / 本人+管理者) を提示。
+**コンテキスト**: AI 連携の観測者問題を最上位踏み絵として認識。
+
+---
+
+**タイムスタンプ**: 2026-05-11T00:15:00Z
+**ユーザー入力**: "本人だけ (踏み絵最安全)"
+**AI応答**: AI 出力は本人のみ参照可と決定。続けて 3 機能の着手順序を AskUserQuestion で提示するも chimo から「悩んでるから相談したい」とフィードバック → 着手軸の議論 (「おっ!」型 vs 「便利」型) に切替。
+**コンテキスト**: 観測者原則確定 = AI 連携の憲法 1 条。
+
+---
+
+**タイムスタンプ**: 2026-05-11T00:30:00Z
+**ユーザー入力**: "なにからやるか、すごく悩んでるから、相談したい。まず、使うことが面白くなるような、おっと思うものを最初にやったほうがいいのか、それとも仕事が便利になったーのほうが使いたくなるのか。"
+**AI応答**: 3 軸 (教員心理 / vitanota 固有構造 / 看板の立て方) で着手戦略を整理。校長動線は memory「校長先生がタスク管理を高評価」で「便利」軸が既に勝ってる、生死線は「日誌が書かれ続けるか」で週次ふりかえりが直撃、看板の立て方として「おっ!」が必要 → アタシの直感は週次ふりかえり先行。ただしリスク (踏み絵 / プロンプト外し / 開発 1-2 週間) も提示。日誌の現状記録量を chimo に質問。
+**コンテキスト**: 戦略議論の核心、「使いたくなる」設計の評価軸を整理。
+
+---
+
+**タイムスタンプ**: 2026-05-11T00:45:00Z
+**ユーザー入力**: "あ、もう一個あった。チャットで書くと、タスクを勝手に新規作成してくれるようにしたい。わざわざクリックして作成しづらいんだって"
+**AI応答**: 4 つ目の機能として「チャット → タスク自動作成」が追加。これが 4 機能中で実は最重要枠と評価 (踏み絵セーフ / 「便利!」と「おっ!」両立 / 校長動線倍化 / 失敗時の戻し対称性)。生死線が実は 2 本 (A: 日誌が書かれる、B: タスクが入力される) と再認識。アタシの直感はチャット → タスク先行に変更。設計の急所として「AI 抽出後の確認 UI」を提示。日誌の現状記録量質問は引き続き保留。
+**コンテキスト**: 機能ラインナップの戦略マップを根本から再評価。
+
+---
+
+**タイムスタンプ**: 2026-05-11T01:00:00Z
+**ユーザー入力**: "日誌はあまり書かれてない"
+**AI応答**: 診断確定 = 生死線 A (日誌が書かれる) は現状破綻している。週次ふりかえりは寝かせる判断 (スカスカな日誌に AI が言っても刺さらない、空気読んで生成すれば嘘の想起で信頼破壊)。戦略書き直し: チャット → タスク先行確定、さらに「チャット → 日誌ネタも同チャットから抽出」拡張案を提示 (生死線 A・B を 1 機能で同時救出)。mood は AI 不可侵原則を確認 (mood 自動推定は最上位踏み絵)。新優先順位を提示。AskUserQuestion で第一弾スコープ確認。
+**コンテキスト**: 現状診断 = 生死線 A 破綻、戦略を全面再構築。
+
+---
+
+**タイムスタンプ**: 2026-05-11T01:15:00Z
+**ユーザー入力**: "タスク + 日誌ネタ抽出"
+**AI応答**: 第一弾スコープ確定 = チャット → タスク + 日誌ネタ抽出。memory 更新 (project_ai_strategy_20260511.md + feedback_mood_ai_untouchable.md 作成、MEMORY.md INDEX 追記)。CLAUDE.md aidlc workflow への移行を提示、戦略レベル細論点 (チャット欄置き場 / 確認 UI / モバイル比重 / チャット履歴) を先に詰めるか確認。
+**コンテキスト**: 第一弾スコープ確定、memory に焼く。
+
+---
+
+**タイムスタンプ**: 2026-05-11T01:30:00Z
+**ユーザー入力**: "戦略レベルの細論点を先に詰める"
+**AI応答**: 4 論点を順次議論。
+- A. チャット欄の置き場 (ホーム常駐 / フローティング / 専用タブ / フォーム代替) → chimo 選択: **フローティング型**
+- B. 確認 UI (インラインバブル / 別パネル / 自動登録+取消 / セッション終了時まとめ) → chimo 選択: **インラインバブル型 (+ 別パネルハイブリッド)**
+- C. モバイル比重 (モバイルファースト / PC ファースト / 同等) → chimo 選択: **モバイルファースト**
+- D. チャット履歴 (永久保存 / 変換時スニペット+未変換揮発 / 完全消失 / オプトイン) → chimo 選択: **変換時スニペット保存 + 未変換揮発**
+
+各論点でアタシの推し (A2/B1/C1/D2) と理由を提示、chimo は全て推し通りを選択。memory の project_ai_strategy_20260511.md に戦略レベル設計決定を追記。
+**コンテキスト**: 戦略レベル設計決定が全論点で完了。
+
+---
+
+**タイムスタンプ**: 2026-05-11T02:00:00Z
+**ユーザー入力**: "workspace 検出 + 要件分析に進む"
+**AI応答**: aidlc workflow に乗る決定。aidlc-state.md 読み込み → 既存大規模ブラウンフィールド確認、5/2-5/3 説明会向け機能追加完了 (ビルド・統合テストのみ未完)、ルール詳細 .aidlc-rule-details 存在。AskUserQuestion でユニット境界 (拡張 vs Unit-05 独立) と 5/2 未完テスト対応を確認。
+**コンテキスト**: workspace 検出完了、進路判断中。
+
+---
+
+**タイムスタンプ**: 2026-05-11T02:15:00Z
+**ユーザー入力 (複数)**: ユニット境界: "Unit-05 として独立 (推し)" / 5/2 未完テスト: "今回は触らず AI 連携を進める"
+**AI応答**: 進路確定 = Unit-05 独立化、5/2 未完項目は触らない。aidlc-state.md に「2026-05-11 セッション: AI 連携機能 (Unit-05)」セクションを追加、本 audit.md にも新セッション開始を記録。次は要件分析へ進む。
+**コンテキスト**: workspace 検出完了 (state 更新済)、要件分析フェーズへ移行。
+
+---
+
+**タイムスタンプ**: 2026-05-11T02:30:00Z
+**ユーザー入力 (3 つの clarifying questions の回答)**: mood UI: "日誌候補承認時 (推し)" / セッション境界: "画面離脱で終了 (推し)" / AI 送信先: "AWS Bedrock (推し)"
+**AI応答**: 全 clarifying questions が解決。要件分析を仕上げる:
+- 要件文書 `aidlc-docs/inception/requirements/2026-05-11-ai-chat-extraction.md` 作成 (詳細 AC 20 件 + NFR 16 件 + 裏テーマ踏み絵チェック + 影響ファイル一覧 + post-MVP backlog 連携)
+- 質問記録 `aidlc-docs/inception/requirements/2026-05-11-ai-chat-extraction-questions.md` 作成
+- aidlc-state.md 更新 (要件分析完了マーク)
+- docs-index.md 更新 (要件セクション + AI 機能セクションに新要件文書を登録)
+
+要件分析の主要決定:
+- 要件深さ: 標準 (アダプティブ短縮)
+- Extension Configuration: Security Baseline 有効 / Property-Based Testing 無効 (5/2 セッション設定継承)
+- 機能スコープ: AC-CE-01 〜 AC-CE-20 でチャット起動 / AI 抽出 / 確認 UI / データ保存を網羅
+- NFR: パフォーマンス (p95 < 3 秒) / コスト (50 回/日上限暫定) / セキュリティ (Bedrock ap-northeast-1) / 信頼性 (1 回 retry) / 観測性 (本人指標は管理者不可視)
+- 裏テーマ踏み絵全項目合格
+**コンテキスト**: 要件分析完了、次はユーザーストーリーフェーズへ移行予定。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T02:45:00Z
+**ユーザー入力**: "承認"
+**AI応答**: 要件分析の承認を確認。aidlc-state.md は既に [x] 要件分析 — 完了マーク済み。次はユーザーストーリーフェーズへ移行。知的評価 (CLAUDE.md user-stories ステージ条件) で実行判定: 新しいユーザー向け機能 (チャット入力) / ユーザーワークフローに影響 (タスク/日誌入力フロー変化) / 新製品機能 → 実行する価値が高い。ストーリー深さは標準予定。既存 personas.md / stories.md のフォーマット参考に、教員ペルソナの新シーン (朝・隙間・帰宅後・モバイル一択シーン) を追加する方針。
+**コンテキスト**: 要件分析承認、ユーザーストーリーフェーズ開始。
+
+---
+
+**タイムスタンプ**: 2026-05-11T03:00:00Z
+**ユーザー入力 (4 つのストーリープラン方針)**: stories 関係: "EPIC-T-07 として新規エピック、新規ファイル別途 (推し)" / 粒度: "5、6 件、主要シーン中心 (推し)" / MoSCoW: "Must + Should 混在 (推し)" / ブレイクダウン: "機能ベース (Feature-Based) (推し)"
+**AI応答**: ユーザーストーリー Part 1 アセスメント完了 (Execute User Stories: Yes、High Priority 4 つすべて該当: 新規ユーザー機能 / ワークフロー変更 / 複雑要件 / 新製品機能)。Plan 方針確定後、アダプティブ短縮で Part 2 生成も同ターンで実施:
+- Assessment 書類: `aidlc-docs/inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md`
+- Plan 書類: `aidlc-docs/inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md`
+- Stories 本体: `aidlc-docs/inception/user-stories/2026-05-11-ai-chat-extraction-stories.md`
+
+EPIC-T-07 「AI チャット抽出」(新規)、6 ストーリー (US-T-070〜075):
+- US-T-070: チャットでサッと書き散らす (起動 UX) 🔴 Must
+- US-T-071: AI に書いた言葉をタスクとして拾ってもらう 🔴 Must
+- US-T-072: AI に書いた言葉を日誌ネタとして拾ってもらう 🔴 Must
+- US-T-073: チャットを閉じても安心 (未承認候補の防護) 🟡 Should
+- US-T-074: 日誌候補に気分絵文字を選ぶ (mood UI、教員選択死守) 🟡 Should
+- US-T-075: Bedrock 障害時もタスク管理は使える (信頼性) 🟢 Could
+
+全 INVEST 準拠、Given/When/Then ベース、要件 AC-CE-XX とのトレース、裏テーマ踏み絵全項目合格。既存 stories.md は触らず別ファイル化、EPIC-T-05/T-06 (Won't 状態) との関係注記も新規ファイル内で整理。aidlc-state.md 更新 (ユーザーストーリー完了マーク)、docs-index.md 更新。
+**コンテキスト**: ユーザーストーリー完了、次はワークフロープランニングへ。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T03:15:00Z
+**ユーザー入力 (chimo の確認質問)**: "Bedrock 障害時もタスク管理は使えるっていうのは、新規タスクボタンをイキにしておくということ?"
+**AI応答**: Yes と回答。ただし「Bedrock 障害時のフォールバック処理を実装する」意味ではなく、もっと根本的: AI チャット抽出は既存 UX への上乗せ、平常時から AI チャット + 新規タスクボタン + 日誌画面が全て常時並行稼働、Bedrock 障害時は AI 側だけ落ちる、既存 UX は何の影響も受けず動き続ける、と説明。memory「既存 TaskBulkCreateForm は残す (リスク対称性)」「実装は常に revert 可能」の現れであり、US-T-075 はそのリスク対称性の "保証" を AC で明文化しているだけ。実装的には AI チャット = 新規追加だけ、既存は一切触らない方針を再確認。
+**コンテキスト**: US-T-075 の設計意図確認、リスク対称性原則の再確認。
+
+---
+
+**タイムスタンプ**: 2026-05-11T03:20:00Z
+**ユーザー入力**: "おk。承認"
+**AI応答**: ユーザーストーリー承認受領。次はワークフロープランニングフェーズへ移行。aidlc-state.md は既に [x] ユーザーストーリー — 完了マーク済み。ワークフロープランニングでは、aidlc-state.md の「ワークフロープラン (アダプティブ短縮)」セクションを基に、5/2 セッション踏襲のスタイルで詳細プラン文書を作成予定。
+**コンテキスト**: ユーザーストーリー承認、ワークフロープランニングフェーズ開始。
+
+---
+
+**タイムスタンプ**: 2026-05-11T03:30:00Z
+**AI応答**: ワークフロープランニング完了。`aidlc-docs/inception/plans/2026-05-11-ai-chat-extraction-plan.md` 作成 (詳細分析サマリー + Mermaid 可視化 + 実行フェーズ判定 + ブランチ戦略 + 段階的着手シーケンス Phase 0-7 + ロールバック手順 + モジュール更新シーケンス + 想定タイムライン + 成功基準 + 進捗追跡)。
+
+要点:
+- リスクレベル: Medium (新規 AI 統合 + プロンプト設計 + モバイル UX 設計、ただし既存 UX 無影響で revert 容易)
+- 実行: Application Design / Functional Design / NFR Req+Design / Infrastructure Design / Code Generation / Build and Test
+- スキップ: Reverse Engineering (既存基盤理解済み) / Units Generation (Unit-05 として直接実装)
+- 段階的着手 Phase 0-7: 設計 → DB migration → Bedrock Lambda → API → Frontend → 統合テスト → 本番デプロイ (フラグ OFF) → フラグ ON
+- ブランチ: `feat/2026-05-11-ai-chat-extraction`、ベースライン tag `pre-ai-chat-extraction-baseline` を作業着手時に付与
+- 想定タイムライン: 約 2〜3 週間 (chimo の commit/push タイミング次第)
+
+aidlc-state.md 更新 (ワークフロープランニング完了マーク)、docs-index.md 更新 (新プラン登録)。
+**コンテキスト**: ワークフロープランニング完了、次はアプリケーション設計フェーズへ。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T03:45:00Z
+**ユーザー入力 (chimo の確認質問・意図表明)**:
+- "フラグって何を ON/OFF するの?"
+- "ああ、なるほどテナントごとに入れる入れないを判断するのね"
+- "テナントごとに ON/OFF 機能は必要ないと思ってる。ハルヒのいうフラグが何を切り替えるものなのか分かってないから教えて"
+
+**AI応答**: chimo がフィーチャーフラグの概念を未理解と判明、解説モードに切替:
+1. フィーチャーフラグの正体 = 「本番デプロイ」と「ユーザー公開」を分離するスイッチ
+2. vitanota AI 連携での 3 つの用途: 本番検証期間の確保 / 緊急停止スイッチ (踏み絵踏み・コスト暴騰・障害発生時の即時 OFF) / 未完成 UI を本番に出さない開発体験
+3. フラグ不要だと: 本番デプロイ = 即公開、緊急停止は cdk redeploy ~3 分でやや遅い
+アタシの推し: フラグあり (環境変数 A)。理由: 踏み絵踏んだ瞬間に止められる保険、実装コスト最小。
+
+**コンテキスト**: フィーチャーフラグの概念解説、戦略判断材料の提供。
+
+---
+
+**タイムスタンプ**: 2026-05-11T04:00:00Z
+**ユーザー入力**: "なるほどね、理解した。フラグありで環境変数でおねがい"
+**AI応答**: フィーチャーフラグ方針確定 = 環境変数 1 個 (`ENABLE_AI_CHAT_EXTRACTION=true/false`)、AppRunner env で制御、全テナント一斉 ON/OFF。memory `project_ai_strategy_20260511.md` に「フィーチャーフラグ」セクション追記。プラン文書 `2026-05-11-ai-chat-extraction-plan.md` の「ブランチ戦略」セクションに「フィーチャーフラグ方針」サブセクション追加 (OFF 時の挙動 + ON 切替手順を明示)。
+**コンテキスト**: フィーチャーフラグ方針確定、ワークフロープランニング全体の最終承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T04:15:00Z
+**ユーザー入力**: "承認"
+**AI応答**: ワークフロープランニング承認受領。aidlc-state.md は既に [x] ワークフロープランニング — 完了マーク済み。次はアプリケーション設計フェーズへ移行。新規コンポーネント (ChatBubble / ChatModal / CandidateInlineBubble / CandidateEditModal / UnconfirmedPanel) + 新規 Lambda + 新規 API のため、アプリケーション設計は EXECUTE 判定。5/2 セッションの `2026-05-07-meeting-features-design.md` フォーマット参考に標準深度で進める予定。
+**コンテキスト**: ワークフロープランニング承認、アプリケーション設計フェーズ開始。
+
+---
+
+**タイムスタンプ**: 2026-05-11T04:30:00Z
+**AI応答**: アプリケーション設計完了。`aidlc-docs/inception/application-design/2026-05-11-ai-chat-extraction-design.md` 作成。5/2 セッションの 1 ファイル統合パターン踏襲 (components.md / methods.md / services.md / dependencies.md 個別生成は省略、1 ファイルにセクション統合)。
+
+設計の主要セクション:
+- 設計方針 (既存 UX 無影響、新規 DB テーブルなし、フラグで統合制御、mood AI 不可侵)
+- コンポーネント階層 (Frontend: ChatBubble → ChatModal → CandidateInlineBubble → CandidateEditModal → MoodPicker / UnconfirmedPanel / CloseConfirmDialog)
+- 画面構成 ASCII (フローティングバブル / モバイル full-height sheet / PC 中央モーダル / 編集モーダル / 未承認パネル / 閉じ確認)
+- コンポーネント定義詳細 (props / 主要 hook / アクション)
+- Hooks (useChatExtraction セッション state + useChatBubbleFlag)
+- サービス (chatExtractionService / piiMasker / candidateValidator / rateLimit)
+- API シグネチャ (POST /api/ai-chat/extract、429 / 503 / 404 / 200)
+- DB スキーマ拡張 (tasks / journal_entries に source_chat_snippet TEXT NULL 追加のみ、新規テーブルなし)
+- ER 差分図 (ASCII)
+- サービス間データフロー (ChatBubble → Modal → API → Lambda → Bedrock → 候補表示 → 承認 → 既存 API)
+- 既存ファイル影響まとめ (UX は無影響、既存 API は body schema に optional sourceChatSnippet 追加のみで後方互換)
+- 新規ファイル一覧 (Frontend 8 / API 1 / Lambda 5 / migration 1 / その他)
+- 踏み絵防御の設計上の保証 (mood AI 不可侵は candidateValidator output schema にフィールド自体を含めない物理的保証)
+
+aidlc-state.md 更新 (アプリケーション設計完了マーク)、docs-index.md 更新。
+**コンテキスト**: アプリケーション設計完了、次は Unit-05 機能設計 (Construction Phase) へ。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T04:45:00Z
+**ユーザー入力 (連続インフラ判断質問)**:
+- "新規 Lambda を別 stack にするか、既存 app-stack 拡張かの判断基準を教えて"
+- "うん、別スタックだね。rateLimit 実装の選択 についても詳しく"
+- "なるほど、rateLimit の仕組みってどうなってるの?"
+- "これって、教員ごとじゃなくてテナント全体での limit になるの?"
+- "おk。理解、それでいこう"
+
+**AI応答**: アプリケーション設計の補足としてインフラ詳細決定を進めた。
+
+**決定 1: 別 stack 採用**
+- 新規 `ai-chat-stack` (Unit-05 専用) として独立化
+- 既存 5 stack に追加、後続機能 (リマインド・週次ふりかえり・抱えすぎ) も同 stack に集約
+- app-stack との依存は SSM Parameter Store / Secrets Manager 経由で疎結合化 (export/import は使わない)
+- 判断基準 5 軸 (デプロイ独立性 / 失敗影響範囲 / 責務分離 / 構成シンプル / 将来拡張性) を提示、4 軸が別 stack 寄り
+
+**決定 2: rate limit 実装 = PostgreSQL ベース + 教員ごと only + 監視アラート**
+- アルゴリズム: Fixed Window (日次リセット)
+- 実装: PostgreSQL `api_rate_limits` テーブル (user_id, endpoint, date, count)、INSERT ON CONFLICT UPDATE
+- 粒度: 教員 (user_id) ごと 50 回/日、テナント単位は採用しない
+- テナント全体予算保護は CloudWatch メトリクス + 運営アラートで観測 (rate limit ではなく運営判断のシグナル)
+- chimo の運営判断: 現状規模では教員ごとで十分、将来「学校契約モデル月固定料金」になればテナント rate limit を C (二重制限) として追加可
+
+教育的解説含む:
+- rate limit の概念 (時間窓内操作回数制限、保険装置)
+- 4 アルゴリズム (Fixed Window / Sliding Window / Token Bucket / Leaky Bucket) の長短
+- vitanota 現状規模での試算 (教員 25 名 × 50 回 = 1,300 回/日、月 約 7,000 円以内)
+- テナント単位 vs 教員単位の選択肢 (A 教員 only / B テナント only / C 二重)
+- アタシの推し A (教員 only + 監視アラート) を chimo が採用
+
+設計書 `2026-05-11-ai-chat-extraction-design.md` を以下のように更新:
+- rateLimit サービス定義を確定値に置換
+- 新規ファイル一覧に ai-chat-stack.ts と api_rate_limits migration を追記
+- 「インフラ設計補足」セクションを末尾に追加 (Stack 構成 + Rate Limit 方針の根拠記録)
+
+**コンテキスト**: アプリケーション設計の補足インフラ詳細決定完了。アプリケーション設計全体の最終承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T05:00:00Z
+**ユーザー入力**: "承認"
+**AI応答**: アプリケーション設計全体の最終承認受領。aidlc-state.md は既に [x] アプリケーション設計 — 完了マーク済み。次は Construction Phase へ移行、Unit-05 機能設計から開始。ワークフロープランで Unit-05 機能設計 EXECUTE と決定済み (新規ビジネスロジック: 抽出プロンプト / 確認 UI 振る舞い / mood UI 仕様 / セッション状態管理 の詳細化が必要)。Unit-01〜04 の functional-design パターン (`aidlc-docs/construction/unit-XX/functional-design/` 配下に business-rules.md / business-logic-model.md / domain-entities.md / frontend-components.md) を参考にしつつ、5/2 セッションのアダプティブ短縮も検討予定。
+**コンテキスト**: アプリケーション設計承認、Construction Phase 開始 (Unit-05 機能設計)。
+
+---
+
+**タイムスタンプ**: 2026-05-11T05:30:00Z
+**ユーザー入力 (3 つの機能設計前確認質問への回答)**:
+- AI モデル: "今回の要件だと、Haiku で十分?" (確信なし、説明要望)
+- 0 件抽出時 UI: "メッセージを送信するということは、日誌かつぶやきかナレッジかタスクのはず。いずれかを絶対に提案して。"
+- Edit 保存: "保存 = 即承認 (1 ステップ) (推し)"
+- 追加質問への回答: "今の UI が、日誌かナレッジ共有かつぶやきを選べるようになってるよね。テーブルは共通だけど。だから、それのいずれかに入れて欲しいということ。"
+- mood 表示条件: "diary の時だけ (推し、既存仕様踏襲推定)"
+
+**AI応答**: 重要な domain knowledge を chimo から獲得: 既存 vitanota の `journal_entries` は `kind` enum (`diary | knowledge | tweet`) で 3 種別に分かれている。アタシ (memory) は この知識を持ってなかった、`project_journal_task_model_20260424.md` には mood / content / scope の話だけで type/category 情報なし。
+
+実装確認 (grep / Read):
+- `src/db/schema.ts:34` で `journalEntryKindEnum` 定義
+- 既存 UI: MoodPromptBar / KindBadge / EntryForm / EntryCard が 3 種別対応
+- 文字数: diary 200 / knowledge 1000 / tweet 200 (推定、コメントから)
+- 既存追加機能: knowledge にはナレッジリアクション (journal_knowledge_reactions)、knowledge_tags 中間テーブル
+
+修正反映 (並列実行):
+- **memory 新規**: `project_journal_kind_model.md` 作成 (3 種別の仕様 + UI コンポーネント + How to apply: AI 抽出時は 4 分類で判定、tweet をデフォルトカテゴリにして 0 件防止)
+- **memory INDEX**: MEMORY.md に新 entry 追加
+- **memory 更新**: `project_ai_strategy_20260511.md` に追記 (4 分類 / 0 件にしない / mood diary 時のみ / Haiku 採用 / Edit 即承認)
+- **要件文書更新**: AC-CE-07〜11 を 4 分類対応に書換え、AC-CE-08 で「最低 1 件、絶対 0 件にしない」、AC-CE-09a で「default tweet」、AC-CE-11a〜c で kind 別文字数・mood 表示条件・knowledge_tags 範囲外
+- **ストーリー更新**: US-T-072 を 4 分類対応に拡張 (tweet 拾い + 「書いたのに無視されない」明示)、US-T-074 (mood) を「diary 候補時のみ」に明示
+- **アプリケーション設計書更新**: candidateValidator output schema を 4 分類対応に書換え (Zod discriminatedUnion、`candidates.min(1)` で空禁止)、Candidate 型の TypeScript 定義イメージを追加、MoodPicker の表示条件を kind='diary' のみに明示
+
+これで戦略・要件・ストーリー・設計が全部 4 分類対応に揃った。次は機能設計フェーズ本体 (Unit-05 の 4 ファイル: business-rules / business-logic-model / domain-entities / frontend-components) を作成予定。
+
+**コンテキスト**: 重要 domain knowledge の獲得 + 全ドキュメント 4 分類対応への更新完了。次は Unit-05 機能設計の本体作成。
+
+---
+
+**タイムスタンプ**: 2026-05-11T05:45:00Z
+**ユーザー入力**: "おk"
+**AI応答**: Unit-05 機能設計の本体 4 ファイル作成完了。
+
+ディレクトリ: `aidlc-docs/construction/unit-05/functional-design/` 新規作成 (Unit-01〜04 と同じ構造、5/2 アダプティブ短縮ではなく Unit-01〜04 スタイル踏襲)。
+
+**作成ファイル 4 件**:
+
+1. `business-rules.md` — ビジネスルール 20 項目 (BR-CE-01〜20)
+   - AI 抽出ルール (モデル / 4 分類 / 空配列禁止 / tweet デフォルト / 文字数)
+   - mood ルール (AI 不可侵 / diary 時のみ UI)
+   - チャットセッションルール (source_chat_snippet 必須 / 非永続化 / 画面離脱境界 / 未承認確認)
+   - 操作ルール (Edit 保存 = 即承認)
+   - 制限・防御ルール (Rate Limit / フラグ / retry / PII / knowledge_tags 範囲外)
+   - 観測性ルール (本文除外 / 個人指標非可視)
+   - ルール優先順位 (踏み絵防御 > 生死線保護 > リスク対称性 > 既存整合 > コスト > UX > その他)
+
+2. `business-logic-model.md` — ビジネスロジック・状態遷移
+   - チャットセッション state ライフサイクル (CLOSED → OPEN → EXTRACTING → OPEN with candidates → CLOSED)
+   - 候補状態遷移 (pending → approved/editing/rejected)
+   - メッセージ抽出フロー (API ルート → Lambda → Bedrock → candidateValidator → 戻り値)
+   - 失敗フロー (1 回 retry → エラーバブル → 手動 retry)
+   - 候補承認フロー (kind 別、diary は MoodPicker 経由)
+   - 編集承認フロー (Edit 保存 = 即承認)
+   - 棄却フロー (即消去、DB に何も入らない)
+   - mood 取得フロー (diary 時のみ、AI 不可侵原則)
+   - Rate Limit フロー (UPSERT + count check)
+   - フィーチャーフラグ判定フロー
+   - セッション終了フロー (画面離脱 → 未承認確認 → 揮発)
+   - 4 分類判定ロジック (プロンプト設計の核、task → knowledge → diary → tweet の優先順位)
+   - 状態管理サマリーテーブル
+
+3. `domain-entities.md` — エンティティ定義
+   - 新規エンティティ (一過性): ChatMessage / Candidate (4 サブタイプ: Task/Diary/Knowledge/Tweet) / ChatSession
+   - 新規エンティティ (永続): ApiRateLimit
+   - 既存エンティティ拡張: Task / JournalEntry に source_chat_snippet
+   - 関係性 ASCII 図
+   - データ寿命サマリーテーブル
+   - AI 出力 Schema (Zod discriminatedUnion、mood フィールド構造的不在)
+
+4. `frontend-components.md` — フロントエンド詳細
+   - 9 コンポーネント (ChatBubble / ChatModal / MessageList / MessageBubble / CandidateInlineBubble / CandidateEditModal / MoodPicker / UnconfirmedPanel / CloseConfirmDialog)
+   - 各コンポーネントの props / state / hook / interactions / a11y / モバイル UX / API 統合
+   - 2 hooks (useChatExtraction / useChatBubbleFlag) の詳細仕様
+   - フォーム validation ルールマトリックス
+   - ユーザーインタラクションフロー 5 種 (基本 / 編集 / 棄却 / 未承認確認 / セッション終了)
+   - API 統合マトリックス
+
+aidlc-state.md 更新 (Unit-05 機能設計完了マーク)、docs-index.md 更新 (Unit-05 行追加)。
+**コンテキスト**: Unit-05 機能設計完了、次は Unit-05 NFR 要件フェーズへ。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T06:00:00Z
+**ユーザー入力 (機能設計レビュー、3 つの議論)**:
+- "3 つのレビュー、順番に丁寧に言っていい?"
+- "あ、ごめん。MoodPicker の「あとで」スキップから話そう"
+- "mood は必須にしたいんだけど、入力タイミングが難しいのよね。4 分類判定ロジックと合わせてユーザーの流れを整理したい。"
+- "入力 → AI 判定 → 登録確認時にタスク以外の時に、一言「お疲れ様」みたいなコメント共に、気分を入れてねと声をかけるのはどうかな"
+- "ナレッジと tweet のカテゴリーをやめようかな。タスクか日誌か、の 2 択"
+- "A" (AI 抽出経由を 2 分類、既存 vitanota の 3 種別は手動経路で残置)
+
+**AI応答**: 機能設計レビューで chimo から重要な方針変更:
+
+**決定 1: mood 必須化 + 温度感コメント**
+- diary 候補承認時の MoodPicker は必須選択 (skip 不可)
+- 温度感固定コメント (例: 「お疲れさま、書いてくれてありがとう。今の気分も教えて」) を MoodPicker と一緒に表示
+- AI 生成ではなく静的固定文言 (踏み絵セーフ、メッセージ内容に応じた動的反応は出さない)
+- 連続 diary 承認時は直前 mood を default 予選択 (ワンタップ承認可、別 mood 変更も可)
+
+**決定 2: AI 抽出経由を 2 分類 (task / diary) に絞る**
+- 既存 vitanota の `journalEntryKindEnum` 3 種別 (diary / knowledge / tweet) は手動 EntryForm 経路でそのまま残置
+- AI チャット抽出経由は task / diary のみ、knowledge / tweet は手動投稿で
+- 棲み分け明確: 思いついた瞬間 = AI チャット → diary 自動、腰据えて知見残す = 手動 EntryForm → knowledge 選択可
+- 既存稼働中機能は無影響、リスク対称性確保
+
+これに合わせて以下を **2 分類化 + 温度感コメント追加 + mood 必須化** で全部更新:
+
+**memory 更新 (2 件)**:
+- `project_ai_strategy_20260511.md`: 候補分類セクションを 4 分類 → 2 分類、temperature コメント追加、mood 必須化を反映
+- `project_journal_kind_model.md`: How to apply を「AI 抽出経由 = 2 分類、手動 EntryForm = 3 種別」の棲み分けで書き直し
+
+**aidlc-docs 更新 (3 件)**:
+- 要件文書 `2026-05-11-ai-chat-extraction.md`: AC-CE-07〜11 を 2 分類対応、AC-CE-11a を「mood UI 表示条件 diary のみ」、AC-CE-11b を「温度感固定コメント」、AC-CE-11c を「既存 knowledge / tweet 残置」に置換
+- ストーリー `2026-05-11-ai-chat-extraction-stories.md`: US-T-072 を「日誌 (diary)」に絞り、US-T-074 を mood 必須 + 温度感コメント + 連続承認 default 予選択 で書き直し
+- アプリケーション設計書 `2026-05-11-ai-chat-extraction-design.md`: candidateValidator を Zod discriminatedUnion 2 値版 (TaskCandidateSchema + DiaryCandidateSchema)、MoodPicker を必須化 + 温度感コメント明示で更新
+
+**機能設計 4 ファイル大規模リライト (Write 上書き)**:
+- `business-rules.md`: BR-CE-02 を 2 分類、BR-CE-04 を diary デフォルト、BR-CE-05 を文字数 (task.title 200 / task.description 2000 / diary.content 200) に、BR-CE-07 を mood 必須 + 温度感コメント + 連続承認 default で書き直し、BR-CE-16 削除
+- `business-logic-model.md`: 候補承認フローを kind 別 2 分岐 (task 即 INSERT / diary は DiaryApproveDialog 経由)、判定ロジックを 2 分類 + diary デフォルトで書き直し、判定例テーブル更新
+- `domain-entities.md`: Candidate サブタイプを TaskCandidate / DiaryCandidate の 2 つに、Zod schema を 2 値 discriminatedUnion で書き直し、既存 journal_entries との関係 (AI 経由は kind='diary' のみ) を明示
+- `frontend-components.md`: CandidateInlineBubble の kind 別表示を 2 つに、CandidateEditModal の kind 別フォームを 2 つに、**新規 `<DiaryApproveDialog>` を追加** (温度感コメント + MoodPicker 統合のポップアップ、ASCII モックアップ付き)、MoodPicker を必須化 + 連続承認 default 予選択で更新
+
+**コンテキスト**: 2 分類化 + 温度感コメント + mood 必須化 で全ドキュメント更新完了。レビュー残項目 (ルール優先順位 + 4 分類判定ロジック→2 分類で解消) の chimo フィードバック待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T06:15:00Z
+**ユーザー入力**: "いいよ" (ルール優先順位このまま、機能設計全体の最終承認)
+**AI応答**: ルール優先順位の議論は現状維持で確定。機能設計全体の最終承認を確認。aidlc-state.md は既に Unit-05 機能設計完了マーク済み。次は Unit-05 NFR 要件フェーズへ移行。
+**コンテキスト**: 機能設計全体承認、NFR 要件フェーズ開始準備。
+
+---
+
+**タイムスタンプ**: 2026-05-11T06:16:00Z
+**ユーザー入力**: "いいよ" (Unit-05 NFR 要件に進む確認)
+**AI応答**: NFR 要件フェーズ開始。ルール詳細と Unit-02 / Unit-03 既存 nfr-requirements の構造参考を並列読み込み、その後 Unit-05 用の NFR 要件 + tech stack 決定を整理予定。要件文書の NFR-CE-01〜16 で大半カバー済みなので、Unit-05 単位で再整理 + 具体値確定 + 新規 (テックスタック・観測ツール選定) を加える方針。
+**コンテキスト**: Unit-05 NFR 要件フェーズ開始。
+
+---
+
+**タイムスタンプ**: 2026-05-11T06:30:00Z
+**ユーザー入力 (Rate Limit 具体値確認)**: "50 回/日 で確定 (推し)"
+**AI応答**: Rate Limit 50 回/日 で確定。Unit-05 NFR 要件フェーズの 2 ファイル作成完了:
+
+**作成ファイル**:
+- `aidlc-docs/construction/unit-05/nfr-requirements/nfr-requirements.md` — NFR 7 カテゴリ × 28 項目 (PER 3 / COST 4 / SEC 7 / REL 4 / OBS 5 / AVL 2 / MNT 3)
+- `aidlc-docs/construction/unit-05/nfr-requirements/tech-stack-decisions.md` — 10 領域のテックスタック決定 (Bedrock / Lambda / PostgreSQL / DB スキーマ / Frontend / Bedrock SDK / 監視 / フラグ / CDK / テスト) + 採用しなかった代替の記録 + 将来の切替経路
+
+主要決定:
+- Bedrock モデル: Claude Haiku 4.5 (`anthropic.claude-haiku-4-5` 想定、Sonnet 4.6 への切替は env 変数で対応可)
+- Lambda: Node.js 22.x / 512 MB / timeout 10 秒 / arm64 / 予約同時実行数 100
+- Rate Limit: 50 回/日 確定、PostgreSQL Fixed Window
+- 月額予算: 1 校最大 7,000 円、実運用予想 2,000〜3,000 円
+- 観測者原則の OBS への落とし込み: 個人レベル指標は管理者にも不可視 (NFR-U05-OBS-04)
+- 採用しない選択肢の記録 (Anthropic API 直接 / OpenAI / Redis / DynamoDB / etc.) と切替経路を明文化
+
+要件文書 NFR-CE-01〜16 とのトレーサビリティテーブル + Unit-05 新規追加 NFR の整理。
+aidlc-state.md 更新 (Unit-05 NFR 要件完了マーク)。
+**コンテキスト**: Unit-05 NFR 要件完了、次は NFR 設計フェーズ。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T06:45:00Z
+**ユーザー入力**: "おk" (Unit-05 NFR 要件承認)
+**AI応答**: NFR 要件承認受領。aidlc-state.md は既に [x] Unit-05 NFR 要件完了マーク済み。次は NFR 設計フェーズ (NFR 実装パターンの詳細化)。NFR 要件で決めた値を Lambda / 既存 API / Frontend のどのレイヤーでどう実装するかの設計、Unit-02 / Unit-03 の `nfr-design/` パターン (nfr-design-patterns.md + logical-components.md) を踏襲予定。
+**コンテキスト**: Unit-05 NFR 設計フェーズ開始。
+
+---
+
+**タイムスタンプ**: 2026-05-11T07:00:00Z
+**AI応答**: Unit-05 NFR 設計フェーズ完了。2 ファイル作成:
+
+- `aidlc-docs/construction/unit-05/nfr-design/nfr-design-patterns.md`: 6 分類のパターン (信頼性 4 / パフォーマンス 3 / スケーラビリティ 2 / セキュリティ Defense in Depth 6 層 / コスト管理 3 / 観測性 3) + 不採用パターン記録 + NFR 適用マトリックス
+- `aidlc-docs/construction/unit-05/nfr-design/logical-components.md`: 5 レイヤー (Frontend / API Gateway / Lambda / Persistence / Observability) × 18 component の責任 / 依存 / NFR マッピング + 不採用 component 記録
+
+主要パターン:
+- 信頼性: Single Auto Retry (Lambda 内 1 回 retry → 503) / Manual Retry UI / Fallback to Existing UX / Lambda Timeout 10 秒
+- セキュリティ: 6 層 Defense in Depth (Feature Flag → Auth → Rate Limit → PII Mask → Zod Validation → RLS)
+- コスト: Pre-Bedrock Rate Limit Check (超過時 Bedrock 呼ばない) / Token Budget / Tenant Budget Monitoring
+- 観測性: Structured Logging (JSON、本文除外) / CloudWatch EMF (個人レベル指標 dimension 除外) / CloudWatch Alarms → SNS
+
+論理コンポーネント主要決定:
+- Frontend: ChatBubbleFlagGate / ChatModalManager / CandidateApprovalFlow / ConcurrentLimitController
+- API Gateway: EnvFlagMiddleware / AuthMiddleware (既存) / RateLimitMiddleware / LambdaInvoker
+- Lambda: PIIMasker / BedrockInvoker / CandidateValidator / MetricsEmitter
+- Persistence: api_rate_limits (新規) / tasks (拡張) / journal_entries (拡張)
+- Observability: CloudWatch Logs / Metrics (EMF) / Alarms → SNS
+
+aidlc-state.md 更新 (Unit-05 NFR 設計完了マーク)。
+**コンテキスト**: Unit-05 NFR 設計完了、次は Unit-05 インフラ設計フェーズ。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T07:15:00Z
+**ユーザー入力**: "おk" (NFR 設計承認)
+**AI応答**: NFR 設計承認受領。aidlc-state.md は既に [x] NFR 設計完了マーク済み。次は Unit-05 インフラ設計フェーズ (CDK ai-chat-stack の具体設計、Lambda + Bedrock IAM + Secrets Manager + CloudWatch アラーム + SNS topic)。
+**コンテキスト**: Unit-05 インフラ設計フェーズ開始。
+
+---
+
+**タイムスタンプ**: 2026-05-11T07:30:00Z
+**ユーザー入力**: "まって、Feature Flag → Auth → Rate Limit → PII Mask → Zod → RLS の一つ一つについて詳しく教えて"
+**AI応答**: インフラ設計を一旦中断、Defense in Depth 6 層の詳細教育解説。各層について 目的 / 何を防ぐか / 実装位置 / 突破時影響 / コード例 / 重要設計判断 を網羅。最後に「層間独立性」「順序の意味 (L1-L3 は Bedrock 前でコスト保護、L4-L5 は Bedrock 周辺で安全性、L6 はデータレイヤー隔離)」を整理。
+**コンテキスト**: セキュリティ多層防御の概念理解を深める教育解説。
+
+---
+
+**タイムスタンプ**: 2026-05-11T07:50:00Z
+**ユーザー入力**: "インフラ設計再開おk"
+**AI応答**: Unit-05 インフラ設計フェーズ再開、2 ファイル作成完了:
+
+- `aidlc-docs/construction/unit-05/infrastructure-design/infrastructure-design.md`: アーキテクチャ全体図 / CDK スタック構成 (新規 AiChatStack を 6 個目に追加) / AWS リソース詳細 (Lambda / IAM 最小権限 / Secrets / SSM / CloudWatch Logs / Metrics / Alarms / SNS) / 既存リソース変更内容 / ネットワーク構成 / データフロー / コスト見積もり / 不採用 AWS リソース記録
+- `aidlc-docs/construction/unit-05/infrastructure-design/deployment-architecture.md`: 環境構成 (dev / prod、staging なし) / スタック依存関係 (AiChatStack 独立) / ベースライン tag / Phase 0-7 段階デプロイ詳細 / ロールバック手順 (即時停止 / コード rollback / Stack destroy / スキーマ rollback) / CI/CD 統合 / 観測対象チェックリスト
+
+主要決定:
+- 新 AiChatStack を vitanota 既存 5 スタックに 6 個目として追加、cross-stack import なしの独立性確保
+- IAM Inline Policy: bedrock:InvokeModel (specific model ARN 限定) + Secrets / SSM (vitanota/ai-chat/* 限定) + CloudWatch PutMetricData (namespace 制限)
+- CloudWatch Metrics dimensions に user_id を入れない (個人指標非可視の物理保証)
+- SNS topic 通知先: chimo email (kamitokusari.c@cozi73.com)
+- Lambda: Node.js 22.x / arm64 / 512 MB / timeout 10 秒 / Reserved 100
+- 月額予算見積もり: 1 校あたり ¥2,500-7,500 (最大ケース)、実運用予想 ¥1,000-3,000
+
+aidlc-state.md 更新 (Unit-05 インフラ設計完了マーク)。
+**コンテキスト**: Unit-05 インフラ設計完了、次は Unit-05 コード生成フェーズ (Phase 1-7 段階実装の出発点)。chimo の承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T08:00:00Z
+**ユーザー入力**: "おk" (インフラ設計承認)
+**AI応答**: インフラ設計承認受領、Inception + Construction 設計フェーズ全完了。次は Unit-05 コード生成フェーズ。CLAUDE.md ルール通り、コード生成は 2 段階: パート 1 (プランニング) で詳細実装プラン (Step ベースのチェックリスト) を作成・承認 → パート 2 (生成) でコードを順次実装。
+**コンテキスト**: Unit-05 コード生成フェーズ開始 (パート 1 プランニング)。
+
+---
+
+**タイムスタンプ**: 2026-05-11T08:15:00Z
+**AI応答**: Unit-05 コード生成プラン作成完了。`aidlc-docs/construction/plans/unit-05-code-generation-plan.md` (既存 Unit-01〜04 と同じ命名規則)。実装プラン (`2026-05-11-ai-chat-extraction-plan.md`) の Phase 1-7 を Step 単位に細分化、計 54 サブステップ + 6 ストーリー全カバー。
+
+**Step 構成**:
+- Step 1 (DB migration): 5 サブステップ
+- Step 2 (Bedrock Lambda + IAM): 10 サブステップ
+- Step 3 (API + Rate Limit): 7 サブステップ
+- Step 4 (Frontend): 13 サブステップ
+- Step 5 (統合テスト + 内部検証): 5 サブステップ
+- Step 6 (本番デプロイ、フラグ OFF): 7 サブステップ
+- Step 7 (フラグ ON、教員公開): 4 サブステップ
+- Step 8 (ドキュメンテーション): 3 サブステップ
+
+**ストーリー紐付けマップ** + **Step 数サマリー** + **想定タイムライン (約 2〜3 週間)** + **完了基準** 含む。
+
+aidlc-state.md 更新 (パート 1 プランニング完了マーク、パート 2 生成は chimo 承認待ち)。
+**コンテキスト**: Unit-05 コード生成パート 1 完了、パート 2 (生成) のプラン承認待ち。
+
+---
+
+**タイムスタンプ**: 2026-05-11T08:30:00Z
+**ユーザー入力 (連続)**:
+- "これって、ローカルテストできるんだっけ?Bedrock 使うんだよね?ローカルじゃ無理かな"
+- "つまり、ローカルで精度をテストすることが可能ってこと?別で金額がかかるということ?"
+- "じゃあハイブリッドでローカル開発やりたいな"
+
+**AI応答**: ローカル開発 + Bedrock の関係について教育的解説。Bedrock 自体はローカル動作不可 (AWS マネージドサービス、エミュレータなし)、ただしローカル PC から AWS Bedrock を呼ぶことは可能 (chimo の AWS 認証情報があれば)、コストは別途 ~¥100/月 程度。
+
+開発スタイル選択肢 3 つ提示:
+- 完全 mock 開発 (コスト 0、ただし実応答確認が遅い)
+- ローカル実 Bedrock against (コスト ¥100-500/月、プロンプト調整しやすい)
+- **ハイブリッド** (mock メイン + プロンプト調整時のみ実 Bedrock、コスト ~¥100/月)
+
+chimo は **ハイブリッド開発スタイル** を採用。
+
+プラン更新 (反映):
+- `unit-05-code-generation-plan.md` に「開発スタイル: ハイブリッド」セクション追加 (MOCK 機構の実装方針 + プロンプト調整フロー)
+- Step 2-3 (bedrockInvoker) を更新: MOCK_BEDROCK env 変数判定の実装を明示
+- Step 5-3 を更新: mock モードでの手動検証を明示
+- 新規 Step 5-3.5 追加: AWS Console Bedrock Playground でのプロンプト調整 (chimo の AWS account 実 Bedrock 試行、コスト ~¥100/月)
+- `2026-05-11-ai-chat-extraction-plan.md` (実装プラン) にも「開発スタイル: ハイブリッド」サブセクション追加 (フラグ方針セクションの直上に)
+
+**コンテキスト**: ハイブリッド開発スタイル確定、コード生成プラン更新済み。残るレビュー項目 (Step 順序 / 粒度 / コード実装着手タイミング) の chimo フィードバック待ち。
+

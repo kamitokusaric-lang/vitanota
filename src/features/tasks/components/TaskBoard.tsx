@@ -469,7 +469,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
       >
         {modal.kind === 'create' && (
           <TaskBulkCreateForm
-            categories={categories}
+            categories={categories.filter((c) => !c.isSystemDefault)}
             assignees={assignees ?? []}
             selfUserId={selfUserId}
             taskTags={taskTags ?? []}

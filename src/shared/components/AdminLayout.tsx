@@ -27,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: '招待',         href: '/admin/invitations',      matchPrefix: '/admin/invitations' },
   { label: 'フィードバック', href: '/admin/feedback',        matchPrefix: '/admin/feedback' },
   { label: 'トピック管理',  href: '/admin/feedback/topics', matchPrefix: '/admin/feedback/topics' },
+  { label: 'カテゴリ管理',  href: '/admin/categories',      matchPrefix: '/admin/categories' },
 ];
 
 export function AdminLayout({ children, session }: AdminLayoutProps) {

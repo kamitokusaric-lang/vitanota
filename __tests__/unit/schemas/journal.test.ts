@@ -10,8 +10,9 @@ const validUuid2 = '550e8400-e29b-41d4-a716-446655440001';
 
 describe('createEntrySchema', () => {
   describe('正常系', () => {
-    it('最小構成のエントリを受け入れる', () => {
+    it('最小構成の diary を受け入れる (mood 必須)', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'diary',
         content: 'a',
         tagIds: [],
         mood: 'neutral',
@@ -20,9 +21,10 @@ describe('createEntrySchema', () => {
       expect(result.success).toBe(true);
     });
 
-    it('最大200文字の content を受け入れる', () => {
+    it('最大 1000 文字の diary content を受け入れる', () => {
       const result = createEntrySchema.safeParse({
-        content: 'x'.repeat(200),
+        kind: 'diary',
+        content: 'x'.repeat(1000),
         tagIds: [],
         mood: 'neutral',
         isPublic: false,
@@ -30,18 +32,49 @@ describe('createEntrySchema', () => {
       expect(result.success).toBe(true);
     });
 
-    it('最大10件の tagIds を受け入れる', () => {
+    it('最大 1000 文字の knowledge content を受け入れる', () => {
       const result = createEntrySchema.safeParse({
-        content: 'test',
-        tagIds: Array.from({ length: 10 }, () => validUuid),
+        kind: 'knowledge',
+        content: 'x'.repeat(1000),
+        tagIds: [],
         isPublic: true,
-        mood: 'neutral',
       });
       expect(result.success).toBe(true);
     });
 
-    it('前後の空白を trim する', () => {
+    it('最大 200 文字の tweet content を受け入れる', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'tweet',
+        content: 'x'.repeat(200),
+        tagIds: [],
+        isPublic: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('knowledge は tagIds 11 件以上も受け入れる (上限なし)', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'knowledge',
+        content: 'test',
+        tagIds: Array.from({ length: 11 }, () => validUuid),
+        isPublic: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('tweet は tagIds (emotion_tags) を受け入れる', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'tweet',
+        content: 'test',
+        tagIds: [validUuid, validUuid2],
+        isPublic: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('前後の空白を trim する (diary)', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'diary',
         content: '  test  ',
         tagIds: [],
         mood: 'neutral',
@@ -52,24 +85,12 @@ describe('createEntrySchema', () => {
         expect(result.data.content).toBe('test');
       }
     });
-  });
 
-  describe('異常系', () => {
-    it('空文字列 content を受け入れる (content は任意)', () => {
+    it('空白のみの content は trim されて空文字として受け入れられる (knowledge)', () => {
       const result = createEntrySchema.safeParse({
-        content: '',
-        tagIds: [],
-        mood: 'neutral',
-        isPublic: true,
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('空白のみの content は trim されて空文字として受け入れられる', () => {
-      const result = createEntrySchema.safeParse({
+        kind: 'knowledge',
         content: '   ',
         tagIds: [],
-        mood: 'neutral',
         isPublic: true,
       });
       expect(result.success).toBe(true);
@@ -77,10 +98,24 @@ describe('createEntrySchema', () => {
         expect(result.data.content).toBe('');
       }
     });
+  });
 
-    it('201文字の content を拒否する', () => {
+  describe('異常系', () => {
+    it('diary で mood なしを拒否する', () => {
       const result = createEntrySchema.safeParse({
-        content: 'x'.repeat(201),
+        kind: 'diary',
+        content: 'test',
+        tagIds: [],
+        isPublic: true,
+        // mood なし
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('knowledge で mood ありを拒否する (diary 以外 mood 禁止)', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'knowledge',
+        content: 'test',
         tagIds: [],
         mood: 'neutral',
         isPublic: true,
@@ -88,18 +123,62 @@ describe('createEntrySchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('tagIds の上限がない（11件以上も受け入れる）', () => {
+    it('tweet で mood ありを拒否する (diary 以外 mood 禁止)', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'tweet',
         content: 'test',
-        tagIds: Array.from({ length: 11 }, () => validUuid),
-        isPublic: true,
+        tagIds: [],
         mood: 'neutral',
+        isPublic: true,
       });
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
 
-    it('不正なUUIDの tagIds を拒否する', () => {
+    it('diary で tagIds ありを拒否する (diary タグ禁止)', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'diary',
+        content: 'test',
+        tagIds: [validUuid],
+        mood: 'neutral',
+        isPublic: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('tweet で 201 文字 content を拒否する', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'tweet',
+        content: 'x'.repeat(201),
+        tagIds: [],
+        isPublic: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('diary で 1001 文字 content を拒否する (base max 1000)', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'diary',
+        content: 'x'.repeat(1001),
+        tagIds: [],
+        mood: 'neutral',
+        isPublic: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('knowledge で 1001 文字 content を拒否する (base max 1000)', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'knowledge',
+        content: 'x'.repeat(1001),
+        tagIds: [],
+        isPublic: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('不正な UUID の tagIds を拒否する', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'knowledge',
         content: 'test',
         tagIds: ['not-a-uuid'],
         isPublic: true,
@@ -109,6 +188,7 @@ describe('createEntrySchema', () => {
 
     it('isPublic が boolean でない場合を拒否する', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'diary',
         content: 'test',
         tagIds: [],
         mood: 'neutral',
@@ -117,8 +197,9 @@ describe('createEntrySchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('必須フィールド欠落を拒否する', () => {
+    it('必須フィールド (isPublic) 欠落を拒否する', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'diary',
         content: 'test',
         tagIds: [],
         mood: 'neutral',
@@ -126,8 +207,29 @@ describe('createEntrySchema', () => {
       expect(result.success).toBe(false);
     });
 
+    it('必須フィールド (kind) 欠落を拒否する', () => {
+      const result = createEntrySchema.safeParse({
+        content: 'test',
+        tagIds: [],
+        mood: 'neutral',
+        isPublic: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('不正な kind 値を拒否する', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'unknown',
+        content: 'test',
+        tagIds: [],
+        isPublic: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
     it('content が数値の場合を拒否する', () => {
       const result = createEntrySchema.safeParse({
+        kind: 'diary',
         content: 123,
         tagIds: [],
         mood: 'neutral',
@@ -139,8 +241,9 @@ describe('createEntrySchema', () => {
 });
 
 describe('updateEntrySchema', () => {
-  it('全フィールド指定の更新を受け入れる', () => {
+  it('全フィールド指定の更新を受け入れる (knowledge)', () => {
     const result = updateEntrySchema.safeParse({
+      kind: 'knowledge',
       content: 'updated',
       tagIds: [validUuid],
       isPublic: false,
@@ -155,14 +258,14 @@ describe('updateEntrySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('空オブジェクト（何も更新しない）を受け入れる', () => {
+  it('空オブジェクト (何も更新しない) を受け入れる', () => {
     const result = updateEntrySchema.safeParse({});
     expect(result.success).toBe(true);
   });
 
-  it('update でも 201文字の content を拒否する', () => {
+  it('update では 1001 文字の content を拒否する (base max 1000、superRefine は partial で外れる)', () => {
     const result = updateEntrySchema.safeParse({
-      content: 'x'.repeat(201),
+      content: 'x'.repeat(1001),
     });
     expect(result.success).toBe(false);
   });

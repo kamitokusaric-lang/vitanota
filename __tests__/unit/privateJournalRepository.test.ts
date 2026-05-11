@@ -65,6 +65,37 @@ function makeSelectListChain(result: unknown[]) {
   };
 }
 
+// attachTags 用 (emotion / knowledge tag JOIN クエリ)
+function makeTagJoinChain(rows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(rows),
+      }),
+    }),
+  };
+}
+
+// attachReactions: count rows (where + groupBy)
+function makeReactionCountChain(rows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        groupBy: vi.fn().mockResolvedValue(rows),
+      }),
+    }),
+  };
+}
+
+// attachReactions: my rows (where のみ)
+function makeReactionMyChain(rows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(rows),
+    }),
+  };
+}
+
 describe('PrivateJournalRepository.create', () => {
   it('エントリを INSERT し、tagIds を journal_entry_tags に一括 INSERT する', async () => {
     const entryReturn = [{ id: 'entry-1', tenantId: 'tenant-1', userId: 'user-1', content: 'test', isPublic: false, createdAt: new Date(), updatedAt: new Date() }];
@@ -84,13 +115,16 @@ describe('PrivateJournalRepository.create', () => {
     );
 
     expect(mockTx.insert).toHaveBeenCalledTimes(2);
+    // kind が未指定の場合は default 'diary' で INSERT される (現在の実装)
     expect(entryInsert.values).toHaveBeenCalledWith({
       tenantId: 'tenant-1',
       userId: 'user-1',
       content: 'test',
       isPublic: false,
       mood: 'neutral',
+      kind: 'diary',
     });
+    // kind='knowledge' でないので journal_entry_tags に INSERT (else 分岐)
     expect(tagsInsert.values).toHaveBeenCalledWith([
       { tenantId: 'tenant-1', entryId: 'entry-1', tagId: 'tag-1' },
       { tenantId: 'tenant-1', entryId: 'entry-1', tagId: 'tag-2' },
@@ -211,22 +245,16 @@ describe('PrivateJournalRepository.delete', () => {
 describe('PrivateJournalRepository.findById', () => {
   it('見つかった場合はタグ付きエントリを返す', async () => {
     const row = { id: 'entry-1', userId: 'user-1', tenantId: 'tenant-1', content: 'x', isPublic: false, createdAt: new Date(), updatedAt: new Date() };
-    let callCount = 0;
+    // select 呼出順: 1=本体 findById / 2=attachTags emotion / 3=attachTags knowledge / 4=attachReactions count / 5=attachReactions my
     const mockTx = {
-      select: vi.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) return makeSelectByIdChain([row]);
-        // attachTags: タグ JOIN クエリ
-        return {
-          from: vi.fn().mockReturnValue({
-            innerJoin: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue([
-                { entryId: 'entry-1', tagId: 't1', tagName: 'うれしい', tagCategory: 'positive' },
-              ]),
-            }),
-          }),
-        };
-      }),
+      select: vi.fn()
+        .mockReturnValueOnce(makeSelectByIdChain([row]))
+        .mockReturnValueOnce(makeTagJoinChain([
+          { entryId: 'entry-1', tagId: 't1', tagName: 'うれしい', tagCategory: 'positive' },
+        ]))
+        .mockReturnValueOnce(makeTagJoinChain([]))  // knowledge_tags 空
+        .mockReturnValueOnce(makeReactionCountChain([]))  // count 空
+        .mockReturnValueOnce(makeReactionMyChain([])),  // my 空
     };
 
     const repo = new PrivateJournalRepository();
@@ -236,6 +264,9 @@ describe('PrivateJournalRepository.findById', () => {
     expect(result?.tags).toEqual([
       { id: 't1', name: 'うれしい', category: 'positive' },
     ]);
+    expect(result?.knowledgeTags).toEqual([]);
+    expect(result?.knowledgeReactionCount).toBe(0);
+    expect(result?.hasMyKnowledgeReaction).toBe(false);
   });
 
   it('見つからない場合は null を返す', async () => {
@@ -254,24 +285,14 @@ describe('PrivateJournalRepository.findMine', () => {
       { id: 'e1', userId: 'user-1', tenantId: 'tenant-1', content: 'a', isPublic: false, createdAt: new Date(), updatedAt: new Date() },
       { id: 'e2', userId: 'user-1', tenantId: 'tenant-1', content: 'b', isPublic: true, createdAt: new Date(), updatedAt: new Date() },
     ];
-    // findMine の select チェーン + attachTags の select チェーン
-    let callCount = 0;
+    // select 呼出順: 1=本体 findMine / 2=emotion / 3=knowledge / 4=count / 5=my
     const mockTx = {
-      select: vi.fn().mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // findMine 本体
-          return makeSelectListChain(rows);
-        }
-        // attachTags: タグ JOIN クエリ（空配列を返す）
-        return {
-          from: vi.fn().mockReturnValue({
-            innerJoin: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        };
-      }),
+      select: vi.fn()
+        .mockReturnValueOnce(makeSelectListChain(rows))
+        .mockReturnValueOnce(makeTagJoinChain([]))
+        .mockReturnValueOnce(makeTagJoinChain([]))
+        .mockReturnValueOnce(makeReactionCountChain([]))
+        .mockReturnValueOnce(makeReactionMyChain([])),
     };
 
     const repo = new PrivateJournalRepository();
@@ -280,5 +301,8 @@ describe('PrivateJournalRepository.findMine', () => {
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe('e1');
     expect(result[0].tags).toEqual([]);
+    expect(result[0].knowledgeTags).toEqual([]);
+    expect(result[0].knowledgeReactionCount).toBe(0);
+    expect(result[0].hasMyKnowledgeReaction).toBe(false);
   });
 });

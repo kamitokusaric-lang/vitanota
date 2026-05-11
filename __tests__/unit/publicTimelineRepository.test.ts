@@ -16,7 +16,7 @@ function makeSelectChain(result: unknown[]) {
   return chain;
 }
 
-// attachTags 用の select チェーン
+// attachTags 用の select チェーン (emotion / knowledge tag JOIN)
 function makeTagsSelectChain(tagRows: unknown[] = []) {
   return {
     from: vi.fn().mockReturnValue({
@@ -27,19 +27,40 @@ function makeTagsSelectChain(tagRows: unknown[] = []) {
   };
 }
 
+// attachReactions: count rows (where + groupBy)
+function makeReactionCountChain(rows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        groupBy: vi.fn().mockResolvedValue(rows),
+      }),
+    }),
+  };
+}
+
+// attachReactions: my rows (where のみ)
+function makeReactionMyChain(rows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(rows),
+    }),
+  };
+}
+
 describe('PublicTimelineRepository', () => {
   describe('findTimeline', () => {
     it('limit と offset を渡して結果を返す（タグ付き）', async () => {
       const mockRows = [
         { id: 'entry-1', tenantId: 't1', userId: 'u1', content: 'hello', createdAt: new Date(), updatedAt: new Date() },
       ];
-      let callCount = 0;
+      // select 呼出順: 1=本体 findTimeline / 2=emotion / 3=knowledge / 4=count / 5=my
       const mockTx = {
-        select: vi.fn().mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) return makeSelectChain(mockRows);
-          return makeTagsSelectChain([]);
-        }),
+        select: vi.fn()
+          .mockReturnValueOnce(makeSelectChain(mockRows))
+          .mockReturnValueOnce(makeTagsSelectChain([]))  // emotion
+          .mockReturnValueOnce(makeTagsSelectChain([]))  // knowledge
+          .mockReturnValueOnce(makeReactionCountChain([]))
+          .mockReturnValueOnce(makeReactionMyChain([])),
       };
 
       const repo = new PublicTimelineRepository();
@@ -48,9 +69,13 @@ describe('PublicTimelineRepository', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ id: 'entry-1' });
       expect(result[0].tags).toEqual([]);
+      expect(result[0].knowledgeTags).toEqual([]);
+      expect(result[0].knowledgeReactionCount).toBe(0);
+      expect(result[0].hasMyKnowledgeReaction).toBe(false);
     });
 
     it('結果が空の場合は空配列を返す', async () => {
+      // entries が空のときは attachTags / attachReactions に進まないので select は 1 回だけ
       const chain = makeSelectChain([]);
       const mockTx = { select: vi.fn().mockReturnValue(chain) };
 
@@ -65,15 +90,16 @@ describe('PublicTimelineRepository', () => {
         { id: 'e1', tenantId: 't1', userId: 'u1', content: 'test', createdAt: new Date(), updatedAt: new Date() },
       ];
       const tagRows = [
-        { entryId: 'e1', tagId: 'tag1', tagName: '喜び', tagType: 'emotion', tagCategory: 'positive' },
+        { entryId: 'e1', tagId: 'tag1', tagName: '喜び', tagCategory: 'positive' },
       ];
-      let callCount = 0;
+      // select 呼出順: 1=本体 / 2=emotion (1件) / 3=knowledge (空) / 4=count (空) / 5=my (空)
       const mockTx = {
-        select: vi.fn().mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) return makeSelectChain(mockRows);
-          return makeTagsSelectChain(tagRows);
-        }),
+        select: vi.fn()
+          .mockReturnValueOnce(makeSelectChain(mockRows))
+          .mockReturnValueOnce(makeTagsSelectChain(tagRows))
+          .mockReturnValueOnce(makeTagsSelectChain([]))
+          .mockReturnValueOnce(makeReactionCountChain([]))
+          .mockReturnValueOnce(makeReactionMyChain([])),
       };
 
       const repo = new PublicTimelineRepository();

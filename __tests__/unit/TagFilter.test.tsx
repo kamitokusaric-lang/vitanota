@@ -102,7 +102,7 @@ describe('TagFilter', () => {
     );
   });
 
-  it('カテゴリ見出し付きグループ表示 (ポジティブ / ちょっと大変 / 状態)', () => {
+  it('カテゴリ見出しは表示されない (グループ化廃止後、1 行 sortOrder 順)', () => {
     const tags = [
       makeTag({ id: 't1', name: '喜び', category: 'positive', sortOrder: 1 }),
       makeTag({ id: 't2', name: '不安', category: 'negative', sortOrder: 2 }),
@@ -110,8 +110,12 @@ describe('TagFilter', () => {
     ];
     render(<TagFilter tags={tags} selectedTagIds={[]} onChange={vi.fn()} />);
     expect(screen.getByTestId('entry-form-emotion-tags')).toBeTruthy();
-    expect(screen.getByText('ポジティブ')).toBeTruthy();
-    expect(screen.getByText('ちょっと大変')).toBeTruthy();
-    expect(screen.getByText('状態')).toBeTruthy();
+    // カテゴリ見出し (ポジティブ / ちょっと大変 / 状態) は表示されない
+    expect(screen.queryByText('ポジティブ')).toBeNull();
+    expect(screen.queryByText('ちょっと大変')).toBeNull();
+    expect(screen.queryByText('状態')).toBeNull();
+    // ただし全タグ自体は表示される (sortOrder 順)
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toEqual(['喜び', '不安', '気づき']);
   });
 });

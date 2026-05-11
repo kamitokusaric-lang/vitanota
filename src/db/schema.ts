@@ -14,6 +14,7 @@ import {
   foreignKey,
   index,
   inet,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql, eq } from 'drizzle-orm';
 
@@ -637,6 +638,40 @@ export const feedbackSubmissions = pgTable(
   }),
 );
 
+// ── user_filter_preferences (migration 0034) ─────────────────
+// ユーザーごとフィルタ設定保存 (TaskBoard 等のカスタムフィルタを記憶)
+// context: 'tasks' / 'journal' (将来) 等で識別
+// settings JSONB: context 別の構造、現状 'tasks' のみ:
+//   { filterOwner, filterTagIds, filterCategoryIds, showDelegated, period }
+export const userFilterPreferences = pgTable(
+  'user_filter_preferences',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    context: text('context').notNull(),
+    settings: jsonb('settings').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.userId, table.tenantId, table.context],
+    }),
+    userTenantIdx: index('user_filter_preferences_user_tenant_idx').on(
+      table.userId,
+      table.tenantId,
+    ),
+  }),
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -664,3 +699,5 @@ export type TaskTagAssignment = typeof taskTagAssignments.$inferSelect;
 export type NewTaskTagAssignment = typeof taskTagAssignments.$inferInsert;
 export type TaskAssignee = typeof taskAssignees.$inferSelect;
 export type NewTaskAssignee = typeof taskAssignees.$inferInsert;
+export type UserFilterPreference = typeof userFilterPreferences.$inferSelect;
+export type NewUserFilterPreference = typeof userFilterPreferences.$inferInsert;

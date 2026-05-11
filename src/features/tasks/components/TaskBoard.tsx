@@ -3,6 +3,7 @@
 // 絞込・新規/編集モーダルはこのコンポーネントで管理
 // デフォルトは「自分」(= scope='mine'、assignee + requester 両方を含む)
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Save } from 'lucide-react';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -11,6 +12,7 @@ import { useToast } from '@/shared/components/Toast';
 import { useTasks, type TaskWithAssignees } from '../hooks/useTasks';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
+import { useTaskFilterPreferences } from '../hooks/useTaskFilterPreferences';
 import { AssigneeFilter } from './AssigneeFilter';
 import { CategoryFilter } from './CategoryFilter';
 import { TagFilter } from './TagFilter';
@@ -53,6 +55,35 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { showToast } = useToast();
+
+  // 教員ごとの保存済みフィルタ設定 (1 フィルタ上書き、画面開いた瞬間に自動適用)
+  const { preference, save: savePreference } = useTaskFilterPreferences();
+  const preferenceAppliedRef = useRef(false);
+  useEffect(() => {
+    if (preferenceAppliedRef.current) return;
+    if (preference === null) return;
+    setFilterOwner(preference.filterOwner ?? undefined);
+    setFilterTagIds(preference.filterTagIds);
+    setFilterCategoryIds(preference.filterCategoryIds);
+    setShowDelegated(preference.showDelegated);
+    setPeriod(preference.period);
+    preferenceAppliedRef.current = true;
+  }, [preference]);
+
+  const handleSaveFilter = async () => {
+    try {
+      await savePreference({
+        filterOwner: filterOwner ?? null,
+        filterTagIds,
+        filterCategoryIds,
+        showDelegated,
+        period,
+      });
+      showToast('フィルタを保存しました', 'success');
+    } catch (_e) {
+      showToast('保存に失敗しました', 'error');
+    }
+  };
 
   // useTasks に渡す dateFilter: default mode は「今日以降 + 期限なし + 期限切れ未完了」
   // 内部的には range の上限を遠未来に倒すことで API 側 default ロジックを流用している
@@ -398,6 +429,16 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             tags={taskTags ?? []}
           />
           <PeriodFilter value={period} onChange={setPeriod} />
+          <button
+            type="button"
+            onClick={handleSaveFilter}
+            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-800"
+            data-testid="task-board-save-filter-button"
+            title="現在のフィルタを次回以降のデフォルトとして保存"
+          >
+            <Save size={12} aria-hidden />
+            フィルタを保存
+          </button>
         </div>
         <button
           type="button"

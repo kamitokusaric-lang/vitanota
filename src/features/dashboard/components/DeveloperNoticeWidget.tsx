@@ -3,14 +3,21 @@
 // - ✕ で「現在表示中の id」を localStorage に dismiss 登録 → widget 非表示
 //   次回ロード時、未 dismiss の最新お知らせがあれば再び表示される
 // - SSR / hydration 不一致を避けるため、初期化は useEffect (client only) で行う
-import { useEffect, useState } from 'react';
-import { getAnnouncementsSorted } from '@/features/dashboard/lib/announcements';
+// - お知らせは /api/announcements から SWR で取得 (旧来は静的 import だったが
+//   migration 0035 で DB 化、管理画面 /admin/announcements から CRUD)
+import { useEffect, useMemo, useState } from 'react';
+import useSWR from 'swr';
+import type { AnnouncementDTO } from '@/schemas/announcement';
 
 const DISMISSED_KEY = 'vn:developer-notice:dismissed';
 
-// announcements は静的データなので module スコープで 1 度だけ整列する。
-// useEffect 内で参照しても依存配列に渡せて毎 render の再実行を防げる。
-const SORTED_ANNOUNCEMENTS = getAnnouncementsSorted();
+const fetcher = async (
+  url: string,
+): Promise<{ announcements: AnnouncementDTO[] }> => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as { announcements: AnnouncementDTO[] };
+};
 
 function readDismissed(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -35,24 +42,37 @@ function writeDismissed(ids: Set<string>): void {
 }
 
 export function DeveloperNoticeWidget() {
+  const { data } = useSWR<{ announcements: AnnouncementDTO[] }>(
+    '/api/announcements',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    },
+  );
+  const announcementsList = useMemo(
+    () => data?.announcements ?? [],
+    [data?.announcements],
+  );
+
   // visible=false のあいだは widget 自体描画しない (SSR は常に非表示)
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0); // 0 = 最新
 
   useEffect(() => {
-    if (SORTED_ANNOUNCEMENTS.length === 0) return;
+    if (announcementsList.length === 0) return;
     const dismissed = readDismissed();
     // 未 dismiss の最新を初期表示位置にする。全部 dismiss 済みなら出さない。
-    const startIdx = SORTED_ANNOUNCEMENTS.findIndex((a) => !dismissed.has(a.id));
+    const startIdx = announcementsList.findIndex((a) => !dismissed.has(a.id));
     if (startIdx === -1) return;
     setIndex(startIdx);
     setVisible(true);
-  }, []);
+  }, [announcementsList]);
 
-  if (!visible || SORTED_ANNOUNCEMENTS.length === 0) return null;
+  if (!visible || announcementsList.length === 0) return null;
 
-  const current = SORTED_ANNOUNCEMENTS[index];
-  const hasOlder = index < SORTED_ANNOUNCEMENTS.length - 1;
+  const current = announcementsList[index];
+  const hasOlder = index < announcementsList.length - 1;
   const hasNewer = index > 0;
 
   const handleClose = () => {
@@ -73,7 +93,7 @@ export function DeveloperNoticeWidget() {
           <span className="text-[11px] font-semibold tracking-wide text-vn-accent">
             開発者から
           </span>
-          <span className="text-[11px] text-vn-muted">{current.date}</span>
+          <span className="text-[11px] text-vn-muted">{current.publishDate}</span>
         </div>
         <div className="flex items-center gap-1">
           <button

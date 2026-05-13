@@ -21,7 +21,7 @@ const dueDateString = z
 const assigneeUserIds = z
   .array(z.string().uuid())
   .min(1, '担当者を 1 名以上選択してください')
-  .max(3, '担当者は 3 名までです');
+  .max(10, '担当者は 10 名までです');
 
 export const createTaskSchema = z
   .object({

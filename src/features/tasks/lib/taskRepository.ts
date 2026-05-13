@@ -122,6 +122,7 @@ export class TaskRepository {
         dueDate: tasks.dueDate,
         status: tasks.status,
         completedAt: tasks.completedAt,
+        sourceChatSnippet: tasks.sourceChatSnippet,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
         commentCount: sql<number>`(SELECT COUNT(*)::int FROM task_comments WHERE task_comments.task_id = ${tasks.id})`,

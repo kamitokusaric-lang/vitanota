@@ -31,6 +31,14 @@ export interface AppStackProps extends cdk.StackProps {
   alertEmail: string;
   /** Google OAuth Client ID (public 値・cdk.json で一元管理) */
   googleClientId: string;
+  /** AI チャット整理 Lambda (AppRunner instance role から InvokeFunction する) */
+  aiChatExtractFunction: lambda.IFunction;
+  /** ENABLE_AI_CHAT_EXTRACTION env (false で機能 OFF、緊急停止スイッチ) */
+  aiChatEnableExtraction: string;
+  /** AI_CHAT_ALLOWLIST_TENANT_IDS env (CSV、空で全テナント ON、設定済で当該テナントのみ ON) */
+  aiChatAllowlistTenantIds: string;
+  /** AI_CHAT_RATE_LIMIT_PER_DAY env (Bedrock コスト保護、default '20') */
+  aiChatRateLimitPerDay: string;
 }
 
 export class AppStack extends cdk.Stack {
@@ -81,6 +89,9 @@ export class AppStack extends cdk.Stack {
       })
     );
 
+    // AI チャット整理 Lambda の invoke 権限 (AppRunner から pages/api/ai-chat/extract.ts 経由で呼ぶ)
+    props.aiChatExtractFunction.grantInvoke(instanceRole);
+
     // ── App Runner アクセスロール（ECR pull 用） ──
     const accessRole = new iam.Role(this, 'AppRunnerAccessRole', {
       roleName: `${prefix}-apprunner-access-role`,
@@ -124,6 +135,15 @@ export class AppStack extends cdk.Stack {
               // 内部ホスト名（ip-x-x-x-x.*.compute.internal）で上書きするため、
               // runtimeEnvironmentVariables 経由で明示的に 0.0.0.0 に再上書きする必要がある。
               { name: 'HOSTNAME', value: '0.0.0.0' },
+              // AI チャット整理機能 (Phase 1 コア体験、project_ai_chat_feature_flag.md)
+              // ENABLE_AI_CHAT_EXTRACTION=false で緊急停止 (~3 分)
+              { name: 'ENABLE_AI_CHAT_EXTRACTION', value: props.aiChatEnableExtraction },
+              // ALLOWLIST 空 = 全テナント ON、CSV 設定で先行 ON テナント限定
+              { name: 'AI_CHAT_ALLOWLIST_TENANT_IDS', value: props.aiChatAllowlistTenantIds },
+              // 1 日あたりの上限 (Bedrock コスト保護)
+              { name: 'AI_CHAT_RATE_LIMIT_PER_DAY', value: props.aiChatRateLimitPerDay },
+              // AppRunner から InvokeFunction で呼び出す Lambda の ARN
+              { name: 'AI_CHAT_LAMBDA_ARN', value: props.aiChatExtractFunction.functionArn },
             ],
             // CloudFront 迂回攻撃防御: middleware が X-CloudFront-Secret header を
             // CLOUDFRONT_SECRET env と照合し、不一致なら 403 返却。

@@ -49,6 +49,22 @@ export const taskStatusEnum = pgEnum('task_status', [
   'done',
 ]);
 
+// AI 整理機能 (Phase 1 コア体験) のセッション種別
+// quick_capture: 雑に書いて整理する / morning_plan: 今日をはじめる / daily_wrap: 今日をしまう
+export const aiSessionTypeEnum = pgEnum('ai_session_type', [
+  'quick_capture',
+  'morning_plan',
+  'daily_wrap',
+]);
+
+// AI セッションの状態
+// draft: 候補生成済・未確定 / confirmed: 教員が採用 / discarded: 教員が破棄
+export const aiSessionStatusEnum = pgEnum('ai_session_status', [
+  'draft',
+  'confirmed',
+  'discarded',
+]);
+
 // ── tenants ────────────────────────────────────────────────────
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -375,6 +391,8 @@ export const tasks = pgTable(
     dueDate: date('due_date', { mode: 'date' }), // PostgreSQL DATE 型
     status: taskStatusEnum('status').notNull().default('todo'),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    // AI チャット (ai_sessions) 経由で作成されたタスクの source 文脈 (任意)
+    sourceChatSnippet: text('source_chat_snippet'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -697,6 +715,59 @@ export const userFilterPreferences = pgTable(
   }),
 );
 
+// ── ai_sessions (migration 0036) ─────────────────────────────
+// AI 整理機能 (Phase 1 コア体験) の中間状態。チャット入力 + AI 出力 +
+// 取捨選択を一時保持。教員が確認・採用したものだけ tasks に保存される。
+// RLS: 本人 + system_admin のみ可視、school_admin 不可視 (踏み絵)。
+export const aiSessions = pgTable(
+  'ai_sessions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: aiSessionTypeEnum('type').notNull().default('quick_capture'),
+    inputText: text('input_text').notNull(),
+    aiOutputJson: jsonb('ai_output_json').notNull().default({}),
+    status: aiSessionStatusEnum('status').notNull().default('draft'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('ai_sessions_user_idx').on(table.userId, table.createdAt),
+    tenantIdx: index('ai_sessions_tenant_idx').on(table.tenantId),
+  }),
+);
+
+// ── api_rate_limits (migration 0038) ─────────────────────────
+// 1 日あたりの API 呼び出し回数を user × endpoint × date 単位で UPSERT。
+// 主用途: /api/ai-chat/extract の日次上限制御 (Bedrock コスト保護)。
+export const apiRateLimits = pgTable(
+  'api_rate_limits',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    endpoint: varchar('endpoint', { length: 80 }).notNull(),
+    date: date('date').notNull(),
+    count: integer('count').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.endpoint, table.date] }),
+    dateIdx: index('api_rate_limits_date_idx').on(table.date),
+  }),
+);
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -728,3 +799,7 @@ export type UserFilterPreference = typeof userFilterPreferences.$inferSelect;
 export type NewUserFilterPreference = typeof userFilterPreferences.$inferInsert;
 export type Announcement = typeof announcements.$inferSelect;
 export type NewAnnouncement = typeof announcements.$inferInsert;
+export type AiSession = typeof aiSessions.$inferSelect;
+export type NewAiSession = typeof aiSessions.$inferInsert;
+export type ApiRateLimit = typeof apiRateLimits.$inferSelect;
+export type NewApiRateLimit = typeof apiRateLimits.$inferInsert;

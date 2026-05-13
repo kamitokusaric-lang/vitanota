@@ -304,22 +304,6 @@
 - **対策**: TS スクリプト (`scripts/backfill-content-masked.ts`) で全 entries に対して maskContent を適用 → content_masked カラムを埋める。dotenv or @next/env で local DB 接続、本番は CDK migration job 内で 1 回だけ実行
 - **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) § 9.3
 
-### 🔴 高: 2026-05-13 本番 deploy 修正の main 反映 fix PR
-- **発見日**: 2026-05-13 (本番 deploy 中の即時対応分)
-- **着手予定**: 2026-05-14 朝一
-- **現状**: 本番 deploy のために local で行った CDK / migration / Lambda 修正が **main にまだ反映されていない**。本番 AWS には deploy 済 (= 本番動作中) だが、コード上は main と divergence。次回 deploy で再現できないリスク
-- **反映すべき変更**:
-  - `infra/lib/ai-chat-stack.ts`:
-    - JP inference profile id (`jp.anthropic.claude-haiku-4-5-20251001-v1:0`) を default
-    - IAM resources に Tokyo + Osaka 両方の foundation model ARN
-    - `aws-marketplace:ViewSubscriptions` / `Subscribe` 権限追加 (Bedrock 初回 model 使用時の subscription)
-    - `reservedConcurrentExecutions` 削除 (account limit と衝突)
-  - `infra/lib/foundation-stack.ts`: Lambda VPC Interface Endpoint (`com.amazonaws.ap-northeast-1.lambda`) 追加 — AppRunner (PRIVATE_ISOLATED) から Lambda InvokeFunction するため必須
-  - `scripts/ai-chat-extract/handler.ts`: bedrock_error の `error_message` を logging に追加 (デバッグ性向上)
-  - `migrations/0039_ai_chat_rls_school_admin_fix.sql`: ai_sessions / api_rate_limits の RLS policy で school_admin を明示的に許可 (本人の中間状態は本人のみ可視、踏み絵セーフ)
-- **着手判断**: 明日朝、B (分析画面) 着手前にこれを片付ける (main / 本番の divergence を解消)
-- **関連 memory**: `[[reference_production_test_tenant]]` `[[project_ai_chat_feature_flag]]` `[[project_bedrock_logging_off]]`
-
 ### 🔴 高: system_admin「AI 改善」分析画面 (H1 検証 Phase B「見る」)
 - **発見日**: 2026-05-13
 - **着手予定**: 2026-05-14 (chimo 指示、明日着手)

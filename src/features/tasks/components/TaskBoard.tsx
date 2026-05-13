@@ -19,17 +19,13 @@ import { TagFilter } from './TagFilter';
 import { PeriodFilter, type PeriodValue } from './PeriodFilter';
 import { getToday } from '../lib/periodCalc';
 import { TaskMatrix, type MatrixGroup } from './TaskMatrix';
-import {
-  TaskBulkCreateForm,
-  type BulkCreateValues,
-} from './TaskBulkCreateForm';
 import { useTaskTags } from '../hooks/useTaskTags';
 import { TaskForm, toFormInitial, type TaskFormValues } from './TaskForm';
 import { TaskCommentSection } from './TaskCommentSection';
 
+// 新規作成 modal は廃止 (chimo 2026-05-13、Dashboard 上部 TaskCreateTabs に移管)
 type ModalState =
   | { kind: 'closed' }
-  | { kind: 'create'; categoryId?: string }
   | { kind: 'edit'; task: TaskWithAssignees }
   | { kind: 'duplicate'; sourceTask: TaskWithAssignees };
 
@@ -130,72 +126,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     setFormError(null);
   };
 
-  // 一括作成: 各行を順次 POST /api/tasks → コメント / タグも個別反映
-  const handleBulkCreate = async (values: BulkCreateValues) => {
-    setSubmitting(true);
-    setFormError(null);
-    try {
-      let createdCount = 0;
-      let failedCount = 0;
-      for (const row of values.rows) {
-        try {
-          const res = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              categoryId: values.categoryId,
-              assigneeUserIds: row.assigneeUserIds,
-              title: row.title,
-              description: row.description || undefined,
-              dueDate: row.dueDate || undefined,
-            }),
-          });
-          if (!res.ok) {
-            failedCount++;
-            continue;
-          }
-          const { task } = (await res.json()) as { task: { id: string } };
-
-          const initialComment = row.initialComment.trim();
-          if (initialComment) {
-            await fetch(`/api/tasks/${task.id}/comments`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ body: initialComment }),
-            });
-          }
-
-          if (values.tagIds.length > 0) {
-            await fetch(`/api/tasks/${task.id}/tags`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tagIds: values.tagIds }),
-            });
-          }
-
-          createdCount++;
-        } catch {
-          failedCount++;
-        }
-      }
-
-      await mutateTasks();
-      if (failedCount === 0) {
-        showToast(`${createdCount} 件のタスクを登録しました`, 'success');
-        closeModal();
-      } else if (createdCount === 0) {
-        setFormError('すべての行の作成に失敗しました');
-      } else {
-        showToast(
-          `${createdCount} 件登録しました (${failedCount} 件失敗)`,
-          'error',
-        );
-        closeModal();
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  // 旧 handleBulkCreate (新規一括作成) は ManualTaskCreateForm に移管済 (chimo 2026-05-13)
 
   const handleUpdate = async (taskId: string, values: TaskFormValues) => {
     setSubmitting(true);
@@ -440,14 +371,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
             フィルタを保存
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ kind: 'create' })}
-          className="inline-flex items-center rounded-md bg-vn-accent px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-vn-accent/40"
-          data-testid="task-board-new-button"
-        >
-          + 新規タスク
-        </button>
+        {/* 新規タスクボタンはダッシュボード上部の TaskCreateTabs (AI 整理 / 手動追加) に移管 (chimo 2026-05-13) */}
       </div>
 
       <TaskMatrix
@@ -460,27 +384,6 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
         // 「全員」フィルタ時のみ自分のタスクを薄い黄色 + カード左の赤ラインでハイライト
         highlightMineTasks={filterOwner === undefined}
       />
-
-      <Modal
-        open={modal.kind === 'create'}
-        onClose={closeModal}
-        title="新規タスク (一括追加)"
-        maxWidth="max-w-5xl"
-      >
-        {modal.kind === 'create' && (
-          <TaskBulkCreateForm
-            categories={categories.filter((c) => !c.isSystemDefault)}
-            assignees={assignees ?? []}
-            selfUserId={selfUserId}
-            taskTags={taskTags ?? []}
-            submitting={submitting}
-            error={formError}
-            onCreateTag={handleCreateTag}
-            onSubmit={handleBulkCreate}
-            onCancel={closeModal}
-          />
-        )}
-      </Modal>
 
       <Modal
         open={modal.kind === 'edit'}

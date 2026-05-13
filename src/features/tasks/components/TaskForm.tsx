@@ -229,7 +229,7 @@ export function TaskForm({
         {canAssignToOthers && (
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-medium text-gray-700">
-              担当者 (1 名以上、最大 3 名)
+              担当者 (1 名以上、最大 10 名)
             </label>
             <AssigneePopoverInput
               candidates={assigneeCandidates}
@@ -237,7 +237,7 @@ export function TaskForm({
               onToggle={toggleAssignee}
               disabled={readonly}
               invalid={values.assigneeUserIds.length === 0}
-              maxSelected={3}
+              maxSelected={10}
               testIdPrefix="task-form-assignees"
             />
             {values.assigneeUserIds.length === 0 && (

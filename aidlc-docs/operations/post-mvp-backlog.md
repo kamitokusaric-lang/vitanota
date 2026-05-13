@@ -304,6 +304,52 @@
 - **対策**: TS スクリプト (`scripts/backfill-content-masked.ts`) で全 entries に対して maskContent を適用 → content_masked カラムを埋める。dotenv or @next/env で local DB 接続、本番は CDK migration job 内で 1 回だけ実行
 - **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) § 9.3
 
+### 🔴 高: system_admin「AI 改善」分析画面 (H1 検証 Phase B「見る」)
+- **発見日**: 2026-05-13
+- **着手予定**: 2026-05-14 (chimo 指示、明日着手)
+- **現状**: H1 検証 MVP デプロイ済。`ai_sessions.ai_output_json` に必要データはすべて入っている (jsonb 集計可能) が、集計画面は未実装。chimo が手動で psql query する状態
+- **影響**: H1 検証の主指標 (タスク候補作成確定率 / 整理スコア平均) と副指標 (修正率系) を継続観測できない。改善材料の抽出が手動・属人的
+- **対策**: system_admin 専用画面 `/admin/ai-analytics` 新設。下記指標を jsonb 集計クエリで表示
+- **指標一覧 (chimo 構想 Phase B)**:
+  - タスク候補作成確定率 (H1 主指標) — `status='confirmed'` / 全 sessions
+  - 整理されたスコア平均 (H1 主指標) — `ai_output_json.survey.organizeScore` AVG
+  - 破棄率 — `status='discarded'` / 全
+  - カテゴリ修正率 — `userConfirmed[].categoryChanged` TRUE 比率
+  - タイトル修正率 — `userConfirmed[].titleChanged` TRUE 比率
+  - 期限修正率 — `userConfirmed[].dueDateChanged` TRUE 比率
+  - prompt_version 別成果 — `ai_output_json.promptVersion` で group + 上記指標 × 版
+  - カテゴリ別修正率 — `userSelectedParentName × categoryChanged` で group
+  - 破棄理由ランキング — `ai_output_json.discardReason` COUNT by reason
+  - 編集理由ランキング — `ai_output_json.editReason` COUNT by reason
+- **裏テーマ踏み絵**: 個人特定可能な集計は不可 (`feedback_observed_moment_broken`)。system_admin のみ閲覧、テナント横断 aggregate のみ。input_text を直接読むのは緊急 debug 時のみ
+- **関連 memory**: `project_phase1_core_experience` `project_ai_sessions_visibility` `project_ai_strategy_20260511`
+
+### 🟡 中: AI 整理 Phase C-E (辞書・カテゴリルール・プロンプトバージョン・フラグの DB 化)
+- **発見日**: 2026-05-13
+- **着手予定**: 2026-05-14 以降 (chimo 指示、明日着手分の延長)
+- **現状**: 各種定義がコード内 hardcode。`categoryDefinitions.ts` / `'v1-2026-05-13'` プロンプトバージョン / env 変数フラグ
+- **影響**: chimo の長文構想「使われるたびに育つ設計」(Phase A → B → C → D → E) のうち、A (記録) は実装済、B (分析画面) も明日対応予定。**C 以降に進むには各種定義の DB 化が前提**
+- **対策段階**:
+  - **C1: 専用テーブル化** — `ai_task_capture_sessions` / `ai_task_candidates` (現状 JSONB を正規化、集計効率化)
+  - **C2: 学校用語辞書** — `tenant_ai_glossary` (term / normalized_meaning / preferred_category_id、school_admin or system_admin が編集)
+  - **C3: カテゴリ AI ルール DB 化** — `category_ai_rules` (description / examples / keywords / exclude_examples、テナント別上書き可)
+  - **C4: プロンプトバージョン管理** — `ai_prompt_versions` (system_prompt / output_schema / is_active、A/B 検証可)
+  - **C5: AI 機能フラグ管理画面** — 既存 backlog 「AI チャット機能の有効化フラグの管理画面化」と統合。env → DB feature_flags へ
+  - **D: 承認フロー** — 「『進調』を辞書に追加しますか?」型の system_admin / school_admin 承認 UI
+  - **E: 自動反映** — 十分な safety net の後、一部のみ自動反映
+- **裏テーマ踏み絵**: 「AI = 観測装置」にしない (`feedback_observed_moment_broken`)。教員へのコメント・励まし禁止 (`feedback_ai_output_guards`)。mood に AI 触らせない (`feedback_mood_ai_untouchable`)
+- **既存 backlog との統合**: 「AI チャット機能の有効化フラグの管理画面化」(同日 backlog 行き) は C5 と同件、本項目に内包される
+- **関連 memory**: `project_ai_strategy_20260511` (構想原典)、`project_ai_chat_feature_flag` (env 2 段の現行設計)、`project_phase1_core_experience` (Phase 概念)
+
+### 🟡 中: AI チャット機能の有効化フラグの管理画面化
+- **発見日**: 2026-05-13
+- **現状**: `ENABLE_AI_CHAT_EXTRACTION` + `AI_CHAT_ALLOWLIST_TENANT_IDS` の 2 段 env で制御 (AppRunner 環境変数)。テナント追加のたびに CSV 文字列を更新 + AppRunner 再起動 (~3 分)。緊急停止は `ENABLE_AI_CHAT_EXTRACTION=false` で全テナント即時 OFF
+- **影響**: テナント追加に deploy 権限と AppRunner 再起動が必要。校長動線で対応校が増えると運用負荷が線形に増える
+- **対策**: system_admin 専用画面 (例: `/admin/feature-flags`) で DB ベースのフラグ管理に移行。`feature_flags` テーブル + `feature_flag_tenants` 関連テーブル + RLS。即時反映、deploy 不要
+- **着手判断**: allowlist 対象テナントが 10 件超えた時点、または「申請から 3 営業日以内に AI 機能 ON」要求が校長動線で出た時点で優先度を上げる。それまで env 運用で十分
+- **裏テーマ踏み絵**: 「機能 ON/OFF」自体は運用情報 (踏み絵ではない)。ただし「AI 利用量」「ON 履歴」を school_admin 閲覧可能にしない (= 観測者原則の対象)。管理画面は system_admin 専用とし RLS 設計を踏襲
+- **関連 memory**: `project_ai_chat_feature_flag.md`
+
 ### 🟡 中: 週次レポート自動生成 Lambda (EventBridge cron)
 - **発見日**: 2026-04-27
 - **現状**: MVP では「アクセス時自動生成」(初回 GET /api/me/weekly-summary でその場で生成 + DB 保存)

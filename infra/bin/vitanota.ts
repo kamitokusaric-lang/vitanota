@@ -6,6 +6,7 @@ import { DataCoreStack } from '../lib/data-core-stack';
 import { DataSharedStack } from '../lib/data-shared-stack';
 import { AppStack } from '../lib/app-stack';
 import { EdgeStack } from '../lib/edge-stack';
+import { AiChatStack } from '../lib/ai-chat-stack';
 
 const app = new cdk.App();
 
@@ -49,6 +50,25 @@ const dataShared = new DataSharedStack(app, `${prefix}-data-shared`, {
   googleClientId,
 });
 
+// AiChatStack を AppStack より先に作る (AppStack 内で extractFunction を参照するため)
+const aiChatStack = new AiChatStack(app, `${prefix}-ai-chat`, {
+  env,
+  projectName,
+  envName,
+});
+
+// テナント単位 allowlist (例: chimo テナント先行 ON 用)
+// 空文字なら ALLOWLIST 未設定 = 全テナント ON (= ENABLE_AI_CHAT_EXTRACTION 単独評価)
+const aiChatAllowlistTenantIds =
+  (app.node.tryGetContext('aiChatAllowlistTenantIds') as string | undefined) ??
+  '';
+const aiChatEnableExtraction =
+  ((app.node.tryGetContext('aiChatEnableExtraction') as string | undefined) ??
+    'false');
+const aiChatRateLimitPerDay =
+  ((app.node.tryGetContext('aiChatRateLimitPerDay') as string | undefined) ??
+    '20');
+
 const appStack = new AppStack(app, `${prefix}-app`, {
   env,
   projectName,
@@ -65,6 +85,10 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   githubActionsRole: foundation.githubActionsRole,
   alertEmail,
   googleClientId,
+  aiChatExtractFunction: aiChatStack.extractFunction,
+  aiChatEnableExtraction,
+  aiChatAllowlistTenantIds,
+  aiChatRateLimitPerDay,
 });
 
 new EdgeStack(app, `${prefix}-edge`, {

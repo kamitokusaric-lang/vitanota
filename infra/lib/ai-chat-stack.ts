@@ -20,7 +20,7 @@ export interface AiChatStackProps extends cdk.StackProps {
   envName: string;
   /** Bedrock のモデル ID。デフォルトは Claude Haiku 4.5 (ap-northeast-1) */
   bedrockModelId?: string;
-  /** Lambda の Reserved Concurrent Executions (コスト/暴走対策) */
+  /** Lambda の Reserved Concurrent Executions (省略で Unreserved pool 共有) */
   reservedConcurrency?: number;
 }
 
@@ -32,8 +32,12 @@ export class AiChatStack extends cdk.Stack {
     super(scope, id, props);
 
     const prefix = `${props.projectName}-${props.envName}`;
-    const modelId =
-      props.bedrockModelId ?? 'anthropic.claude-haiku-4-5-20251001-v1:0';
+    // Claude Haiku 4.5 は on-demand foundation model invoke 不可 (ValidationException)。
+    // ap-northeast-1 では JP inference profile を経由する必要がある (Tokyo region 内完結、
+    // データ国外送信なし、コストは同額)。
+    const inferenceProfileId =
+      props.bedrockModelId ?? 'jp.anthropic.claude-haiku-4-5-20251001-v1:0';
+    const foundationModelId = 'anthropic.claude-haiku-4-5-20251001-v1:0';
 
     // ── IAM Role ──
     const role = new iam.Role(this, 'AiChatExtractRole', {
@@ -46,14 +50,31 @@ export class AiChatStack extends cdk.Stack {
       ],
     });
 
-    // Bedrock InvokeModel は当該 Region の当該モデルのみ (最小権限)
+    // Bedrock InvokeModel: inference profile + その配下の foundation model 全 region に必要。
+    // JP profile は ap-northeast-1 (Tokyo) と ap-northeast-3 (Osaka) の Haiku 4.5 にルーティングする
+    // (Japan 内冗長化、データは国内完結)。両方の foundation model ARN に許可が必須。
     role.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ['bedrock:InvokeModel'],
         resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/${modelId}`,
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${inferenceProfileId}`,
+          `arn:aws:bedrock:ap-northeast-1::foundation-model/${foundationModelId}`,
+          `arn:aws:bedrock:ap-northeast-3::foundation-model/${foundationModelId}`,
         ],
+      }),
+    );
+
+    // AWS Marketplace: Bedrock が初回 model 使用時に内部で Marketplace subscription を実行するため必要。
+    // resources は "*" (Marketplace の subscription は global、ARN レベルで絞り込み不可)。
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'aws-marketplace:ViewSubscriptions',
+          'aws-marketplace:Subscribe',
+        ],
+        resources: ['*'],
       }),
     );
 
@@ -74,12 +95,17 @@ export class AiChatStack extends cdk.Stack {
       handler: 'handler',
       memorySize: 512,
       timeout: cdk.Duration.seconds(15),
-      reservedConcurrentExecutions: props.reservedConcurrency ?? 10,
+      // Reserved concurrency は本番アカウントの limit と衝突しやすいので省略 (Unreserved pool 共有)。
+      // 必要なら CDK context `reservedConcurrency` で明示指定可能。
+      ...(props.reservedConcurrency !== undefined
+        ? { reservedConcurrentExecutions: props.reservedConcurrency }
+        : {}),
       role,
       logRetention: logs.RetentionDays.ONE_MONTH,
       environment: {
         AWS_REGION_OVERRIDE: this.region,
-        BEDROCK_MODEL_ID: modelId,
+        // inference profile id を渡す (Claude Haiku 4.5 は profile 経由必須)
+        BEDROCK_MODEL_ID: inferenceProfileId,
         // Lambda 側の MOCK 機構。本番は false 固定、開発時のみ true で AWS 接続をスキップ。
         MOCK_BEDROCK: 'false',
         ENV: props.envName,

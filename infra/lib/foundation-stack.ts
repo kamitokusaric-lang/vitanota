@@ -74,6 +74,16 @@ export class FoundationStack extends cdk.Stack {
       privateDnsEnabled: true,
     });
 
+    // VPC Interface Endpoint: Lambda
+    // AppRunner (PRIVATE_ISOLATED) から AI チャット整理 Lambda を InvokeFunction するため必須。
+    // NAT 撤廃 (2026-04-22) 後は VPC Endpoint 経由のみで AWS API outbound できる。
+    vpc.addInterfaceEndpoint('LambdaEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.LAMBDA,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      securityGroups: [this.appSecurityGroup],
+      privateDnsEnabled: true,
+    });
+
     // GitHub Actions OIDC プロバイダー
     const oidcProvider = new iam.OpenIdConnectProvider(this, 'GitHubOidc', {
       url: 'https://token.actions.githubusercontent.com',

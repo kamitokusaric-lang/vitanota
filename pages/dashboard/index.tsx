@@ -60,18 +60,22 @@ const RECORD_KINDS: { kind: JournalEntryKind; label: string }[] = [
 ];
 
 // H1 検証中: 教員に「AI が育つ過程である」ことを伝える注意書き。
-// 「観測されてる」感ではなく「一緒に育てる」関係を提示するための文言 (chimo 設計 2026-05-13)。
+// 「観測されてる」感ではなく「教員 → AI」方向の関係を提示するための文言 (chimo 設計 2026-05-13)。
 function AiLearningNotice({ tenantName }: { tenantName: string }) {
   return (
     <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/40 px-5 py-3 text-xs leading-relaxed text-slate-600">
       <p>
-        このAIは、{tenantName}のことを勉強中なので、上手なタスク提案ができないかもしれません。
+        チャットで雑に呟くだけで、タスク登録ができます。一人につき、一日20件まで呟けます。
       </p>
       <p className="mt-1">
-        先生方が直してくれた内容を手がかりに、少しずつ「この学校らしい」タスク案を出せるように育っていきます。
+        まだ未熟なAIなので間違いを教えてあげることで、{tenantName}の仕事を覚えます。
       </p>
       <p className="mt-1">
-        タスク名・期限・カテゴリが違っているときは、その場で直してから登録できます。
+        タスク名・期限・カテゴリが違っているときは、直して登録することでAIが間違いに気づきます。
+      </p>
+      <p className="mt-1">新人AIなので優しくしてあげてください。</p>
+      <p className="mt-1">
+        手動登録がしたい場合は、右上の「手動でタスク追加する」をクリックしてください。
       </p>
     </div>
   );
@@ -148,12 +152,6 @@ export default function DashboardPage({
       id: 'notes',
       label: '日々ノート',
       content: <TimelineTab session={session} />,
-    },
-    {
-      id: 'schedule',
-      label: '時間割',
-      content: <ComingSoonTab label="時間割" />,
-      disabled: true,
     },
   ];
 

@@ -120,6 +120,8 @@ export async function handler(event: unknown): Promise<SuccessResult | ErrorResu
       JSON.stringify({
         event: 'ai_chat.bedrock_error',
         error_name: err instanceof Error ? err.name : 'unknown',
+        error_message: err instanceof Error ? err.message : String(err),
+        // 詳細デバッグ用、PII は含まない (Bedrock の API レスポンスメッセージのみ)
       }),
     );
     return {

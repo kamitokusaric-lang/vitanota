@@ -26,7 +26,6 @@ import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
 import { TaskCreateTabs } from '@/features/ai-chat/TaskCreateTabs';
-import { MorningPlanSection } from '@/features/ai-chat/morning-plan/MorningPlanSection';
 import {
   getMoodIcon,
   getMoodLabel,
@@ -172,9 +171,9 @@ export default function DashboardPage({
             {/* H1 検証中: 哲学挨拶 (PhilosophyGreeting) は一旦外して AI タスク整理を主役に。
                 3 種別の投稿入口は QuickRecordActions として右上に補助導線で寄せる。 */}
             <QuickRecordActions onPick={handleKindPick} />
-            {/* H3 朝の見通し作り (2026-05-14): AI 機能 ON のテナントだけに表示、
-                feature flag (allowlist) は API 側でも 404 を返すので二重防御。 */}
-            {aiChatEnabled && <MorningPlanSection />}
+            {/* TaskCreateTabs は常時表示。手動追加は AI 機能 ON/OFF に関わらず可能 (chimo 2026-05-13)。
+                AiLearningNotice は AI 機能 ON のテナントだけに表示。 */}
+            {aiChatEnabled && <AiLearningNotice tenantName={tenantName} />}
             <TaskCreateTabs
               selfUserId={session.user.userId}
               aiChatEnabled={aiChatEnabled}

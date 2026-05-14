@@ -1,24 +1,15 @@
-// AI チャット系 Lambda (Bedrock Claude Haiku 4.5)。
+// AI チャット入力からタスク候補を抽出する Lambda (Bedrock Claude Haiku 4.5)。
 //
-// 2 つの type を扱う:
-//   - task_extraction (既存): チャット入力 → タスク候補抽出
-//   - morning_plan (H3): 既存タスク → 今日の見通し (today / optional 2 軸)
-//
-// 呼び出し: Next.js API (/api/ai-chat/extract / /api/ai-chat/morning-plan) から InvokeFunction。
+// 呼び出し: API (/api/ai-chat/extract) から InvokeFunction or Function URL。
+// Event:   { inputText: string }
+// Result:  { tasks: TaskCandidate[], needsConfirmation: string[] }
 //
 // 観測者原則 (feedback_observed_moment_broken.md):
-//   - input_text / tasks の中身は構造化ログに流さない (個人情報混入前提)
-//   - 構造化ログには event 名 + 入力長 + 候補数 + type のみ
+//   - input_text は構造化ログに流さない (個人情報混入前提)
+//   - 構造化ログには event 名 + 入力長 + 候補数のみ
 
-import { invokeExtraction, invokeMorningPlan } from './bedrockInvoker';
-import {
-  AiChatEventSchema,
-  ExtractEventSchema,
-  MorningPlanEventSchema,
-  type ExtractionResult,
-  type MorningPlanResult,
-  type MorningPlanEvent,
-} from './schemas';
+import { invokeExtraction } from './bedrockInvoker';
+import { ExtractEventSchema, type ExtractionResult } from './schemas';
 import {
   AI_CATEGORY_DEFINITIONS,
   AI_CATEGORY_PROMPT_RULES,
@@ -84,159 +75,9 @@ function buildSystemPrompt(): string {
   ].join('\n');
 }
 
-// chimo 提供 today_plan_v1 プロンプト。{{today}} / {{current_user}} /
-// {{capacity}} / {{tasks_json}} は呼び出し側で置換ではなく userMessage 内に格納。
-// system prompt 自体は不変。
-function buildMorningPlanSystemPrompt(): string {
-  return [
-    'あなたは、学校の先生の一日の見通しづくりを支援するAIです。',
-    '',
-    '目的は、先生に仕事を増やすことではありません。',
-    '既存のタスクをもとに、今日の余裕に合わせて、',
-    '「今日やる」と「余裕があれば」の2つに整理し、',
-    '先生が少し見通しを持てる状態をつくることです。',
-    '',
-    'これは命令ではなく、あくまで「今日の見通し案」です。',
-    '先生が必要に応じて編集できる前提で、やさしく、負担の少ない提案をしてください。',
-    '',
-    '# 出力の分類',
-    '',
-    '出力は必ず次の2つに分類してください。',
-    '',
-    '## today',
-    '先生が今日まず見る・進めるとよさそうなものです。',
-    'ただし、今日やるものを詰め込みすぎないでください。',
-    '期限切れや期限が今日のタスクが多い場合でも、すべてを today に入れず、先生の余裕に合わせて絞ってください。',
-    '',
-    '## optional',
-    '今日できたら進めるとよいものです。',
-    '今日できなくても問題ないもの、忘れないように置いておくもの、期限が未設定で緊急性がはっきりしないものは optional に入れてください。',
-    '',
-    '# 件数ルール',
-    '',
-    '## 必ず today に入れる (上限なし)',
-    '- 期限が今日以前で未完了のタスクは、件数に関わらず today にすべて入れる。',
-    '- たとえ 10 件あっても、すべて today に入れる。AI が絞らず、先生に判断してもらう。',
-    '',
-    '## それ以外のタスクは、先生の今日の余裕に応じて追加する',
-    '',
-    '### capacity = low',
-    '- 上記の必ず today 分に加えて、追加 today: 0件、optional: 最大2件',
-    '',
-    '### capacity = normal',
-    '- 上記の必ず today 分に加えて、追加 today: 1〜2件、optional: 最大3件',
-    '',
-    '### capacity = high',
-    '- 上記の必ず today 分に加えて、追加 today: 2〜3件、optional: 最大3件',
-    '',
-    '候補が少ない場合は、無理に埋めないでください。',
-    '候補が多い場合は、重要度の低いものは出力せず、not_shown_task_ids に含めてください。',
-    'ただし「今日期限・期限切れ」のタスクは not_shown_task_ids に入れず、必ず today に出してください。',
-    '',
-    '# 優先順位の考え方',
-    '以下の順で優先度を判断してください。',
-    '1. 期限が今日以前で、未完了のもの',
-    '2. 期限が明日または近日中のもの',
-    '3. status が in_progress のもの',
-    '4. タイトル・内容・タグ・コメントに「今日」「確認」「連絡」「提出」「相談」「依頼」「締切」「至急」などが含まれるもの',
-    '5. 自分が担当者に含まれるもの',
-    '6. 自分以外も担当者に含まれるが、今日確認・相談すると進みそうなもの',
-    '7. カテゴリ・タグから見て、学校業務上の優先度が高そうなもの',
-    'ただし、優先度が高そうでも、先生の今日の余裕を超えて today に入れすぎないでください。',
-    '',
-    '# 期限なしタスクの扱い',
-    '期限が未設定のタスクは、重要度が低いとは判断しないでください。',
-    'ただし、期限情報だけでは今日やるべきか判断できないため、原則として optional に分類してください。',
-    'ただし、以下に当てはまる期限なしタスクは today に分類しても構いません。',
-    '- status が in_progress',
-    '- タイトル・内容・タグ・コメントに「今日」「確認」「連絡」「相談」「提出」「締切」「至急」などが含まれる',
-    '- コメントが最近更新されている',
-    '- 自分が担当者に含まれており、短い一歩で進められそう',
-    '- 放置すると他の人を待たせそう',
-    '- 相談・連絡・確認だけでも今日やると抱え込みが減りそう',
-    '期限なしで、緊急性や今日扱う理由が読み取れないものは、',
-    'today には入れず、optional に入れるか、not_shown_task_ids に含めてください。',
-    '期限なしタスクを提案する場合は、先生が負担に感じにくい理由にしてください。',
-    '例:',
-    '- 「期限はありませんが、確認だけ先にすると進めやすそうです」',
-    '- 「今日できなくても大丈夫ですが、余裕があれば少し進められそうです」',
-    '- 「まず相談だけしておくと、抱え込みにくそうです」',
-    '',
-    '# 担当者の扱い',
-    '担当者に current_user が含まれるタスクを優先してください。',
-    '担当者が複数いる場合は、自分だけで完了する前提にしないでください。',
-    '必要に応じて、suggested_action には「確認する」「相談する」「分担を確認する」「一言声をかける」などを提案してください。',
-    '担当者に current_user が含まれないタスクは、原則として出力しないでください。',
-    'ただし、コメントや内容から current_user が確認・相談すべきことが明らかな場合は optional に入れても構いません。',
-    '',
-    '# status の扱い',
-    '- completed のタスクは出力しないでください。',
-    '- in_progress のタスクは today 候補として優先してください。',
-    '- todo のタスクは、期限・内容・タグ・コメントから優先度を判断してください。',
-    '',
-    '# 出力トーン',
-    '- 先生に命令しないでください。',
-    '- 「必ず」「至急やってください」「遅れています」など、圧を感じる表現は避けてください。',
-    '- 「今日まず見るなら」「余裕があれば」「確認だけでも」など、軽く始められる表現にしてください。',
-    '- できなかったことを責める表現は使わないでください。',
-    '- 理由は短くしてください。',
-    '- suggested_action は、最初の一歩がわかる短い行動にしてください。',
-    '',
-    '# 出力ルール',
-    '- JSONのみを返してください。',
-    '- Markdownや説明文は返さないでください。',
-    '- tasks_json に存在しない task_id を作らないでください。',
-    '- タスク名を勝手に変更しないでください。',
-    '- confidence は 0.0〜1.0 の数値にしてください。',
-    '- today と optional の合計件数は、先生が朝に見ても負担にならない量にしてください。',
-    '',
-    '# 出力形式',
-    '{',
-    '  "summary": "今日の見通し案を1文で短く書く",',
-    '  "today": [',
-    '    {',
-    '      "task_id": "string",',
-    '      "reason": "今日やるに入れた短い理由",',
-    '      "suggested_action": "最初の一歩を短く書く",',
-    '      "confidence": 0.0',
-    '    }',
-    '  ],',
-    '  "optional": [',
-    '    {',
-    '      "task_id": "string",',
-    '      "reason": "余裕があればに入れた短い理由",',
-    '      "suggested_action": "できたら進める一歩を短く書く",',
-    '      "confidence": 0.0',
-    '    }',
-    '  ],',
-    '  "not_shown_task_ids": [',
-    '    "string"',
-    '  ],',
-    '  "notes": [',
-    '    "先生に見せてもよい補足を最大2件まで"',
-    '  ]',
-    '}',
-  ].join('\n');
-}
-
-// morning_plan 用 user メッセージ: 入力変数を JSON で渡す
-function buildMorningPlanUserMessage(event: MorningPlanEvent): string {
-  return [
-    `# 入力`,
-    `今日の日付: ${event.today}`,
-    `現在の先生: ${JSON.stringify(event.currentUser)}`,
-    `先生の今日の余裕: ${event.capacity}`,
-    `タスク一覧:`,
-    JSON.stringify(event.tasks, null, 2),
-  ].join('\n');
-}
-
 interface SuccessResult {
   ok: true;
-  type: 'task_extraction' | 'morning_plan';
-  result:
-    | (ExtractionResult & { inputTextRedacted: string })
-    | MorningPlanResult;
+  result: ExtractionResult & { inputTextRedacted: string };
 }
 
 interface ErrorResult {
@@ -246,8 +87,8 @@ interface ErrorResult {
 }
 
 export async function handler(event: unknown): Promise<SuccessResult | ErrorResult> {
-  // 1. Event 検証 (discriminated union)
-  const parsed = AiChatEventSchema.safeParse(event);
+  // 1. Event 検証
+  const parsed = ExtractEventSchema.safeParse(event);
   if (!parsed.success) {
     console.warn(
       JSON.stringify({
@@ -258,33 +99,16 @@ export async function handler(event: unknown): Promise<SuccessResult | ErrorResu
     return { ok: false, error: 'invalid_event', message: 'invalid event shape' };
   }
 
-  const eventType =
-    'type' in parsed.data && parsed.data.type === 'morning_plan'
-      ? 'morning_plan'
-      : 'task_extraction';
-
-  if (eventType === 'morning_plan') {
-    return handleMorningPlan(parsed.data as MorningPlanEvent);
-  }
-
-  // task_extraction (既存) — type 未指定 or 'task_extraction'
-  const extractEvent = ExtractEventSchema.parse(parsed.data);
-  return handleTaskExtraction(extractEvent.inputText);
-}
-
-async function handleTaskExtraction(
-  inputText: string,
-): Promise<SuccessResult | ErrorResult> {
-  const inputTextRedacted = maskPii(inputText);
+  const inputTextRedacted = maskPii(parsed.data.inputText);
 
   console.info(
     JSON.stringify({
       event: 'ai_chat.invoke_start',
-      type: 'task_extraction',
       input_length: inputTextRedacted.length,
     }),
   );
 
+  // 2. Bedrock 呼び出し
   let extraction: ExtractionResult;
   try {
     extraction = await invokeExtraction({
@@ -295,9 +119,9 @@ async function handleTaskExtraction(
     console.error(
       JSON.stringify({
         event: 'ai_chat.bedrock_error',
-        type: 'task_extraction',
         error_name: err instanceof Error ? err.name : 'unknown',
         error_message: err instanceof Error ? err.message : String(err),
+        // 詳細デバッグ用、PII は含まない (Bedrock の API レスポンスメッセージのみ)
       }),
     );
     return {
@@ -310,7 +134,6 @@ async function handleTaskExtraction(
   console.info(
     JSON.stringify({
       event: 'ai_chat.invoke_success',
-      type: 'task_extraction',
       input_length: inputTextRedacted.length,
       candidate_count: extraction.tasks.length,
       need_confirmation_count: extraction.needsConfirmation.length,
@@ -319,52 +142,6 @@ async function handleTaskExtraction(
 
   return {
     ok: true,
-    type: 'task_extraction',
     result: { ...extraction, inputTextRedacted },
   };
-}
-
-async function handleMorningPlan(
-  event: MorningPlanEvent,
-): Promise<SuccessResult | ErrorResult> {
-  console.info(
-    JSON.stringify({
-      event: 'ai_chat.invoke_start',
-      type: 'morning_plan',
-      capacity: event.capacity,
-      task_count: event.tasks.length,
-    }),
-  );
-
-  let result: MorningPlanResult;
-  try {
-    result = await invokeMorningPlan({
-      systemPrompt: buildMorningPlanSystemPrompt(),
-      userMessage: buildMorningPlanUserMessage(event),
-      event,
-    });
-  } catch (err) {
-    console.error(
-      JSON.stringify({
-        event: 'ai_chat.bedrock_error',
-        type: 'morning_plan',
-        error_name: err instanceof Error ? err.name : 'unknown',
-        error_message: err instanceof Error ? err.message : String(err),
-      }),
-    );
-    return { ok: false, error: 'bedrock_error', message: 'morning_plan failed' };
-  }
-
-  console.info(
-    JSON.stringify({
-      event: 'ai_chat.invoke_success',
-      type: 'morning_plan',
-      capacity: event.capacity,
-      today_count: result.today.length,
-      optional_count: result.optional.length,
-      not_shown_count: result.not_shown_task_ids.length,
-    }),
-  );
-
-  return { ok: true, type: 'morning_plan', result };
 }

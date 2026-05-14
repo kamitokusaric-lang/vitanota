@@ -38,7 +38,7 @@ export function TaskCreateTabs({
             data-testid="task-create-tabs-to-manual"
             className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-xs font-bold text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
           >
-            タスクを手動で追加する
+            手動で追加する
           </button>
         }
       />
@@ -58,7 +58,7 @@ export function TaskCreateTabs({
             data-testid="task-create-tabs-to-ai"
             className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-xs font-bold text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
           >
-            タスクをAIで整理する
+            AI で整理する
           </button>
         )}
       </header>

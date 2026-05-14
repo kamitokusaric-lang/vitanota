@@ -113,11 +113,8 @@ const DISCARD_REASON_OPTIONS: { value: DiscardReason; label: string }[] = [
   { value: 'other', label: 'その他' },
 ];
 
-// 入力欄上に表示する説明 (placeholder ではない)
-const INPUT_LEAD = '思いついた仕事を書き出すと、AIがタスクを登録します。';
-// textarea の placeholder = 例文だけ (= 中を軽く保つ、chimo 2026-05-14 提案)
 const PLACEHOLDER =
-  '例: 明日までに保護者返信、金曜までに掲示物、Aさんの件を学年主任に相談';
+  'やることや気になることを文章で書くと、AIがタスク候補に整理します。';
 
 // 「今日のひとこと」: 事実 + 次の一歩。励まし語彙なし。
 // テンプレ (chimo 2026-05-13):
@@ -444,14 +441,14 @@ export function RoughCaptureSection({
       data-testid="rough-capture-section"
       className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
     >
-      <header className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold text-gray-800">
-            タスクを書き出す
-          </h2>
-          <span className="text-[11px] text-gray-400">β</span>
+      <header className="mb-3 flex items-baseline justify-between">
+        <h2 className="text-base font-semibold text-gray-800">
+          タスクを整理する
+        </h2>
+        <div className="flex items-baseline gap-3">
+          {headerRight}
+          <span className="text-xs text-gray-400">β</span>
         </div>
-        {headerRight}
       </header>
 
       {view.kind === 'idle' || view.kind === 'loading' ? (
@@ -529,17 +526,17 @@ function InputView({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs text-slate-500">{INPUT_LEAD}</p>
       <textarea
         value={input}
         onChange={(e) => onChange(e.target.value)}
         placeholder={PLACEHOLDER}
-        rows={2}
+        rows={3}
         maxLength={2000}
         disabled={loading}
         data-testid="rough-capture-input"
-        className="w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm placeholder:text-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-50"
+        className="w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-50"
       />
+      <p className="mt-1 text-xs text-gray-400">{EXAMPLE}</p>
       {error && (
         <p className="mt-2 text-sm text-red-600" role="alert">
           {error}
@@ -551,7 +548,7 @@ function InputView({
           onClick={onSubmit}
           disabled={!canSubmit || loading}
           data-testid="rough-capture-submit"
-          className="h-9 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {loading ? '整理中…' : '整理する'}
         </button>

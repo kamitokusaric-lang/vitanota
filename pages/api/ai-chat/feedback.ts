@@ -1,7 +1,8 @@
-// POST /api/ai-chat/feedback — AI 整理直後の「少し整理されましたか？」アンケートを保存。
+// POST /api/ai-chat/feedback — AI 整理後の任意フィードバック (編集理由) を保存。
 //
-// H1 検証の主指標 (organizeScore 4.0+) を回収するための endpoint。
-// ai_sessions.ai_output_json.survey に追記する形で永続化 (school_admin 不可視)。
+// 2026-05-14: 「整理されましたか？」スコア (organizeScore / inputBurdenScore) UI を撤去。
+// schema は optional のまま残し、過去データとの互換性を維持。新規送信は editReason のみ。
+// ai_sessions.ai_output_json に追記する形で永続化 (school_admin 不可視)。
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
@@ -24,7 +25,7 @@ const EDIT_REASONS = [
 
 const RequestSchema = z.object({
   sessionId: z.string().uuid(),
-  organizeScore: z.number().int().min(1).max(5),
+  organizeScore: z.number().int().min(1).max(5).optional(),
   inputBurdenScore: z.number().int().min(1).max(5).optional(),
   editReason: z.enum(EDIT_REASONS).optional(),
   editReasonText: z.string().max(500).optional(),
@@ -71,11 +72,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .set({
           aiOutputJson: {
             ...existingOutput,
-            survey: {
-              organizeScore: body.organizeScore,
-              inputBurdenScore: body.inputBurdenScore ?? null,
-              submittedAt: new Date().toISOString(),
-            },
+            ...(body.organizeScore != null
+              ? {
+                  survey: {
+                    organizeScore: body.organizeScore,
+                    inputBurdenScore: body.inputBurdenScore ?? null,
+                    submittedAt: new Date().toISOString(),
+                  },
+                }
+              : {}),
             ...(body.editReason
               ? {
                   editReason: body.editReason,
@@ -102,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   logger.info({
     event: 'ai_chat.feedback_submitted',
     session_id: body.sessionId,
-    organize_score: body.organizeScore,
+    organize_score: body.organizeScore ?? null,
     input_burden_score: body.inputBurdenScore ?? null,
     edit_reason: body.editReason ?? null,
   });

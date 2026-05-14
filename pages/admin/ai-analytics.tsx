@@ -289,28 +289,12 @@ function SessionCard({ s }: { s: SessionDetail }) {
         </div>
       )}
 
-      {(s.survey || s.editReason || s.editReasonText) && (
+      {(s.editReason || s.editReasonText) && (
         <div className="rounded border border-gray-100 bg-gray-50 p-3 text-xs">
-          <div className="font-semibold text-gray-600">アンケート</div>
-          {s.survey && (
-            <div className="mt-1 flex flex-wrap gap-x-4 text-gray-700">
-              <span>
-                整理されたスコア:{' '}
-                <span className="font-medium">{s.survey.organizeScore} / 5</span>
-              </span>
-              {s.survey.inputBurdenScore != null && (
-                <span>
-                  入力負担:{' '}
-                  <span className="font-medium">
-                    {s.survey.inputBurdenScore} / 5
-                  </span>
-                </span>
-              )}
-            </div>
-          )}
+          <div className="font-semibold text-gray-600">編集理由</div>
           {s.editReason && (
             <div className="mt-1 text-gray-700">
-              編集理由: {reasonLabel(s.editReason)}
+              {reasonLabel(s.editReason)}
             </div>
           )}
           {s.editReasonText && (
@@ -436,7 +420,7 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                     <h2 className="mb-3 text-sm font-semibold text-gray-700">
                       主指標 (H1 検証)
                     </h2>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <MetricCard
                         label="タスク候補作成確定率"
                         value={formatPercent(
@@ -444,11 +428,6 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                           decisionTotal,
                         )}
                         caption={`確定 ${data.summary.confirmedCount} / 決定 ${decisionTotal}`}
-                      />
-                      <MetricCard
-                        label="整理されたスコア平均"
-                        value={formatScore(data.summary.organizeScoreAvg)}
-                        caption={`アンケート回答数 ${data.summary.surveyCount} / 5 点満点`}
                       />
                       <MetricCard
                         label="破棄率"
@@ -463,25 +442,6 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                       総セッション数 {data.summary.totalSessions} (うち draft{' '}
                       {data.summary.draftCount})
                     </p>
-                  </section>
-
-                  {/* アンケート分布 */}
-                  <section>
-                    <h2 className="mb-3 text-sm font-semibold text-gray-700">
-                      アンケート スコア分布
-                    </h2>
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      <ScoreHistogram
-                        label="整理されたスコア (1〜5)"
-                        caption="高いほど整理された感覚 / 目安 4.0 以上"
-                        data={data.surveyDistribution.organizeScore}
-                      />
-                      <ScoreHistogram
-                        label="入力負担スコア (1〜5)"
-                        caption="低いほど負担が小さい / ガードレール"
-                        data={data.surveyDistribution.inputBurdenScore}
-                      />
-                    </div>
                   </section>
 
                   {/* 副指標 */}
@@ -553,7 +513,7 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                     <h2 className="mb-3 text-sm font-semibold text-gray-700">
                       ガードレール
                     </h2>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <MetricCard
                         label="生成後破棄率 (危険域: 70%以上)"
                         value={formatPercent(
@@ -561,13 +521,6 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                           decisionTotal,
                         )}
                         caption={`破棄 ${data.summary.discardedCount} / 決定 ${decisionTotal}`}
-                      />
-                      <MetricCard
-                        label="入力負担スコア平均"
-                        value={formatScore(
-                          data.guardrails.inputBurdenScoreAvg,
-                        )}
-                        caption={`回答数 ${data.guardrails.inputBurdenScoreCount} / 5 点満点 (低いほど負担小)`}
                       />
                       <MetricCard
                         label="監視不安での破棄"
@@ -608,9 +561,6 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                               <th className="px-4 py-2 text-right font-medium text-gray-600">
                                 確定率
                               </th>
-                              <th className="px-4 py-2 text-right font-medium text-gray-600">
-                                整理スコア平均
-                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
@@ -632,9 +582,6 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                                   </td>
                                   <td className="px-4 py-2 text-right tabular-nums">
                                     {formatPercent(v.confirmed, dt)}
-                                  </td>
-                                  <td className="px-4 py-2 text-right tabular-nums">
-                                    {formatScore(v.organizeScoreAvg)}
                                   </td>
                                 </tr>
                               );

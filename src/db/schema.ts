@@ -746,6 +746,47 @@ export const aiSessions = pgTable(
   }),
 );
 
+// ── today_plan_items (migration 0040) ────────────────────────
+// H3「朝の見通し作り」(morning_plan) の task 単位レコード。
+// 1 ai_sessions (type='morning_plan') × N task_id でリンク、教員の編集 /
+// Done 行動を保存する。RLS は本人 + system_admin (school_admin 不可視、踏み絵)。
+export const todayPlanItems = pgTable(
+  'today_plan_items',
+  {
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => aiSessions.id, { onDelete: 'cascade' }),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    aiBucket: text('ai_bucket'), // 'today' | 'optional' | null (null = 教員の手動追加)
+    finalBucket: text('final_bucket'), // null = AI 案維持、 'today' | 'optional' | 'excluded'
+    doneAt: timestamp('done_at', { withTimezone: true }),
+    movedCount: integer('moved_count').notNull().default(0),
+    lastMovedTo: text('last_moved_to'), // 'today' | 'optional' | null
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.sessionId, table.taskId] }),
+    userSessionIdx: index('today_plan_items_user_session_idx').on(
+      table.userId,
+      table.sessionId,
+    ),
+    sessionIdx: index('today_plan_items_session_idx').on(table.sessionId),
+  }),
+);
+
 // ── api_rate_limits (migration 0038) ─────────────────────────
 // 1 日あたりの API 呼び出し回数を user × endpoint × date 単位で UPSERT。
 // 主用途: /api/ai-chat/extract の日次上限制御 (Bedrock コスト保護)。
@@ -801,5 +842,7 @@ export type Announcement = typeof announcements.$inferSelect;
 export type NewAnnouncement = typeof announcements.$inferInsert;
 export type AiSession = typeof aiSessions.$inferSelect;
 export type NewAiSession = typeof aiSessions.$inferInsert;
+export type TodayPlanItem = typeof todayPlanItems.$inferSelect;
+export type NewTodayPlanItem = typeof todayPlanItems.$inferInsert;
 export type ApiRateLimit = typeof apiRateLimits.$inferSelect;
 export type NewApiRateLimit = typeof apiRateLimits.$inferInsert;

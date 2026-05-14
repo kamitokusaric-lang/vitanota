@@ -20,6 +20,7 @@ import { logger } from '@/shared/lib/logger';
 import type {
   AiAnalyticsResponse,
   SessionDetail,
+  MorningPlanAnalytics,
 } from '@/features/ai-chat/analyticsTypes';
 
 // 最新セッション詳細を取得する件数。chimo 2026-05-14 指示で踏み絵から外し、
@@ -150,6 +151,176 @@ interface FreeCommentRow {
   reason: string | null;
   text: string;
   at: string | null;
+}
+
+// ── H3 morning_plan 集計 row types ─────────────────────────
+interface MpFunnelRow {
+  total: number;
+  capacity_selected: number;
+  generated: number;
+  started: number;
+  edit_started: number;
+  closed_without_start: number;
+}
+interface MpDoneRow {
+  total_items: number;
+  done_items: number;
+  today_done: number;
+  today_total: number;
+  optional_done: number;
+  optional_total: number;
+}
+interface MpZeroDoneRow {
+  started_sessions: number;
+  zero_done_sessions: number;
+}
+interface MpOutlookRow {
+  held: number;
+  somewhat: number;
+  difficult: number;
+  feedback_count: number;
+}
+interface MpBucketsRow {
+  ai_today: number;
+  ai_optional: number;
+  retained: number;
+  today_to_optional: number;
+  optional_to_today: number;
+  excluded_count: number;
+  user_added_count: number;
+  total: number;
+}
+interface MpCapacityRow {
+  capacity: 'low' | 'normal' | 'high';
+  session_count: number;
+  started: number;
+  edit_started: number;
+}
+interface MpNextDayRow {
+  unique_users: number;
+  consecutive_users: number;
+}
+
+function rate(numerator: number, denominator: number): number | null {
+  if (!denominator) return null;
+  return numerator / denominator;
+}
+
+function buildMorningPlanAnalytics(data: {
+  mpFunnel: MpFunnelRow | undefined;
+  mpDone: MpDoneRow | undefined;
+  mpZeroDone: MpZeroDoneRow | undefined;
+  mpOutlook: MpOutlookRow | undefined;
+  mpBuckets: MpBucketsRow | undefined;
+  mpCapacity: MpCapacityRow[];
+  mpNextDay: MpNextDayRow | undefined;
+}): MorningPlanAnalytics {
+  const f = data.mpFunnel ?? {
+    total: 0,
+    capacity_selected: 0,
+    generated: 0,
+    started: 0,
+    edit_started: 0,
+    closed_without_start: 0,
+  };
+  const d = data.mpDone ?? {
+    total_items: 0,
+    done_items: 0,
+    today_done: 0,
+    today_total: 0,
+    optional_done: 0,
+    optional_total: 0,
+  };
+  const z = data.mpZeroDone ?? { started_sessions: 0, zero_done_sessions: 0 };
+  const o = data.mpOutlook ?? {
+    held: 0,
+    somewhat: 0,
+    difficult: 0,
+    feedback_count: 0,
+  };
+  const b = data.mpBuckets ?? {
+    ai_today: 0,
+    ai_optional: 0,
+    retained: 0,
+    today_to_optional: 0,
+    optional_to_today: 0,
+    excluded_count: 0,
+    user_added_count: 0,
+    total: 0,
+  };
+  const n = data.mpNextDay ?? { unique_users: 0, consecutive_users: 0 };
+
+  return {
+    funnel: {
+      totalSessions: f.total,
+      capacitySelectedCount: f.capacity_selected,
+      generatedCount: f.generated,
+      startedCount: f.started,
+      editStartedCount: f.edit_started,
+      closedWithoutStartCount: f.closed_without_start,
+      capacitySelectedRate: rate(f.capacity_selected, f.total),
+      generatedRate: rate(f.generated, f.capacity_selected),
+      startedRate: rate(f.started, f.generated),
+      editStartedRate: rate(f.edit_started, f.generated),
+      closedAfterGenerationRate: rate(f.closed_without_start, f.generated),
+    },
+    done: {
+      totalItemsInStartedSessions: d.total_items,
+      doneCount: d.done_items,
+      doneRate: rate(d.done_items, d.total_items),
+      todayBucketDoneCount: d.today_done,
+      todayBucketTotal: d.today_total,
+      todayBucketDoneRate: rate(d.today_done, d.today_total),
+      optionalBucketDoneCount: d.optional_done,
+      optionalBucketTotal: d.optional_total,
+      optionalBucketDoneRate: rate(d.optional_done, d.optional_total),
+      startedSessions: z.started_sessions,
+      zeroDoneSessions: z.zero_done_sessions,
+      zeroDoneSessionRate: rate(z.zero_done_sessions, z.started_sessions),
+    },
+    outlook: {
+      feedbackCount: o.feedback_count,
+      heldCount: o.held,
+      somewhatCount: o.somewhat,
+      difficultCount: o.difficult,
+      outlookHeldRate: rate(o.held + o.somewhat, o.feedback_count),
+    },
+    buckets: {
+      aiTodayCount: b.ai_today,
+      aiOptionalCount: b.ai_optional,
+      retainedCount: b.retained,
+      totalItems: b.total,
+      bucketChangeRate: rate(b.total - b.retained, b.total),
+      todayToOptional: b.today_to_optional,
+      optionalToToday: b.optional_to_today,
+      excludedCount: b.excluded_count,
+      excludedRate: rate(b.excluded_count, b.total),
+      userAddedCount: b.user_added_count,
+      userAddedRate: rate(b.user_added_count, b.total),
+    },
+    capacityCross: (['low', 'normal', 'high'] as const).map((c) => {
+      const row = data.mpCapacity.find((r) => r.capacity === c);
+      if (!row) {
+        return {
+          capacity: c,
+          sessionCount: 0,
+          startedRate: null,
+          editRate: null,
+        };
+      }
+      return {
+        capacity: c,
+        sessionCount: row.session_count,
+        startedRate: rate(row.started, row.session_count),
+        editRate: rate(row.edit_started, row.session_count),
+      };
+    }),
+    nextDayReturn: {
+      uniqueUsers: n.unique_users,
+      consecutiveUsers: n.consecutive_users,
+      nextDayReturnRate: rate(n.consecutive_users, n.unique_users),
+    },
+  };
 }
 
 export default async function handler(
@@ -308,6 +479,113 @@ export default async function handler(
         .orderBy(desc(aiSessions.createdAt))
         .limit(SESSION_DETAIL_LIMIT);
 
+      // ── H3 morning_plan 集計 ──────────────────────────────────
+      const mpFunnelResult = await tx.execute(sql`
+        SELECT
+          COUNT(*)::int                                                                         AS total,
+          COUNT(*) FILTER (WHERE ai_output_json->>'capacitySelectedAt' IS NOT NULL)::int        AS capacity_selected,
+          COUNT(*) FILTER (WHERE ai_output_json->>'generatedAt' IS NOT NULL)::int               AS generated,
+          COUNT(*) FILTER (WHERE ai_output_json->>'startedAt' IS NOT NULL)::int                 AS started,
+          COUNT(*) FILTER (WHERE ai_output_json->>'editStartedAt' IS NOT NULL)::int             AS edit_started,
+          COUNT(*) FILTER (
+            WHERE ai_output_json->>'closedAt' IS NOT NULL
+              AND ai_output_json->>'startedAt' IS NULL
+              AND ai_output_json->>'generatedAt' IS NOT NULL
+          )::int AS closed_without_start
+        FROM ${aiSessions}
+        WHERE type = 'morning_plan'
+      `);
+
+      // Done 集計は excluded を分母から除外 (active items のみ)
+      const mpDoneResult = await tx.execute(sql`
+        SELECT
+          COUNT(*)::int                                                                  AS total_items,
+          COUNT(*) FILTER (WHERE done_at IS NOT NULL)::int                                AS done_items,
+          COUNT(*) FILTER (WHERE done_at IS NOT NULL AND COALESCE(final_bucket, ai_bucket) = 'today')::int    AS today_done,
+          COUNT(*) FILTER (WHERE COALESCE(final_bucket, ai_bucket) = 'today')::int                            AS today_total,
+          COUNT(*) FILTER (WHERE done_at IS NOT NULL AND COALESCE(final_bucket, ai_bucket) = 'optional')::int AS optional_done,
+          COUNT(*) FILTER (WHERE COALESCE(final_bucket, ai_bucket) = 'optional')::int                         AS optional_total
+        FROM today_plan_items tpi
+        WHERE EXISTS (
+          SELECT 1 FROM ai_sessions s
+          WHERE s.id = tpi.session_id AND s.ai_output_json->>'startedAt' IS NOT NULL
+        )
+          AND (tpi.final_bucket IS NULL OR tpi.final_bucket <> 'excluded')
+      `);
+
+      const mpZeroDoneResult = await tx.execute(sql`
+        SELECT
+          COUNT(*)::int AS started_sessions,
+          COUNT(*) FILTER (
+            WHERE NOT EXISTS (
+              SELECT 1 FROM today_plan_items tpi
+              WHERE tpi.session_id = s.id AND tpi.done_at IS NOT NULL
+            )
+          )::int AS zero_done_sessions
+        FROM ${aiSessions} s
+        WHERE s.type = 'morning_plan'
+          AND s.ai_output_json->>'startedAt' IS NOT NULL
+      `);
+
+      const mpOutlookResult = await tx.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE ai_output_json->'feedback'->>'outlookScore' = 'held')::int       AS held,
+          COUNT(*) FILTER (WHERE ai_output_json->'feedback'->>'outlookScore' = 'somewhat')::int   AS somewhat,
+          COUNT(*) FILTER (WHERE ai_output_json->'feedback'->>'outlookScore' = 'difficult')::int  AS difficult,
+          COUNT(*) FILTER (WHERE ai_output_json->'feedback'->>'outlookScore' IS NOT NULL)::int    AS feedback_count
+        FROM ${aiSessions}
+        WHERE type = 'morning_plan'
+      `);
+
+      const mpBucketsResult = await tx.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE ai_bucket = 'today')::int                                  AS ai_today,
+          COUNT(*) FILTER (WHERE ai_bucket = 'optional')::int                               AS ai_optional,
+          COUNT(*) FILTER (WHERE ai_bucket IS NOT NULL AND (final_bucket IS NULL OR final_bucket = ai_bucket))::int AS retained,
+          COUNT(*) FILTER (WHERE ai_bucket = 'today' AND final_bucket = 'optional')::int    AS today_to_optional,
+          COUNT(*) FILTER (WHERE ai_bucket = 'optional' AND final_bucket = 'today')::int    AS optional_to_today,
+          COUNT(*) FILTER (WHERE final_bucket = 'excluded')::int                            AS excluded_count,
+          COUNT(*) FILTER (WHERE ai_bucket IS NULL)::int                                    AS user_added_count,
+          COUNT(*)::int                                                                     AS total
+        FROM today_plan_items
+      `);
+
+      const mpCapacityResult = await tx.execute(sql`
+        SELECT
+          ai_output_json->>'capacity'                                                       AS capacity,
+          COUNT(*)::int                                                                     AS session_count,
+          COUNT(*) FILTER (WHERE ai_output_json->>'startedAt' IS NOT NULL)::int             AS started,
+          COUNT(*) FILTER (WHERE ai_output_json->>'editStartedAt' IS NOT NULL)::int         AS edit_started
+        FROM ${aiSessions}
+        WHERE type = 'morning_plan'
+          AND ai_output_json->>'capacity' IN ('low','normal','high')
+        GROUP BY 1
+      `);
+
+      // 翌日再訪: 過去 14 日間で、同じ user が翌日も morning_plan を始めた割合
+      const mpNextDayResult = await tx.execute(sql`
+        WITH user_dates AS (
+          SELECT DISTINCT
+            user_id,
+            (created_at AT TIME ZONE 'Asia/Tokyo')::date AS plan_date
+          FROM ${aiSessions}
+          WHERE type = 'morning_plan'
+            AND ai_output_json->>'startedAt' IS NOT NULL
+            AND created_at >= NOW() - INTERVAL '14 days'
+        )
+        SELECT
+          COUNT(DISTINCT user_id)::int AS unique_users,
+          (
+            SELECT COUNT(DISTINCT u1.user_id)::int
+            FROM user_dates u1
+            WHERE EXISTS (
+              SELECT 1 FROM user_dates u2
+              WHERE u2.user_id = u1.user_id AND u2.plan_date = u1.plan_date + 1
+            )
+          ) AS consecutive_users
+        FROM user_dates
+      `);
+
       return {
         summary: (summaryResult.rows[0] as unknown as SummaryRow) ?? null,
         editRate: (editRateResult.rows[0] as unknown as EditRateRow) ?? null,
@@ -321,6 +599,13 @@ export default async function handler(
         discardComments: discardCommentResult.rows as unknown as FreeCommentRow[],
         editComments: editCommentResult.rows as unknown as FreeCommentRow[],
         sessionRows,
+        mpFunnel: mpFunnelResult.rows[0] as unknown as MpFunnelRow,
+        mpDone: mpDoneResult.rows[0] as unknown as MpDoneRow,
+        mpZeroDone: mpZeroDoneResult.rows[0] as unknown as MpZeroDoneRow,
+        mpOutlook: mpOutlookResult.rows[0] as unknown as MpOutlookRow,
+        mpBuckets: mpBucketsResult.rows[0] as unknown as MpBucketsRow,
+        mpCapacity: mpCapacityResult.rows as unknown as MpCapacityRow[],
+        mpNextDay: mpNextDayResult.rows[0] as unknown as MpNextDayRow,
       };
     });
 
@@ -393,6 +678,7 @@ export default async function handler(
         })),
       },
       sessions: data.sessionRows.map(mapSessionDetail),
+      morningPlan: buildMorningPlanAnalytics(data),
     };
 
     return res.status(200).json(response);

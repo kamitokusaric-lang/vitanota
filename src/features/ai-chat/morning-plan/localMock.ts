@@ -27,10 +27,15 @@ export interface MockMorningPlanResult {
   notes: string[];
 }
 
-const MAX_BY_CAPACITY: Record<Capacity, { today: number; optional: number }> = {
-  low: { today: 2, optional: 2 },
-  normal: { today: 3, optional: 3 },
-  high: { today: 3, optional: 3 },
+// chimo 2026-05-14: 「今日期限・期限切れ」は件数に関わらず全部 today に入れる。
+// それ以外のタスクを capacity で振り分け (AI が絞らず先生に判断してもらう)。
+const ADDITIONAL_BY_CAPACITY: Record<
+  Capacity,
+  { extraToday: number; optional: number }
+> = {
+  low: { extraToday: 0, optional: 2 },
+  normal: { extraToday: 2, optional: 3 },
+  high: { extraToday: 3, optional: 3 },
 };
 
 export function mockMorningPlan(
@@ -38,51 +43,73 @@ export function mockMorningPlan(
   today: string,
   tasks: MockTaskInput[],
 ): MockMorningPlanResult {
-  const max = MAX_BY_CAPACITY[capacity];
+  const additional = ADDITIONAL_BY_CAPACITY[capacity];
 
-  const scored = tasks.map((t) => {
+  // 1. 今日期限・期限切れ = 必ず today に入れる
+  const forcedToday = tasks.filter(
+    (t) => t.due_date != null && t.due_date <= today,
+  );
+  const others = tasks.filter(
+    (t) => !(t.due_date != null && t.due_date <= today),
+  );
+
+  // 2. それ以外を score でソート
+  const scored = others.map((t) => {
     let score = 0;
-    if (t.due_date && t.due_date <= today) score += 10;
-    else if (t.due_date) score += 5;
+    if (t.due_date) score += 5;
     if (t.status === 'in_progress') score += 3;
-    if (/今日|確認|連絡|提出|相談|締切|至急/.test(t.title + t.description)) score += 2;
+    if (/今日|確認|連絡|提出|相談|締切|至急/.test(t.title + t.description))
+      score += 2;
     return { task: t, score };
   });
   scored.sort((a, b) => b.score - a.score);
 
-  const todayItems = scored.slice(0, max.today).map((s) => ({
-    task_id: s.task.id,
-    reason: s.task.due_date
-      ? `期限が ${s.task.due_date} なので、今日まず見るとよさそうです`
-      : '優先度が高そうなので、今日まず見るとよさそうです',
+  const forcedTodayItems = forcedToday.map((t) => ({
+    task_id: t.id,
+    reason:
+      t.due_date != null && t.due_date < today
+        ? `期限が ${t.due_date} で過ぎています、今日まず見るとよさそうです`
+        : `期限が今日 (${t.due_date}) なので、今日まず見るとよさそうです`,
     suggested_action:
-      s.task.status === 'in_progress' ? '続きから少し進める' : '内容を確認する',
-    confidence: 0.6,
+      t.status === 'in_progress' ? '続きから少し進める' : '内容を確認する',
+    confidence: 0.8,
   }));
 
+  const extraTodayItems = scored
+    .slice(0, additional.extraToday)
+    .map((s) => ({
+      task_id: s.task.id,
+      reason: '優先度が高そうなので、今日まず見るとよさそうです',
+      suggested_action:
+        s.task.status === 'in_progress' ? '続きから少し進める' : '内容を確認する',
+      confidence: 0.5,
+    }));
+
   const optionalItems = scored
-    .slice(max.today, max.today + max.optional)
+    .slice(additional.extraToday, additional.extraToday + additional.optional)
     .map((s) => ({
       task_id: s.task.id,
       reason: '今日できなくても大丈夫ですが、余裕があれば少し進められそうです',
       suggested_action: '確認だけ先にする',
-      confidence: 0.5,
+      confidence: 0.4,
     }));
 
   const notShown = scored
-    .slice(max.today + max.optional)
+    .slice(additional.extraToday + additional.optional)
     .map((s) => s.task.id);
 
   const summary =
-    capacity === 'low'
-      ? '今日は少なめに絞ってあります'
-      : capacity === 'high'
-        ? '今日の見通し案を出しました'
-        : '今日まず見るとよさそうな案です';
+    forcedToday.length > 0
+      ? `今日期限・期限切れが ${forcedToday.length} 件あります。先生の判断で進めてください。`
+      : capacity === 'low'
+        ? '今日は少なめに絞ってあります'
+        : capacity === 'high'
+          ? '今日の見通し案を出しました'
+          : '今日まず見るとよさそうな案です';
 
   return {
     summary,
-    today: todayItems,
+    today: [...forcedTodayItems, ...extraTodayItems],
     optional: optionalItems,
     not_shown_task_ids: notShown,
     notes: [],

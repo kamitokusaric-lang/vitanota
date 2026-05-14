@@ -8,6 +8,7 @@ interface Props {
   onClick: () => void;
   disabled?: boolean;
   incompleteTaskCount?: number;
+  overdueTaskCount?: number;
   // まだ一度も使ったことがない教員に NEW バッジを出す (= 「初日」感)
   isNew?: boolean;
 }
@@ -16,10 +17,13 @@ export function MorningPlanCard({
   onClick,
   disabled,
   incompleteTaskCount,
+  overdueTaskCount,
   isNew,
 }: Props) {
   const hasCount =
     typeof incompleteTaskCount === 'number' && incompleteTaskCount > 0;
+  const hasOverdue =
+    typeof overdueTaskCount === 'number' && overdueTaskCount > 0;
   return (
     <button
       type="button"
@@ -50,6 +54,11 @@ export function MorningPlanCard({
           {hasCount && (
             <span className="ml-2 text-[11px] text-slate-400">
               · 未完了 {incompleteTaskCount} 件
+              {hasOverdue && (
+                <span className="ml-1 font-medium text-amber-700">
+                  (うち期限切れ {overdueTaskCount} 件)
+                </span>
+              )}
             </span>
           )}
         </p>

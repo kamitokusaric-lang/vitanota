@@ -86,6 +86,12 @@ export function PlanResultModal({
     await onMoveItem(taskId, to);
   };
 
+  // 「完了にする」: tasks.status='done' に更新 + リストから消す
+  const markDone = async (taskId: string) => {
+    setItems((prev) => prev.filter((i) => i.task_id !== taskId));
+    await onMarkTaskDone(taskId);
+  };
+
   // 「追加した / 完了にした」候補の状態 (AddTaskModal の row は残して視覚フィードバックを保持)
   const [processedMap, setProcessedMap] = useState<Map<string, 'added' | 'done'>>(
     new Map(),
@@ -141,7 +147,7 @@ export function PlanResultModal({
             <br />
           </>
         )}
-        違っていたら、入れ替えても、「今日やらない」を選んでも大丈夫です。
+        タスクを入れ替えたり、「今日やらない」を選んでも大丈夫です。
       </p>
 
       {/* アクションバー: スクロールしても常に上に貼り付く (タスクが多くても埋もれない) */}
@@ -177,6 +183,7 @@ export function PlanResultModal({
         label="今日やる"
         items={todayItems}
         onMove={move}
+        onMarkDone={markDone}
         onOpenDetail={setDetailItem}
         currentBucket="today"
         emptyText="今日やるは空です"
@@ -185,6 +192,7 @@ export function PlanResultModal({
         label="余裕があれば"
         items={optionalItems}
         onMove={move}
+        onMarkDone={markDone}
         onOpenDetail={setDetailItem}
         currentBucket="optional"
         emptyText="余裕があればは空です"
@@ -229,6 +237,7 @@ function PlanList({
   label,
   items,
   onMove,
+  onMarkDone,
   onOpenDetail,
   currentBucket,
   emptyText,
@@ -236,13 +245,15 @@ function PlanList({
   label: string;
   items: Array<GeneratedPlanItem & { bucket: Bucket }>;
   onMove: (taskId: string, to: EditTarget) => Promise<void> | void;
+  onMarkDone: (taskId: string) => Promise<void> | void;
   onOpenDetail: (item: GeneratedPlanItem) => void;
   currentBucket: Bucket;
   emptyText: string;
 }) {
   // 反対 bucket への移動先
   const otherBucket: Bucket = currentBucket === 'today' ? 'optional' : 'today';
-  const otherLabel = otherBucket === 'today' ? '今日やる' : '余裕があれば';
+  const otherLabel =
+    otherBucket === 'today' ? '今日やる' : '余裕があれば';
 
   return (
     <section className="mb-4">
@@ -299,6 +310,14 @@ function PlanList({
                     className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500 transition hover:border-slate-400 hover:bg-slate-50"
                   >
                     今日やらない
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onMarkDone(i.task_id)}
+                    data-testid={`plan-result-item-mark-done-${i.task_id}`}
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                  >
+                    完了にする
                   </button>
                 </div>
               </div>

@@ -52,9 +52,17 @@ export default async function handler(
 
   try {
     const result = await withTenantUser(ctx.tenantId, ctx.userId, role, async (tx) => {
-      // 自分が assignee の未完了タスク件数 (カード表示用)
-      const countResult = await tx.execute<{ count: number }>(sql`
-        SELECT COUNT(*)::int AS count
+      // 自分が assignee の未完了タスク件数 + 期限切れ件数 (カード表示用)
+      const countResult = await tx.execute<{
+        incomplete: number;
+        overdue: number;
+      }>(sql`
+        SELECT
+          COUNT(*)::int AS incomplete,
+          COUNT(*) FILTER (
+            WHERE t.due_date IS NOT NULL
+              AND t.due_date < (NOW() AT TIME ZONE 'Asia/Tokyo')::date
+          )::int AS overdue
         FROM tasks t
         INNER JOIN task_assignees ta
           ON ta.task_id = t.id AND ta.tenant_id = t.tenant_id
@@ -62,7 +70,8 @@ export default async function handler(
           AND t.tenant_id = ${ctx.tenantId}::uuid
           AND t.status <> 'done'
       `);
-      const incompleteAssigneeTaskCount = countResult.rows[0]?.count ?? 0;
+      const incompleteAssigneeTaskCount = countResult.rows[0]?.incomplete ?? 0;
+      const overdueAssigneeTaskCount = countResult.rows[0]?.overdue ?? 0;
 
       // 過去に morning_plan を一度でも開始 (startedAt 立った) ことがあるか
       const everResult = await tx.execute<{ exists: boolean }>(sql`
@@ -95,6 +104,7 @@ export default async function handler(
           sessionId: null,
           plan: null,
           incompleteAssigneeTaskCount,
+          overdueAssigneeTaskCount,
           hasEverUsedMorningPlan,
         };
       }
@@ -222,6 +232,7 @@ export default async function handler(
           feedbackSubmitted: Boolean(json.feedback),
         },
         incompleteAssigneeTaskCount,
+        overdueAssigneeTaskCount,
         hasEverUsedMorningPlan,
       };
     });

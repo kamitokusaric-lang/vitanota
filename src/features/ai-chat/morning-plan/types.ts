@@ -37,6 +37,8 @@ export interface TodayPlanResponse {
   } | null;
   // 今日プランがない時にカードの「N 件あります」表示用 (自分が assignee で未完了)
   incompleteAssigneeTaskCount: number;
+  // 期限切れ未完了タスク数 (自分が assignee、due_date が今日より前)
+  overdueAssigneeTaskCount: number;
   // 過去に morning_plan を一度でも始めたことがあるか (初回利用判定、NEW バッジ表示用)
   hasEverUsedMorningPlan: boolean;
 }

@@ -26,8 +26,18 @@ import type {
 
 type Phase =
   | { kind: 'loading' }
-  | { kind: 'no-plan'; incompleteTaskCount: number; isFirstTime: boolean }
-  | { kind: 'capacity-modal'; incompleteTaskCount: number; isFirstTime: boolean }
+  | {
+      kind: 'no-plan';
+      incompleteTaskCount: number;
+      overdueTaskCount: number;
+      isFirstTime: boolean;
+    }
+  | {
+      kind: 'capacity-modal';
+      incompleteTaskCount: number;
+      overdueTaskCount: number;
+      isFirstTime: boolean;
+    }
   | { kind: 'generating' }
   | { kind: 'result-modal'; gen: MorningPlanGenerateResponse }
   | { kind: 'starting' }
@@ -59,6 +69,7 @@ export function MorningPlanSection() {
         setPhase({
           kind: 'no-plan',
           incompleteTaskCount: data.incompleteAssigneeTaskCount,
+          overdueTaskCount: data.overdueAssigneeTaskCount,
           isFirstTime: !data.hasEverUsedMorningPlan,
         });
       }
@@ -74,9 +85,16 @@ export function MorningPlanSection() {
   const openCapacity = () => {
     const incompleteTaskCount =
       phase.kind === 'no-plan' ? phase.incompleteTaskCount : 0;
+    const overdueTaskCount =
+      phase.kind === 'no-plan' ? phase.overdueTaskCount : 0;
     const isFirstTime =
       phase.kind === 'no-plan' ? phase.isFirstTime : false;
-    setPhase({ kind: 'capacity-modal', incompleteTaskCount, isFirstTime });
+    setPhase({
+      kind: 'capacity-modal',
+      incompleteTaskCount,
+      overdueTaskCount,
+      isFirstTime,
+    });
   };
 
   const handleSelectCapacity = async (capacity: Capacity) => {
@@ -91,13 +109,13 @@ export function MorningPlanSection() {
       const data = (await res.json()) as MorningPlanGenerateResponse;
       if (data.empty || !data.sessionId) {
         showToast('今日のタスクは見当たりません', 'info');
-        setPhase({ kind: 'no-plan', incompleteTaskCount: 0, isFirstTime: false });
+        setPhase({ kind: 'no-plan', incompleteTaskCount: 0, overdueTaskCount: 0, isFirstTime: false });
         return;
       }
       setPhase({ kind: 'result-modal', gen: data });
     } catch {
       showToast('AI 整理に失敗しました', 'error');
-      setPhase({ kind: 'no-plan', incompleteTaskCount: 0, isFirstTime: false });
+      setPhase({ kind: 'no-plan', incompleteTaskCount: 0, overdueTaskCount: 0, isFirstTime: false });
     }
   };
 
@@ -168,7 +186,7 @@ export function MorningPlanSection() {
       await fetchTodayPlan();
     } catch {
       showToast('プランの開始に失敗しました', 'error');
-      setPhase({ kind: 'no-plan', incompleteTaskCount: 0, isFirstTime: false });
+      setPhase({ kind: 'no-plan', incompleteTaskCount: 0, overdueTaskCount: 0, isFirstTime: false });
     }
   };
 
@@ -186,7 +204,12 @@ export function MorningPlanSection() {
         // best effort
       }
     }
-    setPhase({ kind: 'no-plan', incompleteTaskCount: 0, isFirstTime: false });
+    setPhase({
+      kind: 'no-plan',
+      incompleteTaskCount: 0,
+      overdueTaskCount: 0,
+      isFirstTime: false,
+    });
     // closeResult 後に件数を取り直す (= 表示が "0 件" から最新へ)
     void fetchTodayPlan();
   };
@@ -256,6 +279,7 @@ export function MorningPlanSection() {
         <MorningPlanCard
           onClick={openCapacity}
           incompleteTaskCount={phase.incompleteTaskCount}
+          overdueTaskCount={phase.overdueTaskCount}
           isNew={phase.isFirstTime}
         />
       )}
@@ -282,6 +306,7 @@ export function MorningPlanSection() {
             setPhase({
               kind: 'no-plan',
               incompleteTaskCount: phase.incompleteTaskCount,
+              overdueTaskCount: phase.overdueTaskCount,
               isFirstTime: phase.isFirstTime,
             });
         }}

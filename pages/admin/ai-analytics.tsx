@@ -770,6 +770,25 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                       </div>
                     </div>
                   </section>
+
+                  {/* ─── H3 morning_plan「朝の見通し作り」 ─── */}
+                  <section className="mt-8 border-t border-gray-200 pt-8">
+                    <h1 className="mb-1 text-xl font-bold text-gray-900">
+                      H3 朝の見通し作り
+                    </h1>
+                    <p className="mb-5 text-xs text-gray-500">
+                      既存タスクから AI が「今日やる / 余裕があれば」の 2 軸に整理する機能の集計。
+                      今日のプラン開始率 / Done 発生率 / 見通しが持てた率 が主指標。
+                    </p>
+                  </section>
+
+                  <MorningPlanMainMetrics mp={data.morningPlan} />
+                  <MorningPlanFunnel mp={data.morningPlan} />
+                  <MorningPlanGuardrails mp={data.morningPlan} />
+                  <MorningPlanDoneBreakdown mp={data.morningPlan} />
+                  <MorningPlanBuckets mp={data.morningPlan} />
+                  <MorningPlanCapacityCross mp={data.morningPlan} />
+                  <MorningPlanContinuity mp={data.morningPlan} />
                 </div>
               )}
             </div>
@@ -777,6 +796,244 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
         </AdminLayout>
       </RoleGuard>
     </TenantGuard>
+  );
+}
+
+// ── H3 morning_plan セクション群 ──────────────────────────────
+
+function formatRate(value: number | null): string {
+  if (value == null) return '—';
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function MorningPlanMainMetrics({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">主指標 (H3 検証)</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard
+          label="今日のプラン開始率"
+          value={formatRate(mp.funnel.startedRate)}
+          caption={`開始 ${mp.funnel.startedCount} / 生成 ${mp.funnel.generatedCount}`}
+        />
+        <MetricCard
+          label="Done 発生率"
+          value={formatRate(mp.done.doneRate)}
+          caption={`Done ${mp.done.doneCount} / 開始セッションの items ${mp.done.totalItemsInStartedSessions}`}
+        />
+        <MetricCard
+          label="見通しが持てた率"
+          value={formatRate(mp.outlook.outlookHeldRate)}
+          caption={`持てた+少し ${mp.outlook.heldCount + mp.outlook.somewhatCount} / 回答 ${mp.outlook.feedbackCount}`}
+        />
+      </div>
+    </section>
+  );
+}
+
+function MorningPlanFunnel({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  const f = mp.funnel;
+  const max = Math.max(1, f.totalSessions);
+  const steps: Array<{ label: string; count: number; rate: number | null }> = [
+    { label: '整理セッション開始', count: f.totalSessions, rate: 1 },
+    { label: '余裕選択', count: f.capacitySelectedCount, rate: f.capacitySelectedRate },
+    { label: 'AI 提案生成', count: f.generatedCount, rate: f.generatedRate },
+    { label: '今日を始める', count: f.startedCount, rate: f.startedRate },
+  ];
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">
+        ファネル (整理 → 始める)
+      </h2>
+      <div className="rounded-lg border border-gray-200 bg-white p-5">
+        {steps.map((s) => (
+          <div key={s.label} className="flex items-center gap-3 py-1.5 text-sm">
+            <div className="w-40 shrink-0 text-gray-700">{s.label}</div>
+            <div className="relative h-5 flex-1 overflow-hidden rounded bg-gray-100">
+              <div
+                className="absolute inset-y-0 left-0 bg-vn-accent/70"
+                style={{ width: `${(s.count / max) * 100}%` }}
+              />
+            </div>
+            <div className="w-12 shrink-0 text-right tabular-nums text-gray-600">
+              {s.count}
+            </div>
+            <div className="w-14 shrink-0 text-right text-[11px] tabular-nums text-gray-400">
+              {s.rate == null ? '—' : `${(s.rate * 100).toFixed(1)}%`}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400">
+        編集開始: {f.editStartedCount} ({formatRate(f.editStartedRate)})
+      </p>
+    </section>
+  );
+}
+
+function MorningPlanGuardrails({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">ガードレール</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard
+          label="AI 提案後 即閉じ率"
+          value={formatRate(mp.funnel.closedAfterGenerationRate)}
+          caption={`生成 ${mp.funnel.generatedCount} のうち閉じる ${mp.funnel.closedWithoutStartCount}`}
+        />
+        <MetricCard
+          label="編集開始率 (≧70% で警告)"
+          value={formatRate(mp.funnel.editStartedRate)}
+          caption={`編集開始 ${mp.funnel.editStartedCount} / 生成 ${mp.funnel.generatedCount}`}
+        />
+        <MetricCard
+          label="Done ゼロ率"
+          value={formatRate(mp.done.zeroDoneSessionRate)}
+          caption={`Done 0 件 ${mp.done.zeroDoneSessions} / 開始 ${mp.done.startedSessions}`}
+        />
+      </div>
+    </section>
+  );
+}
+
+function MorningPlanDoneBreakdown({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">
+        Done 内訳 (bucket 別)
+      </h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <MetricCard
+          label="今日やる タスク Done 率"
+          value={formatRate(mp.done.todayBucketDoneRate)}
+          caption={`Done ${mp.done.todayBucketDoneCount} / 今日やる ${mp.done.todayBucketTotal}`}
+        />
+        <MetricCard
+          label="余裕があれば タスク Done 率"
+          value={formatRate(mp.done.optionalBucketDoneRate)}
+          caption={`Done ${mp.done.optionalBucketDoneCount} / 余裕があれば ${mp.done.optionalBucketTotal}`}
+        />
+      </div>
+    </section>
+  );
+}
+
+function MorningPlanBuckets({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">
+        AI 分類精度 (今日やる / 余裕があれば)
+      </h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label="AI 分類維持率"
+          value={formatRate(
+            mp.buckets.totalItems === 0
+              ? null
+              : mp.buckets.retainedCount / mp.buckets.totalItems,
+          )}
+          caption={`維持 ${mp.buckets.retainedCount} / 全 ${mp.buckets.totalItems}`}
+        />
+        <MetricCard
+          label="今日やる → 余裕があれば 移動"
+          value={`${mp.buckets.todayToOptional}`}
+          caption="AI が詰め込みすぎ (多いと注意)"
+        />
+        <MetricCard
+          label="余裕があれば → 今日やる 移動"
+          value={`${mp.buckets.optionalToToday}`}
+          caption="AI が控えめすぎ (多いと注意)"
+        />
+        <MetricCard
+          label="AI 提案除外率"
+          value={formatRate(mp.buckets.excludedRate)}
+          caption={`今日やらない ${mp.buckets.excludedCount} / 全 ${mp.buckets.totalItems}`}
+        />
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <MetricCard
+          label="手動追加率 (AI 提案外)"
+          value={formatRate(mp.buckets.userAddedRate)}
+          caption={`手動追加 ${mp.buckets.userAddedCount} / 全 ${mp.buckets.totalItems} (AI 提案が足りなかった指標)`}
+        />
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400">
+        AI 提案分布: 今日やる {mp.buckets.aiTodayCount} / 余裕があれば {mp.buckets.aiOptionalCount}
+      </p>
+    </section>
+  );
+}
+
+function MorningPlanCapacityCross({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  const labels: Record<'low' | 'normal' | 'high', string> = {
+    low: '少なめ',
+    normal: 'ふつう',
+    high: '少しある',
+  };
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">
+        余裕レベル別 (AI 出し分けが効いてるか)
+      </h2>
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr>
+              <th className="px-4 py-2 font-medium text-gray-600">余裕レベル</th>
+              <th className="px-4 py-2 text-right font-medium text-gray-600">
+                セッション数
+              </th>
+              <th className="px-4 py-2 text-right font-medium text-gray-600">
+                開始率
+              </th>
+              <th className="px-4 py-2 text-right font-medium text-gray-600">
+                編集率
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {mp.capacityCross.map((c) => (
+              <tr key={c.capacity}>
+                <td className="px-4 py-2 text-gray-700">{labels[c.capacity]}</td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {c.sessionCount}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatRate(c.startedRate)}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatRate(c.editRate)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function MorningPlanContinuity({ mp }: { mp: AiAnalyticsResponse['morningPlan'] }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">継続 (過去 14 日)</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard
+          label="翌日再訪率"
+          value={formatRate(mp.nextDayReturn.nextDayReturnRate)}
+          caption={`連続ユーザー ${mp.nextDayReturn.consecutiveUsers} / 利用ユーザー ${mp.nextDayReturn.uniqueUsers}`}
+        />
+        <MetricCard
+          label="見通しスコア分布"
+          value={
+            mp.outlook.feedbackCount === 0
+              ? '—'
+              : `${mp.outlook.heldCount}/${mp.outlook.somewhatCount}/${mp.outlook.difficultCount}`
+          }
+          caption="持てた / 少し / まだ"
+        />
+      </div>
+    </section>
   );
 }
 

@@ -11,7 +11,10 @@ import { AdminLayout } from '@/shared/components/AdminLayout';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import type { VitanotaSession } from '@/shared/types/auth';
-import type { AiAnalyticsResponse } from '@/features/ai-chat/analyticsTypes';
+import type {
+  AiAnalyticsResponse,
+  SessionDetail,
+} from '@/features/ai-chat/analyticsTypes';
 
 interface AiAnalyticsPageProps {
   session: VitanotaSession;
@@ -106,6 +109,274 @@ function BarRow({
   );
 }
 
+function StatusBadge({ status }: { status: SessionDetail['status'] }) {
+  const map: Record<SessionDetail['status'], { label: string; cls: string }> = {
+    draft: { label: 'draft', cls: 'bg-gray-100 text-gray-600' },
+    confirmed: { label: 'confirmed', cls: 'bg-emerald-100 text-emerald-700' },
+    discarded: { label: 'discarded', cls: 'bg-orange-100 text-orange-700' },
+  };
+  const { label, cls } = map[status];
+  return (
+    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+function DiffPair({
+  label,
+  before,
+  after,
+  changed,
+}: {
+  label: string;
+  before: string | null;
+  after: string | null;
+  changed: boolean;
+}) {
+  if (!changed) {
+    return (
+      <div className="text-xs">
+        <span className="text-gray-400">{label}:</span>{' '}
+        <span className="text-gray-700">{after ?? '—'}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="text-xs">
+      <span className="text-gray-400">{label}:</span>{' '}
+      <span className="text-gray-400 line-through">{before ?? '—'}</span>
+      <span className="mx-1 text-gray-400">→</span>
+      <span className="font-medium text-amber-700">{after ?? '—'}</span>
+    </div>
+  );
+}
+
+function SessionCard({ s }: { s: SessionDetail }) {
+  return (
+    <article className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <StatusBadge status={s.status} />
+        <span>{formatDateTime(s.createdAt)}</span>
+        <span className="text-gray-400">·</span>
+        <span className="font-mono">{s.type}</span>
+        {s.promptVersion && (
+          <>
+            <span className="text-gray-400">·</span>
+            <span className="font-mono">{s.promptVersion}</span>
+          </>
+        )}
+        <span className="ml-auto font-mono text-gray-400">{s.id.slice(0, 8)}</span>
+      </div>
+
+      <div className="mb-4">
+        <div className="text-[11px] font-semibold text-gray-500">入力本文</div>
+        <pre className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-3 text-sm text-gray-800">
+{s.inputText}
+        </pre>
+        {s.inputTextRedacted && s.inputTextRedacted !== s.inputText && (
+          <details className="mt-2 text-[11px] text-gray-500">
+            <summary className="cursor-pointer">PII マスク後 (Bedrock 入力)</summary>
+            <pre className="mt-1 whitespace-pre-wrap rounded border border-gray-100 bg-gray-50 p-2 text-xs text-gray-700">
+{s.inputTextRedacted}
+            </pre>
+          </details>
+        )}
+      </div>
+
+      <div className="mb-4">
+        <div className="text-[11px] font-semibold text-gray-500">
+          AI 提案 (extraction.tasks)
+        </div>
+        {!s.extraction || s.extraction.tasks.length === 0 ? (
+          <p className="mt-1 text-xs text-gray-400">候補なし</p>
+        ) : (
+          <ol className="mt-1 space-y-1.5">
+            {s.extraction.tasks.map((t, i) => (
+              <li
+                key={i}
+                className="rounded border border-gray-100 bg-gray-50 p-2 text-xs text-gray-700"
+              >
+                <div className="font-medium text-gray-900">{t.title}</div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
+                  <span>カテゴリ: {t.categoryId ?? '—'}</span>
+                  <span>期限: {t.dueDate ?? '—'}</span>
+                  <span>信頼度: {t.confidence || '—'}</span>
+                </div>
+                {t.memo && (
+                  <div className="mt-1 text-[11px] text-gray-500">メモ: {t.memo}</div>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+        {s.extraction?.needsConfirmation &&
+          s.extraction.needsConfirmation.length > 0 && (
+            <div className="mt-2 text-[11px] text-amber-700">
+              要確認: {s.extraction.needsConfirmation.join(' / ')}
+            </div>
+          )}
+      </div>
+
+      {s.userConfirmed && s.userConfirmed.length > 0 && (
+        <div className="mb-4">
+          <div className="text-[11px] font-semibold text-gray-500">
+            教員確定 (userConfirmed)
+            {s.confirmedAt && (
+              <span className="ml-2 font-normal text-gray-400">
+                · {formatDateTime(s.confirmedAt)}
+              </span>
+            )}
+          </div>
+          <ol className="mt-1 space-y-2">
+            {s.userConfirmed.map((c, i) => (
+              <li
+                key={i}
+                className="rounded border border-gray-100 bg-emerald-50/30 p-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-900">
+                    {c.title}
+                  </span>
+                  {!c.taskCreated && (
+                    <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">
+                      task 未作成
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1.5 space-y-1">
+                  <DiffPair
+                    label="タイトル"
+                    before={c.aiSuggestedTitle}
+                    after={c.title}
+                    changed={c.titleChanged}
+                  />
+                  <DiffPair
+                    label="カテゴリ"
+                    before={c.aiSuggestedParentName}
+                    after={c.userSelectedParentName}
+                    changed={c.categoryChanged}
+                  />
+                  <DiffPair
+                    label="期限"
+                    before={c.aiSuggestedDueDate}
+                    after={c.dueDate}
+                    changed={c.dueDateChanged}
+                  />
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {s.status === 'discarded' && (
+        <div className="mb-4 rounded border border-orange-100 bg-orange-50/50 p-3 text-xs">
+          <div className="font-semibold text-orange-700">破棄</div>
+          <div className="mt-1 text-gray-700">
+            理由: {s.discardReason ? reasonLabel(s.discardReason) : '(未選択)'}
+          </div>
+          {s.discardReasonText && (
+            <div className="mt-1 whitespace-pre-wrap text-gray-700">
+              {s.discardReasonText}
+            </div>
+          )}
+          {s.discardedAt && (
+            <div className="mt-1 text-[11px] text-gray-400">
+              {formatDateTime(s.discardedAt)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(s.survey || s.editReason || s.editReasonText) && (
+        <div className="rounded border border-gray-100 bg-gray-50 p-3 text-xs">
+          <div className="font-semibold text-gray-600">アンケート</div>
+          {s.survey && (
+            <div className="mt-1 flex flex-wrap gap-x-4 text-gray-700">
+              <span>
+                整理されたスコア:{' '}
+                <span className="font-medium">{s.survey.organizeScore} / 5</span>
+              </span>
+              {s.survey.inputBurdenScore != null && (
+                <span>
+                  入力負担:{' '}
+                  <span className="font-medium">
+                    {s.survey.inputBurdenScore} / 5
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+          {s.editReason && (
+            <div className="mt-1 text-gray-700">
+              編集理由: {reasonLabel(s.editReason)}
+            </div>
+          )}
+          {s.editReasonText && (
+            <div className="mt-1 whitespace-pre-wrap text-gray-700">
+              {s.editReasonText}
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ScoreHistogram({
+  label,
+  caption,
+  data,
+}: {
+  label: string;
+  caption?: string;
+  data: Array<{ score: number; count: number }>;
+}) {
+  // 1〜5 を必ず全部表示 (0 件のスコアもバーの空欄として出す)
+  const full = [1, 2, 3, 4, 5].map((s) => ({
+    score: s,
+    count: data.find((d) => d.score === s)?.count ?? 0,
+  }));
+  const total = full.reduce((sum, d) => sum + d.count, 0);
+  const max = Math.max(1, ...full.map((d) => d.count));
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <h3 className="text-xs font-semibold text-gray-600">{label}</h3>
+      <p className="mb-3 text-[11px] text-gray-400">
+        回答数 {total}
+        {caption ? ` · ${caption}` : ''}
+      </p>
+      <div className="space-y-1.5">
+        {full.map((d) => {
+          const width = (d.count / max) * 100;
+          const ratio = total === 0 ? 0 : (d.count / total) * 100;
+          return (
+            <div key={d.score} className="flex items-center gap-3 text-sm">
+              <div className="w-4 shrink-0 text-right tabular-nums text-gray-700">
+                {d.score}
+              </div>
+              <div className="relative h-5 flex-1 overflow-hidden rounded bg-gray-100">
+                <div
+                  className="absolute inset-y-0 left-0 bg-vn-accent/70"
+                  style={{ width: `${width}%` }}
+                />
+              </div>
+              <div className="w-10 shrink-0 text-right tabular-nums text-gray-600">
+                {d.count}
+              </div>
+              <div className="w-12 shrink-0 text-right text-[11px] tabular-nums text-gray-400">
+                {total === 0 ? '—' : `${ratio.toFixed(1)}%`}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
   const [data, setData] = useState<AiAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,6 +463,25 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                       総セッション数 {data.summary.totalSessions} (うち draft{' '}
                       {data.summary.draftCount})
                     </p>
+                  </section>
+
+                  {/* アンケート分布 */}
+                  <section>
+                    <h2 className="mb-3 text-sm font-semibold text-gray-700">
+                      アンケート スコア分布
+                    </h2>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <ScoreHistogram
+                        label="整理されたスコア (1〜5)"
+                        caption="高いほど整理された感覚 / 目安 4.0 以上"
+                        data={data.surveyDistribution.organizeScore}
+                      />
+                      <ScoreHistogram
+                        label="入力負担スコア (1〜5)"
+                        caption="低いほど負担が小さい / ガードレール"
+                        data={data.surveyDistribution.inputBurdenScore}
+                      />
+                    </div>
                   </section>
 
                   {/* 副指標 */}
@@ -452,6 +742,28 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                         </div>
                       )}
                     </div>
+                  </section>
+
+                  {/* セッション詳細 (最新 50 件、入力 → AI 提案 → 教員確定) */}
+                  <section>
+                    <h2 className="mb-3 text-sm font-semibold text-gray-700">
+                      セッション詳細 (最新 {data.sessions.length} 件)
+                    </h2>
+                    <p className="mb-3 text-xs text-gray-500">
+                      入力本文 → AI 提案 → 教員確定の流れ。差分はオレンジで強調。
+                      system_admin 専用。
+                    </p>
+                    {data.sessions.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        まだセッションがありません
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {data.sessions.map((s) => (
+                          <SessionCard key={s.id} s={s} />
+                        ))}
+                      </div>
+                    )}
                   </section>
 
                   {/* 自由コメント (定性ログ) */}

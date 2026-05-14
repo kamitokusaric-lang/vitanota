@@ -7,13 +7,106 @@
 //   - school_admin 不可視は API 認証層で 403
 //   - 期間フィルタは v1 では未実装 (全期間 aggregate のみ、データ量が増えたら追加)
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from 'drizzle-orm';
+import { sql, desc } from 'drizzle-orm';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { withSystemAdmin } from '@/shared/lib/db';
 import { aiSessions } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
-import type { AiAnalyticsResponse } from '@/features/ai-chat/analyticsTypes';
+import type {
+  AiAnalyticsResponse,
+  SessionDetail,
+} from '@/features/ai-chat/analyticsTypes';
+
+// 最新セッション詳細を取得する件数。chimo 2026-05-14 指示で踏み絵から外し、
+// 入力本文 + AI 提案 + 教員確定を system_admin に開示。
+const SESSION_DETAIL_LIMIT = 50;
+
+function mapSessionDetail(row: {
+  id: string;
+  type: string;
+  status: 'draft' | 'confirmed' | 'discarded';
+  createdAt: Date;
+  inputText: string;
+  aiOutputJson: unknown;
+}): SessionDetail {
+  const j = (row.aiOutputJson ?? {}) as Record<string, unknown>;
+  const str = (v: unknown): string | null =>
+    typeof v === 'string' ? v : null;
+  const num = (v: unknown): number | null =>
+    typeof v === 'number' ? v : null;
+
+  const extraction = j.extraction as
+    | { tasks?: unknown[]; needsConfirmation?: unknown[] }
+    | undefined;
+  const userConfirmed = j.userConfirmed as unknown[] | undefined;
+  const survey = j.survey as
+    | {
+        organizeScore?: unknown;
+        inputBurdenScore?: unknown;
+        submittedAt?: unknown;
+      }
+    | undefined;
+
+  return {
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+    inputText: row.inputText,
+    inputTextRedacted: str(j.inputTextRedacted),
+    promptVersion: str(j.promptVersion),
+    extraction: extraction
+      ? {
+          tasks: Array.isArray(extraction.tasks)
+            ? extraction.tasks.map((t) => {
+                const o = (t ?? {}) as Record<string, unknown>;
+                return {
+                  title: String(o.title ?? ''),
+                  categoryId: str(o.category_id),
+                  dueDate: str(o.due_date),
+                  memo: String(o.memo ?? ''),
+                  confidence: String(o.confidence ?? ''),
+                };
+              })
+            : [],
+          needsConfirmation: Array.isArray(extraction.needsConfirmation)
+            ? extraction.needsConfirmation.map((n) => String(n))
+            : [],
+        }
+      : null,
+    userConfirmed: Array.isArray(userConfirmed)
+      ? userConfirmed.map((c) => {
+          const o = (c ?? {}) as Record<string, unknown>;
+          return {
+            title: String(o.title ?? ''),
+            aiSuggestedTitle: str(o.aiSuggestedTitle),
+            titleChanged: Boolean(o.titleChanged),
+            aiSuggestedParentName: str(o.aiSuggestedParentName),
+            userSelectedParentName: String(o.userSelectedParentName ?? ''),
+            categoryChanged: Boolean(o.categoryChanged),
+            dueDate: str(o.dueDate),
+            aiSuggestedDueDate: str(o.aiSuggestedDueDate),
+            dueDateChanged: Boolean(o.dueDateChanged),
+            taskCreated: Boolean(o.taskCreated),
+          };
+        })
+      : null,
+    confirmedAt: str(j.confirmedAt),
+    discardReason: str(j.discardReason),
+    discardReasonText: str(j.discardReasonText),
+    discardedAt: str(j.discardedAt),
+    survey: survey
+      ? {
+          organizeScore: Number(survey.organizeScore),
+          inputBurdenScore: num(survey.inputBurdenScore),
+          submittedAt: String(survey.submittedAt ?? ''),
+        }
+      : null,
+    editReason: str(j.editReason),
+    editReasonText: str(j.editReasonText),
+  };
+}
 
 interface SummaryRow {
   total_sessions: number;
@@ -74,6 +167,11 @@ interface FreeCommentRow {
   reason: string | null;
   text: string;
   at: string | null;
+}
+
+interface ScoreDistributionRow {
+  score: number;
+  count: number;
 }
 
 export default async function handler(
@@ -223,6 +321,41 @@ export default async function handler(
         LIMIT 50
       `);
 
+      // アンケートのスコア分布 (1〜5 のヒストグラム)
+      const organizeScoreDistResult = await tx.execute(sql`
+        SELECT
+          (ai_output_json->'survey'->>'organizeScore')::int AS score,
+          COUNT(*)::int                                       AS count
+        FROM ${aiSessions}
+        WHERE ai_output_json->'survey'->>'organizeScore' IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
+      const inputBurdenDistResult = await tx.execute(sql`
+        SELECT
+          (ai_output_json->'survey'->>'inputBurdenScore')::int AS score,
+          COUNT(*)::int                                          AS count
+        FROM ${aiSessions}
+        WHERE ai_output_json->'survey'->>'inputBurdenScore' IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
+      // セッション詳細 (最新 N 件、入力本文 + AI 提案 + 教員確定)
+      const sessionRows = await tx
+        .select({
+          id: aiSessions.id,
+          type: aiSessions.type,
+          status: aiSessions.status,
+          createdAt: aiSessions.createdAt,
+          inputText: aiSessions.inputText,
+          aiOutputJson: aiSessions.aiOutputJson,
+        })
+        .from(aiSessions)
+        .orderBy(desc(aiSessions.createdAt))
+        .limit(SESSION_DETAIL_LIMIT);
+
       return {
         summary: (summaryResult.rows[0] as unknown as SummaryRow) ?? null,
         editRate: (editRateResult.rows[0] as unknown as EditRateRow) ?? null,
@@ -235,6 +368,9 @@ export default async function handler(
         guardrail: (guardrailResult.rows[0] as unknown as GuardrailRow) ?? null,
         discardComments: discardCommentResult.rows as unknown as FreeCommentRow[],
         editComments: editCommentResult.rows as unknown as FreeCommentRow[],
+        organizeScoreDist: organizeScoreDistResult.rows as unknown as ScoreDistributionRow[],
+        inputBurdenDist: inputBurdenDistResult.rows as unknown as ScoreDistributionRow[],
+        sessionRows,
       };
     });
 
@@ -318,6 +454,17 @@ export default async function handler(
           at: r.at,
         })),
       },
+      surveyDistribution: {
+        organizeScore: data.organizeScoreDist.map((r) => ({
+          score: r.score,
+          count: r.count,
+        })),
+        inputBurdenScore: data.inputBurdenDist.map((r) => ({
+          score: r.score,
+          count: r.count,
+        })),
+      },
+      sessions: data.sessionRows.map(mapSessionDetail),
     };
 
     return res.status(200).json(response);

@@ -12,8 +12,6 @@ export interface AiAnalyticsResponse {
     confirmedCount: number;
     discardedCount: number;
     draftCount: number;
-    organizeScoreAvg: number | null;
-    surveyCount: number;
   };
   editRate: {
     candidateCount: number;
@@ -31,8 +29,6 @@ export interface AiAnalyticsResponse {
     reusedUsers: number;
   };
   guardrails: {
-    inputBurdenScoreAvg: number | null;
-    inputBurdenScoreCount: number;
     privacyConcernDiscardCount: number;
     privacyConcernDiscardRate: number | null;
   };
@@ -41,7 +37,6 @@ export interface AiAnalyticsResponse {
     total: number;
     confirmed: number;
     discarded: number;
-    organizeScoreAvg: number | null;
   }>;
   categoryEdit: Array<{
     parentName: string;
@@ -50,10 +45,6 @@ export interface AiAnalyticsResponse {
   }>;
   discardReasons: Array<{ reason: string; count: number }>;
   editReasons: Array<{ reason: string; count: number }>;
-  surveyDistribution: {
-    organizeScore: Array<{ score: number; count: number }>;
-    inputBurdenScore: Array<{ score: number; count: number }>;
-  };
   freeComments: {
     discard: Array<{
       reason: string | null;
@@ -104,11 +95,6 @@ export interface SessionDetail {
   discardReason: string | null;
   discardReasonText: string | null;
   discardedAt: string | null;
-  survey: {
-    organizeScore: number;
-    inputBurdenScore: number | null;
-    submittedAt: string;
-  } | null;
   editReason: string | null;
   editReasonText: string | null;
 }

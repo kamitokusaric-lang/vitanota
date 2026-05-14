@@ -2,7 +2,7 @@
 //
 // 動線:
 //   idle/input → 教員が雑に書く → extract API → review (候補確認・修正) → confirm API
-//   → survey (整理されましたか?) → feedback API → idle に戻る
+//   → reasonForm (任意で気になった理由を聞く) → feedback API → idle に戻る
 //
 // 設計憲法 (feedback_design_vocab.md): 「分析・評価・最適化」を避け
 // 「整える・しまう・残す・渡す」「雑に書く」を使う。AI 主体ではなく教員主体の語彙。
@@ -368,15 +368,26 @@ export function RoughCaptureSection({
           userSelectedParentName: r.userSelectedParentName,
         })),
       );
-      setView({
-        kind: 'survey',
-        sessionId: view.sessionId,
-        createdCount: data.createdCount ?? 0,
-        hasEdits: Boolean(data.hasEdits),
-        pendingDiscardSessionId,
-        factLine,
-        suggestionLine,
-      });
+      // 編集なし & 破棄なしのときは聞くことがないので survey をスキップ
+      const needsFeedback = Boolean(data.hasEdits) || pendingDiscardSessionId !== null;
+      if (needsFeedback) {
+        setView({
+          kind: 'survey',
+          sessionId: view.sessionId,
+          createdCount: data.createdCount ?? 0,
+          hasEdits: Boolean(data.hasEdits),
+          pendingDiscardSessionId,
+          factLine,
+          suggestionLine,
+        });
+      } else {
+        setView({
+          kind: 'thanks',
+          createdCount: data.createdCount ?? 0,
+          factLine,
+          suggestionLine,
+        });
+      }
       setInput('');
     } catch {
       setError('通信に失敗しました。');
@@ -893,31 +904,32 @@ function SurveyView({
   ) => Promise<void>;
   onDone: (createdCount: number) => void;
 }) {
-  const [organizeScore, setOrganizeScore] = useState<number | null>(null);
   const [discardReason, setDiscardReason] = useState<DiscardReason | null>(null);
   const [discardReasonText, setDiscardReasonText] = useState('');
   const [editReason, setEditReason] = useState<DiscardReason | null>(null);
   const [editReasonText, setEditReasonText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const hasAnyInput = editReason !== null || discardReason !== null;
+
   const submit = async () => {
-    if (organizeScore === null) return;
     setSubmitting(true);
     const tasks: Promise<unknown>[] = [];
-    tasks.push(
-      fetch('/api/ai-chat/feedback', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          organizeScore,
-          ...(editReason ? { editReason } : {}),
-          ...(editReason === 'other' && editReasonText.trim()
-            ? { editReasonText: editReasonText.trim() }
-            : {}),
-        }),
-      }).catch(() => undefined),
-    );
+    if (editReason) {
+      tasks.push(
+        fetch('/api/ai-chat/feedback', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            editReason,
+            ...(editReason === 'other' && editReasonText.trim()
+              ? { editReasonText: editReasonText.trim() }
+              : {}),
+          }),
+        }).catch(() => undefined),
+      );
+    }
     if (pendingDiscardSessionId && discardReason) {
       tasks.push(
         onSendDiscardReason(pendingDiscardSessionId, discardReason, discardReasonText),
@@ -937,16 +949,6 @@ function SurveyView({
         {factLine ? ` ${factLine}` : ''}
         {suggestionLine ? ` ${suggestionLine}` : ''}
       </p>
-      <div className="mt-7">
-        <ScaleField
-          label="やることが少し見えやすくなりましたか？"
-          leftLabel="変わらない"
-          rightLabel="かなり見えた"
-          value={organizeScore}
-          onChange={setOrganizeScore}
-          testIdPrefix="rough-capture-survey-organize"
-        />
-      </div>
       {pendingDiscardSessionId && (
         <ReasonPanel
           title="途中で戻った整理について"
@@ -982,7 +984,7 @@ function SurveyView({
         <button
           type="button"
           onClick={submit}
-          disabled={organizeScore === null || submitting}
+          disabled={!hasAnyInput || submitting}
           className="h-12 min-w-[128px] rounded-xl bg-indigo-600 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] transition hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_22px_rgba(79,70,229,0.26)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
         >
           {submitting ? '送信中…' : '送信する'}
@@ -1150,11 +1152,8 @@ function ThanksView({
 
   return (
     <div className="py-2">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
-        ありがとうございます。次の整理に活かします。
-      </div>
       {(factLine || suggestionLine) && (
-        <p className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-3 text-xs leading-relaxed text-indigo-800">
+        <p className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-3 text-xs leading-relaxed text-indigo-800">
           <span className="font-medium text-indigo-700">
             {createdCount}件のタスクを作成しました。
           </span>

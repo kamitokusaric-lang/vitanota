@@ -6,6 +6,10 @@
 //   - 出力は aggregate のみ。user_id / tenant_id / input_text / 個別 session は返さない
 //   - school_admin 不可視は API 認証層で 403
 //   - 期間フィルタは v1 では未実装 (全期間 aggregate のみ、データ量が増えたら追加)
+//
+// 2026-05-14: 「整理されましたか?」アンケート UI 撤去に伴い、organizeScore /
+// inputBurdenScore 集計を画面から削除。過去データは ai_sessions.ai_output_json.survey に
+// 残ったまま (削除はしない)、編集理由 (editReason) 集計は残す。
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql, desc } from 'drizzle-orm';
 import { getServerSession } from 'next-auth';
@@ -33,20 +37,11 @@ function mapSessionDetail(row: {
   const j = (row.aiOutputJson ?? {}) as Record<string, unknown>;
   const str = (v: unknown): string | null =>
     typeof v === 'string' ? v : null;
-  const num = (v: unknown): number | null =>
-    typeof v === 'number' ? v : null;
 
   const extraction = j.extraction as
     | { tasks?: unknown[]; needsConfirmation?: unknown[] }
     | undefined;
   const userConfirmed = j.userConfirmed as unknown[] | undefined;
-  const survey = j.survey as
-    | {
-        organizeScore?: unknown;
-        inputBurdenScore?: unknown;
-        submittedAt?: unknown;
-      }
-    | undefined;
 
   return {
     id: row.id,
@@ -96,13 +91,6 @@ function mapSessionDetail(row: {
     discardReason: str(j.discardReason),
     discardReasonText: str(j.discardReasonText),
     discardedAt: str(j.discardedAt),
-    survey: survey
-      ? {
-          organizeScore: Number(survey.organizeScore),
-          inputBurdenScore: num(survey.inputBurdenScore),
-          submittedAt: String(survey.submittedAt ?? ''),
-        }
-      : null,
     editReason: str(j.editReason),
     editReasonText: str(j.editReasonText),
   };
@@ -113,8 +101,6 @@ interface SummaryRow {
   confirmed_count: number;
   discarded_count: number;
   draft_count: number;
-  organize_score_avg: string | null;
-  survey_count: number;
 }
 
 interface EditRateRow {
@@ -130,7 +116,6 @@ interface PromptVersionRow {
   total: number;
   confirmed: number;
   discarded: number;
-  organize_score_avg: string | null;
 }
 
 interface CategoryEditRow {
@@ -157,8 +142,6 @@ interface ReuseRow {
 }
 
 interface GuardrailRow {
-  input_burden_score_avg: string | null;
-  input_burden_score_count: number;
   privacy_concern_discard_count: number;
   total_discarded: number;
 }
@@ -167,11 +150,6 @@ interface FreeCommentRow {
   reason: string | null;
   text: string;
   at: string | null;
-}
-
-interface ScoreDistributionRow {
-  score: number;
-  count: number;
 }
 
 export default async function handler(
@@ -199,9 +177,7 @@ export default async function handler(
           COUNT(*)::int                                                          AS total_sessions,
           COUNT(*) FILTER (WHERE ${aiSessions.status} = 'confirmed')::int        AS confirmed_count,
           COUNT(*) FILTER (WHERE ${aiSessions.status} = 'discarded')::int        AS discarded_count,
-          COUNT(*) FILTER (WHERE ${aiSessions.status} = 'draft')::int            AS draft_count,
-          AVG((ai_output_json->'survey'->>'organizeScore')::int)                 AS organize_score_avg,
-          COUNT(*) FILTER (WHERE ai_output_json->'survey'->>'organizeScore' IS NOT NULL)::int AS survey_count
+          COUNT(*) FILTER (WHERE ${aiSessions.status} = 'draft')::int            AS draft_count
         FROM ${aiSessions}
       `);
 
@@ -222,8 +198,7 @@ export default async function handler(
           COALESCE(ai_output_json->>'promptVersion', '(none)')          AS prompt_version,
           COUNT(*)::int                                                  AS total,
           COUNT(*) FILTER (WHERE ${aiSessions.status} = 'confirmed')::int AS confirmed,
-          COUNT(*) FILTER (WHERE ${aiSessions.status} = 'discarded')::int AS discarded,
-          AVG((ai_output_json->'survey'->>'organizeScore')::int)         AS organize_score_avg
+          COUNT(*) FILTER (WHERE ${aiSessions.status} = 'discarded')::int AS discarded
         FROM ${aiSessions}
         GROUP BY 1
         ORDER BY total DESC
@@ -284,13 +259,11 @@ export default async function handler(
         ) AS u
       `);
 
-      // ガードレール: 入力負担スコア + privacy_concern 破棄
+      // ガードレール: privacy_concern 破棄
       const guardrailResult = await tx.execute(sql`
         SELECT
-          AVG((ai_output_json->'survey'->>'inputBurdenScore')::int)::numeric                          AS input_burden_score_avg,
-          COUNT(*) FILTER (WHERE ai_output_json->'survey'->>'inputBurdenScore' IS NOT NULL)::int      AS input_burden_score_count,
-          COUNT(*) FILTER (WHERE ai_output_json->>'discardReason' = 'privacy_concern')::int           AS privacy_concern_discard_count,
-          COUNT(*) FILTER (WHERE ${aiSessions.status} = 'discarded')::int                              AS total_discarded
+          COUNT(*) FILTER (WHERE ai_output_json->>'discardReason' = 'privacy_concern')::int  AS privacy_concern_discard_count,
+          COUNT(*) FILTER (WHERE ${aiSessions.status} = 'discarded')::int                     AS total_discarded
         FROM ${aiSessions}
       `);
 
@@ -321,27 +294,6 @@ export default async function handler(
         LIMIT 50
       `);
 
-      // アンケートのスコア分布 (1〜5 のヒストグラム)
-      const organizeScoreDistResult = await tx.execute(sql`
-        SELECT
-          (ai_output_json->'survey'->>'organizeScore')::int AS score,
-          COUNT(*)::int                                       AS count
-        FROM ${aiSessions}
-        WHERE ai_output_json->'survey'->>'organizeScore' IS NOT NULL
-        GROUP BY 1
-        ORDER BY 1
-      `);
-
-      const inputBurdenDistResult = await tx.execute(sql`
-        SELECT
-          (ai_output_json->'survey'->>'inputBurdenScore')::int AS score,
-          COUNT(*)::int                                          AS count
-        FROM ${aiSessions}
-        WHERE ai_output_json->'survey'->>'inputBurdenScore' IS NOT NULL
-        GROUP BY 1
-        ORDER BY 1
-      `);
-
       // セッション詳細 (最新 N 件、入力本文 + AI 提案 + 教員確定)
       const sessionRows = await tx
         .select({
@@ -368,8 +320,6 @@ export default async function handler(
         guardrail: (guardrailResult.rows[0] as unknown as GuardrailRow) ?? null,
         discardComments: discardCommentResult.rows as unknown as FreeCommentRow[],
         editComments: editCommentResult.rows as unknown as FreeCommentRow[],
-        organizeScoreDist: organizeScoreDistResult.rows as unknown as ScoreDistributionRow[],
-        inputBurdenDist: inputBurdenDistResult.rows as unknown as ScoreDistributionRow[],
         sessionRows,
       };
     });
@@ -380,11 +330,6 @@ export default async function handler(
         confirmedCount: data.summary?.confirmed_count ?? 0,
         discardedCount: data.summary?.discarded_count ?? 0,
         draftCount: data.summary?.draft_count ?? 0,
-        organizeScoreAvg:
-          data.summary?.organize_score_avg == null
-            ? null
-            : Number(data.summary.organize_score_avg),
-        surveyCount: data.summary?.survey_count ?? 0,
       },
       editRate: {
         candidateCount: data.editRate?.candidate_count ?? 0,
@@ -398,8 +343,6 @@ export default async function handler(
         total: r.total,
         confirmed: r.confirmed,
         discarded: r.discarded,
-        organizeScoreAvg:
-          r.organize_score_avg == null ? null : Number(r.organize_score_avg),
       })),
       categoryEdit: data.categoryEdit.map((r) => ({
         parentName: r.parent_name,
@@ -429,11 +372,6 @@ export default async function handler(
         reusedUsers: data.reuse?.reused_users ?? 0,
       },
       guardrails: {
-        inputBurdenScoreAvg:
-          data.guardrail?.input_burden_score_avg == null
-            ? null
-            : Number(data.guardrail.input_burden_score_avg),
-        inputBurdenScoreCount: data.guardrail?.input_burden_score_count ?? 0,
         privacyConcernDiscardCount:
           data.guardrail?.privacy_concern_discard_count ?? 0,
         privacyConcernDiscardRate:
@@ -452,16 +390,6 @@ export default async function handler(
           reason: r.reason,
           text: r.text,
           at: r.at,
-        })),
-      },
-      surveyDistribution: {
-        organizeScore: data.organizeScoreDist.map((r) => ({
-          score: r.score,
-          count: r.count,
-        })),
-        inputBurdenScore: data.inputBurdenDist.map((r) => ({
-          score: r.score,
-          count: r.count,
         })),
       },
       sessions: data.sessionRows.map(mapSessionDetail),

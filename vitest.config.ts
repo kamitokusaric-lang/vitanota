@@ -32,8 +32,6 @@ export default defineConfig({
         'src/**/*.d.ts',
         'src/db/schema.ts',
         'src/db/rls/**',
-        'src/shared/lib/db.ts',
-        'src/shared/lib/db-auth.ts',
         'src/shared/lib/secrets.ts',
         'src/features/auth/lib/auth-options.ts',
         'src/features/auth/lib/withAuthSSR.ts',

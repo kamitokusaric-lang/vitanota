@@ -69,6 +69,31 @@
 - **影響**: idle 30 秒で connection が破棄され、次リクエストで新規 PAM 認証（コスト・レイテンシ）
 - **対策**: 5〜10 分に緩和して再利用率を上げる。ただし max 10 で RDS connection 数との兼ね合いを確認
 
+### 🔴 高: PAM failed 根本原因の確定 (2026-05-15 fix デプロイ後の検証)
+- **発見日**: 2026-05-15 (PAM failed 再発、incident #6 解析で構造確定)
+- **背景**: 5/9 で TTL 短縮で解消したと判断したのは不完全。2026-05-15 に「特定 token generation が RDS 側で 3-4 分間 blacklist される」別構造が判明。教員アクセス集中時に発火 (必要条件)。詳細は memory `project_pam_auth_real_structure_20260515`
+- **当日対応**: `fix/2026-05-15-pam-retry-invalidate` で retry + compare-and-invalidate を実装、4 分障害 → ~50ms に短縮する症状対策。CloudWatch postgresql logs export を ON
+- **やること**:
+  1. 本番デプロイ後の次回 PAM failed event で CloudWatch logs を確認し、retry succeeded が正常に出ることを verify
+  2. 次回再発で **postgres logs から reason code を取得**して根本原因仮説 (per-token throttling) を検証
+  3. AWS Support に IAM auth per-token throttling 仕様を問い合わせ
+  4. 根本原因確定後、症状対策で十分か (retry のみ) / 経路切替必要か (password auth + Secrets rotation / RDS Proxy) を再判断
+
+### 🟡 中: PAM retry 関連の cleanup (本番デプロイ後の余裕で着手)
+- **発見日**: 2026-05-15 (上記 retry 実装の副産物)
+- **項目**:
+  1. **pool sweep (Phase 2)**: 同一 generation で N 秒以内に M 回失敗 → idle clients destroy。最初の retry 実装では未着手 (reconnect storm 防止)。本番ログで retry_success が出続けても旧 generation の尾が長く残る場合に追加
+  2. **`db.connect.retry.same_generation` assertion の unit test**: production code 改変 (UUID 注入可能化 or 専用 wrapper) なしには `vi.doMock('node:crypto')` が効かず unit test 困難 ([[feedback_vi_domock_node_builtin]])。production の assertion 行は CloudWatch で監視中
+  3. **`RDS_PROXY_ENDPOINT` env 名 rename**: RDS Proxy 無いのに名前嘘 (`src/shared/lib/db.ts:90`、`src/shared/lib/db-auth.ts:33`)。`RDS_ENDPOINT` に rename。CDK 側との同期必要
+  4. **`src/shared/lib/db.ts` / `db-auth.ts` のコメント嘘修正**: 「RDS Proxy がプール管理」「IAM トークン 15 分」「12 分 TTL キャッシュ」等の古い記述を実態 (Proxy 無し、TTL 8 分) に合わせる
+  5. **AutoMinorVersionUpgrade 運用見直し**: 2026-05-15 当日に B+C ハイブリッド (AutoMinor: false + window 変更) を検討したが、PAM failed が AutoMinor 起因ではないと判明し見送り。再発が別パターンになったら再評価
+
+### 🟢 低: CDK ドリフト解消 (CloudWatch Logs export ON を CDK に反映)
+- **発見日**: 2026-05-15 (PAM 調査中の本番設定変更)
+- **現状**: AWS CLI 直接 `modify-db-instance --cloudwatch-logs-export-configuration` で postgresql ログを ON。CDK 側 (`infra/lib/data-core-stack.ts` 想定) には反映していない
+- **影響**: 次回 cdk deploy で drift が出る、もしくは ON が消える可能性
+- **対策**: CDK の RDS instance 定義に `cloudwatchLogsExports: ['postgresql']` を追加
+
 ---
 
 ## インフラ整理

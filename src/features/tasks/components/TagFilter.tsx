@@ -36,11 +36,14 @@ export function TagFilter({ value, onChange, tags }: TagFilterProps) {
       return;
     }
     const r = triggerRef.current.getBoundingClientRect();
+    const margin = 16;
+    const maxHeight = Math.max(160, window.innerHeight - r.bottom - margin);
     setPopoverStyle({
       position: 'fixed',
       top: r.bottom + 4,
       left: r.left,
       minWidth: Math.max(r.width, 200),
+      maxHeight,
       zIndex: 60,
     });
   }, [open]);
@@ -90,7 +93,7 @@ export function TagFilter({ value, onChange, tags }: TagFilterProps) {
       {open && popoverStyle && (
         <div
           ref={popoverRef}
-          className="rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+          className="overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg"
           style={popoverStyle}
           role="dialog"
           aria-label="タグを選択"
@@ -130,6 +133,9 @@ export function TagFilter({ value, onChange, tags }: TagFilterProps) {
                   {checked && <span className="text-[10px] leading-none">✓</span>}
                 </span>
                 <span>#{t.name}</span>
+                <span className="ml-auto text-[10px] text-gray-400">
+                  {t.assignmentCount}件
+                </span>
               </button>
             );
           })}

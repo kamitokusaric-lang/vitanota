@@ -94,6 +94,18 @@
 - **影響**: 次回 cdk deploy で drift が出る、もしくは ON が消える可能性
 - **対策**: CDK の RDS instance 定義に `cloudwatchLogsExports: ['postgresql']` を追加
 
+### 🟡 中: アクセス分布ダッシュボード Phase 2 項目
+- **発見日**: 2026-05-15 (Phase 1 `/admin/access-distribution` 実装と並走)
+- **現状**: `/admin/access-distribution` は PV (CloudWatch Metrics Requests) + UU (sessions テーブル) を時間帯別/日付×時間帯で可視化。全テナント集計、system_admin のみ
+- **Phase 2 項目**:
+  1. **PAM failed event overlay** — 時間帯バーに `vitanota-prod-pam-auth-failed` 件数を重ね表示。incident と利用集中時間帯の相関を一目で
+  2. **tenant 別 breakdown** — 学校ごとの PV / UU。⚠️ memory `feedback_observed_moment_broken` 踏み絵 (「観測されてる感」を admin に出すかの判断必要)
+  3. **1 分粒度集計** — incident 分析用。CloudWatch Metrics retention 15 日制約、UI も別画面化推奨
+  4. **middleware page_view event** — 精度高い PV (route 単位の breakdown 可)。middleware.ts に 10 行追加 + CloudWatch Logs Insights クエリ
+  5. **ヒートマップで UU** — 現在は PV のみ、UU は sessions 粒度の制約あり (last_accessed_at 更新間隔)
+  6. **`APPRUNNER_SERVICE_NAME` / `APPRUNNER_SERVICE_ID` の env 化** — 現在 `src/features/access-distribution/lib/cloudwatchClient.ts` で `process.env.X ?? '本番 default'` フォールバック。CDK で AppRunner env に追加すれば test/prod 切り替え可能に
+  7. **aggregator / API route / UI コンポーネントの test 強化** — Phase 1 MVP は aggregator unit test のみ。CloudWatch SDK mock (`@aws-sdk/client-mock`) で API route 統合テスト + RTL で UI 検証
+
 ---
 
 ## インフラ整理

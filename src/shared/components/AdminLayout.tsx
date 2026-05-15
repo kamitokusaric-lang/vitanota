@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'カテゴリ管理',  href: '/admin/categories',      matchPrefix: '/admin/categories' },
   { label: 'お知らせ管理',  href: '/admin/announcements',    matchPrefix: '/admin/announcements' },
   { label: 'AI 改善',       href: '/admin/ai-analytics',     matchPrefix: '/admin/ai-analytics' },
+  { label: 'アクセス分布',  href: '/admin/access-distribution', matchPrefix: '/admin/access-distribution' },
 ];
 
 export function AdminLayout({ children, session }: AdminLayoutProps) {

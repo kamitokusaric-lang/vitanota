@@ -89,6 +89,16 @@ export class AppStack extends cdk.Stack {
       })
     );
 
+    // CloudWatch Metrics 読み取り (system_admin 用 access-distribution dashboard 経由で
+    // AWS/AppRunner Requests を時間帯別に集計する)。CW Metrics は resource-level 権限なし。
+    instanceRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'CloudWatchGetMetricData',
+        actions: ['cloudwatch:GetMetricData'],
+        resources: ['*'],
+      })
+    );
+
     // AI チャット整理 Lambda の invoke 権限 (AppRunner から pages/api/ai-chat/extract.ts 経由で呼ぶ)
     props.aiChatExtractFunction.grantInvoke(instanceRole);
 

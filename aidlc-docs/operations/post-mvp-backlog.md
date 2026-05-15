@@ -201,21 +201,40 @@
 
 ## CI / テスト
 
+### 🔴 高: CI workflow が main で常時 fail (5/14 以降、 setup-node の pnpm × Node 不一致)
+
+- **発見日**: 2026-05-15 (PAM retry / access-distribution 一連の作業中)
+- **背景**: setup-node action 経由で pnpm を install する際、 最新版 pnpm が Node v22.13+ を要求するが CI runner は Node v20 を使用。`Error [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:sqlite` で setup-node が失敗 → 依存ジョブも全部 fail
+- **影響ジョブ** (最新 run 25904201369 / sha 6d95a46、 main の **全** CI run が 5/14 以降 failure):
+  - Lockfile Integrity (setup-node 段階で失敗)
+  - Lint / Type Check / Test (同上)
+  - Integration Tests (PostgreSQL) (同上)
+  - E2E Tests (Playwright) (下記 既知項目 + setup-node 問題併発)
+  - Dependency Audit (OSV-Scanner) (Next.js 14→15 backlog の既知 CVE allowlist、 これは別系統)
+  - Secret Scan (gitleaks) のみ success
+- **影響**: 回帰検出能力ゼロ。 何を変更しても何も気づかない状態
+- **対策候補**:
+  1. CI workflow を Node v22 にアップグレード (`.github/workflows/ci.yml` の `node-version`)
+  2. pnpm version を Node v20 互換の特定バージョンに pin (setup-node の `version: latest` を `version: 9` 等に固定)
+  3. setup-node + corepack で pnpm 管理を一元化
+- **判断保留**: Node v22 upgrade は Next.js 14→15 と同時にやる方が干渉少ない可能性。 ただし「常時 fail で何を変更しても何も気づかない」状態は危険、 最低でも pnpm pin の hotfix を先行
+- **着手判断**: 至急 hotfix (pnpm pin) を 1-2 時間で投入、 Node v22 upgrade は Next.js 15 と同時
+- **関連**: Next.js 14→15 upgrade (脆弱性セクション)、 下記 E2E test 16 件
+
 ### 🟢 低: functions coverage threshold を 70% → 80% に戻す
 - **発見日**: 2026-05-04
 - **現状**: `vitest.config.ts` の coverage threshold を `functions: 70`、他 (lines / branches / statements) は 80% に設定。MVP 暫定で functions だけ甘くしてある
 - **未カバー箇所**:
   - `src/features/tasks/lib/taskService.ts`: `duplicateTask` のみ test 済、`createTask / updateTask / deleteTask / listTasks / setTaskTags / setTaskAssignees` が未カバー
   - `src/features/journal/lib/errors.ts` / `src/features/tasks/lib/errors.ts`: 各 Error class の constructor が未 test
+  - **2026-05-15 update**: PR #20 で db.ts / db-auth.ts を coverage 対象化、 PR #22 で `access-distribution/lib/aggregator.ts` は test 済。 ただし cloudwatchClient.ts / sessionUuRepository.ts / API route / UI components は未カバー (access-distribution Phase 2 行き)
 - **対策**: taskService の各 method にユニットテスト追加 → functions 80% に戻す
 - **着手判断**: 5/7 説明会後の安定期、coverage 厳守ポリシー復元
-
-### ✅ 完了: 統合テストの DB schema 追従 (2026-05-04 fix/ci-green ブランチで対応)
-- testDb.ts truncateAll の tags → emotion_tags 置換、session-leakage.test.ts の SELECT FROM tags → emotion_tags 置換、加えて移行中に tenant 越境の脆弱性 (security_invoker 未設定) を発見 → migration 0028 で hotfix
 
 ### 🔴 高: E2E test (Playwright) 16 件の現行 UI / DB schema 追従
 - **発見日**: 2026-05-04 (fix/ci-green 着手中、ローカル実走 16 failed / 10 passed を確認)
 - **影響**: CI workflow の `E2E Tests (Playwright)` ジョブが常時赤。本番動作には影響しないが、回帰検出能力ゼロ。今後の UI / API 改修で何が壊れたか判別不能
+- **⚠️ 2026-05-15 update**: 上記 16 件の調査は 2026-05-04 ローカル実走ベース。 5/14 以降 CI 側は setup-node の Node version 不一致で **E2E ジョブが起動段階で fail** しており、 実走 0 件。 まず上記「CI workflow が main で常時 fail」を解消してから spec 再 verify する流れ
 - **失敗内訳と原因** (16 件):
   - **01-auth: 1 件** — `/journal` route 不在 (現行は `/`)。修正: 該当 test の goto 先を `/` に
   - **02-journal-crud: 6 件** — `/journal/new` / `/journal/mine` route 不在。現行 UI は timeline (`/`) 上部に常駐する compact form (mood 絵文字選択 → expand → textarea) で投稿。修正: route 追従 + compact form の操作シーケンス (mood click → fill content → submit) に書き換え
@@ -334,32 +353,14 @@
   3. 残置 DB スキーマを再利用 or 別設計
   4. `pre-anthropic-removal-baseline` tag のコードを参照しつつ再実装
 
-### 🟢 低: 既存 journal_entries の content_masked を batch backfill
-- **発見日**: 2026-04-27
-- **現状**: 週次レポート機能 MVP では「on-the-fly mask」(AI 入力時に `content_masked IS NULL` なら maskContent をその場で呼ぶ) で対応中。新規投稿は API 側で content_masked が常に埋まる
-- **影響**: 既存投稿が大量にある場合、週次サマリ生成時のレスポンスが遅くなる可能性 (1 ユーザー × 1 週で数件〜十数件マスク = 数 ms〜数十 ms で問題ないが、scale が増えれば気になる)
-- **対策**: TS スクリプト (`scripts/backfill-content-masked.ts`) で全 entries に対して maskContent を適用 → content_masked カラムを埋める。dotenv or @next/env で local DB 接続、本番は CDK migration job 内で 1 回だけ実行
-- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) § 9.3
-
-### 🔴 高: system_admin「AI 改善」分析画面 (H1 検証 Phase B「見る」)
-- **発見日**: 2026-05-13
-- **着手予定**: 2026-05-14 (chimo 指示、明日着手)
-- **現状**: H1 検証 MVP デプロイ済。`ai_sessions.ai_output_json` に必要データはすべて入っている (jsonb 集計可能) が、集計画面は未実装。chimo が手動で psql query する状態
-- **影響**: H1 検証の主指標 (タスク候補作成確定率 / 整理スコア平均) と副指標 (修正率系) を継続観測できない。改善材料の抽出が手動・属人的
-- **対策**: system_admin 専用画面 `/admin/ai-analytics` 新設。下記指標を jsonb 集計クエリで表示
-- **指標一覧 (chimo 構想 Phase B)**:
-  - タスク候補作成確定率 (H1 主指標) — `status='confirmed'` / 全 sessions
-  - 整理されたスコア平均 (H1 主指標) — `ai_output_json.survey.organizeScore` AVG
-  - 破棄率 — `status='discarded'` / 全
-  - カテゴリ修正率 — `userConfirmed[].categoryChanged` TRUE 比率
-  - タイトル修正率 — `userConfirmed[].titleChanged` TRUE 比率
-  - 期限修正率 — `userConfirmed[].dueDateChanged` TRUE 比率
-  - prompt_version 別成果 — `ai_output_json.promptVersion` で group + 上記指標 × 版
-  - カテゴリ別修正率 — `userSelectedParentName × categoryChanged` で group
-  - 破棄理由ランキング — `ai_output_json.discardReason` COUNT by reason
-  - 編集理由ランキング — `ai_output_json.editReason` COUNT by reason
-- **裏テーマ踏み絵**: 個人特定可能な集計は不可 (`feedback_observed_moment_broken`)。system_admin のみ閲覧、テナント横断 aggregate のみ。input_text を直接読むのは緊急 debug 時のみ
-- **関連 memory**: `project_phase1_core_experience` `project_ai_sessions_visibility` `project_ai_strategy_20260511`
+### ⚪ 凍結: 既存 journal_entries の content_masked を batch backfill
+- **凍結日**: 2026-05-15 (週次レポート機能撤回 2026-04-27 に伴い、 本項目も実質不要)
+- **凍結理由**: 週次サマリ機能が「先週のvitanotaレポート 機能 (凍結)」で全面撤回されたため、 content_masked カラムを埋める backfill 自体が不要。 ただし将来 AI 機能再開時に同じ仕組みが復活する可能性があるため、 設計参照用として残置
+- **元の内容** (2026-04-27 発見):
+  - 週次レポート MVP で on-the-fly mask 採用、 新規投稿は API で content_masked 常時埋め
+  - 既存投稿は backfill 必要 (TS script で全 entries に maskContent 適用)
+  - 設計書: `construction/weekly-summary-design.md` § 9.3
+- **再開時に必要**: 週次レポート機能を再設計するなら本項目も再評価
 
 ### 🟡 中: AI 整理 Phase C-E (辞書・カテゴリルール・プロンプトバージョン・フラグの DB 化)
 - **発見日**: 2026-05-13
@@ -387,12 +388,14 @@
 - **裏テーマ踏み絵**: 「機能 ON/OFF」自体は運用情報 (踏み絵ではない)。ただし「AI 利用量」「ON 履歴」を school_admin 閲覧可能にしない (= 観測者原則の対象)。管理画面は system_admin 専用とし RLS 設計を踏襲
 - **関連 memory**: `project_ai_chat_feature_flag.md`
 
-### 🟡 中: 週次レポート自動生成 Lambda (EventBridge cron)
-- **発見日**: 2026-04-27
-- **現状**: MVP では「アクセス時自動生成」(初回 GET /api/me/weekly-summary でその場で生成 + DB 保存)
-- **影響**: 月曜にアクセスがないと、火曜以降の初回アクセス時に生成。ユーザー体験はほぼ問題ないが、「常に月曜時点で fresh な summary がある」とは保証されない
-- **対策**: EventBridge Scheduler + Lambda で月曜 0:00 JST に全 active user 分を batch 生成 → DB 保存。アクセス時は既存を返すだけになる
-- **設計書**: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) § 17 (Phase 2)
+### ⚪ 凍結: 週次レポート自動生成 Lambda (EventBridge cron)
+- **凍結日**: 2026-05-15 (週次レポート機能撤回 2026-04-27 に伴い、 本項目も実質不要)
+- **凍結理由**: 週次サマリ機能が「先週のvitanotaレポート 機能 (凍結)」で全面撤回されたため、 cron 自動生成も不要。 ただし将来 AI 機能再開時に類似の batch 設計が必要になる可能性があるため、 設計参照用として残置
+- **元の内容** (2026-04-27 発見):
+  - MVP では「アクセス時自動生成」、 月曜 fresh は保証されない
+  - 対策: EventBridge Scheduler + Lambda で月曜 0:00 JST に batch 生成
+  - 設計書: `construction/weekly-summary-design.md` § 17 (Phase 2)
+- **再開時に必要**: 週次レポート機能を再設計するなら本項目も再評価
 
 ---
 

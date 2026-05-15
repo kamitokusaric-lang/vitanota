@@ -84,6 +84,17 @@ export class FoundationStack extends cdk.Stack {
       privateDnsEnabled: true,
     });
 
+    // VPC Interface Endpoint: CloudWatch Monitoring (Metrics API)
+    // system_admin の /admin/access-distribution が CloudWatch Metrics GetMetricData を
+    // 呼ぶため必須。PRIVATE_ISOLATED の AppRunner からは VPC Endpoint 経由でないと到達不可で
+    // 永久 hang → CloudFront 30s timeout で 504 になる (2026-05-15 観測)。
+    vpc.addInterfaceEndpoint('CloudWatchMonitoringEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      securityGroups: [this.appSecurityGroup],
+      privateDnsEnabled: true,
+    });
+
     // GitHub Actions OIDC プロバイダー
     const oidcProvider = new iam.OpenIdConnectProvider(this, 'GitHubOidc', {
       url: 'https://token.actions.githubusercontent.com',

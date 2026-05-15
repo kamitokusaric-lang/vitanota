@@ -96,3 +96,112 @@ describe('getDbAuthToken (singleflight + cache + meta)', () => {
     expect(getAuthToken).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('invalidateTokenGeneration (compare-and-invalidate)', () => {
+  it('現 cache.generationId と一致するときに cache を消し true を返す', async () => {
+    const getAuthToken = vi.fn().mockResolvedValue('token-INV1');
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+    }));
+
+    const { getDbAuthToken, getCurrentTokenMeta, invalidateTokenGeneration } =
+      await import('@/shared/lib/db-auth');
+
+    await getDbAuthToken();
+    const meta = getCurrentTokenMeta()!;
+
+    const result = invalidateTokenGeneration(meta.generationId, 'test_reason');
+
+    expect(result).toBe(true);
+    expect(getCurrentTokenMeta()).toBeNull();
+  });
+
+  it('世代不一致のときは cache 不変で false を返す (stale failure protect)', async () => {
+    const getAuthToken = vi.fn().mockResolvedValue('token-INV2');
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+    }));
+
+    const { getDbAuthToken, getCurrentTokenMeta, invalidateTokenGeneration } =
+      await import('@/shared/lib/db-auth');
+
+    await getDbAuthToken();
+    const meta = getCurrentTokenMeta()!;
+
+    const staleGenerationId = '00000000-0000-0000-0000-000000000000';
+    const result = invalidateTokenGeneration(staleGenerationId, 'stale_test');
+
+    expect(result).toBe(false);
+    expect(getCurrentTokenMeta()).not.toBeNull();
+    expect(getCurrentTokenMeta()!.generationId).toBe(meta.generationId);
+  });
+
+  it('cache が空のときの invalidate は false を返す', async () => {
+    const getAuthToken = vi.fn().mockResolvedValue('token-INV3');
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+    }));
+
+    const { invalidateTokenGeneration, getCurrentTokenMeta } =
+      await import('@/shared/lib/db-auth');
+
+    expect(getCurrentTokenMeta()).toBeNull();
+
+    const result = invalidateTokenGeneration('any-gen-id', 'empty_cache_test');
+
+    expect(result).toBe(false);
+  });
+});
+
+describe('getDbAuthToken { forceRefresh: true }', () => {
+  it('forceRefresh で既存 cache を無視して signer を再呼び出しする', async () => {
+    const getAuthToken = vi
+      .fn()
+      .mockResolvedValueOnce('token-F1')
+      .mockResolvedValueOnce('token-F2');
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+    }));
+
+    const { getDbAuthToken, getCurrentTokenMeta } = await import('@/shared/lib/db-auth');
+
+    const t1 = await getDbAuthToken();
+    const meta1 = getCurrentTokenMeta()!;
+
+    const t2 = await getDbAuthToken({ forceRefresh: true });
+    const meta2 = getCurrentTokenMeta()!;
+
+    expect(t1).toBe('token-F1');
+    expect(t2).toBe('token-F2');
+    expect(meta1.generationId).not.toBe(meta2.generationId);
+    expect(getAuthToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('forceRefresh でも inflight があれば集約する (signer 1 回)', async () => {
+    let resolveSigner: (value: string) => void = () => {};
+    const signerPromise = new Promise<string>((resolve) => {
+      resolveSigner = resolve;
+    });
+    const getAuthToken = vi.fn().mockReturnValue(signerPromise);
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+    }));
+
+    const { getDbAuthToken } = await import('@/shared/lib/db-auth');
+
+    // 1 つ目を inflight 化、その後 forceRefresh で 5 つ並列に呼ぶ
+    const first = getDbAuthToken();
+    await Promise.resolve();
+
+    const forced = Array.from({ length: 5 }, () => getDbAuthToken({ forceRefresh: true }));
+    await Promise.resolve();
+    expect(getAuthToken).toHaveBeenCalledTimes(1);
+
+    resolveSigner('token-AGG');
+
+    const results = await Promise.all([first, ...forced]);
+
+    expect(results).toEqual(Array(6).fill('token-AGG'));
+    expect(getAuthToken).toHaveBeenCalledTimes(1);
+  });
+});

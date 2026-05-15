@@ -13,21 +13,6 @@ function spyOnPoolConnectPromise() {
   );
 }
 
-function spyOnPoolConnectCallback() {
-  return vi.spyOn(
-    Pool.prototype as unknown as {
-      connect: (
-        cb: (
-          err: Error | undefined,
-          client: PoolClient | undefined,
-          done: (release?: unknown) => void,
-        ) => void,
-      ) => void;
-    },
-    'connect',
-  );
-}
-
 beforeEach(() => {
   __resetTokenCacheForTest();
 });
@@ -90,61 +75,50 @@ describe('ObservablePool — promise 経路', () => {
 
 // ★ 5/9 14:14 の本番事故の再発防止テスト。
 // pg-pool 内部 (pool.query() の implementation) は this.connect((err, client, done) => …)
-// と callback 形式で self-call する。Promise 専用の override を書くと callback が
-// 永久に呼ばれず、リクエストが forever pending → CloudFront 30s で 504 となる。
-// 今回の override が「callback を必ず forward する」ことを構造的に検証する。
-describe('ObservablePool — callback 経路 (本番 504 再発防止)', () => {
-  it('callback 形式で呼ばれた場合、super.connect も callback で呼ばれて結果が forward される', () => {
+// と callback 形式で self-call する。callback path で user callback が forward されない実装だと
+// リクエストが forever pending → CloudFront 30s で 504 となる。
+// 2026-05-15 retry 実装で callback path も promise helper 経由に統一したため、
+// super.connect は promise 形式で呼ばれる。user callback への forward が崩れていないことを検証する。
+describe('ObservablePool — callback 経路 (5/9 事故の再発防止)', () => {
+  it('callback 形式で呼ばれた場合、成功した client が user callback に forward される', async () => {
     const fakeClient = { release: vi.fn() } as unknown as PoolClient;
-    const fakeDone = vi.fn();
-    let capturedSuperCb:
-      | ((
-          err: Error | undefined,
-          client: PoolClient | undefined,
-          done: (release?: unknown) => void,
-        ) => void)
-      | null = null;
-    spyOnPoolConnectCallback().mockImplementation((cb) => {
-      capturedSuperCb = cb;
-    });
+    spyOnPoolConnectPromise().mockResolvedValue(fakeClient);
 
     const p = new ObservablePool();
     const userCb = vi.fn();
     p.connect(userCb);
 
-    // ObservablePool は super.connect(callback) を必ず呼んだはず
-    expect(capturedSuperCb).not.toBeNull();
+    // promise resolve まで microtask を待つ
+    await new Promise((r) => setImmediate(r));
 
-    // super 側 callback を成功で発火 → user の callback が forward される
-    capturedSuperCb!(undefined, fakeClient, fakeDone);
-    expect(userCb).toHaveBeenCalledWith(undefined, fakeClient, fakeDone);
+    expect(userCb).toHaveBeenCalledTimes(1);
+    expect(userCb.mock.calls[0]![0]).toBeUndefined();
+    expect(userCb.mock.calls[0]![1]).toBe(fakeClient);
+    expect(typeof userCb.mock.calls[0]![2]).toBe('function');
   });
 
-  it('callback 形式の失敗時、failed ログが出たうえで user callback にも error が forward される', () => {
-    const pamErr = Object.assign(
-      new Error('PAM authentication failed for user "vitanota_app"'),
-      { code: '28000' },
-    );
-    spyOnPoolConnectCallback().mockImplementation((cb) => {
-      cb(pamErr, undefined, () => {});
-    });
+  it('callback 形式の失敗時 (非 PAM)、failed ログ + user callback に error forward', async () => {
+    const otherErr = Object.assign(new Error('non-pam connection error'), { code: '08006' });
+    spyOnPoolConnectPromise().mockRejectedValue(otherErr);
     const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
 
     const p = new ObservablePool();
     const userCb = vi.fn();
     p.connect(userCb);
 
+    await new Promise((r) => setImmediate(r));
+
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0]![0]).toMatchObject({
       event: 'db.client.connect.failed',
-      err_code: '28000',
+      err_code: '08006',
     });
     expect(userCb).toHaveBeenCalledTimes(1);
-    expect(userCb.mock.calls[0]![0]).toBe(pamErr);
+    expect(userCb.mock.calls[0]![0]).toBe(otherErr);
   });
 
   it('callback 形式の override が void を返す (Promise を返さない)', () => {
-    spyOnPoolConnectCallback().mockImplementation(() => {});
+    spyOnPoolConnectPromise().mockResolvedValue({ release: vi.fn() } as unknown as PoolClient);
     const p = new ObservablePool();
     const ret = p.connect(() => {});
     expect(ret).toBeUndefined();

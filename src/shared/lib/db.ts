@@ -4,7 +4,13 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolClient } from 'pg';
 import { sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { getDbAuthToken, getCurrentTokenMeta } from './db-auth';
+import {
+  getDbAuthToken,
+  getCurrentTokenMeta,
+  invalidateTokenGeneration,
+  IAM_TOKEN_TTL_MS,
+  type TokenMeta,
+} from './db-auth';
 import { logger } from './logger';
 import * as schema from '@/db/schema';
 
@@ -25,51 +31,144 @@ type PgConnectCallback = (
   done: (release?: unknown) => void,
 ) => void;
 
+function sleepJitter(minMs: number, maxMs: number): Promise<void> {
+  const delay = minMs + Math.random() * (maxMs - minMs);
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+function isRetryablePamFailure(err: unknown, tokenAgeMs: number | null): boolean {
+  if (tokenAgeMs === null || tokenAgeMs >= IAM_TOKEN_TTL_MS) return false;
+  const code = (err as { code?: string }).code;
+  if (code !== '28000') return false;
+  const message = err instanceof Error ? err.message : '';
+  return message.includes('PAM authentication failed');
+}
+
 export class ObservablePool extends Pool {
   override connect(): Promise<PoolClient>;
   override connect(cb: PgConnectCallback): void;
   override connect(cb?: PgConnectCallback): Promise<PoolClient> | void {
-    const meta = getCurrentTokenMeta();
-    const startedAt = Date.now();
-
-    const logFailure = (err: unknown) => {
-      const tokenAge = meta ? Date.now() - meta.createdAt : null;
-      const errCode = (err as { code?: string }).code;
-      const errMessage = err instanceof Error ? err.message : String(err);
-      logger.error(
-        {
-          event: 'db.client.connect.failed',
-          token_generation_id: meta?.generationId,
-          token_age_at_connect_ms: tokenAge,
-          connect_duration_ms: Date.now() - startedAt,
-          err_code: errCode,
-          err_message: errMessage,
-          pool_total: this.totalCount,
-          pool_idle: this.idleCount,
-          pool_waiting: this.waitingCount,
-        },
-        'pool.connect() failed',
-      );
-    };
-
     if (cb) {
-      // callback 形式: super.connect も callback で呼び、cb をそのまま forward する。
-      // ここを忘れると pg-pool 内部 self-call が握り潰されて pending リクエストが残る。
-      super.connect((err, client, done) => {
-        if (err) logFailure(err);
-        cb(err, client, done);
-      });
+      // callback path も promise helper 経由で統一 (5/9 callback overload 事故ポイント、
+      // pg-pool 内部 self-call (index.js 449 付近) はここを通る)。
+      this.connectWithRetry().then(
+        (client) => {
+          const release = (releaseArg?: unknown) => {
+            if (releaseArg instanceof Error || releaseArg === true) {
+              client.release(releaseArg as Error | true);
+            } else {
+              client.release();
+            }
+          };
+          cb(undefined, client, release);
+        },
+        (err: Error) => {
+          cb(err, undefined, () => {});
+        },
+      );
       return;
     }
+    return this.connectWithRetry();
+  }
 
-    return (async () => {
-      try {
-        return await super.connect();
-      } catch (err) {
-        logFailure(err);
+  // PAM auth failed を検出した場合に「同世代の cache を invalidate して新 token で 1 回 retry」する。
+  // incident #6 (2026-05-12 4 分継続) の構造に対する本丸対応:
+  // 旧 token が RDS 側で拒否された後、新 token は 40ms で成功する。アプリ側は cache TTL 8 分の
+  // 手前で問題発生するため refresh のトリガーが無く、死んだ token を握って障害が伸びる。
+  // ここで invalidate + forceRefresh + retry を 1 回挟むことで 4 分障害 → ~50ms に短縮する。
+  private async connectWithRetry(): Promise<PoolClient> {
+    const failedMeta = getCurrentTokenMeta();
+    const attempt0StartedAt = Date.now();
+
+    try {
+      return await super.connect();
+    } catch (err) {
+      this.logConnectFailure(err, failedMeta, attempt0StartedAt, 0);
+      const tokenAgeMs = failedMeta ? Date.now() - failedMeta.createdAt : null;
+
+      if (!failedMeta || !isRetryablePamFailure(err, tokenAgeMs)) {
         throw err;
       }
-    })();
+
+      // compare-and-invalidate (世代 fence)。旧世代の遅延 failure が新 token cache を消さない。
+      const invalidated = invalidateTokenGeneration(failedMeta.generationId, 'pam_auth_failed');
+
+      // 複数 instance / 並列 callsite の signer storm 分散
+      await sleepJitter(100, 300);
+
+      // 強制 refresh して新 token を取りに行く (inflight があれば集約)
+      await getDbAuthToken({ forceRefresh: true });
+      const retryMeta = getCurrentTokenMeta();
+
+      // assertion: forceRefresh 後も同 generation なら race detection
+      if (retryMeta && retryMeta.generationId === failedMeta.generationId) {
+        logger.error(
+          {
+            event: 'db.connect.retry.same_generation',
+            failed_generation_id: failedMeta.generationId,
+            retry_generation_id: retryMeta.generationId,
+            invalidated,
+          },
+          'Retry attempted with same token generation (forceRefresh path race)',
+        );
+      }
+
+      const attempt1StartedAt = Date.now();
+      try {
+        const client = await super.connect();
+        logger.info(
+          {
+            event: 'db.connect.retry.succeeded',
+            failed_generation_id: failedMeta.generationId,
+            current_generation_id_before_invalidate: failedMeta.generationId,
+            invalidated,
+            retry_generation_id: retryMeta?.generationId,
+            failed_token_age_ms: tokenAgeMs,
+            connect_duration_ms: Date.now() - attempt1StartedAt,
+          },
+          'pool.connect() succeeded after token invalidate + retry',
+        );
+        return client;
+      } catch (retryErr) {
+        this.logConnectFailure(retryErr, retryMeta ?? failedMeta, attempt1StartedAt, 1);
+        logger.error(
+          {
+            event: 'db.connect.retry.failed',
+            failed_generation_id: failedMeta.generationId,
+            retry_generation_id: retryMeta?.generationId,
+            invalidated,
+          },
+          'pool.connect() retry also failed (storm protect: no further retry)',
+        );
+        throw retryErr;
+      }
+    }
+  }
+
+  private logConnectFailure(
+    err: unknown,
+    meta: TokenMeta | null,
+    startedAt: number,
+    attempt: 0 | 1,
+  ): void {
+    const tokenAge = meta ? Date.now() - meta.createdAt : null;
+    const errCode = (err as { code?: string }).code;
+    const errMessage = err instanceof Error ? err.message : String(err);
+    logger.error(
+      {
+        event: 'db.client.connect.failed',
+        token_generation_id: meta?.generationId,
+        token_age_at_connect_ms: tokenAge,
+        connect_duration_ms: Date.now() - startedAt,
+        err_code: errCode,
+        err_message: errMessage,
+        pool_total: this.totalCount,
+        pool_idle: this.idleCount,
+        pool_waiting: this.waitingCount,
+        attempt,
+      },
+      'pool.connect() failed',
+    );
   }
 }
 

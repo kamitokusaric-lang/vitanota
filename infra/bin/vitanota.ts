@@ -62,9 +62,17 @@ const aiChatStack = new AiChatStack(app, `${prefix}-ai-chat`, {
 const aiChatAllowlistTenantIds =
   (app.node.tryGetContext('aiChatAllowlistTenantIds') as string | undefined) ??
   '';
+// chimo 2026-05-17: prod 環境では default 'true' (= 本番値) に固定。
+// 経緯: 2026-05-14 事故で context 未指定 cdk deploy が本番 AppRunner env を
+// 'false' に上書きして AI 機能停止した。context 渡し忘れ防御として
+// fallback default を環境別に分ける。
+// false に戻したいとき (AI 機能を全 OFF にしたいとき) の手順:
+//   1. cdk deploy で明示的に context を渡す: -c aiChatEnableExtraction=false
+//   2. または本ファイルの prod 分岐を 'false' に変更してデプロイ
+// 詳細経緯: post-mvp-backlog.md「AI 機能フラグ default の経緯」セクション
 const aiChatEnableExtraction =
   ((app.node.tryGetContext('aiChatEnableExtraction') as string | undefined) ??
-    'false');
+    (envName === 'prod' ? 'true' : 'false'));
 const aiChatRateLimitPerDay =
   ((app.node.tryGetContext('aiChatRateLimitPerDay') as string | undefined) ??
     '20');

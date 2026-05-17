@@ -379,6 +379,23 @@
 - **既存 backlog との統合**: 「AI チャット機能の有効化フラグの管理画面化」(同日 backlog 行き) は C5 と同件、本項目に内包される
 - **関連 memory**: `project_ai_strategy_20260511` (構想原典)、`project_ai_chat_feature_flag` (env 2 段の現行設計)、`project_phase1_core_experience` (Phase 概念)
 
+### 📝 記録: AI 機能フラグ default の経緯 (`aiChatEnableExtraction`)
+
+- **記録日**: 2026-05-17
+- **現状**: `infra/bin/vitanota.ts` の `aiChatEnableExtraction` の fallback default を **prod 環境のときだけ `'true'`** に固定 (それ以外の環境では `'false'`)
+- **経緯**:
+  1. 2026-05-14: context 未指定の `cdk deploy vitanota-prod-app` が本番 AppRunner env を default `'false'` に上書きして AI 機能を全テナント停止する事故が発生 (memory `feedback_cdk_app_stack_context_required`)
+  2. 2026-05-17: db-migrator Lambda 更新で再度同じ罠を踏みそうになり、context 明示 (`-c aiChatEnableExtraction=true`) で回避
+  3. 同日: 「次回も忘れる前提」で fallback default を prod=true / その他=false に変更 (本 commit)
+- **AI 機能を本番で全 OFF にしたいとき (= 障害 / 一時停止 / コスト超過 等)**:
+  - **A. CDK deploy で明示**: `pnpm cdk deploy vitanota-prod-app -c aiChatEnableExtraction=false`
+  - **B. ソース変更**: `infra/bin/vitanota.ts` の prod 分岐を `'false'` にしてデプロイ
+  - どちらも本番 AppRunner サービスの env が `ENABLE_AI_CHAT_EXTRACTION=false` に上書きされ、即時に全テナント OFF
+- **特定テナントだけ ON にしたいとき**: `AI_CHAT_ALLOWLIST_TENANT_IDS` を CSV 文字列で指定 (`-c aiChatAllowlistTenantIds=uuid1,uuid2`)。現在は空 (全テナント ON)。allowlist 運用に切り替えるなら chmo 判断
+- **関連**: memory `feedback_cdk_app_stack_context_required` / `project_ai_chat_feature_flag`
+
+---
+
 ### 🟡 中: AI チャット機能の有効化フラグの管理画面化
 - **発見日**: 2026-05-13
 - **現状**: `ENABLE_AI_CHAT_EXTRACTION` + `AI_CHAT_ALLOWLIST_TENANT_IDS` の 2 段 env で制御 (AppRunner 環境変数)。テナント追加のたびに CSV 文字列を更新 + AppRunner 再起動 (~3 分)。緊急停止は `ENABLE_AI_CHAT_EXTRACTION=false` で全テナント即時 OFF

@@ -187,8 +187,29 @@ export function RoughCaptureSection({
   const [input, setInput] = useState('');
   const [view, setView] = useState<View>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
+  const inputStartedFiredRef = useRef(false);
   const { tags: availableTags, mutate: mutateTags } = useTaskTags();
   const { assignees } = useAssignees();
+
+  // textarea の初回入力で 1 度だけ AiCaptureInputStarted を発火する
+  const handleInputChange = (next: string) => {
+    if (
+      !inputStartedFiredRef.current &&
+      input.length === 0 &&
+      next.length > 0
+    ) {
+      inputStartedFiredRef.current = true;
+      void fetch('/api/ai-chat/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'ai_capture_input_started',
+          source: 'rough_capture',
+        }),
+      }).catch(() => undefined);
+    }
+    setInput(next);
+  };
 
   const assigneeCandidates: AssigneeCandidate[] = useMemo(
     () =>
@@ -457,7 +478,7 @@ export function RoughCaptureSection({
       {view.kind === 'idle' || view.kind === 'loading' ? (
         <InputView
           input={input}
-          onChange={setInput}
+          onChange={handleInputChange}
           onSubmit={handleExtract}
           loading={view.kind === 'loading'}
           canSubmit={canSubmit}

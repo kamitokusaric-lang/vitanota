@@ -13,10 +13,16 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/shared/components/Modal';
 import { AddTaskModal } from './AddTaskModal';
+import { TaskEditModal } from '@/features/tasks/components/TaskEditModal';
+import { useOnboardingState } from '@/features/onboarding/hooks/useOnboardingState';
 import {
-  TaskDetailDialog,
-  type TaskDetailViewModel,
-} from './TaskDetailDialog';
+  PlanResultButtonsHint,
+  PLAN_RESULT_BUTTONS_HINT_VERSION,
+} from '@/features/onboarding/PlanResultButtonsHint';
+import {
+  PlanResultStartHint,
+  PLAN_RESULT_START_HINT_VERSION,
+} from '@/features/onboarding/PlanResultStartHint';
 import type { Bucket, GeneratedPlanItem, NotShownCandidate } from './types';
 
 type EditTarget = Bucket | 'excluded';
@@ -24,6 +30,7 @@ type EditTarget = Bucket | 'excluded';
 interface Props {
   open: boolean;
   sessionId: string | null;
+  selfUserId: string;
   summary: string;
   today: GeneratedPlanItem[];
   optional: GeneratedPlanItem[];
@@ -35,11 +42,14 @@ interface Props {
   onMarkTaskDone: (taskId: string) => Promise<void> | void;
   onClose: () => void;
   starting?: boolean;
+  // 編集モーダルでタスクが更新/削除されたら親で plan を再 fetch する
+  onTaskMutated?: () => void;
 }
 
 export function PlanResultModal({
   open,
   sessionId,
+  selfUserId,
   summary,
   today,
   optional,
@@ -51,6 +61,7 @@ export function PlanResultModal({
   onMarkTaskDone,
   onClose,
   starting,
+  onTaskMutated,
 }: Props) {
   // ローカル state (常時編集可、parent には API 経由で反映)
   // 'excluded' したものは local state から取り除く
@@ -59,7 +70,49 @@ export function PlanResultModal({
   );
   const [addCandidates, setAddCandidates] = useState<NotShownCandidate[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [detailItem, setDetailItem] = useState<GeneratedPlanItem | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+
+  // 3 ボタンナビ (chimo 2026-05-17): 1 回の dismiss で 3 つ一括非表示
+  const {
+    shouldShow: shouldShowButtonsHint,
+    markDismissed: markButtonsHintDismissed,
+  } = useOnboardingState(
+    'plan_result_buttons_hint',
+    PLAN_RESULT_BUTTONS_HINT_VERSION,
+  );
+  const dismissButtonsHint = (reason: 'close_button' | 'cta_click') => {
+    void fetch('/api/ai-chat/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'plan_result_buttons_hint_dismissed',
+        reason,
+        version: PLAN_RESULT_BUTTONS_HINT_VERSION,
+      }),
+    }).catch(() => undefined);
+    void markButtonsHintDismissed(1).catch(() => undefined);
+  };
+
+  // 「今日の仕事を始める」CTA ナビ (chimo 2026-05-17)
+  const {
+    shouldShow: shouldShowStartHint,
+    markDismissed: markStartHintDismissed,
+  } = useOnboardingState(
+    'plan_result_start_hint',
+    PLAN_RESULT_START_HINT_VERSION,
+  );
+  const dismissStartHint = (reason: 'close_button' | 'cta_click') => {
+    void fetch('/api/ai-chat/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'plan_result_start_hint_dismissed',
+        reason,
+        version: PLAN_RESULT_START_HINT_VERSION,
+      }),
+    }).catch(() => undefined);
+    void markStartHintDismissed(1).catch(() => undefined);
+  };
 
   // sessionId が変わったら local state を初期化
   useEffect(() => {
@@ -169,7 +222,10 @@ export function PlanResultModal({
           </button>
           <button
             type="button"
-            onClick={() => void onStart()}
+            onClick={() => {
+              if (shouldShowStartHint) dismissStartHint('cta_click');
+              void onStart();
+            }}
             disabled={!sessionId || starting}
             data-testid="plan-result-start-button"
             className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-5 text-sm font-medium text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
@@ -184,16 +240,18 @@ export function PlanResultModal({
         items={todayItems}
         onMove={move}
         onMarkDone={markDone}
-        onOpenDetail={setDetailItem}
+        onOpenDetail={(i) => setEditingTaskId(i.task_id)}
         currentBucket="today"
         emptyText="今日やるは空です"
+        showButtonsHintOnFirstCard={shouldShowButtonsHint}
+        onDismissButtonsHint={dismissButtonsHint}
       />
       <PlanList
         label="余裕があれば"
         items={optionalItems}
         onMove={move}
         onMarkDone={markDone}
-        onOpenDetail={setDetailItem}
+        onOpenDetail={(i) => setEditingTaskId(i.task_id)}
         currentBucket="optional"
         emptyText="余裕があればは空です"
       />
@@ -209,28 +267,22 @@ export function PlanResultModal({
         onClose={() => setAddModalOpen(false)}
       />
 
-      <TaskDetailDialog
-        item={toDetailViewModel(detailItem)}
-        onClose={() => setDetailItem(null)}
+      <TaskEditModal
+        taskId={editingTaskId}
+        selfUserId={selfUserId}
+        onClose={() => setEditingTaskId(null)}
+        onUpdated={() => onTaskMutated?.()}
+        onDeleted={() => onTaskMutated?.()}
       />
+
+      {shouldShowStartHint && (
+        <PlanResultStartHint
+          anchorSelector='[data-testid="plan-result-start-button"]'
+          onDismiss={(reason) => dismissStartHint(reason)}
+        />
+      )}
     </Modal>
   );
-}
-
-function toDetailViewModel(
-  i: GeneratedPlanItem | null,
-): TaskDetailViewModel | null {
-  if (!i) return null;
-  return {
-    title: i.title,
-    dueDate: i.dueDate,
-    categoryName: i.categoryName,
-    status: i.status,
-    description: i.description,
-    assigneeNames: i.assigneeNames,
-    reason: i.reason,
-    suggestedAction: i.suggested_action,
-  };
 }
 
 function PlanList({
@@ -241,6 +293,8 @@ function PlanList({
   onOpenDetail,
   currentBucket,
   emptyText,
+  showButtonsHintOnFirstCard,
+  onDismissButtonsHint,
 }: {
   label: string;
   items: Array<GeneratedPlanItem & { bucket: Bucket }>;
@@ -249,6 +303,9 @@ function PlanList({
   onOpenDetail: (item: GeneratedPlanItem) => void;
   currentBucket: Bucket;
   emptyText: string;
+  // 「今日やる」セクションの 1 番目のカードのみ表示するナビ用フラグ
+  showButtonsHintOnFirstCard?: boolean;
+  onDismissButtonsHint?: (reason: 'close_button' | 'cta_click') => void;
 }) {
   // 反対 bucket への移動先
   const otherBucket: Bucket = currentBucket === 'today' ? 'optional' : 'today';
@@ -256,73 +313,120 @@ function PlanList({
     otherBucket === 'today' ? '今日やる' : '余裕があれば';
 
   return (
-    <section className="mb-4">
+    <section
+      className={
+        'mb-4 ' +
+        (currentBucket === 'optional'
+          ? 'rounded-xl bg-amber-100 p-3'
+          : '')
+      }
+    >
       <h3 className="mb-2 text-sm font-semibold text-slate-700">{label}</h3>
       {items.length === 0 ? (
         <p className="text-xs text-slate-400">{emptyText}</p>
       ) : (
         <ul className="space-y-2">
-          {items.map((i) => (
-            <li
-              key={i.task_id}
-              className="rounded-xl border border-slate-200 bg-white p-3"
-              data-testid={`plan-result-item-${i.task_id}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <button
-                    type="button"
-                    onClick={() => onOpenDetail(i)}
-                    data-testid={`plan-result-item-title-${i.task_id}`}
-                    className="text-left text-sm font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-900 hover:decoration-indigo-700"
+          {items.map((i, idx) => {
+            const isFirstCard = idx === 0;
+            const showHint =
+              isFirstCard && !!showButtonsHintOnFirstCard;
+            return (
+              <li
+                key={i.task_id}
+                className="rounded-xl border border-slate-200 bg-white p-3"
+                data-testid={`plan-result-item-${i.task_id}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(i)}
+                      data-testid={`plan-result-item-title-${i.task_id}`}
+                      className="text-left text-sm font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-900 hover:decoration-indigo-700"
+                    >
+                      {i.title}
+                    </button>
+                    {i.dueDate && (
+                      <div className="mt-0.5 text-[11px] text-slate-400">
+                        期限: {i.dueDate}
+                      </div>
+                    )}
+                    {i.reason && (() => {
+                      const todayIsoLocal = new Date().toISOString().slice(0, 10);
+                      const isOverdue = !!i.dueDate && i.dueDate < todayIsoLocal;
+                      return (
+                        <p
+                          className={
+                            'mt-1.5 text-xs leading-relaxed ' +
+                            (isOverdue
+                              ? 'font-medium text-red-600'
+                              : 'text-slate-600')
+                          }
+                        >
+                          {i.reason}
+                        </p>
+                      );
+                    })()}
+                    {i.suggested_action && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        最初の一歩: {i.suggested_action}
+                      </p>
+                    )}
+                  </div>
+                  <div
+                    className="flex shrink-0 flex-col gap-1.5"
+                    data-testid={`plan-result-buttons-${i.task_id}`}
                   >
-                    {i.title}
-                  </button>
-                  {i.dueDate && (
-                    <div className="mt-0.5 text-[11px] text-slate-400">
-                      期限: {i.dueDate}
-                    </div>
-                  )}
-                  {i.reason && (
-                    <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                      {i.reason}
-                    </p>
-                  )}
-                  {i.suggested_action && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      最初の一歩: {i.suggested_action}
-                    </p>
-                  )}
+                    {showHint && onDismissButtonsHint && (
+                      <PlanResultButtonsHint
+                        anchorSelector={`[data-testid="plan-result-buttons-${i.task_id}"]`}
+                        onDismiss={(reason) => onDismissButtonsHint(reason)}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showHint && onDismissButtonsHint) {
+                          onDismissButtonsHint('cta_click');
+                        }
+                        void onMove(i.task_id, otherBucket);
+                      }}
+                      data-testid={`plan-result-item-move-${i.task_id}`}
+                      className="h-8 rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      {otherLabel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showHint && onDismissButtonsHint) {
+                          onDismissButtonsHint('cta_click');
+                        }
+                        void onMove(i.task_id, 'excluded');
+                      }}
+                      data-testid={`plan-result-item-exclude-${i.task_id}`}
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500 transition hover:border-slate-400 hover:bg-slate-50"
+                    >
+                      今日やらない
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showHint && onDismissButtonsHint) {
+                          onDismissButtonsHint('cta_click');
+                        }
+                        void onMarkDone(i.task_id);
+                      }}
+                      data-testid={`plan-result-item-mark-done-${i.task_id}`}
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                    >
+                      完了にする
+                    </button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => void onMove(i.task_id, otherBucket)}
-                    data-testid={`plan-result-item-move-${i.task_id}`}
-                    className="h-8 rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700"
-                  >
-                    {otherLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void onMove(i.task_id, 'excluded')}
-                    data-testid={`plan-result-item-exclude-${i.task_id}`}
-                    className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500 transition hover:border-slate-400 hover:bg-slate-50"
-                  >
-                    今日やらない
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void onMarkDone(i.task_id)}
-                    data-testid={`plan-result-item-mark-done-${i.task_id}`}
-                    className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-500 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
-                  >
-                    完了にする
-                  </button>
-                </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

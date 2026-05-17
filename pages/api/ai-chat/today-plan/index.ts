@@ -41,6 +41,10 @@ export default async function handler(
     return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   }
 
+  // start/edit/done 直後にクライアントが古いキャッシュ (304) を返さないように
+  // 明示的に no-store。今日のプランは状態遷移が速いので毎回 fresh で取りたい。
+  res.setHeader('Cache-Control', 'no-store, must-revalidate');
+
   const ctx = await requireAuth(req, res);
   if (!ctx) return;
 

@@ -715,6 +715,41 @@ export const userFilterPreferences = pgTable(
   }),
 );
 
+// ── user_onboarding_states (migration 0041) ─────────────────
+// 初回コーチマーク等の表示状態を user × tenant × context 単位で保存。
+// context: 'ai_capture' (将来 'morning_plan' 等で横展開可)
+// state JSONB:
+//   { dismissedAt: ISO?, completedStep: 1|2|3?, version: 'v1-2026-05-19' }
+// RLS: 本人 + system_admin のみ可視、school_admin 不可視 (踏み絵)。
+export const userOnboardingStates = pgTable(
+  'user_onboarding_states',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    context: text('context').notNull(),
+    state: jsonb('state').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.userId, table.tenantId, table.context],
+    }),
+    userTenantIdx: index('user_onboarding_states_user_tenant_idx').on(
+      table.userId,
+      table.tenantId,
+    ),
+  }),
+);
+
 // ── ai_sessions (migration 0036) ─────────────────────────────
 // AI 整理機能 (Phase 1 コア体験) の中間状態。チャット入力 + AI 出力 +
 // 取捨選択を一時保持。教員が確認・採用したものだけ tasks に保存される。
@@ -838,6 +873,8 @@ export type TaskAssignee = typeof taskAssignees.$inferSelect;
 export type NewTaskAssignee = typeof taskAssignees.$inferInsert;
 export type UserFilterPreference = typeof userFilterPreferences.$inferSelect;
 export type NewUserFilterPreference = typeof userFilterPreferences.$inferInsert;
+export type UserOnboardingState = typeof userOnboardingStates.$inferSelect;
+export type NewUserOnboardingState = typeof userOnboardingStates.$inferInsert;
 export type Announcement = typeof announcements.$inferSelect;
 export type NewAnnouncement = typeof announcements.$inferInsert;
 export type AiSession = typeof aiSessions.$inferSelect;

@@ -74,6 +74,14 @@ export const LogEvents = {
   // TodayPlanView「完了」ボタン上のヒント (1 番目タスクのみ)
   TodayPlanDoneHintShown: 'today_plan_done_hint_shown',
   TodayPlanDoneHintDismissed: 'today_plan_done_hint_dismissed',
+
+  // F3: フィードバック返信 (片方向スレッド)。全て info 出力、踏み絵で warn 化しない
+  FeedbackReplyPosted: 'feedback_reply_posted',
+  FeedbackThreadMarkedRead: 'feedback_thread_marked_read',
+
+  // F3: FAB の未読 dot 上に出すヒント (chimo 2026-05-17)
+  FeedbackUnreadHintShown: 'feedback_unread_hint_shown',
+  FeedbackUnreadHintDismissed: 'feedback_unread_hint_dismissed',
 } as const;
 
 export type LogEventName = (typeof LogEvents)[keyof typeof LogEvents];
@@ -246,6 +254,28 @@ interface TodayPlanDoneHintDismissedPayload extends BaseEventFields {
   version: string;
 }
 
+// F3: フィードバック返信。 system_admin による返信投稿
+interface FeedbackReplyPostedPayload extends BaseEventFields {
+  // userId は system_admin の id、tenantId は対象 submission のもの
+  // (system_admin 自身は tenantId を持たないため)
+  submissionId: string;
+  replyId: string;
+  contentLength: number;
+}
+
+// 教員側: mark-read API call (accordion 展開で 1 度だけ)
+type FeedbackThreadMarkedReadPayload = BaseEventFields;
+
+interface FeedbackUnreadHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface FeedbackUnreadHintDismissedPayload extends BaseEventFields {
+  // close_button: × クリック / cta_click: FAB 押下 (= 教員が気づいてモーダル開いた)
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
 // ─────────────────────────────────────────────────────────────
 // イベント名 → ペイロード型のマッピング
 // ─────────────────────────────────────────────────────────────
@@ -282,6 +312,10 @@ export interface LogEventPayloads {
   [LogEvents.TodayPlanFeedbackHintDismissed]: TodayPlanFeedbackHintDismissedPayload;
   [LogEvents.TodayPlanDoneHintShown]: TodayPlanDoneHintShownPayload;
   [LogEvents.TodayPlanDoneHintDismissed]: TodayPlanDoneHintDismissedPayload;
+  [LogEvents.FeedbackReplyPosted]: FeedbackReplyPostedPayload;
+  [LogEvents.FeedbackThreadMarkedRead]: FeedbackThreadMarkedReadPayload;
+  [LogEvents.FeedbackUnreadHintShown]: FeedbackUnreadHintShownPayload;
+  [LogEvents.FeedbackUnreadHintDismissed]: FeedbackUnreadHintDismissedPayload;
 }
 
 // ─────────────────────────────────────────────────────────────

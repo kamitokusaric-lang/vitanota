@@ -3,6 +3,7 @@ import {
   feedbackSubmissionSchema,
   feedbackTopicCreateSchema,
   feedbackTopicUpdateSchema,
+  feedbackReplyCreateSchema,
 } from '@/features/feedback/lib/feedbackSchemas';
 
 const validTopicId = '11111111-1111-1111-1111-111111111111';
@@ -128,6 +129,33 @@ describe('feedbackTopicUpdateSchema', () => {
 
   it('title 101 文字は VALIDATION_ERROR', () => {
     const result = feedbackTopicUpdateSchema.safeParse({ title: 'あ'.repeat(101) });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('feedbackReplyCreateSchema', () => {
+  it('正常系: body 1 文字 (下限)', () => {
+    const result = feedbackReplyCreateSchema.safeParse({ body: 'a' });
+    expect(result.success).toBe(true);
+  });
+
+  it('正常系: body 5000 文字 (上限)', () => {
+    const result = feedbackReplyCreateSchema.safeParse({ body: 'a'.repeat(5000) });
+    expect(result.success).toBe(true);
+  });
+
+  it('body 0 文字は VALIDATION_ERROR', () => {
+    const result = feedbackReplyCreateSchema.safeParse({ body: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('body 5001 文字は VALIDATION_ERROR', () => {
+    const result = feedbackReplyCreateSchema.safeParse({ body: 'a'.repeat(5001) });
+    expect(result.success).toBe(false);
+  });
+
+  it('body 欠損は VALIDATION_ERROR', () => {
+    const result = feedbackReplyCreateSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 });

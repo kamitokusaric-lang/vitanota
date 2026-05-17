@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
@@ -46,6 +47,7 @@ function formatDateTime(iso: string): string {
 }
 
 export default function FeedbackListPage({ session }: PageProps) {
+  const router = useRouter();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [topics, setTopics] = useState<TopicSummary[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -187,7 +189,12 @@ export default function FeedbackListPage({ session }: PageProps) {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {submissions.map((s) => (
-                      <tr key={s.id} data-testid={`submission-row-${s.id}`}>
+                      <tr
+                        key={s.id}
+                        data-testid={`submission-row-${s.id}`}
+                        onClick={() => router.push(`/admin/feedback/${s.id}`)}
+                        className="cursor-pointer hover:bg-vn-muted-bg"
+                      >
                         <td className="px-4 py-3 align-top text-gray-600 whitespace-nowrap">
                           {formatDateTime(s.createdAt)}
                         </td>

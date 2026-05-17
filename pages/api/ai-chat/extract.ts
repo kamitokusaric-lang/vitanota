@@ -13,6 +13,7 @@ import { requireAuth, pickDbRole } from '@/features/journal/lib/apiHelpers';
 import { withTenantUser } from '@/shared/lib/db';
 import { aiSessions } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
+import { LogEvents, logEvent } from '@/shared/lib/log-events';
 import { mockExtractTasks } from '@/features/ai-chat/mockExtraction';
 import { isAiChatEnabledForTenant } from '@/features/ai-chat/featureFlag';
 import { maskPii } from '@/features/ai-chat/piiMask';
@@ -75,6 +76,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: parsed.error.errors[0]?.message ?? '入力が不正です',
     });
   }
+
+  // AI 整理 Phase 1 コア体験の計測: 「整理する」押下相当 (extract 受信時)
+  logEvent(LogEvents.AiCaptureSubmitted, {
+    userId: ctx.userId,
+    tenantId: ctx.tenantId,
+    inputLength: parsed.data.inputText.length,
+  });
 
   const role = pickDbRole(ctx);
   const today = new Date().toISOString().slice(0, 10);

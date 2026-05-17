@@ -14,6 +14,10 @@ services:
     image: postgres:16-alpine
     container_name: vitanota-postgres
     restart: unless-stopped
+    # 本番 RDS の timezone (Asia/Tokyo) に揃える。これがないと `(NOW() AT TIME ZONE
+    # 'Asia/Tokyo')::date AT TIME ZONE 'Asia/Tokyo'` が想定外の境界を返し、
+    # today-plan 等の「今日範囲」フィルタがローカルだけ壊れる。
+    command: ['postgres', '-c', 'timezone=Asia/Tokyo']
     environment:
       POSTGRES_USER: vitanota
       POSTGRES_PASSWORD: vitanota_local

@@ -174,7 +174,7 @@ export default function DashboardPage({
             <QuickRecordActions onPick={handleKindPick} />
             {/* H3 朝の見通し作り (2026-05-14): AI 機能 ON のテナントだけに表示、
                 feature flag (allowlist) は API 側でも 404 を返すので二重防御。 */}
-            {aiChatEnabled && <MorningPlanSection />}
+            {aiChatEnabled && <MorningPlanSection selfUserId={session.user.userId} />}
             <TaskCreateTabs
               selfUserId={session.user.userId}
               aiChatEnabled={aiChatEnabled}

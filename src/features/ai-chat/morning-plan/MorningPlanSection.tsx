@@ -16,6 +16,11 @@ import { MorningPlanCard } from './MorningPlanCard';
 import { CapacityModal } from './CapacityModal';
 import { PlanResultModal } from './PlanResultModal';
 import { TodayPlanView } from './TodayPlanView';
+import { useOnboardingState } from '@/features/onboarding/hooks/useOnboardingState';
+import {
+  MorningPlanHint,
+  MORNING_PLAN_HINT_VERSION,
+} from '@/features/onboarding/MorningPlanHint';
 import type {
   Capacity,
   Bucket,
@@ -44,7 +49,11 @@ type Phase =
   | { kind: 'has-plan'; data: TodayPlanResponse }
   | { kind: 'error'; message: string };
 
-export function MorningPlanSection() {
+interface MorningPlanSectionProps {
+  selfUserId: string;
+}
+
+export function MorningPlanSection({ selfUserId }: MorningPlanSectionProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   // 現セッションでフィードバックを dismiss した sessionId (= 一度だけ表示の制御)
   const [feedbackDismissedFor, setFeedbackDismissedFor] = useState<string | null>(
@@ -52,10 +61,34 @@ export function MorningPlanSection() {
   );
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const { showToast } = useToast();
+  // 「おつかれさまです」を toast でなく TodayPlanView の header 右端に inline 表示する
+  // (chimo 2026-05-17)。key を都度更新して useEffect で 3 秒だけ見せる。
+  const [recentDone, setRecentDone] = useState<{ count: number; key: number } | null>(null);
+
+  // 初回ヒント (chimo 2026-05-16): no-plan 状態 = まだ今日の見通しを作っていない
+  // 教員にだけ、CTA カードの上にぽわわーんで案内する。閉じる or カードクリックで dismiss。
+  const {
+    shouldShow: shouldShowHint,
+    markDismissed: markHintDismissed,
+  } = useOnboardingState('morning_plan_hint', MORNING_PLAN_HINT_VERSION);
+  const dismissHint = (reason: 'close_button' | 'cta_click') => {
+    void fetch('/api/ai-chat/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'morning_plan_hint_dismissed',
+        reason,
+        version: MORNING_PLAN_HINT_VERSION,
+      }),
+    }).catch(() => undefined);
+    // 永続化 (失敗してもセッション中は表示されない optimistic update が効く)
+    void markHintDismissed(1).catch(() => undefined);
+  };
 
   const fetchTodayPlan = useCallback(async () => {
     try {
-      const res = await fetch('/api/ai-chat/today-plan');
+      // start/edit/done 直後の状態を確実に反映するため、ブラウザキャッシュを使わない
+      const res = await fetch('/api/ai-chat/today-plan', { cache: 'no-store' });
       if (res.status === 404) {
         // feature flag OFF: 何も表示しない
         setPhase({ kind: 'error', message: 'feature_disabled' });
@@ -230,10 +263,7 @@ export function MorningPlanSection() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { ok: boolean; todayDoneCount: number };
       if (done) {
-        showToast(
-          `おつかれさまです。${data.todayDoneCount} つ進みました。`,
-          'success',
-        );
+        setRecentDone({ count: data.todayDoneCount, key: Date.now() });
       } else {
         showToast('完了を戻しました', 'info');
       }
@@ -276,16 +306,27 @@ export function MorningPlanSection() {
   return (
     <>
       {phase.kind === 'no-plan' && (
-        <MorningPlanCard
-          onClick={openCapacity}
-          incompleteTaskCount={phase.incompleteTaskCount}
-          overdueTaskCount={phase.overdueTaskCount}
-          isNew={phase.isFirstTime}
-        />
+        <div className="relative">
+          {shouldShowHint && (
+            <MorningPlanHint
+              onDismiss={(reason) => dismissHint(reason)}
+            />
+          )}
+          <MorningPlanCard
+            onClick={() => {
+              if (shouldShowHint) dismissHint('cta_click');
+              openCapacity();
+            }}
+            incompleteTaskCount={phase.incompleteTaskCount}
+            overdueTaskCount={phase.overdueTaskCount}
+            isNew={phase.isFirstTime}
+          />
+        </div>
       )}
       {phase.kind === 'has-plan' && phase.data.plan && (
         <TodayPlanView
           sessionId={phase.data.sessionId!}
+          selfUserId={selfUserId}
           summary={phase.data.plan.summary}
           today={phase.data.plan.today}
           optional={phase.data.plan.optional}
@@ -297,6 +338,8 @@ export function MorningPlanSection() {
           onDismissFeedback={() =>
             setFeedbackDismissedFor(phase.data.sessionId)
           }
+          onTaskMutated={() => void fetchTodayPlan()}
+          recentDone={recentDone}
         />
       )}
       <CapacityModal
@@ -316,6 +359,7 @@ export function MorningPlanSection() {
       <PlanResultModal
         open={phase.kind === 'result-modal' || phase.kind === 'starting'}
         sessionId={phase.kind === 'result-modal' ? phase.gen.sessionId : null}
+        selfUserId={selfUserId}
         summary={phase.kind === 'result-modal' ? phase.gen.plan.summary : ''}
         today={phase.kind === 'result-modal' ? phase.gen.plan.today : []}
         optional={phase.kind === 'result-modal' ? phase.gen.plan.optional : []}
@@ -327,6 +371,7 @@ export function MorningPlanSection() {
         onMarkTaskDone={handleMarkTaskDone}
         onClose={() => void handleCloseResult()}
         starting={phase.kind === 'starting'}
+        onTaskMutated={() => void fetchTodayPlan()}
       />
     </>
   );

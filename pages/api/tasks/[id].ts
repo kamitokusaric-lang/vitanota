@@ -1,4 +1,5 @@
-// PATCH /api/tasks/:id - タスク更新 (assignee or createdBy or school_admin)
+// GET    /api/tasks/:id - タスク 1 件取得 (RLS 範囲内、TaskWithAssignees shape)
+// PATCH  /api/tasks/:id - タスク更新 (assignee or createdBy or school_admin)
 // DELETE /api/tasks/:id - タスク削除 (同上)
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '@/features/journal/lib/apiHelpers';
@@ -23,6 +24,22 @@ export default async function handler(
     return res.status(400).json({ error: 'VALIDATION_ERROR' });
   }
   const { id } = paramParsed.data;
+
+  if (req.method === 'GET') {
+    try {
+      // RLS で同テナント可視範囲のみ取得。listTasks 全件 → find by id (1 教員の
+      // タスク数は数百件程度の想定、専用 repo method を増やさず最小実装)。
+      const tasks = await taskService.listTasks(ctx);
+      const task = tasks.find((t) => t.id === id);
+      if (!task) {
+        return res.status(404).json({ error: 'NOT_FOUND' });
+      }
+      return res.status(200).json({ task });
+    } catch (err) {
+      logger.error({ event: 'tasks.get.error', err, id });
+      return res.status(500).json({ error: 'INTERNAL_ERROR' });
+    }
+  }
 
   if (req.method === 'PATCH') {
     const parsed = updateTaskSchema.safeParse(req.body);
@@ -67,6 +84,6 @@ export default async function handler(
     }
   }
 
-  res.setHeader('Allow', 'PATCH, DELETE');
+  res.setHeader('Allow', 'GET, PATCH, DELETE');
   return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
 }

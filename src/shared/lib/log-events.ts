@@ -39,6 +39,41 @@ export const LogEvents = {
   SessionCreated: 'session_created',
   SessionRevoked: 'session_revoked',
   SessionExpired: 'session_expired',
+
+  // AI 整理 (Phase 1 コア体験) のオンボーディング + 利用イベント
+  // 注: 全て logEvent (info) のみ使用。「閉じる」を負シグナル扱いしない
+  // (feedback_observed_moment_broken / feedback_design_vocab 踏み絵)。
+  AiCaptureCoachmarkShown: 'ai_capture_coachmark_shown',
+  AiCaptureCoachmarkAdvanced: 'ai_capture_coachmark_advanced',
+  AiCaptureCoachmarkDismissed: 'ai_capture_coachmark_dismissed',
+  AiCaptureInputStarted: 'ai_capture_input_started',
+  AiCaptureSubmitted: 'ai_capture_submitted',
+
+  // H3「今日の見通し」入口カード上のヒント (chimo 2026-05-16 方針転換、
+  // 3 ステップ overlay から各 CTA 個別ヒントへ)
+  MorningPlanHintShown: 'morning_plan_hint_shown',
+  MorningPlanHintDismissed: 'morning_plan_hint_dismissed',
+
+  // CapacityModal「ふつう」ボタン上のヒント (chimo 2026-05-17、離脱対策)
+  CapacityModalDefaultHintShown: 'capacity_modal_default_hint_shown',
+  CapacityModalDefaultHintDismissed: 'capacity_modal_default_hint_dismissed',
+
+  // PlanResultModal の 3 ボタン (余裕があれば / 今日やらない / 完了にする) ヒント
+  // 1 番目カードのみ表示、1 回の dismiss で 3 つ一括非表示
+  PlanResultButtonsHintShown: 'plan_result_buttons_hint_shown',
+  PlanResultButtonsHintDismissed: 'plan_result_buttons_hint_dismissed',
+
+  // PlanResultModal「このタスクで今日の仕事を始める」CTA ヒント
+  PlanResultStartHintShown: 'plan_result_start_hint_shown',
+  PlanResultStartHintDismissed: 'plan_result_start_hint_dismissed',
+
+  // TodayPlanView「今日の見通しは持てましたか?」フィードバック上のヒント
+  TodayPlanFeedbackHintShown: 'today_plan_feedback_hint_shown',
+  TodayPlanFeedbackHintDismissed: 'today_plan_feedback_hint_dismissed',
+
+  // TodayPlanView「完了」ボタン上のヒント (1 番目タスクのみ)
+  TodayPlanDoneHintShown: 'today_plan_done_hint_shown',
+  TodayPlanDoneHintDismissed: 'today_plan_done_hint_dismissed',
 } as const;
 
 export type LogEventName = (typeof LogEvents)[keyof typeof LogEvents];
@@ -127,6 +162,90 @@ interface SessionExpiredPayload extends BaseEventFields {
   reason: 'idle_timeout' | 'absolute_max';
 }
 
+// AI 整理コーチマーク + 入力イベント
+interface AiCaptureCoachmarkShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface AiCaptureCoachmarkAdvancedPayload extends BaseEventFields {
+  step: 1 | 2 | 3;
+  version: string;
+}
+
+interface AiCaptureCoachmarkDismissedPayload extends BaseEventFields {
+  step: 1 | 2 | 3;
+  reason: 'skip' | 'completed' | 'outside_click';
+  version: string;
+}
+
+interface AiCaptureInputStartedPayload extends BaseEventFields {
+  // textarea で初めて 1 文字以上入力された瞬間。同セッションで 1 回のみ発火想定。
+  source: 'rough_capture';
+}
+
+interface AiCaptureSubmittedPayload extends BaseEventFields {
+  inputLength: number;
+}
+
+interface MorningPlanHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface MorningPlanHintDismissedPayload extends BaseEventFields {
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
+interface CapacityModalDefaultHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface CapacityModalDefaultHintDismissedPayload extends BaseEventFields {
+  // close_button: × クリック / cta_click: いずれかの capacity ボタン押下 (normal 以外も含む)
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
+interface PlanResultButtonsHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface PlanResultButtonsHintDismissedPayload extends BaseEventFields {
+  // close_button: × クリック / cta_click: いずれかの 3 ボタン押下
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
+interface PlanResultStartHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface PlanResultStartHintDismissedPayload extends BaseEventFields {
+  // close_button: × クリック / cta_click: 「今日の仕事を始める」押下
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
+interface TodayPlanFeedbackHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface TodayPlanFeedbackHintDismissedPayload extends BaseEventFields {
+  // close_button: × クリック / cta_click: フィードバックボタン押下 (持てた等) or × 押下
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
+interface TodayPlanDoneHintShownPayload extends BaseEventFields {
+  version: string;
+}
+
+interface TodayPlanDoneHintDismissedPayload extends BaseEventFields {
+  // close_button: × クリック / cta_click: 完了ボタン押下
+  reason: 'close_button' | 'cta_click';
+  version: string;
+}
+
 // ─────────────────────────────────────────────────────────────
 // イベント名 → ペイロード型のマッピング
 // ─────────────────────────────────────────────────────────────
@@ -146,6 +265,23 @@ export interface LogEventPayloads {
   [LogEvents.SessionCreated]: SessionCreatedPayload;
   [LogEvents.SessionRevoked]: SessionRevokedPayload;
   [LogEvents.SessionExpired]: SessionExpiredPayload;
+  [LogEvents.AiCaptureCoachmarkShown]: AiCaptureCoachmarkShownPayload;
+  [LogEvents.AiCaptureCoachmarkAdvanced]: AiCaptureCoachmarkAdvancedPayload;
+  [LogEvents.AiCaptureCoachmarkDismissed]: AiCaptureCoachmarkDismissedPayload;
+  [LogEvents.AiCaptureInputStarted]: AiCaptureInputStartedPayload;
+  [LogEvents.AiCaptureSubmitted]: AiCaptureSubmittedPayload;
+  [LogEvents.MorningPlanHintShown]: MorningPlanHintShownPayload;
+  [LogEvents.MorningPlanHintDismissed]: MorningPlanHintDismissedPayload;
+  [LogEvents.CapacityModalDefaultHintShown]: CapacityModalDefaultHintShownPayload;
+  [LogEvents.CapacityModalDefaultHintDismissed]: CapacityModalDefaultHintDismissedPayload;
+  [LogEvents.PlanResultButtonsHintShown]: PlanResultButtonsHintShownPayload;
+  [LogEvents.PlanResultButtonsHintDismissed]: PlanResultButtonsHintDismissedPayload;
+  [LogEvents.PlanResultStartHintShown]: PlanResultStartHintShownPayload;
+  [LogEvents.PlanResultStartHintDismissed]: PlanResultStartHintDismissedPayload;
+  [LogEvents.TodayPlanFeedbackHintShown]: TodayPlanFeedbackHintShownPayload;
+  [LogEvents.TodayPlanFeedbackHintDismissed]: TodayPlanFeedbackHintDismissedPayload;
+  [LogEvents.TodayPlanDoneHintShown]: TodayPlanDoneHintShownPayload;
+  [LogEvents.TodayPlanDoneHintDismissed]: TodayPlanDoneHintDismissedPayload;
 }
 
 // ─────────────────────────────────────────────────────────────

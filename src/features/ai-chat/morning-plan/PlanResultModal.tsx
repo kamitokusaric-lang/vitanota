@@ -220,18 +220,25 @@ export function PlanResultModal({
               </span>
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (shouldShowStartHint) dismissStartHint('cta_click');
-              void onStart();
-            }}
-            disabled={!sessionId || starting}
-            data-testid="plan-result-start-button"
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-5 text-sm font-medium text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-          >
-            {starting ? '始めています…' : 'このタスクで今日の仕事を始める'}
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                if (shouldShowStartHint) dismissStartHint('cta_click');
+                void onStart();
+              }}
+              disabled={!sessionId || starting}
+              data-testid="plan-result-start-button"
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-5 text-sm font-medium text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+            >
+              {starting ? '始めています…' : 'このタスクで今日の仕事を始める'}
+            </button>
+            {shouldShowStartHint && (
+              <PlanResultStartHint
+                onDismiss={(reason) => dismissStartHint(reason)}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -275,12 +282,6 @@ export function PlanResultModal({
         onDeleted={() => onTaskMutated?.()}
       />
 
-      {shouldShowStartHint && (
-        <PlanResultStartHint
-          anchorSelector='[data-testid="plan-result-start-button"]'
-          onDismiss={(reason) => dismissStartHint(reason)}
-        />
-      )}
     </Modal>
   );
 }

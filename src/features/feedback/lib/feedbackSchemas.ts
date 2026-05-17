@@ -42,3 +42,13 @@ export const feedbackTopicUpdateSchema = z
   });
 
 export type FeedbackTopicUpdateInput = z.infer<typeof feedbackTopicUpdateSchema>;
+
+// F3: system_admin による返信投稿
+export const feedbackReplyCreateSchema = z.object({
+  body: z
+    .string()
+    .min(1, '本文を入力してください')
+    .max(5000, '本文は 5000 文字以内で入力してください'),
+});
+
+export type FeedbackReplyCreateInput = z.infer<typeof feedbackReplyCreateSchema>;

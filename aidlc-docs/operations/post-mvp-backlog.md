@@ -405,18 +405,19 @@
 - **裏テーマ踏み絵**: 「機能 ON/OFF」自体は運用情報 (踏み絵ではない)。ただし「AI 利用量」「ON 履歴」を school_admin 閲覧可能にしない (= 観測者原則の対象)。管理画面は system_admin 専用とし RLS 設計を踏襲
 - **関連 memory**: `project_ai_chat_feature_flag.md`
 
-### 🟡 中: フィードバック返信機能 (F3)
+### ✅ 実装済: フィードバック返信機能 (F3)
 
 - **発見日**: 2026-05-16 (`feature/2026-05-16-ai-capture-onboarding` ブランチでスコープ外として切り出し)
-- **背景**: 校長導入動線で教員フィードバック頻度が増える見込み。「声が届いている」感を返すと実証参加感・継続協力意欲が上がる仮説。本機能は別ブランチで後追い実装する想定。
-- **実装範囲**:
-  - フィードバック一覧 (system_admin / school_admin から)
-  - ステータス管理 (`new` / `reviewing` / `planned` / `fixed` / `answered` / `見送り` / `別途検討中`)
-  - 返信文作成 + 教員側 UI への通知
-  - AI による返信下書きは optional
+- **実装日**: 2026-05-17 (`feature/2026-05-17-feedback-reply` ブランチ、migration 0042)
+- **実装スコープ** (MVP):
+  - 片方向スレッド (system_admin の複数返信 / 教員 read-only)
+  - 返信者表記は一律「運営より」固定 (個人名を出さない、`feedback_design_vocab`)
+  - 内部 status enum は **持たない** (本文に「今回は見送り」「別のかたちで検討中」等を書く運用)
+  - 教員側 FAB に未読 dot のみ (件数表示なし)、FAB モーダル accordion から read-only 表示
+  - school_admin 完全不可視 (admin 画面・admin API は system_admin のみ、`feedback_observed_moment_broken`)
+- **スコープ外** (将来検討): 返信の編集/削除、AI 返信下書き、通知 push/メール、教員からの返信
 - **言葉遣いの注意 (踏み絵)**: 内部 enum で `declined` を使う場合でも、教員に見える日本語文言は「却下」「拒否」を避け、「今回は見送り」「別のかたちで検討中」等にする (`feedback_design_vocab`)。
-- **裏テーマ踏み絵**: 運営→教員方向の返信は「届いてる感」で OK。ただし返信頻度・件数を school_admin 集計に出すと「教員ごとの不満度」可視化に滑るので避ける (`feedback_observed_moment_broken`)。
-- **着手判断**: 月曜デプロイ後、フィードバック投稿数の推移を見て優先度判断。
+- **裏テーマ踏み絵**: 運営→教員方向の返信は「届いてる感」で OK。ただし返信頻度・件数を school_admin 集計に出すと「教員ごとの不満度」可視化に滑るので避ける (`feedback_observed_moment_broken`)。school_admin 集計 endpoint は **意図的に作らない**。
 
 ### 🟢 低: AI 整理コーチマーク再表示動線
 

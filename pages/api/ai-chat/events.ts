@@ -88,6 +88,15 @@ const RequestSchema = z.discriminatedUnion('event', [
     reason: z.enum(['close_button', 'cta_click']),
     version: z.string().min(1),
   }),
+  z.object({
+    event: z.literal('feedback_unread_hint_shown'),
+    version: z.string().min(1),
+  }),
+  z.object({
+    event: z.literal('feedback_unread_hint_dismissed'),
+    reason: z.enum(['close_button', 'cta_click']),
+    version: z.string().min(1),
+  }),
 ]);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -209,6 +218,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       break;
     case 'today_plan_done_hint_dismissed':
       logEvent(LogEvents.TodayPlanDoneHintDismissed, {
+        ...base,
+        reason: parsed.data.reason,
+        version: parsed.data.version,
+      });
+      break;
+    case 'feedback_unread_hint_shown':
+      logEvent(LogEvents.FeedbackUnreadHintShown, {
+        ...base,
+        version: parsed.data.version,
+      });
+      break;
+    case 'feedback_unread_hint_dismissed':
+      logEvent(LogEvents.FeedbackUnreadHintDismissed, {
         ...base,
         reason: parsed.data.reason,
         version: parsed.data.version,

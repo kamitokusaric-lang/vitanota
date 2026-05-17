@@ -646,6 +646,8 @@ export const feedbackSubmissions = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     content: text('content').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // 教員 (submitter) が FAB モーダルで replies を読んだ最終時刻。null = 未読扱い
+    lastReadBySubmitterAt: timestamp('last_read_by_submitter_at', { withTimezone: true }),
   },
   (table) => ({
     tenantCreatedIdx: index('feedback_submissions_tenant_created_idx').on(
@@ -653,6 +655,48 @@ export const feedbackSubmissions = pgTable(
       table.createdAt,
     ),
     topicIdx: index('feedback_submissions_topic_idx').on(table.topicId),
+    idTenantUniq: unique('feedback_submissions_id_tenant_uniq').on(
+      table.id,
+      table.tenantId,
+    ),
+  }),
+);
+
+// ── feedback_replies (機能 F3) ──────────────────────────────────
+// system_admin → 教員の片方向返信。教員は自分の submission に紐づく
+// replies を read-only で参照する。RLS 0039 パターン (own row 可)。
+// 返信者表記は UI 層で一律「運営より」固定 (replier_user_id は表示しない)。
+export const feedbackReplies = pgTable(
+  'feedback_replies',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    submissionId: uuid('submission_id').notNull(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    // 親 submission の user_id を非正規化 (RLS で EXISTS を回避するため)
+    submitterUserId: uuid('submitter_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // 退会時 SET NULL で匿名化 (返信本体は残す)
+    replierUserId: uuid('replier_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    submissionFk: foreignKey({
+      columns: [table.submissionId, table.tenantId],
+      foreignColumns: [feedbackSubmissions.id, feedbackSubmissions.tenantId],
+      name: 'feedback_replies_submission_fk',
+    }).onDelete('cascade'),
+    submissionIdx: index('feedback_replies_submission_idx').on(
+      table.submissionId,
+      table.createdAt,
+    ),
+    tenantIdx: index('feedback_replies_tenant_idx').on(table.tenantId),
   }),
 );
 
@@ -865,6 +909,8 @@ export type FeedbackTopic = typeof feedbackTopics.$inferSelect;
 export type NewFeedbackTopic = typeof feedbackTopics.$inferInsert;
 export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
 export type NewFeedbackSubmission = typeof feedbackSubmissions.$inferInsert;
+export type FeedbackReply = typeof feedbackReplies.$inferSelect;
+export type NewFeedbackReply = typeof feedbackReplies.$inferInsert;
 export type TaskTag = typeof taskTags.$inferSelect;
 export type NewTaskTag = typeof taskTags.$inferInsert;
 export type TaskTagAssignment = typeof taskTagAssignments.$inferSelect;

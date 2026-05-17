@@ -12,6 +12,7 @@ export const onboardingContextSchema = z.enum([
   'plan_result_start_hint',
   'today_plan_feedback_hint',
   'today_plan_done_hint',
+  'feedback_unread_hint',
 ]);
 export type OnboardingContext = z.infer<typeof onboardingContextSchema>;
 

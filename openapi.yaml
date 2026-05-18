@@ -51,6 +51,17 @@ components:
         content:
           type: string
           example: 今日の授業の振り返り
+        mood:
+          type:
+            - string
+            - "null"
+          enum:
+            - very_positive
+            - positive
+            - neutral
+            - negative
+            - very_negative
+          example: positive
         createdAt:
           type: string
           format: date-time
@@ -64,6 +75,7 @@ components:
         - tenantId
         - userId
         - content
+        - mood
         - createdAt
         - updatedAt
     TimelineResponse:
@@ -113,41 +125,68 @@ components:
     CreateEntryInput:
       type: object
       properties:
+        kind:
+          type: string
+          enum: &a1
+            - diary
+            - knowledge
+            - tweet
+          example: diary
         content:
           type: string
-          minLength: 1
-          maxLength: 200
+          maxLength: 1000
           example: 今日の授業の振り返り
         tagIds:
           type: array
           items:
             type: string
             format: uuid
-          example: &a1 []
+          example: &a2 []
         isPublic:
           type: boolean
           example: true
+        mood:
+          type:
+            - string
+            - "null"
+          enum: &a3
+            - very_positive
+            - positive
+            - neutral
+            - negative
+            - very_negative
+          example: neutral
       required:
+        - kind
         - content
         - tagIds
         - isPublic
     UpdateEntryInput:
       type: object
       properties:
+        kind:
+          type: string
+          enum: *a1
+          example: diary
         content:
           type: string
-          minLength: 1
-          maxLength: 200
+          maxLength: 1000
           example: 今日の授業の振り返り
         tagIds:
           type: array
           items:
             type: string
             format: uuid
-          example: *a1
+          example: *a2
         isPublic:
           type: boolean
           example: true
+        mood:
+          type:
+            - string
+            - "null"
+          enum: *a3
+          example: neutral
     MyJournalResponse:
       type: object
       properties:
@@ -236,17 +275,8 @@ components:
           minLength: 1
           maxLength: 50
           example: 喜び
-        type:
-          type: string
-          enum:
-            - emotion
-            - context
-          default: context
-          example: emotion
         category:
-          type:
-            - string
-            - "null"
+          type: string
           enum:
             - positive
             - negative
@@ -254,6 +284,7 @@ components:
           example: positive
       required:
         - name
+        - category
     TagDeleteResponse:
       type: object
       properties:
@@ -272,7 +303,7 @@ paths:
       tags:
         - Journal (Public)
       security:
-        - &a2
+        - &a4
           cookieAuth: []
       parameters:
         - schema:
@@ -287,8 +318,8 @@ paths:
             type: integer
             minimum: 1
             maximum: 50
-            default: 20
-            example: 20
+            default: 50
+            example: 50
           required: false
           name: perPage
           in: query
@@ -342,7 +373,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a2
+        - *a4
       requestBody:
         content:
           application/json:
@@ -397,7 +428,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a2
+        - *a4
       parameters:
         - schema:
             type: string
@@ -454,7 +485,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a2
+        - *a4
       parameters:
         - schema:
             type: string
@@ -515,7 +546,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a2
+        - *a4
       parameters:
         - schema:
             type: string
@@ -569,7 +600,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a2
+        - *a4
       parameters:
         - schema:
             type: integer
@@ -583,8 +614,8 @@ paths:
             type: integer
             minimum: 1
             maximum: 50
-            default: 20
-            example: 20
+            default: 50
+            example: 50
           required: false
           name: perPage
           in: query
@@ -637,7 +668,7 @@ paths:
       tags:
         - Tag
       security:
-        - *a2
+        - *a4
       responses:
         "200":
           description: タグ一覧
@@ -686,7 +717,7 @@ paths:
       tags:
         - Tag
       security:
-        - *a2
+        - *a4
       requestBody:
         content:
           application/json:
@@ -741,7 +772,7 @@ paths:
       tags:
         - Tag
       security:
-        - *a2
+        - *a4
       parameters:
         - schema:
             type: string

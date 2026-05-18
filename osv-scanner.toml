@@ -69,3 +69,9 @@ reason = "postcss 8.4.31 (Next.js 14.2.35 経由 transitive) + 8.5.9 (autoprefix
 [[IgnoredVulns]]
 id = "GHSA-w5hq-g745-h8pq"
 reason = "uuid 8.3.2 (next-auth 4.24.13 経由 transitive)。next-auth の内部 token 生成等で使用。next-auth 5 (Auth.js) ではこの依存が更新済。Next.js 15 upgrade と合わせて next-auth 5 系へ移行で解消予定 (期限: 2026-06-30)。CSRF token は next-auth が管理し、vitanota は invitation token を crypto.randomBytes(32) で独自生成しているため uuid 弱点の影響を直接受けない"
+
+# ── 2026-05-18 追加 (CI 緑化作業中に検出) ────────────
+
+[[IgnoredVulns]]
+id = "GHSA-5wm8-gmm8-39j9"
+reason = "fast-xml-builder 1.1.4 (AWS SDK 経由 transitive: fast-xml-parser 5.5.8 → @aws-sdk/xml-builder → @aws-sdk/core → 各 client)。既存の fast-xml-parser CVE (GHSA-gh4j-gqv2-49f6) と全く同じ依存経路でさらに 1 段深い transitive。攻撃者制御の input が builder/parser に到達する経路は AWS API response のみで、AWS API は信頼境界内 (IAM 認証済)。runtime には混入してるが実効リスクなし。AWS SDK 側の patch を待つ (CVE 修正済バージョンが SDK に取り込まれ次第 pnpm update で解消)"

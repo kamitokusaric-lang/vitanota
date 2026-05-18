@@ -21,6 +21,16 @@
 - **発見日**: 2026-04-22 (Phase C CI GREEN 化中に OSV-Scanner の CVE 一斉発覚)
 - **期限**: 2026-06-30 (MVP ローンチから約 2 ヶ月)
 - **背景**: Next.js 14.2 系の 5 CVE (High 2 + Medium 3) と drizzle-orm 0.30.10 の 1 High CVE が、それぞれ 14.2 最終 patch / 0.30 最終 patch で fix 対応していない。major upgrade (Next.js) / minor upgrade (drizzle-orm) が必要
+- **2026-05-18 update**: GHSA DB の新規 publish で Next.js 14.2.35 系の CVE が **9 件追加検出** (合計でほぼ全方位の Next.js 脆弱性が surface)。 これらは個別 osv-scanner.toml への ignore 追加ではなく **Next.js 15 upgrade で一括解消** する方針。 期限 (2026-06-30) は据え置き、 upgrade 着手時に CVE 解消を verify する手順に組み込む:
+  - `GHSA-c4j6-fc7j-m34r` (CVSS 8.6 High) ← 要 review
+  - `GHSA-36qx-fr4f-26g5` (CVSS 7.5)
+  - `GHSA-8h8q-6873-q5fj` (CVSS 7.5)
+  - `GHSA-gx5p-jg67-6x7h` (CVSS 6.1)
+  - `GHSA-h64f-5h5j-jqjh` (CVSS 5.9)
+  - `GHSA-wfc6-r584-vfw7` (CVSS 5.4)
+  - `GHSA-ffhc-5mcf-pf4q` (CVSS 4.7)
+  - `GHSA-3g8h-86w9-wvmq` (CVSS 3.7)
+  - `GHSA-vfv6-92ff-j949` (CVSS 3.7)
 - **MVP β 期間の allowlist 根拠**:
   - vitanota は多層防御 (CloudFront secret 強制化 + WAF rate limit + 招待制 + RLS + session 8h) により実効リスクを中弱に抑制
   - SSRF は VPC Private Isolated で外部到達不能、Cache 系は CachingDisabled で影響ゼロ
@@ -30,8 +40,10 @@
   1. Next.js 14 → 15 migration (React 19 含む、App Router / Middleware signature 変更追従)
   2. drizzle-orm 0.30 → 0.31+ migration (schema API 変更確認)
   3. 統合テスト + E2E regression 確認
-  4. 本番 deploy (CloudFront + App Runner)
+  4. 2026-05-18 検出分を含む 9 CVE が解消されたことを osv-scanner で verify
+  5. 本番 deploy (CloudFront + App Runner)
 - **運用監視**: 月次で OSV-Scanner 結果を review、新 CVE 発生 or severity 上方修正時は個別対応判断
+- **CI 表示の扱い**: Dependency Audit ジョブは `continue-on-error: true` で workflow conclusion は success だが、 ジョブバッジは Next.js 9 CVE で red 表示が継続。 Next.js 15 upgrade まで許容
 
 ---
 

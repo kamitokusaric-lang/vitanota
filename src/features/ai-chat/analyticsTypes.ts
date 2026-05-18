@@ -59,6 +59,10 @@ export interface AiAnalyticsResponse {
   };
   sessions: SessionDetail[];
   morningPlan: MorningPlanAnalytics;
+  dailyCounts: {
+    h1: Array<{ date: string; count: number }>;
+    h3: Array<{ date: string; count: number }>;
+  };
 }
 
 // H3「朝の見通し作り」の集計 (Phase B 分析画面の H3 セクション)

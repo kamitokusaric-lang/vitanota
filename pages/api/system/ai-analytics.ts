@@ -11,7 +11,7 @@
 // inputBurdenScore 集計を画面から削除。過去データは ai_sessions.ai_output_json.survey に
 // 残ったまま (削除はしない)、編集理由 (editReason) 集計は残す。
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql, desc } from 'drizzle-orm';
+import { sql, desc, eq } from 'drizzle-orm';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { withSystemAdmin } from '@/shared/lib/db';
@@ -151,6 +151,31 @@ interface FreeCommentRow {
   reason: string | null;
   text: string;
   at: string | null;
+}
+
+interface DailyCountRow {
+  date: string;
+  count: number;
+}
+
+// 過去 30 日分の JST 日付を生成し、 SQL の集計結果と merge して 0 件埋めする
+function fillDailyCounts(
+  rows: DailyCountRow[],
+  days = 30,
+): Array<{ date: string; count: number }> {
+  const map = new Map(rows.map((r) => [r.date, r.count]));
+  const out: Array<{ date: string; count: number }> = [];
+  // 今日 (JST) から (days-1) 日前まで遡る
+  const nowJst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const todayJst = new Date(
+    Date.UTC(nowJst.getUTCFullYear(), nowJst.getUTCMonth(), nowJst.getUTCDate()),
+  );
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(todayJst.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = d.toISOString().slice(0, 10);
+    out.push({ date: key, count: map.get(key) ?? 0 });
+  }
+  return out;
 }
 
 // ── H3 morning_plan 集計 row types ─────────────────────────
@@ -466,6 +491,8 @@ export default async function handler(
       `);
 
       // セッション詳細 (最新 N 件、入力本文 + AI 提案 + 教員確定)
+      // H1 (quick_capture) のみ対象。 morning_plan は SessionCard の構造に合わないため
+      // 別途必要になったら H3 タブ用の詳細ビューを追加する。
       const sessionRows = await tx
         .select({
           id: aiSessions.id,
@@ -476,6 +503,7 @@ export default async function handler(
           aiOutputJson: aiSessions.aiOutputJson,
         })
         .from(aiSessions)
+        .where(eq(aiSessions.type, 'quick_capture'))
         .orderBy(desc(aiSessions.createdAt))
         .limit(SESSION_DETAIL_LIMIT);
 
@@ -586,6 +614,29 @@ export default async function handler(
         FROM user_dates
       `);
 
+      // 日別件数 (過去 30 日、JST 日付で GROUP BY)
+      // H1 = quick_capture, H3 = morning_plan の利用数推移を見る
+      const dailyH1Result = await tx.execute(sql`
+        SELECT
+          (created_at AT TIME ZONE 'Asia/Tokyo')::date::text AS date,
+          COUNT(*)::int                                      AS count
+        FROM ${aiSessions}
+        WHERE type = 'quick_capture'
+          AND created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY 1
+        ORDER BY 1
+      `);
+      const dailyH3Result = await tx.execute(sql`
+        SELECT
+          (created_at AT TIME ZONE 'Asia/Tokyo')::date::text AS date,
+          COUNT(*)::int                                      AS count
+        FROM ${aiSessions}
+        WHERE type = 'morning_plan'
+          AND created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
       return {
         summary: (summaryResult.rows[0] as unknown as SummaryRow) ?? null,
         editRate: (editRateResult.rows[0] as unknown as EditRateRow) ?? null,
@@ -606,6 +657,8 @@ export default async function handler(
         mpBuckets: mpBucketsResult.rows[0] as unknown as MpBucketsRow,
         mpCapacity: mpCapacityResult.rows as unknown as MpCapacityRow[],
         mpNextDay: mpNextDayResult.rows[0] as unknown as MpNextDayRow,
+        dailyH1: dailyH1Result.rows as unknown as DailyCountRow[],
+        dailyH3: dailyH3Result.rows as unknown as DailyCountRow[],
       };
     });
 
@@ -679,6 +732,10 @@ export default async function handler(
       },
       sessions: data.sessionRows.map(mapSessionDetail),
       morningPlan: buildMorningPlanAnalytics(data),
+      dailyCounts: {
+        h1: fillDailyCounts(data.dailyH1),
+        h3: fillDailyCounts(data.dailyH3),
+      },
     };
 
     return res.status(200).json(response);

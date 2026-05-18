@@ -3,6 +3,15 @@
 // データ源: ai_sessions.ai_output_json (jsonb 集計、school_admin 不可視)
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
@@ -361,10 +370,62 @@ function ScoreHistogram({
   );
 }
 
+function DailyCountLineChart({
+  data,
+  caption,
+}: {
+  data: Array<{ date: string; count: number }>;
+  caption: string;
+}) {
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-semibold text-gray-700">
+        日別利用数 (過去 30 日)
+      </h2>
+      <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <p className="mb-3 text-[11px] text-gray-400">
+          {caption} · 期間合計 {total} 件
+        </p>
+        <ResponsiveContainer width="100%" height={240}>
+          <LineChart
+            data={data}
+            margin={{ top: 5, right: 16, bottom: 5, left: -16 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 11, fill: '#6b7280' }}
+              tickFormatter={(v: string) => v.slice(5)}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fontSize: 11, fill: '#6b7280' }}
+            />
+            <Tooltip
+              labelFormatter={(v) => v}
+              formatter={(value: unknown) => [`${value} 件`, '利用数']}
+            />
+            <Line
+              type="monotone"
+              dataKey="count"
+              stroke="#4f46e5"
+              strokeWidth={2}
+              dot={{ r: 3, fill: '#4f46e5' }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  );
+}
+
 export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
   const [data, setData] = useState<AiAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'h1' | 'h3'>('h1');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -414,7 +475,40 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
               {loadError && <ErrorMessage message={loadError} />}
 
               {!loading && !loadError && data && (
-                <div className="space-y-8">
+                <>
+                  <div className="mb-6 border-b border-gray-200">
+                    <nav className="-mb-px flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('h1')}
+                        className={`border-b-2 px-4 py-2 text-sm font-medium ${
+                          activeTab === 'h1'
+                            ? 'border-vn-accent text-vn-accent'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        タスク AI 整理 (H1)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('h3')}
+                        className={`border-b-2 px-4 py-2 text-sm font-medium ${
+                          activeTab === 'h3'
+                            ? 'border-vn-accent text-vn-accent'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        朝の見通し作り (H3)
+                      </button>
+                    </nav>
+                  </div>
+                  <div className="space-y-8">
+                  {activeTab === 'h1' && (
+                    <>
+                  <DailyCountLineChart
+                    data={data.dailyCounts.h1}
+                    caption="テキスト入力 → AI 整理 (整理ボタン)"
+                  />
                   {/* 主指標 */}
                   <section>
                     <h2 className="mb-3 text-sm font-semibold text-gray-700">
@@ -771,17 +865,14 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                     </div>
                   </section>
 
-                  {/* ─── H3 morning_plan「朝の見通し作り」 ─── */}
-                  <section className="mt-8 border-t border-gray-200 pt-8">
-                    <h1 className="mb-1 text-xl font-bold text-gray-900">
-                      H3 朝の見通し作り
-                    </h1>
-                    <p className="mb-5 text-xs text-gray-500">
-                      既存タスクから AI が「今日やる / 余裕があれば」の 2 軸に整理する機能の集計。
-                      今日のプラン開始率 / Done 発生率 / 見通しが持てた率 が主指標。
-                    </p>
-                  </section>
-
+                    </>
+                  )}
+                  {activeTab === 'h3' && (
+                    <>
+                  <DailyCountLineChart
+                    data={data.dailyCounts.h3}
+                    caption="見通しを作る クリック"
+                  />
                   <MorningPlanMainMetrics mp={data.morningPlan} />
                   <MorningPlanFunnel mp={data.morningPlan} />
                   <MorningPlanGuardrails mp={data.morningPlan} />
@@ -789,7 +880,10 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                   <MorningPlanBuckets mp={data.morningPlan} />
                   <MorningPlanCapacityCross mp={data.morningPlan} />
                   <MorningPlanContinuity mp={data.morningPlan} />
-                </div>
+                    </>
+                  )}
+                  </div>
+                </>
               )}
             </div>
           </div>

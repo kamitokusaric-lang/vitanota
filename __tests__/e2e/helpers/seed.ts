@@ -26,8 +26,7 @@ export interface SeedTag {
   id: string;
   tenantId: string;
   name: string;
-  type: 'emotion' | 'context';
-  category: 'positive' | 'negative' | 'neutral' | null;
+  category: 'positive' | 'negative' | 'neutral';
 }
 
 export class SeedClient {
@@ -82,20 +81,17 @@ export class SeedClient {
     return body.entry;
   }
 
+  // 2026-05-18: migration 0016 で tags → emotion_tags に rename され
+  // context タグは task_categories に移譲済。 createTag は emotion_tags 専用、
+  // category は required (positive / negative / neutral)。
   async createTag(params: {
     tenantId: string;
     userId: string;
     name: string;
-    type?: 'emotion' | 'context';
-    category?: 'positive' | 'negative' | 'neutral' | null;
+    category: 'positive' | 'negative' | 'neutral';
   }): Promise<SeedTag> {
     const res = await this.request.post('/api/test/_seed', {
-      data: {
-        action: 'tag',
-        ...params,
-        type: params.type ?? 'context',
-        category: params.category ?? null,
-      },
+      data: { action: 'tag', ...params },
     });
     if (!res.ok()) throw new Error(`createTag failed: ${res.status()}`);
     const body = (await res.json()) as { tag: SeedTag };

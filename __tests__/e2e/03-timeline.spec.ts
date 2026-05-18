@@ -1,5 +1,6 @@
 // Step 16b - Spec 03: 共有タイムライン (US-T-014)
 // stories.md 改訂版: 共有タイムラインはテナント内全教員の公開エントリを表示
+// 2026-05-18 update: /journal route 廃止 → /dashboard?tab=notes (子タブ staffroom が default) に追従
 import { test, expect } from '@playwright/test';
 import { SeedClient } from './helpers/seed';
 import { loginAs } from './helpers/auth';
@@ -21,9 +22,9 @@ test.describe('共有タイムライン (US-T-014)', () => {
       isPublic: true,
     });
 
-    // 教員 A としてログイン
+    // 教員 A としてログイン → 日々ノート (staffroom = default 子タブ)
     await loginAs(context, seed, userA, tenant.id);
-    await page.goto('/journal');
+    await page.goto('/dashboard?tab=notes');
 
     await expect(page.getByText('教員 B の公開投稿')).toBeVisible();
   });
@@ -51,7 +52,7 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, userA, tenant.id);
-    await page.goto('/journal');
+    await page.goto('/dashboard?tab=notes');
 
     await expect(page.getByText('B の公開記録')).toBeVisible();
     await expect(page.getByText('B の非公開記録')).not.toBeVisible();
@@ -73,13 +74,13 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, userA, tenantA.id);
-    await page.goto('/journal');
+    await page.goto('/dashboard?tab=notes');
 
     await expect(page.getByTestId('timeline-list-empty')).toBeVisible();
     await expect(page.getByText('テナント B の公開投稿')).not.toBeVisible();
   });
 
-  test('マイ記録は別ページで自分の全エントリ (公開・非公開両方) を表示', async ({ page, context, request }) => {
+  test('マイノートは自分の全エントリ (公開・非公開両方) を表示', async ({ page, context, request }) => {
     const seed = new SeedClient(request);
     await seed.reset();
     const tenant = await seed.createTenant('学校 A');
@@ -99,7 +100,8 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, user, tenant.id);
-    await page.goto('/journal/mine');
+    await page.goto('/dashboard?tab=notes');
+    await page.getByTestId('timeline-subtab-personal').click();
 
     await expect(page.getByText('自分の公開')).toBeVisible();
     await expect(page.getByText('自分の非公開')).toBeVisible();

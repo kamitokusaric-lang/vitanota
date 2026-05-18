@@ -16,15 +16,15 @@ test.describe('認証フロー', () => {
     await expect(page).toHaveURL(/\/auth\/signin/);
   });
 
-  test('セッション注入後に /journal が表示される', async ({ page, context, request }) => {
+  test('セッション注入後に /dashboard が表示される', async ({ page, context, request }) => {
     const seed = new SeedClient(request);
     const tenant = await seed.createTenant('学校 A');
     const user = await seed.createUser(tenant.id, 'teacher');
 
     await loginAs(context, seed, user, tenant.id);
-    await page.goto('/journal');
+    await page.goto('/dashboard');
 
-    await expect(page.getByTestId('journal-timeline-heading')).toBeVisible();
+    await expect(page.getByTestId('dashboard-page')).toBeVisible();
   });
 
   test('セッション Cookie がない場合、API も 401 を返す', async ({ request }) => {

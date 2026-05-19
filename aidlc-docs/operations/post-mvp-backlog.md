@@ -212,6 +212,17 @@
 - **現状**: pino 構造化ログのみ。トレース ID なし
 - **対策**: 本番運用データ蓄積後、X-Ray or OpenTelemetry を検討
 
+### 🟢 低: `sessions.session_token_hash` カラム追加 (集計効率化)
+- **発見日**: 2026-05-19 (middleware page_view 構造化ログ実装の設計議論中)
+- **背景**: middleware page_view ログには session_token の sha256 hash prefix (16 char) のみ記録する設計を採用 (生 token を吐くと漏洩時にセッション乗っ取り可能になるため)。 集計時は sessions テーブル側で `encode(digest(session_token, 'sha256'), 'hex')` を都度計算して log の hash と join する
+- **影響**: sessions テーブルが将来肥大化したとき、 集計クエリで毎回 digest 計算が走るためパフォーマンス劣化の可能性。 vitanota β 期間の規模 (数百〜数千行) なら誤差レベルだが、 学校導入数が増えてアクセス分析を頻繁に実行するようになると体感される可能性
+- **対策**: sessions テーブルに `session_token_hash TEXT` カラムを追加、 NextAuth session 作成時 (DrizzleAdapter のフック or trigger) に pre-compute して埋める。 既存 row は migration で backfill。 集計クエリは digest 計算なしで直接 join 可能になる
+- **判断材料**:
+  - sessions テーブル row 数 (現状は 8h expire で自然減、 session cleanup backlog 未実装のため累積)
+  - 集計クエリ頻度 (アクセス分析を 1 日 1 回程度なら不要、 リアルタイム BI ツール経由で多発するようになったら必要)
+- **着手判断**: sessions テーブルが数万行 + 集計遅延を感じたとき、 もしくは BI ツール導入で集計頻度が大幅増加したとき
+- **関連 backlog**: 「🟡 中: 期限切れ session の自動クリーンアップ」 (DB / 接続セクション、 sessions テーブル肥大化対策)
+
 ---
 
 ## CI / テスト

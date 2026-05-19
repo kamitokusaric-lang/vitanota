@@ -1,23 +1,20 @@
 // access-distribution dashboard の API response 型定義
 // system_admin 向け /admin/access-distribution で使用
-
-export interface HourlyDataPoint {
-  hour: number; // 0-23 (JST)
-  pv: number;
-  uu: number;
-}
+//
+// 集計対象 (2026-05-19 刷新):
+// - UU: sessions.created_at の date×hour matrix で user_id distinct
+// - AI 利用: ai_sessions.created_at の date×hour matrix を type 別 (quick_capture / morning_plan) に件数集計
+// 旧 PV (AppRunner Requests metric) は HTTP リクエスト数で page view と対応しないため廃止
 
 export interface HeatmapRow {
   date: string; // YYYY-MM-DD (JST)
-  hours: number[]; // length 24, PV per hour
+  hours: number[]; // length 24
 }
 
 export interface AccessDistributionSummary {
-  totalPv: number;
   totalUu: number;
-  peakHour: number; // 0-23 (JST)
-  peakHourPv: number;
-  avgPvPerHour: number;
+  totalQuickCaptureSessions: number; // H1
+  totalMorningPlanSessions: number; // H3
 }
 
 export interface AccessDistributionMeta {
@@ -28,8 +25,9 @@ export interface AccessDistributionMeta {
 }
 
 export interface AccessDistributionResponse {
-  hourly: HourlyDataPoint[]; // 24 entries (0:00 - 23:00)
-  heatmap: HeatmapRow[];
+  uuHeatmap: HeatmapRow[];
+  quickCaptureHeatmap: HeatmapRow[]; // H1
+  morningPlanHeatmap: HeatmapRow[]; // H3
   summary: AccessDistributionSummary;
   meta: AccessDistributionMeta;
 }

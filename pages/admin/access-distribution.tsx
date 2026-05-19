@@ -1,7 +1,7 @@
 // system_admin: アクセス分布ダッシュボード
-// AppRunner HTTP リクエスト (PV) + sessions テーブル (UU) を時間帯別に可視化
+// UU (sessions.created_at の date×hour distinct) + AI 利用 (H1 quick_capture + H3 morning_plan) をヒートマップ可視化
 // 2026-05-15 朝の PAM failed 障害調査で「教員アクセス集中時に発火」が必要条件と判明、
-// incident と利用パターンの照合に使う運用基盤
+// incident と利用パターンの照合に使う運用基盤。 2026-05-19 PV (CloudWatch Requests) 廃止 + ヒートマップ刷新
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth';
@@ -12,7 +12,6 @@ import { AdminLayout } from '@/shared/components/AdminLayout';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { SummaryCards } from '@/features/access-distribution/components/SummaryCards';
-import { HourlyBarChart } from '@/features/access-distribution/components/HourlyBarChart';
 import { HeatmapTable } from '@/features/access-distribution/components/HeatmapTable';
 import type { VitanotaSession } from '@/shared/types/auth';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
@@ -25,15 +24,12 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function daysAgoIsoDate(days: number): string {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-}
+// 説明会日 (= 教員導入開始日)。 これより前は MVP 内部テスト期間でノイズが多いため除外。
+const LAUNCH_DATE = '2026-05-07';
 
 export default function AccessDistributionPage({ session }: PageProps) {
-  // default: 過去 7 日 (今日含む)
-  const [start, setStart] = useState<string>(daysAgoIsoDate(6));
+  // default: 説明会日 (2026-05-07) 〜 今日。 最大 90 日 (3 ヶ月) まで延長可
+  const [start, setStart] = useState<string>(LAUNCH_DATE);
   const [end, setEnd] = useState<string>(todayIsoDate());
   const [data, setData] = useState<AccessDistributionResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,10 +79,10 @@ export default function AccessDistributionPage({ session }: PageProps) {
               <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">アクセス分布</h1>
                 <p className="mt-2 text-sm text-gray-600">
-                  教員アクセスの時間帯分布を集計。PAM failed 等の incident と利用パターンの照合に使う。
+                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ / H3 朝の見通し) の利用を時間帯×日付ヒートマップで可視化。
                 </p>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  1 時間集計 / JST / CloudWatch retention 15 ヶ月 / 直近 1h は集計中 (3〜5 分遅延)
+                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数
                 </p>
               </div>
 
@@ -105,6 +101,7 @@ export default function AccessDistributionPage({ session }: PageProps) {
                     id="start-date"
                     type="date"
                     value={start}
+                    min={LAUNCH_DATE}
                     onChange={(e) => setStart(e.target.value)}
                     className="mt-1 rounded border border-gray-300 px-3 py-1.5 text-sm"
                   />
@@ -120,6 +117,7 @@ export default function AccessDistributionPage({ session }: PageProps) {
                     id="end-date"
                     type="date"
                     value={end}
+                    min={LAUNCH_DATE}
                     onChange={(e) => setEnd(e.target.value)}
                     className="mt-1 rounded border border-gray-300 px-3 py-1.5 text-sm"
                   />
@@ -132,7 +130,7 @@ export default function AccessDistributionPage({ session }: PageProps) {
                   集計
                 </button>
                 <span className="ml-2 text-[11px] text-gray-400">
-                  期間 1〜60 日
+                  期間 1〜90 日 / 開始日は {LAUNCH_DATE} 以降
                 </span>
               </form>
 
@@ -142,8 +140,21 @@ export default function AccessDistributionPage({ session }: PageProps) {
               {!loading && !error && data && (
                 <div className="space-y-6">
                   <SummaryCards summary={data.summary} />
-                  <HourlyBarChart hourly={data.hourly} />
-                  <HeatmapTable heatmap={data.heatmap} />
+                  <HeatmapTable
+                    heatmap={data.uuHeatmap}
+                    title="UU (ログイン教員数)"
+                    caption="sessions.created_at の JST date×hour 別 distinct user_id"
+                  />
+                  <HeatmapTable
+                    heatmap={data.quickCaptureHeatmap}
+                    title="AI 整理 (H1) 利用数"
+                    caption="ai_sessions WHERE type='quick_capture' の件数"
+                  />
+                  <HeatmapTable
+                    heatmap={data.morningPlanHeatmap}
+                    title="朝の見通し (H3) 利用数"
+                    caption="ai_sessions WHERE type='morning_plan' の件数"
+                  />
                   <p className="text-[11px] text-gray-400">
                     生成: {new Date(data.meta.generatedAt).toLocaleString('ja-JP')} / {data.meta.periodDays} 日間
                   </p>

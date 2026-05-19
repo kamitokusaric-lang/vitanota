@@ -7,9 +7,13 @@ import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import {
   initializeHeatmap,
   fillHeatmap,
+  initializeHeatmapWithSub,
+  fillHeatmapWithSub,
 } from '@/features/access-distribution/lib/aggregator';
 import { getUuByHourDate } from '@/features/access-distribution/lib/sessionUuRepository';
 import { getAiSessionUsageByHourDate } from '@/features/access-distribution/lib/aiSessionUsageRepository';
+import { getJournalUsageByHourDate } from '@/features/access-distribution/lib/journalUsageRepository';
+import { getTaskUsageByHourDate } from '@/features/access-distribution/lib/taskUsageRepository';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
 import { logger } from '@/shared/lib/logger';
 
@@ -70,9 +74,19 @@ export default async function handler(
   }
 
   try {
-    const [uu, ai] = await Promise.all([
+    const [uu, ai, journal, task] = await Promise.all([
       getUuByHourDate(session.user.userId, startUtc, endUtcExclusive),
       getAiSessionUsageByHourDate(
+        session.user.userId,
+        startUtc,
+        endUtcExclusive,
+      ),
+      getJournalUsageByHourDate(
+        session.user.userId,
+        startUtc,
+        endUtcExclusive,
+      ),
+      getTaskUsageByHourDate(
         session.user.userId,
         startUtc,
         endUtcExclusive,
@@ -91,15 +105,29 @@ export default async function handler(
       initializeHeatmap(startUtc, endUtcExclusive),
       ai.morningPlan,
     );
+    const journalHeatmap = fillHeatmapWithSub(
+      initializeHeatmapWithSub(startUtc, endUtcExclusive),
+      journal.rows,
+    );
+    const taskHeatmap = fillHeatmapWithSub(
+      initializeHeatmapWithSub(startUtc, endUtcExclusive),
+      task.rows,
+    );
 
     const response: AccessDistributionResponse = {
       uuHeatmap,
       quickCaptureHeatmap,
       morningPlanHeatmap,
+      journalHeatmap,
+      taskHeatmap,
       summary: {
         totalUu: uu.totalUu,
         totalQuickCaptureSessions: ai.totalQuickCaptureSessions,
         totalMorningPlanSessions: ai.totalMorningPlanSessions,
+        totalJournalEntries: journal.totalEntries,
+        totalJournalPrivateEntries: journal.totalPrivateEntries,
+        totalTaskTouches: task.totalTouches,
+        totalTaskCompletes: task.totalCompletes,
       },
       meta: {
         start: startStr,

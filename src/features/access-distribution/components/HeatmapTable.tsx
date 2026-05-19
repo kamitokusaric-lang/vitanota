@@ -56,16 +56,29 @@ export function HeatmapTable({ heatmap, title, caption }: HeatmapTableProps) {
               <td className="sticky left-0 z-10 bg-white px-2 py-0.5 font-mono text-gray-700">
                 {row.date}
               </td>
-              {row.hours.map((v, h) => (
-                <td
-                  key={h}
-                  className="min-w-[2rem] border border-gray-100 px-1 py-0.5 text-center"
-                  style={cellStyle(v, max)}
-                  title={`${row.date} ${pad(h)}:00: ${v.toLocaleString()}`}
-                >
-                  {v > 0 ? v.toLocaleString() : ''}
-                </td>
-              ))}
+              {row.hours.map((v, h) => {
+                const sub = row.subHours?.[h] ?? 0;
+                const label =
+                  v > 0
+                    ? sub > 0
+                      ? `${v.toLocaleString()} (${sub.toLocaleString()})`
+                      : v.toLocaleString()
+                    : '';
+                const titleText =
+                  row.subHours !== undefined
+                    ? `${row.date} ${pad(h)}:00: ${v.toLocaleString()} (うち非公開 ${sub.toLocaleString()})`
+                    : `${row.date} ${pad(h)}:00: ${v.toLocaleString()}`;
+                return (
+                  <td
+                    key={h}
+                    className="min-w-[2rem] border border-gray-100 px-1 py-0.5 text-center"
+                    style={cellStyle(v, max)}
+                    title={titleText}
+                  >
+                    {label}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

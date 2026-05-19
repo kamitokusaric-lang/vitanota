@@ -2,6 +2,8 @@ import type { HeatmapRow } from '@/features/access-distribution/types';
 
 interface HeatmapTableProps {
   heatmap: HeatmapRow[];
+  title?: string;
+  caption?: string;
 }
 
 function pad(n: number): string {
@@ -21,11 +23,17 @@ function cellStyle(value: number, max: number): React.CSSProperties {
   };
 }
 
-export function HeatmapTable({ heatmap }: HeatmapTableProps) {
+export function HeatmapTable({ heatmap, title, caption }: HeatmapTableProps) {
   const max = Math.max(1, ...heatmap.flatMap((row) => row.hours));
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white p-3">
+      {title && (
+        <div className="mb-2 px-1">
+          <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+          {caption && <p className="mt-0.5 text-[11px] text-gray-500">{caption}</p>}
+        </div>
+      )}
       <table className="text-[10px] tabular-nums">
         <thead>
           <tr>

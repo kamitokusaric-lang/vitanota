@@ -22,32 +22,23 @@ function Card({
   );
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
 export function SummaryCards({ summary }: SummaryCardsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Card
-        label="総 PV"
-        value={summary.totalPv.toLocaleString()}
-        caption="期間内 HTTP リクエスト数"
-      />
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <Card
         label="総 UU"
         value={summary.totalUu.toLocaleString()}
-        caption="期間内ユニーク user_id"
+        caption="期間内ユニーク user_id (sessions.created_at)"
       />
       <Card
-        label="ピーク時間帯"
-        value={`${pad(summary.peakHour)}:00`}
-        caption={`${summary.peakHourPv.toLocaleString()} PV (時間帯合計)`}
+        label="AI 整理 (H1) 利用数"
+        value={summary.totalQuickCaptureSessions.toLocaleString()}
+        caption="期間内 quick_capture セッション件数"
       />
       <Card
-        label="平均 PV / 時"
-        value={Math.round(summary.avgPvPerHour).toLocaleString()}
-        caption="24 時間 × 期間日数で平均化"
+        label="朝の見通し (H3) 利用数"
+        value={summary.totalMorningPlanSessions.toLocaleString()}
+        caption="期間内 morning_plan セッション件数"
       />
     </div>
   );

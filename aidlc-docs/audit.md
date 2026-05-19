@@ -2445,3 +2445,43 @@ chimo は **ハイブリッド開発スタイル** を採用。
 
 **コンテキスト**: ハイブリッド開発スタイル確定、コード生成プラン更新済み。残るレビュー項目 (Step 順序 / 粒度 / コード実装着手タイミング) の chimo フィードバック待ち。
 
+---
+
+## OSV-Scanner fail 修正 — 新規 2 CVE を backlog に追記
+**タイムスタンプ**: 2026-05-19T (JST 2026-05-19)
+**ユーザー入力**: "CIでOSV の failが起きているとのこと。修正したい"
+**AI応答**: CI 状況を確認。`Dependency Audit (OSV-Scanner)` ジョブが exit code 1 で fail (continue-on-error: true により workflow 全体は success 判定、ジョブバッジは red)。検出未許可 CVE は 11 件:
+- Next.js 14.2.35: 9 件 (backlog `脆弱性対応 / 依存更新` 2026-05-18 update に記載済み)
+- brace-expansion 5.0.5 (GHSA-jxxr-4gwj-5jf2, CVSS 6.5): 新規、 backlog 未記載
+- ws 8.20.0 (GHSA-58qx-3vcg-4xpx, CVSS 4.4): 新規、 backlog 未記載
+
+修正方針の選択肢を提示 (新規 2 件のみ allowlist / 全 11 件 allowlist / OSV ジョブ自体を回避)。
+
+**ユーザー入力 (1 回目)**: "全 11 件を期限付きで allowlist して CI 緑化" (AskUserQuestion 経由)
+
+実装プランを提示 (osv-scanner.toml に 11 件追記、 backlog L24/L46 の方針記述を「allowlist 化で CI 緑化」に書き換え、 audit.md 記録、 ローカル verify、 commit/push timing は chimo 指示まで保留)。
+
+**ユーザー入力 (2 回目)**: "ああ、まって。今のbacklog方針と同じにするわ"
+
+**AI応答**: 新規 2 件の扱いを再確認するため AskUserQuestion を再実行。
+
+**ユーザー入力 (3 回目)**: "Next 同様、個別 ignore 追加せず backlog 記載のみ" (AskUserQuestion 経由)
+
+**最終方針確定**:
+- osv-scanner.toml は変更しない (Next 9 + brace-expansion + ws 計 11 件は個別 ignore 追加せず)
+- 新規 2 件 (brace-expansion / ws) を post-mvp-backlog.md の「2026-05-19 update」として追記
+- 既存 L46「CI 表示の扱い」を「Next.js 9 + devDeps 系 2 CVE で red 表示が継続」に更新
+- upgrade 手順 (L43) も brace-expansion / ws の verify を含む形に微修正
+- ジョブバッジは Next.js 15 upgrade + vitest upgrade まで red 許容を継続
+
+**依存経路の事実確認 (grep 済み)**:
+- brace-expansion 5.0.5: `minimatch@10.2.5` → `@typescript-eslint/typescript-estree@8.58.2` → `eslint-config-next@14.2.35` (devDependencies)、 production runtime 非混入
+- ws 8.20.0: `jsdom@24.1.3` → `vitest@1.6.1` / `@vitest/coverage-v8@1.6.1` (devDependencies)、 production runtime 非混入
+
+**変更ファイル**:
+- `aidlc-docs/operations/post-mvp-backlog.md` (L24-33 直後に「2026-05-19 update」追加、 L43 と L46 を微修正)
+
+ブランチ `fix/2026-05-19-osv-backlog-update` を作成。 commit / push / PR 作成タイミングは chimo の明示指示まで保留 (memory [[feedback_commit_push_timing]])。
+
+**コンテキスト**: OSV-Scanner fail は backlog 方針通り「red 許容、 upgrade で一括解消」の継続を確認。 新規 2 件も devDependency only で実害なしのため同方針を適用、 backlog に経緯を残すのみで処理完了。
+

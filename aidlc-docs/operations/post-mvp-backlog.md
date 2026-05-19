@@ -31,6 +31,9 @@
   - `GHSA-ffhc-5mcf-pf4q` (CVSS 4.7)
   - `GHSA-3g8h-86w9-wvmq` (CVSS 3.7)
   - `GHSA-vfv6-92ff-j949` (CVSS 3.7)
+- **2026-05-19 update**: 上記 Next.js 9 CVE と同タイミングで **devDependency 経路の 2 CVE** が追加検出。 いずれも production runtime に混入しない (build/test time only) ため、 Next.js 9 CVE と同様に **個別 osv-scanner.toml への ignore 追加はせず**、 上位パッケージの upgrade で自然解消する方針。 期限 (2026-06-30) は据え置き:
+  - `GHSA-jxxr-4gwj-5jf2` (brace-expansion 5.0.5, CVSS 6.5) — 依存経路: `minimatch@10.2.5` → `@typescript-eslint/typescript-estree@8.58.2` → `eslint-config-next@14.2.35` (devDependencies)。 Next.js 15 upgrade で eslint-config-next も追従するため自然解消の可能性高
+  - `GHSA-58qx-3vcg-4xpx` (ws 8.20.0, CVSS 4.4) — 依存経路: `jsdom@24.1.3` → `vitest@1.6.1` / `@vitest/coverage-v8@1.6.1` (devDependencies)。 vitest 系の minor upgrade で解消可能、 Next.js 15 upgrade と独立して任意のタイミングで対応可
 - **MVP β 期間の allowlist 根拠**:
   - vitanota は多層防御 (CloudFront secret 強制化 + WAF rate limit + 招待制 + RLS + session 8h) により実効リスクを中弱に抑制
   - SSRF は VPC Private Isolated で外部到達不能、Cache 系は CachingDisabled で影響ゼロ
@@ -40,10 +43,10 @@
   1. Next.js 14 → 15 migration (React 19 含む、App Router / Middleware signature 変更追従)
   2. drizzle-orm 0.30 → 0.31+ migration (schema API 変更確認)
   3. 統合テスト + E2E regression 確認
-  4. 2026-05-18 検出分を含む 9 CVE が解消されたことを osv-scanner で verify
+  4. 2026-05-18 検出分の 9 CVE + 2026-05-19 検出の brace-expansion CVE が解消されたことを osv-scanner で verify (ws CVE は vitest upgrade を別途実施)
   5. 本番 deploy (CloudFront + App Runner)
 - **運用監視**: 月次で OSV-Scanner 結果を review、新 CVE 発生 or severity 上方修正時は個別対応判断
-- **CI 表示の扱い**: Dependency Audit ジョブは `continue-on-error: true` で workflow conclusion は success だが、 ジョブバッジは Next.js 9 CVE で red 表示が継続。 Next.js 15 upgrade まで許容
+- **CI 表示の扱い**: Dependency Audit ジョブは `continue-on-error: true` で workflow conclusion は success だが、 ジョブバッジは Next.js 9 CVE + devDeps 系 2 CVE (brace-expansion / ws) で red 表示が継続。 Next.js 15 upgrade + vitest upgrade まで許容
 
 ---
 
@@ -208,6 +211,17 @@
 ### 🟢 低: APM / 分散トレーシング導入 (R9)
 - **現状**: pino 構造化ログのみ。トレース ID なし
 - **対策**: 本番運用データ蓄積後、X-Ray or OpenTelemetry を検討
+
+### 🟢 低: `sessions.session_token_hash` カラム追加 (集計効率化)
+- **発見日**: 2026-05-19 (middleware page_view 構造化ログ実装の設計議論中)
+- **背景**: middleware page_view ログには session_token の sha256 hash prefix (16 char) のみ記録する設計を採用 (生 token を吐くと漏洩時にセッション乗っ取り可能になるため)。 集計時は sessions テーブル側で `encode(digest(session_token, 'sha256'), 'hex')` を都度計算して log の hash と join する
+- **影響**: sessions テーブルが将来肥大化したとき、 集計クエリで毎回 digest 計算が走るためパフォーマンス劣化の可能性。 vitanota β 期間の規模 (数百〜数千行) なら誤差レベルだが、 学校導入数が増えてアクセス分析を頻繁に実行するようになると体感される可能性
+- **対策**: sessions テーブルに `session_token_hash TEXT` カラムを追加、 NextAuth session 作成時 (DrizzleAdapter のフック or trigger) に pre-compute して埋める。 既存 row は migration で backfill。 集計クエリは digest 計算なしで直接 join 可能になる
+- **判断材料**:
+  - sessions テーブル row 数 (現状は 8h expire で自然減、 session cleanup backlog 未実装のため累積)
+  - 集計クエリ頻度 (アクセス分析を 1 日 1 回程度なら不要、 リアルタイム BI ツール経由で多発するようになったら必要)
+- **着手判断**: sessions テーブルが数万行 + 集計遅延を感じたとき、 もしくは BI ツール導入で集計頻度が大幅増加したとき
+- **関連 backlog**: 「🟡 中: 期限切れ session の自動クリーンアップ」 (DB / 接続セクション、 sessions テーブル肥大化対策)
 
 ---
 

@@ -1,19 +1,19 @@
 // system_admin 向け /admin/access-distribution の集計 API
-// PV (CloudWatch Metrics Requests) + UU (sessions テーブル user_id distinct) を時間帯別に集約
+// UU (sessions.created_at の date×hour distinct) + AI 利用 (ai_sessions の type 別件数) を時間帯別に集約
+// PV (旧 CloudWatch AppRunner Requests) は 2026-05-19 廃止 — HTTP リクエスト数は page view と対応しないため
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
-import { getRequestsHourly } from '@/features/access-distribution/lib/cloudwatchClient';
 import {
-  aggregateToJstHourly,
-  mergeHourly,
-  computeSummary,
+  initializeHeatmap,
+  fillHeatmap,
 } from '@/features/access-distribution/lib/aggregator';
-import { getUuByHour } from '@/features/access-distribution/lib/sessionUuRepository';
+import { getUuByHourDate } from '@/features/access-distribution/lib/sessionUuRepository';
+import { getAiSessionUsageByHourDate } from '@/features/access-distribution/lib/aiSessionUsageRepository';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
 import { logger } from '@/shared/lib/logger';
 
-const MAX_PERIOD_DAYS = 60;
+const MAX_PERIOD_DAYS = 90;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -70,22 +70,37 @@ export default async function handler(
   }
 
   try {
-    const [datapoints, uu] = await Promise.all([
-      getRequestsHourly(startUtc, endUtcExclusive),
-      getUuByHour(session.user.userId, startUtc, endUtcExclusive),
+    const [uu, ai] = await Promise.all([
+      getUuByHourDate(session.user.userId, startUtc, endUtcExclusive),
+      getAiSessionUsageByHourDate(
+        session.user.userId,
+        startUtc,
+        endUtcExclusive,
+      ),
     ]);
-    const { hourly: pvHourly, heatmap } = aggregateToJstHourly(
-      datapoints,
-      startUtc,
-      endUtcExclusive,
+
+    const uuHeatmap = fillHeatmap(
+      initializeHeatmap(startUtc, endUtcExclusive),
+      uu.rows,
     );
-    const hourly = mergeHourly(pvHourly, uu.hourly);
-    const summary = computeSummary(hourly, uu.totalUu, periodDays);
+    const quickCaptureHeatmap = fillHeatmap(
+      initializeHeatmap(startUtc, endUtcExclusive),
+      ai.quickCapture,
+    );
+    const morningPlanHeatmap = fillHeatmap(
+      initializeHeatmap(startUtc, endUtcExclusive),
+      ai.morningPlan,
+    );
 
     const response: AccessDistributionResponse = {
-      hourly,
-      heatmap,
-      summary,
+      uuHeatmap,
+      quickCaptureHeatmap,
+      morningPlanHeatmap,
+      summary: {
+        totalUu: uu.totalUu,
+        totalQuickCaptureSessions: ai.totalQuickCaptureSessions,
+        totalMorningPlanSessions: ai.totalMorningPlanSessions,
+      },
       meta: {
         start: startStr,
         end: endStr,

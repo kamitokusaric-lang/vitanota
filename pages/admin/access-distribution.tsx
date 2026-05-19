@@ -79,10 +79,10 @@ export default function AccessDistributionPage({ session }: PageProps) {
               <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">アクセス分布</h1>
                 <p className="mt-2 text-sm text-gray-600">
-                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ / H3 朝の見通し) の利用を時間帯×日付ヒートマップで可視化。
+                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ / H3 朝の見通し)、 日々ノート登録、 タスク操作の利用を時間帯×日付ヒートマップで可視化。
                 </p>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数
+                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数 / 日々ノートは journal_entries 件数 (括弧内は非公開) / タスクは tasks.updated_at 件数 (括弧内は完了)
                 </p>
               </div>
 
@@ -154,6 +154,16 @@ export default function AccessDistributionPage({ session }: PageProps) {
                     heatmap={data.morningPlanHeatmap}
                     title="朝の見通し (H3) 利用数"
                     caption="ai_sessions WHERE type='morning_plan' の件数"
+                  />
+                  <HeatmapTable
+                    heatmap={data.journalHeatmap}
+                    title="日々ノート登録数"
+                    caption="journal_entries 合算 (うち非公開) の件数"
+                  />
+                  <HeatmapTable
+                    heatmap={data.taskHeatmap}
+                    title="タスク操作数"
+                    caption="tasks.updated_at 件数 (うち完了 = completed_at 件数)"
                   />
                   <p className="text-[11px] text-gray-400">
                     生成: {new Date(data.meta.generatedAt).toLocaleString('ja-JP')} / {data.meta.periodDays} 日間

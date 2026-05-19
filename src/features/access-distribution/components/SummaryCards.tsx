@@ -24,7 +24,7 @@ function Card({
 
 export function SummaryCards({ summary }: SummaryCardsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <Card
         label="総 UU"
         value={summary.totalUu.toLocaleString()}
@@ -39,6 +39,16 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         label="朝の見通し (H3) 利用数"
         value={summary.totalMorningPlanSessions.toLocaleString()}
         caption="期間内 morning_plan セッション件数"
+      />
+      <Card
+        label="日々ノート登録数"
+        value={`${summary.totalJournalEntries.toLocaleString()} (${summary.totalJournalPrivateEntries.toLocaleString()})`}
+        caption="合算 (うち非公開)、 journal_entries 件数"
+      />
+      <Card
+        label="タスク操作数"
+        value={`${summary.totalTaskTouches.toLocaleString()} (${summary.totalTaskCompletes.toLocaleString()})`}
+        caption="updated_at 件数 (うち完了)、 tasks 件数"
       />
     </div>
   );

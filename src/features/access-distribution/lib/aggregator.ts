@@ -13,6 +13,14 @@ export interface HourDateValue {
   count: number;
 }
 
+// main count + sub count を同時に持つ集計行 (例: journal 合算 + 非公開件数)
+export interface HourDateValueWithSub {
+  date: string;
+  hour: number;
+  count: number;
+  subCount: number;
+}
+
 // 期間内の JST 日付すべてを 0 埋めの hours[24] で初期化する
 export function initializeHeatmap(
   startUtc: Date,
@@ -64,4 +72,33 @@ export function sumHeatmap(heatmap: HeatmapRow[]): number {
     for (const v of row.hours) total += v;
   }
   return total;
+}
+
+// sub 付き初期化 (main hours と sub hours を両方 0 埋め)
+export function initializeHeatmapWithSub(
+  startUtc: Date,
+  endUtcExclusive: Date,
+): HeatmapRow[] {
+  return initializeHeatmap(startUtc, endUtcExclusive).map((row) => ({
+    ...row,
+    subHours: Array(24).fill(0),
+  }));
+}
+
+// sub 付きヒートマップに DB rows をマージ (in-place)
+export function fillHeatmapWithSub(
+  initial: HeatmapRow[],
+  rows: HourDateValueWithSub[],
+): HeatmapRow[] {
+  const dateIndex = new Map(initial.map((r, i) => [r.date, i]));
+  for (const row of rows) {
+    const idx = dateIndex.get(row.date);
+    if (idx === undefined) continue;
+    if (row.hour < 0 || row.hour > 23) continue;
+    initial[idx]!.hours[row.hour] = row.count;
+    if (initial[idx]!.subHours) {
+      initial[idx]!.subHours![row.hour] = row.subCount;
+    }
+  }
+  return initial;
 }

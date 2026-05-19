@@ -8,13 +8,19 @@
 
 export interface HeatmapRow {
   date: string; // YYYY-MM-DD (JST)
-  hours: number[]; // length 24
+  hours: number[]; // length 24 (main value)
+  // optional: cell 内に括弧表示する 2 番目の数値 (例: journal の非公開件数)
+  subHours?: number[]; // length 24
 }
 
 export interface AccessDistributionSummary {
   totalUu: number;
   totalQuickCaptureSessions: number; // H1
   totalMorningPlanSessions: number; // H3
+  totalJournalEntries: number; // journal 合算
+  totalJournalPrivateEntries: number; // journal 非公開のみ
+  totalTaskTouches: number; // task updated_at 件数
+  totalTaskCompletes: number; // task completed_at 件数
 }
 
 export interface AccessDistributionMeta {
@@ -28,6 +34,8 @@ export interface AccessDistributionResponse {
   uuHeatmap: HeatmapRow[];
   quickCaptureHeatmap: HeatmapRow[]; // H1
   morningPlanHeatmap: HeatmapRow[]; // H3
+  journalHeatmap: HeatmapRow[]; // 合算 (hours) + 非公開件数 (subHours)
+  taskHeatmap: HeatmapRow[]; // touch 合算 (hours) + 完了件数 (subHours)
   summary: AccessDistributionSummary;
   meta: AccessDistributionMeta;
 }

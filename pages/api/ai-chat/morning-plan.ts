@@ -84,6 +84,7 @@ const LambdaMorningPlanResponseSchema = z.discriminatedUnion('ok', [
   z.object({
     ok: z.literal(true),
     type: z.literal('morning_plan'),
+    modelId: z.string().optional(),
     result: z.object({
       summary: z.string(),
       today: z.array(PlanItemSchema),
@@ -354,7 +355,7 @@ async function handleGenerate(
         description: t.description ?? '',
       })),
     );
-    plan = { ok: true, type: 'morning_plan', result: mocked };
+    plan = { ok: true, type: 'morning_plan', modelId: 'local-mock', result: mocked };
     logger.info({ event: 'ai_chat.morning_plan.local_mock_used' });
   } else if (!LAMBDA_ARN) {
     logger.error({ event: 'ai_chat.morning_plan.lambda_arn_missing' });
@@ -410,6 +411,7 @@ async function handleGenerate(
   }
 
   const planResult = plan.result;
+  const planModelId = plan.modelId ?? 'unknown';
 
   // 5. ai_output_json に plan + generatedAt、today_plan_items を bulk INSERT
   // tasks_json に存在しない task_id を AI が返した場合は除外 (safety net)
@@ -438,6 +440,7 @@ async function handleGenerate(
               not_shown_task_ids: planResult.not_shown_task_ids,
               notes: planResult.notes,
             },
+            modelId: planModelId,
             generatedAt: new Date().toISOString(),
           },
           updatedAt: new Date(),

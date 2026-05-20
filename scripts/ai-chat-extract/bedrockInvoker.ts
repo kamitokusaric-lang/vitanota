@@ -75,31 +75,33 @@ function parsePayload<T>(text: string, schema: ZodSchema<T>): T {
 export async function invokeExtraction(args: {
   systemPrompt: string;
   userMessage: string;
-}): Promise<ExtractionResult> {
+}): Promise<{ result: ExtractionResult; modelId: string }> {
   if (USE_MOCK) {
-    return mockExtraction(args.userMessage);
+    return { result: mockExtraction(args.userMessage), modelId: MODEL_ID };
   }
-  return invokeBedrock({
+  const result = await invokeBedrock({
     systemPrompt: args.systemPrompt,
     userMessage: args.userMessage,
     schema: ExtractionResultSchema,
   });
+  return { result, modelId: MODEL_ID };
 }
 
 export async function invokeMorningPlan(args: {
   systemPrompt: string;
   userMessage: string;
   event: MorningPlanEvent;
-}): Promise<MorningPlanResult> {
+}): Promise<{ result: MorningPlanResult; modelId: string }> {
   if (USE_MOCK) {
-    return mockMorningPlan(args.event);
+    return { result: mockMorningPlan(args.event), modelId: MODEL_ID };
   }
-  return invokeBedrock({
+  const result = await invokeBedrock({
     systemPrompt: args.systemPrompt,
     userMessage: args.userMessage,
     schema: MorningPlanResultSchema,
     maxTokens: 1500,
   });
+  return { result, modelId: MODEL_ID };
 }
 
 // MOCK_BEDROCK=true 用の fixture。実 AI 呼び出しなしで UX 動線を確認できる。

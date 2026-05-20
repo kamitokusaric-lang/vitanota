@@ -407,6 +407,45 @@
 - **既存 backlog との統合**: 「AI チャット機能の有効化フラグの管理画面化」(同日 backlog 行き) は C5 と同件、本項目に内包される
 - **関連 memory**: `project_ai_strategy_20260511` (構想原典)、`project_ai_chat_feature_flag` (env 2 段の現行設計)、`project_phase1_core_experience` (Phase 概念)
 
+### 🟡 中: AI prompt 改善のためのデータ取得拡張 (Step 1 棚卸し)
+
+- **発見日**: 2026-05-20 (chimo の「データから AI に再学習させたい」議論の棚卸し調査)
+- **背景**: prompt を磨くには「AI 提案 vs 教員確定」の差分データが必要。棚卸し調査で `ai_sessions.userConfirmed` (titleChanged / categoryChanged / dueDateChanged) と morning_plan の `ai_bucket` vs `final_bucket` は既に取れていることを確認。一方で以下 4 件の取得ギャップがあり、これを埋めないと「/admin/ai-improvement ダッシュボード (Step 2)」と「AI 整理 Phase C-E」の橋渡しが片手落ちになる
+- **取得ギャップ 4 件**:
+  1. **model_id を `ai_output_json` に記録** — Bedrock invoke payload 拡張で `model='claude-sonnet-4-6'` 等を payload に含めて保存。Sonnet / Haiku の精度比較が可能になる
+  2. **AI タグ提案を実装** — `LambdaResponseSchema` に `suggestedTagNames: string[]` を追加 (category_id 同様に名前で返す)。`ai_output_json.aiSuggestedTags` 保存 + confirm 時に `adoptedTagIds` 差分を `userConfirmed` に追記。タグ採用率を集計可能に
+  3. **morning_plan 見送り理由** — Lambda が `not_shown_task_ids` に `reason` / `confidence` を付与して返す。`ai_output_json.plan.not_shown_tasks` に保存。「なぜこのタスクは朝プランから外れたか」を集計可能に
+  4. **教員編集後の最終 text を `ai_sessions` に永続化** — 現状 confirmed 後は tasks / journal 側に流れて `ai_sessions` には残らない (`userConfirmed` の field 単位差分のみ)。`confirmed_final_values JSONB` カラム追加で AI 提案 → 教員編集 → 最終確定の 3 段階を追跡可能に
+- **着手順序の推奨**: 1 (model_id) → 4 (final values) → 3 (morning_plan reason) → 2 (タグ提案)。1 と 4 は schema / payload 拡張のみで軽い、2 と 3 は Lambda 側 prompt 拡張を伴う
+- **裏テーマ踏み絵チェック**: 全項目セーフ
+  - model_id / prompt version / 見送り理由は system 側メタデータ (教員観測ではない)
+  - 業務タグ提案は `feedback_work_tag_not_observed` で OK
+  - final text は `ai_sessions` の RLS が「本人 + system_admin のみ」で school_admin 不可視 (`project_ai_sessions_visibility`)
+  - mood には触れない (`feedback_mood_ai_untouchable`)
+- **依存 / 関連 backlog**:
+  - 前提: なし (即着手可)
+  - 後続: 「/admin/ai-improvement ダッシュボード」(Step 2、本項目完了後に着手)
+  - 並行可: 「AI 整理 Phase C-E」C4 (プロンプトバージョン DB 化) — 独立に進められる
+- **関連 memory**: `project_ai_sessions_visibility` / `project_morning_plan_h3` / `project_tag_to_category_strategy_20260515` / `feedback_work_tag_not_observed`
+
+### 🟢 低: /admin/ai-improvement ダッシュボード (Step 2)
+
+- **発見日**: 2026-05-20 (同セッション)
+- **着手条件**: 上記「AI prompt 改善のためのデータ取得拡張」完了 + ai_sessions に最低 2 週間分のデータ蓄積
+- **背景**: system_admin が「AI 提案 vs 教員確定」の差分パターンを見て prompt 改善を判断するための画面。Step 1 のデータ取得拡張が前提
+- **画面要件 (案)**:
+  - セッション一覧 (匿名化済み、テナント横断): 元投稿 → AI 出力 → 教員確定 の 3 段表示
+  - 差分の頻出パターン (「AI がよく外す箇所」)
+  - タグ提案の採用率 / 拒否率
+  - morning_plan の編集パターン (削除多い? 並べ替え多い?)
+  - model 別 / prompt version 別の精度比較
+- **API**: `/api/system/ai-improvement/*` (`feedback_system_admin_no_tenant` パターン)
+- **裏テーマ踏み絵チェック**:
+  - 教員名 / メアド / mood は絶対出さない (`feedback_observed_moment_broken` / `feedback_mood_ai_untouchable`)
+  - 画面内文言で「AI が学習しています」「教員の投稿で AI が改善」は使わない (観測感 NG)
+  - 集計は完全に匿名化、個人特定可能な状態で表示しない
+- **関連 memory**: `feedback_system_admin_no_tenant` / `project_ai_sessions_visibility` / `feedback_observed_moment_broken`
+
 ### 📝 記録: AI 機能フラグ default の経緯 (`aiChatEnableExtraction`)
 
 - **記録日**: 2026-05-17

@@ -43,6 +43,7 @@ type TaskCandidateResponse = z.infer<typeof TaskCandidateResponseSchema>;
 const LambdaResponseSchema = z.discriminatedUnion('ok', [
   z.object({
     ok: z.literal(true),
+    modelId: z.string().optional(),
     result: z.object({
       tasks: z.array(TaskCandidateResponseSchema),
       needsConfirmation: z.array(z.string()),
@@ -120,9 +121,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 2. AI 整理 (本番: Lambda invoke、ローカル: inline mock)
   let extraction: { tasks: TaskCandidateResponse[]; needsConfirmation: string[] };
   let inputTextRedacted: string;
+  let modelId: string;
   if (LOCAL_MOCK) {
     extraction = mockExtractTasks(parsed.data.inputText);
     inputTextRedacted = maskPii(parsed.data.inputText);
+    modelId = 'local-mock';
     logger.info({ event: 'ai_chat.local_mock_used' });
   } else {
     if (!LAMBDA_ARN) {
@@ -161,6 +164,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { inputTextRedacted: redacted, ...rest } = lambdaPayload.result;
     extraction = rest;
     inputTextRedacted = redacted;
+    modelId = lambdaPayload.modelId ?? 'unknown';
   }
 
   // 3. ai_sessions に draft で INSERT (本人 + system_admin のみ可視、school_admin 不可視)
@@ -177,6 +181,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           aiOutputJson: {
             extraction,
             promptVersion: 'v1-2026-05-13',
+            modelId,
             placement: 'dashboard_section',
             inputTextRedacted,
           },

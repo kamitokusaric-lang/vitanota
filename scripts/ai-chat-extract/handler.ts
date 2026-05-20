@@ -234,6 +234,7 @@ function buildMorningPlanUserMessage(event: MorningPlanEvent): string {
 interface SuccessResult {
   ok: true;
   type: 'task_extraction' | 'morning_plan';
+  modelId: string;
   result:
     | (ExtractionResult & { inputTextRedacted: string })
     | MorningPlanResult;
@@ -286,11 +287,14 @@ async function handleTaskExtraction(
   );
 
   let extraction: ExtractionResult;
+  let modelId: string;
   try {
-    extraction = await invokeExtraction({
+    const invoked = await invokeExtraction({
       systemPrompt: buildSystemPrompt(),
       userMessage: inputTextRedacted,
     });
+    extraction = invoked.result;
+    modelId = invoked.modelId;
   } catch (err) {
     console.error(
       JSON.stringify({
@@ -320,6 +324,7 @@ async function handleTaskExtraction(
   return {
     ok: true,
     type: 'task_extraction',
+    modelId,
     result: { ...extraction, inputTextRedacted },
   };
 }
@@ -337,12 +342,15 @@ async function handleMorningPlan(
   );
 
   let result: MorningPlanResult;
+  let modelId: string;
   try {
-    result = await invokeMorningPlan({
+    const invoked = await invokeMorningPlan({
       systemPrompt: buildMorningPlanSystemPrompt(),
       userMessage: buildMorningPlanUserMessage(event),
       event,
     });
+    result = invoked.result;
+    modelId = invoked.modelId;
   } catch (err) {
     console.error(
       JSON.stringify({
@@ -366,5 +374,5 @@ async function handleMorningPlan(
     }),
   );
 
-  return { ok: true, type: 'morning_plan', result };
+  return { ok: true, type: 'morning_plan', modelId, result };
 }

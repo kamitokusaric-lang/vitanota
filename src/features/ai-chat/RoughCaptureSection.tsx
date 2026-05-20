@@ -17,6 +17,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from 'react';
+import { useSWRConfig } from 'swr';
 import {
   AI_CATEGORY_DEFINITIONS,
   resolveParentName,
@@ -190,6 +191,7 @@ export function RoughCaptureSection({
   const inputStartedFiredRef = useRef(false);
   const { tags: availableTags, mutate: mutateTags } = useTaskTags();
   const { assignees } = useAssignees();
+  const { mutate: globalMutate } = useSWRConfig();
 
   // textarea の初回入力で 1 度だけ AiCaptureInputStarted を発火する
   const handleInputChange = (next: string) => {
@@ -386,32 +388,25 @@ export function RoughCaptureSection({
         setView({ ...view, kind: 'review' });
         return;
       }
+      // chimo 2026-05-20: 作成成功時にタスクボード SWR を再検証して即座に反映
+      await globalMutate(
+        (key) => typeof key === 'string' && key.startsWith('/api/tasks'),
+        undefined,
+        { revalidate: true },
+      );
       const { factLine, suggestionLine } = makeHitokoto(
         includedRows.map((r) => ({
           dueDate: r.dueDate,
           userSelectedParentName: r.userSelectedParentName,
         })),
       );
-      // 編集なし & 破棄なしのときは聞くことがないので survey をスキップ
-      const needsFeedback = Boolean(data.hasEdits) || pendingDiscardSessionId !== null;
-      if (needsFeedback) {
-        setView({
-          kind: 'survey',
-          sessionId: view.sessionId,
-          createdCount: data.createdCount ?? 0,
-          hasEdits: Boolean(data.hasEdits),
-          pendingDiscardSessionId,
-          factLine,
-          suggestionLine,
-        });
-      } else {
-        setView({
-          kind: 'thanks',
-          createdCount: data.createdCount ?? 0,
-          factLine,
-          suggestionLine,
-        });
-      }
+      // chimo 2026-05-20: タスク追加後のアンケート (survey) は廃止。 常に thanks へ遷移。
+      setView({
+        kind: 'thanks',
+        createdCount: data.createdCount ?? 0,
+        factLine,
+        suggestionLine,
+      });
       setInput('');
     } catch {
       setError('通信に失敗しました。');
@@ -463,14 +458,14 @@ export function RoughCaptureSection({
   return (
     <section
       data-testid="rough-capture-section"
-      className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+      className="mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]"
     >
-      <header className="mb-3 flex items-center justify-between gap-3">
+      <header className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold text-gray-800">
+          <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
             タスクを書き出す
           </h2>
-          <span className="text-[11px] text-gray-400">β</span>
+          <span className="text-[11px] text-slate-400">β</span>
         </div>
         {headerRight}
       </header>
@@ -550,7 +545,7 @@ function InputView({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs text-slate-500">{INPUT_LEAD}</p>
+      <p className="mb-2 text-[13px] font-normal leading-[1.6] text-slate-500">{INPUT_LEAD}</p>
       <textarea
         value={input}
         onChange={(e) => onChange(e.target.value)}
@@ -559,20 +554,20 @@ function InputView({
         maxLength={2000}
         disabled={loading}
         data-testid="rough-capture-input"
-        className="w-full resize-y rounded-md border border-gray-200 px-3 py-2 text-sm placeholder:text-slate-300 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-50"
+        className="min-h-[60px] w-full resize-y rounded-[10px] border border-vn-border-strong bg-white px-4 py-2.5 text-[15px] leading-[1.55] text-slate-900 placeholder:text-vn-border-strong focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50"
       />
       {error && (
         <p className="mt-2 text-sm text-red-600" role="alert">
           {error}
         </p>
       )}
-      <div className="mt-3 flex items-center justify-end gap-2">
+      <div className="mt-2.5 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={onSubmit}
           disabled={!canSubmit || loading}
           data-testid="rough-capture-submit"
-          className="h-9 rounded-md bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="h-9 rounded-full bg-indigo-600 px-5 text-[14px] font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-vn-border-strong disabled:text-white"
         >
           {loading ? '整理中…' : '整理する'}
         </button>

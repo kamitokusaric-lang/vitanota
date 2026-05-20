@@ -335,7 +335,7 @@ export function ManualTaskCreateForm({
           onClick={handleSubmit}
           disabled={submitting}
           data-testid="manual-task-submit"
-          className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="h-9 rounded-full bg-indigo-600 px-5 text-[14px] font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-vn-border-strong disabled:text-white"
         >
           {submitting ? '作成中…' : 'タスクを作成する'}
         </button>

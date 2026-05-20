@@ -20,12 +20,13 @@ import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
 import { Modal } from '@/shared/components/Modal';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
-import { TimelineTab } from '@/features/dashboard/components/TimelineTab';
 import { PhilosophyGreeting } from '@/features/dashboard/components/PhilosophyGreeting';
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
 import { TaskCreateTabs } from '@/features/ai-chat/TaskCreateTabs';
+import { MorningGreetingCard } from '@/features/dashboard/components/MorningGreetingCard';
+import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimelineRail';
 import {
   getMoodIcon,
   getMoodLabel,
@@ -86,16 +87,21 @@ function QuickRecordActions({
 }: {
   onPick: (kind: JournalEntryKind) => void;
 }) {
+  // chimo 2026-05-21: 「日誌 / ナレッジ / つぶやき」 を「タスクを手動で追加する」 と
+  //   同じ indigo pill に統一 (= action 系は indigo / 表示系は slate の使い分け)。
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-end gap-2.5">
-      <span className="text-xs font-bold text-slate-400">今日の記録</span>
+    <div
+      className="mb-3 flex flex-wrap items-center gap-2"
+      data-testid="quick-record-actions"
+    >
+      <span className="text-[13px] font-bold text-slate-500">今日の記録</span>
       {RECORD_KINDS.map(({ kind, label }) => (
         <button
           key={kind}
           type="button"
           onClick={() => onPick(kind)}
           data-testid={`quick-record-${kind}`}
-          className="inline-flex h-9 items-center rounded-full border border-slate-300 bg-white px-3.5 text-xs font-extrabold text-slate-600 transition hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50"
+          className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
         >
           {label}
         </button>
@@ -149,9 +155,12 @@ export default function DashboardPage({
       content: <TaskBoard selfUserId={session.user.userId} />,
     },
     {
-      id: 'notes',
-      label: '日々ノート',
-      content: <TimelineTab session={session} />,
+      // chimo 2026-05-20: マイノートタブ削除 (右レーンの「マイノート」 タブで代替) →
+      // 代わりにマイレポートを準備中で出す。 中身は disabled なので表示されない。
+      id: 'my-report',
+      label: 'マイレポート',
+      content: null,
+      disabled: true,
     },
   ];
 
@@ -167,17 +176,30 @@ export default function DashboardPage({
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="teacher">
         <Layout session={session}>
-          <div className="pb-6" data-testid="dashboard-page">
-            {/* H1 検証中: 哲学挨拶 (PhilosophyGreeting) は一旦外して AI タスク整理を主役に。
-                3 種別の投稿入口は QuickRecordActions として右上に補助導線で寄せる。 */}
-            <QuickRecordActions onPick={handleKindPick} />
-            {/* H3 morning_plan は 2026-05-20 リフレーミングで撤去 (project_h3_reframing_20260520)。
-                朝カード (H3-B) は別ブランチで Phase 1 として実装予定。 */}
-            <TaskCreateTabs
-              selfUserId={session.user.userId}
-              aiChatEnabled={aiChatEnabled}
-            />
-            <Tabs tabs={mainTabs} defaultTabId="tasks" queryParam="tab" />
+          {/* chimo 2026-05-20: ダッシュボードを 2 カラム化。 右レーンに「公開中の日々ノート」 を常時。
+              踏み絵: 観測感を作らないため mood は出さず、 文言は柔らかく (PublicTimelineRail 参照)。 */}
+          <div
+            className="grid grid-cols-1 gap-7 pb-6 xl:grid-cols-[minmax(0,1fr)_360px]"
+            data-testid="dashboard-page"
+          >
+            <div className="min-w-0">
+              {/* chimo 2026-05-20: タスク追加カード → 朝カードの順 (= 入口を先頭に出す) */}
+              <TaskCreateTabs
+                selfUserId={session.user.userId}
+                aiChatEnabled={aiChatEnabled}
+              />
+              {/* H3-B 朝カード (project_h3_morning_arrival_value):
+                  朝 4-11 時 JST に表示、 開いた瞬間に「来てよかった」 を作る装置。
+                  AI 不使用、 ルールベース + 日付シードランダム文言で温かみを出す。 */}
+              <MorningGreetingCard selfUserId={session.user.userId} />
+              <Tabs tabs={mainTabs} defaultTabId="tasks" queryParam="tab" />
+            </div>
+            <div className="hidden xl:block">
+              {/* 記録入口は右レーン上部に集約 (chimo 2026-05-20)。
+                  「書く → 公開する → 職員室ノートに並ぶ」 動線を視覚的に直結。 */}
+              <QuickRecordActions onPick={handleKindPick} />
+              <PublicTimelineRail selfUserId={session.user.userId} />
+            </div>
           </div>
 
           <Modal

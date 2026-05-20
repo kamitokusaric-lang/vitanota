@@ -82,12 +82,12 @@ export function CategoryFilter({ value, onChange, categories }: CategoryFilterPr
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50"
+        className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-vn-border-strong bg-white px-[11px] text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50"
         data-testid="category-filter-trigger"
       >
-        <span className="text-gray-500">カテゴリ:</span>
-        <span className="font-medium text-gray-800">{chipLabel}</span>
-        <span className="text-gray-400">▼</span>
+        <span className="font-normal text-slate-500">カテゴリ:</span>
+        <span className="font-semibold text-slate-700">{chipLabel}</span>
+        <span className="text-slate-400">▼</span>
       </button>
 
       {open && popoverStyle && (

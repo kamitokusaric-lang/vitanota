@@ -120,6 +120,13 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
   const { categories, error: catsError, isLoading: catsLoading } = useTaskCategories();
   const { assignees } = useAssignees();
   const { tags: taskTags, mutate: mutateTags } = useTaskTags();
+  // 縦軸 grouping 廃止に伴い、 各カード上端にカテゴリ chip を出すための name 解決用 Map
+  // (hook 呼び出しは early return より前に置く必要があるためここで定義)
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of categories ?? []) m.set(c.id, c.name);
+    return m;
+  }, [categories]);
 
   const closeModal = () => {
     setModal({ kind: 'closed' });
@@ -298,49 +305,18 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     return true;
   });
 
-  // 縦軸 (横軸は status × 3 固定): 常にカテゴリ軸で grouping
-  //   - カテゴリ絞込中: 選択カテゴリの行のみ表示 (sortOrder 順)
-  //   - カテゴリ絞込なし: タスクがあるカテゴリのみ並べる (0 件カテゴリは隠す)
-  // タグ filter は task の絞り込み条件としてのみ作用し、行構造には影響しない
-  const rows: MatrixGroup[] =
-    categoryFilterSet.size > 0
-      ? categories
-          .filter((c) => categoryFilterSet.has(c.id))
-          .map((c) => ({ id: c.id, label: c.name }))
-      : (() => {
-          const usedIds = new Set(filteredTasks.map((t) => t.categoryId));
-          // 「自分の今週やる」タスク数を集計、降順で並べる (tie は元の sortOrder)
-          // 自分が assignees に含まれる && status='todo' のものをカウント
-          const todoCounts = new Map<string, number>();
-          for (const t of filteredTasks) {
-            if (t.status === 'todo' && t.assignees.some((a) => a.userId === selfUserId)) {
-              todoCounts.set(t.categoryId, (todoCounts.get(t.categoryId) ?? 0) + 1);
-            }
-          }
-          return categories
-            .filter((c) => usedIds.has(c.id))
-            .map((c) => ({
-              id: c.id,
-              label: c.name,
-              sortOrder: c.sortOrder,
-              todoCount: todoCounts.get(c.id) ?? 0,
-            }))
-            .sort((a, b) => {
-              const diff = b.todoCount - a.todoCount;
-              if (diff !== 0) return diff;
-              return a.sortOrder - b.sortOrder;
-            })
-            .map(({ id, label }) => ({ id, label }));
-        })();
-
-  // タスク → 行 id 配列 (常にカテゴリ軸)
-  const assignTaskToRows = (t: TaskWithAssignees): string[] => [t.categoryId];
+  // 縦軸の「カテゴリ別 grouping」 は廃止 (chimo 2026-05-20)。
+  // タスクは 1 つの 5 列 grid (status 別) に統合表示。
+  // カテゴリ filter は task の絞り込み条件としてのみ作用する (rows 構造には影響しない)。
+  const rows: MatrixGroup[] = [{ id: 'all', label: '' }];
+  const assignTaskToRows = (_t: TaskWithAssignees): string[] => ['all'];
 
   return (
     <div data-testid="task-board">
-      {/* Linear 風 filter row: chip 4 つを左寄せ + 右端に新規ボタン */}
-      <div className="mb-8 flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Linear 風 filter row: chip 4 つを左寄せ + 右端に新規ボタン
+          chimo 2026-05-20: 高さ 34px / 14px / pill、 wrap 下余白 28px */}
+      <div className="mb-7 flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <AssigneeFilter
             value={filterOwner}
             onChange={setFilterOwner}
@@ -363,11 +339,11 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
           <button
             type="button"
             onClick={handleSaveFilter}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-800"
+            className="inline-flex h-[30px] items-center gap-1 rounded-full border border-vn-border-strong bg-white px-[11px] text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
             data-testid="task-board-save-filter-button"
             title="現在のフィルタを次回以降のデフォルトとして保存"
           >
-            <Save size={12} aria-hidden />
+            <Save size={14} aria-hidden />
             フィルタを保存
           </button>
         </div>
@@ -383,6 +359,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
         onTaskDropStatus={handleDropStatus}
         // 「全員」フィルタ時のみ自分のタスクを薄い黄色 + カード左の赤ラインでハイライト
         highlightMineTasks={filterOwner === undefined}
+        categoryNameById={categoryNameById}
       />
 
       <Modal

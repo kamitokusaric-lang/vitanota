@@ -65,6 +65,14 @@ export const aiSessionStatusEnum = pgEnum('ai_session_status', [
   'discarded',
 ]);
 
+// H3-B 朝カード (project_h3_morning_arrival_value) のクライアント発火イベント種別 (migration 0045)
+export const morningCardEventTypeEnum = pgEnum('morning_card_event_type', [
+  'shown',
+  'dismissed',
+  'candidate_clicked',
+  'candidate_status_changed',
+]);
+
 // ── tenants ────────────────────────────────────────────────────
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -822,6 +830,42 @@ export const aiSessions = pgTable(
   (table) => ({
     userIdx: index('ai_sessions_user_idx').on(table.userId, table.createdAt),
     tenantIdx: index('ai_sessions_tenant_idx').on(table.tenantId),
+  }),
+);
+
+// ── morning_card_events (migration 0045) ────────────────────
+// H3-B 朝カード (project_h3_morning_arrival_value) の教員行動ログ。
+// RLS: 本人 + system_admin (school_admin 不可視、 ai_sessions と同水準の踏み絵)。
+export const morningCardEvents = pgTable(
+  'morning_card_events',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventType: morningCardEventTypeEnum('event_type').notNull(),
+    version: varchar('version', { length: 32 }).notNull(),
+    payload: jsonb('payload').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    tenantCreatedIdx: index('morning_card_events_tenant_created_idx').on(
+      table.tenantId,
+      table.createdAt,
+    ),
+    typeCreatedIdx: index('morning_card_events_type_created_idx').on(
+      table.eventType,
+      table.createdAt,
+    ),
+    userIdx: index('morning_card_events_user_idx').on(
+      table.userId,
+      table.createdAt,
+    ),
   }),
 );
 

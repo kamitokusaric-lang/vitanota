@@ -36,7 +36,7 @@ export function TaskCreateTabs({
             type="button"
             onClick={() => setActive('manual')}
             data-testid="task-create-tabs-to-manual"
-            className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-xs font-bold text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
+            className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
           >
             タスクを手動で追加する
           </button>
@@ -46,9 +46,9 @@ export function TaskCreateTabs({
   }
 
   return (
-    <section className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <header className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-base font-semibold text-gray-800">
+    <section className="mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+      <header className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
           {aiChatEnabled ? '手動でタスクを追加する' : 'タスクを追加する'}
         </h2>
         {aiChatEnabled && (
@@ -56,7 +56,7 @@ export function TaskCreateTabs({
             type="button"
             onClick={() => setActive('ai')}
             data-testid="task-create-tabs-to-ai"
-            className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-xs font-bold text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
+            className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
           >
             タスクをAIで整理する
           </button>

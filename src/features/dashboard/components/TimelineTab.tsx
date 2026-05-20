@@ -1,5 +1,6 @@
-// 日々ノート: 投稿フォーム (sticky) + 子タブ (みんなの投稿 / わたしの投稿)
-// 投稿成功時は両方のリストを再検証 (子の useSWRInfinite mutate を ref 経由で呼ぶ)
+// マイノート (旧 日々ノート、 chimo 2026-05-20 リネーム): 自分の投稿のみ表示。
+// 「みんなの投稿」 は右レーン (PublicTimelineRail) に分離済 → ここはマイ専用。
+// kind 絞り込みは廃止 (chimo 2026-05-20)。 編集 / 削除 modal は従来通り。
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Button } from '@/shared/components/Button';
@@ -7,21 +8,13 @@ import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
 import { EntryForm } from '@/features/journal/components/EntryForm';
-import { KIND_META } from '@/features/journal/components/KindBadge';
-import type { JournalEntryKind } from '@/features/journal/schemas/journal';
 import {
   MyJournalList,
   type MyJournalMutate,
 } from '@/features/journal/components/MyJournalList';
-import {
-  TimelineList,
-  type TimelineMutate,
-} from '@/features/journal/components/TimelineList';
 import type { EntryCardData } from '@/features/journal/components/EntryCard';
 import type { JournalEntry } from '@/db/schema';
 import type { VitanotaSession } from '@/shared/types/auth';
-
-type TimelineMode = 'staffroom' | 'personal';
 
 type ModalState =
   | { kind: 'closed' }
@@ -45,35 +38,14 @@ interface TimelineTabProps {
   session: VitanotaSession;
 }
 
-const KIND_FILTER_OPTIONS: JournalEntryKind[] = ['knowledge', 'diary', 'tweet'];
-
-export function TimelineTab({ session }: TimelineTabProps) {
-  const currentUserId = session.user.userId;
-  const [mode, setMode] = useState<TimelineMode>('staffroom');
+export function TimelineTab({ session: _session }: TimelineTabProps) {
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
-  // kind 絞り込み: 初期は全 3 種 ON (= フィルタなしと等価)
-  const [kindFilter, setKindFilter] =
-    useState<JournalEntryKind[]>(KIND_FILTER_OPTIONS);
 
-  const toggleKindFilter = (k: JournalEntryKind) => {
-    setKindFilter((prev) =>
-      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k],
-    );
-  };
-
-  // 子コンポーネント (useSWRInfinite 保有) の mutate を ref で受け取る。
-  // global mutate の matcher 関数は SWR v2 で `$inf$` キーが skip されるため、
-  // Infinite キャッシュの再検証は子の mutate を直接呼ぶ必要がある。
-  const timelineMutateRef = useRef<TimelineMutate | null>(null);
+  // useSWRInfinite 由来の mutate を ref で受け取り、 投稿成功時に再検証
   const myJournalMutateRef = useRef<MyJournalMutate | null>(null);
 
   const refreshLists = async () => {
-    // 現在マウント中のリストだけ同期再検証 (非アクティブ側は unmount 中で ref が null)。
-    // 非アクティブ側は revalidateOnMount: true により remount 時に必ず再取得される。
-    await Promise.all([
-      timelineMutateRef.current?.(),
-      myJournalMutateRef.current?.(),
-    ]);
+    await myJournalMutateRef.current?.();
   };
 
   const handleModalSuccess = async () => {
@@ -91,86 +63,13 @@ export function TimelineTab({ session }: TimelineTabProps) {
 
   return (
     <div className="space-y-4" data-testid="timeline-tab">
-      {/* 投稿入口は dashboard 上部の MoodPromptBar に統合済 (重複防止のため
-          このタブ内には EntryForm を置かない) */}
-
-      {/* 子タブ: 職員室タイムライン / 自分のタイムライン */}
-      <div role="tablist" className="flex gap-1 border-b border-vn-border">
-        <SubTab
-          active={mode === 'staffroom'}
-          onClick={() => setMode('staffroom')}
-          testId="timeline-subtab-staffroom"
-        >
-          職員室ノート
-        </SubTab>
-        <SubTab
-          active={mode === 'personal'}
-          onClick={() => setMode('personal')}
-          testId="timeline-subtab-personal"
-        >
-          マイノート
-        </SubTab>
-        <SubTab
-          active={false}
-          onClick={() => {}}
-          disabled
-          testId="timeline-subtab-report"
-        >
-          マイレポート
-        </SubTab>
-      </div>
-
-      {/* kind 絞り込み chip (3 種別を multi-select でトグル、Linear 風 styling) */}
-      <div
-        className="flex items-center gap-2 px-3"
-        role="group"
-        aria-label="種別で絞り込み"
-        data-testid="timeline-kind-filter"
-      >
-        <span className="text-xs text-gray-500">表示:</span>
-        {KIND_FILTER_OPTIONS.map((k) => {
-          const { Icon, label } = KIND_META[k];
-          const active = kindFilter.includes(k);
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => toggleKindFilter(k)}
-              aria-pressed={active}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
-                active
-                  ? 'border-vn-accent/40 bg-vn-accent/10 text-vn-accent'
-                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              }`}
-              data-testid={`timeline-kind-filter-${k}`}
-            >
-              {active && <span className="text-[10px] leading-none">✓</span>}
-              <Icon size={11} strokeWidth={1.75} aria-hidden />
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 投稿リスト本体: ページ #fafafa の中に #ffffff の "面" を浮かせる
-          (border / shadow は使わない — chimo 指針 "面で分ける、箱で区切らない") */}
+      {/* マイノート本体: 自分の投稿のみ (公開・非公開両方)、 kind 絞り込みなし */}
       <div className="bg-vn-surface">
-        {mode === 'staffroom' ? (
-          <TimelineList
-            currentUserId={currentUserId}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            mutateRef={timelineMutateRef}
-            kindFilter={kindFilter}
-          />
-        ) : (
-          <MyJournalList
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            mutateRef={myJournalMutateRef}
-            kindFilter={kindFilter}
-          />
-        )}
+        <MyJournalList
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          mutateRef={myJournalMutateRef}
+        />
       </div>
 
       <Modal

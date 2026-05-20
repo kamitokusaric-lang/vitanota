@@ -60,6 +60,13 @@ export const LogEvents = {
   // F3: FAB の未読 dot 上に出すヒント (chimo 2026-05-17)
   FeedbackUnreadHintShown: 'feedback_unread_hint_shown',
   FeedbackUnreadHintDismissed: 'feedback_unread_hint_dismissed',
+
+  // H3-B: 朝カード (project_h3_morning_arrival_value) の利用計測 (chimo 2026-05-20)。
+  // 全て info 出力、 「dismiss = 負シグナル」 として扱わない (踏み絵: 観測感を作らない)。
+  MorningCardShown: 'morning_card_shown',
+  MorningCardDismissed: 'morning_card_dismissed',
+  MorningCardCandidateClicked: 'morning_card_candidate_clicked',
+  MorningCardCandidateStatusChanged: 'morning_card_candidate_status_changed',
 } as const;
 
 export type LogEventName = (typeof LogEvents)[keyof typeof LogEvents];
@@ -200,6 +207,45 @@ interface FeedbackUnreadHintDismissedPayload extends BaseEventFields {
   version: string;
 }
 
+// H3-B 朝カード analytics (chimo 2026-05-20)
+// position は候補リスト上の 1-indexed の表示位置 (1 = 一番上)。
+// urgency は朝カード API の MorningCardCandidate.urgency と同値。
+type MorningCardUrgency =
+  | 'overdue'
+  | 'today'
+  | 'soon'
+  | 'in_progress'
+  | 'no_due_date'
+  | 'other';
+type MorningCardStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
+
+interface MorningCardShownPayload extends BaseEventFields {
+  version: string;
+  candidateCount: number;
+  overdueCount: number;
+  todayDueCount: number;
+  noDueDateCount: number;
+  yesterdayDoneCount: number;
+}
+
+interface MorningCardDismissedPayload extends BaseEventFields {
+  version: string;
+}
+
+interface MorningCardCandidateClickedPayload extends BaseEventFields {
+  version: string;
+  position: number;
+  urgency: MorningCardUrgency;
+}
+
+interface MorningCardCandidateStatusChangedPayload extends BaseEventFields {
+  version: string;
+  position: number;
+  urgency: MorningCardUrgency;
+  from: MorningCardStatus;
+  to: MorningCardStatus;
+}
+
 // ─────────────────────────────────────────────────────────────
 // イベント名 → ペイロード型のマッピング
 // ─────────────────────────────────────────────────────────────
@@ -228,6 +274,10 @@ export interface LogEventPayloads {
   [LogEvents.FeedbackThreadMarkedRead]: FeedbackThreadMarkedReadPayload;
   [LogEvents.FeedbackUnreadHintShown]: FeedbackUnreadHintShownPayload;
   [LogEvents.FeedbackUnreadHintDismissed]: FeedbackUnreadHintDismissedPayload;
+  [LogEvents.MorningCardShown]: MorningCardShownPayload;
+  [LogEvents.MorningCardDismissed]: MorningCardDismissedPayload;
+  [LogEvents.MorningCardCandidateClicked]: MorningCardCandidateClickedPayload;
+  [LogEvents.MorningCardCandidateStatusChanged]: MorningCardCandidateStatusChangedPayload;
 }
 
 // ─────────────────────────────────────────────────────────────

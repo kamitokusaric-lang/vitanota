@@ -14,6 +14,7 @@ import { getUuByHourDate } from '@/features/access-distribution/lib/sessionUuRep
 import { getAiSessionUsageByHourDate } from '@/features/access-distribution/lib/aiSessionUsageRepository';
 import { getJournalUsageByHourDate } from '@/features/access-distribution/lib/journalUsageRepository';
 import { getTaskUsageByHourDate } from '@/features/access-distribution/lib/taskUsageRepository';
+import { getMorningCardUsageByHourDate } from '@/features/access-distribution/lib/morningCardUsageRepository';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
 import { logger } from '@/shared/lib/logger';
 
@@ -74,7 +75,7 @@ export default async function handler(
   }
 
   try {
-    const [uu, ai, journal, task] = await Promise.all([
+    const [uu, ai, journal, task, morningCard] = await Promise.all([
       getUuByHourDate(session.user.userId, startUtc, endUtcExclusive),
       getAiSessionUsageByHourDate(
         session.user.userId,
@@ -87,6 +88,11 @@ export default async function handler(
         endUtcExclusive,
       ),
       getTaskUsageByHourDate(
+        session.user.userId,
+        startUtc,
+        endUtcExclusive,
+      ),
+      getMorningCardUsageByHourDate(
         session.user.userId,
         startUtc,
         endUtcExclusive,
@@ -110,12 +116,17 @@ export default async function handler(
       initializeHeatmapWithSub(startUtc, endUtcExclusive),
       task.rows,
     );
+    const morningCardHeatmap = fillHeatmap(
+      initializeHeatmap(startUtc, endUtcExclusive),
+      morningCard.shown,
+    );
 
     const response: AccessDistributionResponse = {
       uuHeatmap,
       quickCaptureHeatmap,
       journalHeatmap,
       taskHeatmap,
+      morningCardHeatmap,
       summary: {
         totalUu: uu.totalUu,
         totalQuickCaptureSessions: ai.totalQuickCaptureSessions,
@@ -123,6 +134,11 @@ export default async function handler(
         totalJournalPrivateEntries: journal.totalPrivateEntries,
         totalTaskTouches: task.totalTouches,
         totalTaskCompletes: task.totalCompletes,
+        totalMorningCardShown: morningCard.totalShown,
+        totalMorningCardDismissed: morningCard.totalDismissed,
+        totalMorningCardCandidateClicked: morningCard.totalCandidateClicked,
+        totalMorningCardCandidateStatusChanged:
+          morningCard.totalCandidateStatusChanged,
       },
       meta: {
         start: startStr,

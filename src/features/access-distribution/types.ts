@@ -21,6 +21,11 @@ export interface AccessDistributionSummary {
   totalJournalPrivateEntries: number; // journal 非公開のみ
   totalTaskTouches: number; // task updated_at 件数
   totalTaskCompletes: number; // task completed_at 件数
+  // H3-B 朝カード (morning_card_events、 chimo 2026-05-20):
+  totalMorningCardShown: number; // 「朝に開いた」 回数
+  totalMorningCardDismissed: number; // 「閉じる」 押下
+  totalMorningCardCandidateClicked: number; // 候補タイトル押下 (= 編集モーダル開く)
+  totalMorningCardCandidateStatusChanged: number; // 「今日やるに入れる」 / 「完了にする」 押下
 }
 
 export interface AccessDistributionMeta {
@@ -35,6 +40,7 @@ export interface AccessDistributionResponse {
   quickCaptureHeatmap: HeatmapRow[]; // H1
   journalHeatmap: HeatmapRow[]; // 合算 (hours) + 非公開件数 (subHours)
   taskHeatmap: HeatmapRow[]; // touch 合算 (hours) + 完了件数 (subHours)
+  morningCardHeatmap: HeatmapRow[]; // 朝カード「shown」 のみ、 H3-B (chimo 2026-05-20)
   summary: AccessDistributionSummary;
   meta: AccessDistributionMeta;
 }

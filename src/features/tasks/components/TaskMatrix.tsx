@@ -1,5 +1,7 @@
 // タスクマトリクス: カテゴリ (or タグ) ごとに 5 列 Kanban を縦に積むレイアウト
-// 横軸: ステータス (未着手 / 今週やる / 進行中 / 確認・調整中 / 完了) — 5 列固定
+// 横軸: ステータス (未着手 / 今日やる / 進行中 / 確認・調整中 / 完了) — 5 列固定
+//   chimo 2026-05-20: 'todo' の表示ラベルを「今週やる」 → 「今日やる」 に変更
+//   (朝カード H3-B「今日の予定に入れる」 動線と整合させる、 status enum 自体は不変)
 // 縦: 行 (カテゴリ別が基本、タグ絞込時は 1 行に集約)
 // 1 タスクが複数の行に紐づく (タグ別表示時) ケースは assignTaskToRows が複数 id を返す。
 // 各セル (row × status) にそのタスクが TaskCard として並ぶ。
@@ -12,7 +14,7 @@ type StatusId = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
 
 const STATUS_COLS: { id: StatusId; label: string }[] = [
   { id: 'backlog', label: '未着手' },
-  { id: 'todo', label: '今週やる' },
+  { id: 'todo', label: '今日やる' },
   { id: 'in_progress', label: '進行中' },
   { id: 'review', label: '確認・調整中' },
   { id: 'done', label: '完了' },
@@ -32,6 +34,8 @@ interface TaskMatrixProps {
   onTaskDropStatus?: (taskId: string, newStatus: StatusId) => void;
   // true のとき、自分が assignee のタスクを薄い黄色 + カード左の赤ラインで識別 (「全員」フィルタ時に有効化)
   highlightMineTasks?: boolean;
+  // 縦軸 grouping 廃止に伴い、 カードにカテゴリ chip を出すための name 解決用 Map
+  categoryNameById?: Map<string, string>;
 }
 
 export function TaskMatrix({
@@ -42,6 +46,7 @@ export function TaskMatrix({
   onEdit,
   onTaskDropStatus,
   highlightMineTasks = false,
+  categoryNameById,
 }: TaskMatrixProps) {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [hoverCell, setHoverCell] = useState<{ rowId: string; statusId: StatusId } | null>(null);
@@ -88,15 +93,15 @@ export function TaskMatrix({
 
   return (
     <div data-testid="task-matrix">
-      {/* status ヘッダ (sticky で常に見える、nav h-16 の下にピン)
-          chimo 強弱再設計: カラム見出しは "ガイド" 扱いで弱く (13px / 500 / #777) */}
+      {/* status ヘッダ (sticky で常に見える、nav h-[72px] の下にピン)
+          chimo 2026-05-20: カラム見出しは 16px / 800 / #1E293B、 下線 2px slate-800 */}
       <div
-        className="sticky top-16 z-10 mb-2 grid grid-cols-5 gap-4 bg-vn-bg/95 py-2 backdrop-blur"
+        className="sticky top-[72px] z-10 mb-3 grid grid-cols-5 gap-5 bg-vn-bg/95 py-2 backdrop-blur"
       >
         {STATUS_COLS.map((c) => (
           <div
             key={c.id}
-            className="border-b-2 border-gray-900 px-2 pb-2 text-center text-[13px] font-semibold text-gray-700"
+            className="border-b-2 border-slate-700/55 px-2 pb-3 text-center text-[15px] font-bold leading-[1.4] text-slate-700"
             data-testid={`matrix-col-${c.id}`}
           >
             {c.label}
@@ -105,18 +110,20 @@ export function TaskMatrix({
       </div>
 
       {/* 各 row (カテゴリ or タグ) を独立 Kanban として縦に積む
-          chimo 強弱再設計: セクション見出しは "ちょい目立つ" 程度に下げる
-          (16px / 600 / #222)、件数は補助 (13px / 400 / #999) */}
+          chimo 2026-05-20: カテゴリ見出しは 18px / 800 / #0F172A、 件数は 15px / 700 / slate-400
+          row.label === '' のときは見出しを出さない (= 縦軸 grouping 廃止モード、 chimo 2026-05-20) */}
       <div className="space-y-10">
         {rows.map((row) => (
           <section key={row.id} data-testid={`matrix-row-${row.id}`}>
-            <h3 className="mb-3 text-base font-semibold text-gray-900">
-              {row.label}
-              <span className="ml-2 text-[13px] font-normal text-gray-400">
-                ({rowCounts.get(row.id) ?? 0})
-              </span>
-            </h3>
-            <div className="grid grid-cols-5 gap-4">
+            {row.label !== '' && (
+              <h3 className="mb-3.5 mt-6 text-[18px] font-extrabold leading-[1.4] text-slate-900">
+                {row.label}
+                <span className="ml-1 text-[15px] font-bold text-slate-400">
+                  ({rowCounts.get(row.id) ?? 0})
+                </span>
+              </h3>
+            )}
+            <div className="grid grid-cols-5 gap-5">
               {STATUS_COLS.map((c) => {
                 const cellTasks = grid.get(row.id)?.get(c.id) ?? [];
                 const isDropTarget =
@@ -128,11 +135,11 @@ export function TaskMatrix({
                   <div
                     key={c.id}
                     className={[
-                      // chimo: 各セル (status × category) に薄い外枠
-                      'min-h-[88px] rounded-[10px] border p-2 transition-colors',
+                      // chimo 2026-05-20: カラム背景を薄白 (55%) で塗ってカードとの境界を出す
+                      'min-h-[260px] rounded-xl border p-3 transition-colors',
                       isDropTarget
                         ? 'border-vn-accent bg-vn-muted-bg'
-                        : 'border-vn-border',
+                        : 'border-vn-border bg-white/55',
                     ].join(' ')}
                     data-testid={`matrix-cell-${row.id}-${c.id}`}
                     onDragOver={
@@ -187,6 +194,7 @@ export function TaskMatrix({
                               onEdit={onEdit}
                               delegated={delegated}
                               mineHighlight={highlightMineTasks && isMine}
+                              categoryName={categoryNameById?.get(t.categoryId)}
                               onDragStart={
                                 dndEnabled
                                   ? (taskId) => setDraggingTaskId(taskId)

@@ -304,6 +304,9 @@ export class TaskRepository {
         title: params.title,
         description: params.description,
         dueDate: params.dueDate,
+        // chimo 2026-05-20: 新規作成は backlog (未着手) で起こす。
+        // DB enum default は 'todo' のまま、 アプリ層で明示することで migration を回避。
+        status: 'backlog',
       })
       .returning();
     return row;

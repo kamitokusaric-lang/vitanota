@@ -266,7 +266,7 @@ export function TaskForm({
               disabled={readonly}
             >
               <option value="backlog">未着手 (Backlog)</option>
-              <option value="todo">今週やる (ToDo)</option>
+              <option value="todo">今日やる (Today)</option>
               <option value="in_progress">進行中 (Doing)</option>
               <option value="review">確認・調整中 (Review)</option>
               <option value="done">完了 (Done)</option>

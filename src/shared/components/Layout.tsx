@@ -22,14 +22,14 @@ export function Layout({ children, session }: LayoutProps) {
   const canSwitchToAdmin = canUseSystemAdminFeatures(session.user.roles);
 
   return (
-    <div className="min-h-screen bg-vn-bg">
+    <div className="min-h-screen bg-vn-bg text-slate-900">
       <nav className="fixed inset-x-0 top-0 z-10 bg-vn-header">
-        <div className="mx-auto flex h-16 max-w-[1040px] items-center justify-between px-6 lg:px-10">
-          {/* 左: ロゴ + vitanotaとは */}
-          <div className="flex items-center gap-4">
+        <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-6 lg:px-14">
+          {/* 左: ロゴ + vitanotaとは + 開発者ノート */}
+          <div className="flex items-center gap-5">
             <Link
               href="/"
-              className="text-xl font-bold tracking-tight text-white"
+              className="text-[26px] font-extrabold tracking-tight text-slate-50"
               data-testid="nav-logo"
             >
               vita<span className="text-vn-accent">nota</span>
@@ -38,19 +38,21 @@ export function Layout({ children, session }: LayoutProps) {
             <button
               type="button"
               onClick={() => setAboutOpen(true)}
-              className="text-[13px] text-gray-400 transition-colors hover:text-white"
+              className="text-[15px] text-slate-300 transition-colors hover:text-white"
               data-testid="nav-about"
             >
               vitanotaとは
             </button>
+            <DeveloperNoticeWidget />
           </div>
 
-          {/* 右: 管理画面リンク (兼務時) + ユーザー名 (プロフィール) + ログアウト */}
-          <div className="flex items-center gap-3 text-[13px]">
+          {/* 右: 管理画面リンク (兼務時) + ユーザー名 (プロフィール) + ログアウト
+              (開発者ノートはヘッダーからぶら下がる「しおり」 として nav の外に配置) */}
+          <div className="flex items-center gap-3 text-[14px]">
             {canSwitchToAdmin && (
               <Link
                 href="/admin/tenants"
-                className="rounded-md border border-gray-600 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-400 hover:text-white"
+                className="inline-flex h-9 items-center rounded-[9px] border border-slate-600 px-4 text-[14px] text-slate-200 transition-colors hover:border-slate-400 hover:text-white"
                 data-testid="nav-switch-to-admin"
               >
                 管理画面へ
@@ -59,7 +61,7 @@ export function Layout({ children, session }: LayoutProps) {
             <button
               type="button"
               onClick={() => setProfileOpen(true)}
-              className="text-gray-400 transition-colors hover:text-white"
+              className="text-slate-300 transition-colors hover:text-white"
               data-testid="nav-username"
             >
               {name}
@@ -67,14 +69,14 @@ export function Layout({ children, session }: LayoutProps) {
             <button
               onClick={() => signOut({ callbackUrl: '/auth/signin' })}
               data-testid="nav-signout-button"
-              className="rounded-md border border-gray-600 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-gray-400 hover:text-white"
+              className="inline-flex h-9 items-center rounded-[9px] border border-slate-600 px-4 text-[14px] text-slate-200 transition-colors hover:border-slate-400 hover:text-white"
             >
               ログアウト
             </button>
           </div>
         </div>
       </nav>
-      <main className="mx-auto max-w-[1040px] px-6 pb-20 pt-[104px] lg:px-10">
+      <main className="mx-auto max-w-[1440px] px-6 pb-16 pt-[104px] lg:px-14">
         {children}
       </main>
 
@@ -82,7 +84,6 @@ export function Layout({ children, session }: LayoutProps) {
       <AboutVitanotaModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {showFeedbackFab && <FeedbackFAB />}
-      <DeveloperNoticeWidget />
     </div>
   );
 }

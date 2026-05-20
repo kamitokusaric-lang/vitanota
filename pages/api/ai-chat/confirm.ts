@@ -239,6 +239,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             description: t.memo || null,
             dueDate: t.dueDate ? new Date(t.dueDate) : null,
             sourceChatSnippet: body.inputSnippet || null,
+            // chimo 2026-05-20: 新規作成は backlog (未着手) で起こす。 taskRepository.create と整合。
+            status: 'backlog',
           })
           .returning({ id: tasks.id });
 

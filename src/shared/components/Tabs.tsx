@@ -43,9 +43,10 @@ export function Tabs({ tabs, defaultTabId, queryParam = 'tab' }: TabsProps) {
 
   return (
     <div data-testid="tabs">
+      {/* chimo 2026-05-20: gap 32 / 18px / 800、 underline は 2px slate-200 + active 3px indigo */}
       <div
         role="tablist"
-        className="flex gap-1 border-b border-gray-200"
+        className="mb-5 flex gap-8 border-b border-vn-border"
       >
         {tabs.map((tab) => {
           const isActive = tab.id === active;
@@ -60,17 +61,17 @@ export function Tabs({ tabs, defaultTabId, queryParam = 'tab' }: TabsProps) {
               onClick={() => handleSelect(tab.id)}
               data-testid={`tab-${tab.id}`}
               className={[
-                'px-4 py-2 text-sm font-medium transition-colors',
+                'pb-3.5 text-[17px] transition-colors',
                 tab.disabled
-                  ? 'cursor-not-allowed text-gray-300'
+                  ? 'cursor-not-allowed font-semibold text-slate-300'
                   : isActive
-                    ? 'border-b-2 border-vn-accent text-vn-accent'
-                    : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700',
+                    ? 'border-b-[3px] border-vn-accent font-bold text-vn-accent -mb-px'
+                    : 'border-b-[3px] border-transparent font-semibold text-slate-500 hover:text-slate-700',
               ].join(' ')}
             >
               {tab.label}
               {tab.disabled && (
-                <span className="ml-1 text-xs text-gray-400">(準備中)</span>
+                <span className="ml-1 text-xs text-slate-400">(準備中)</span>
               )}
             </button>
           );

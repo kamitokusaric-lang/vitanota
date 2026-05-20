@@ -9,6 +9,8 @@ interface TaskCardProps {
   delegated?: boolean;
   // 「全員」フィルタ時に自分のタスクを薄い黄色 + 左の赤ラインで識別するためのフラグ
   mineHighlight?: boolean;
+  // 縦軸 grouping 廃止に伴い、 カード上端にカテゴリ chip を出す (chimo 2026-05-20)
+  categoryName?: string;
   onDragStart?: (taskId: string) => void;
   onDragEnd?: () => void;
 }
@@ -31,6 +33,15 @@ function isDueToday(value: string | Date): boolean {
   );
 }
 
+// 期限切れ判定: due_date が今日 (00:00) より前。 status='done' のチェックは呼び元で行う。
+function isOverdue(value: string | Date): boolean {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  const t = new Date();
+  const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const due = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return due.getTime() < today.getTime();
+}
+
 function displayName(a: TaskAssigneeSummary): string {
   return a.nickname ?? a.name ?? '';
 }
@@ -50,6 +61,7 @@ export function TaskCard({
   onEdit,
   delegated = false,
   mineHighlight = false,
+  categoryName,
   onDragStart,
   onDragEnd,
 }: TaskCardProps) {
@@ -60,9 +72,9 @@ export function TaskCard({
     : mineHighlight
       ? 'bg-yellow-50'
       : 'bg-white';
-  // chimo スケール: padding 14/16、Radius 10、Border 1px #EAEAEA、shadow なし
+  // chimo 2026-05-20: padding 14/14/12、 Radius 10、 Border 1px slate-200、 shadow 軽め
   const cardClass = [
-    'rounded-[10px] border border-vn-border px-4 py-3.5 transition-opacity',
+    'rounded-[10px] border border-vn-border px-3.5 pb-3 pt-3.5 shadow-[0_2px_8px_rgba(15,23,42,0.035)] transition-opacity',
     bgClass,
     task.status === 'done' ? 'opacity-60' : '',
     // delegated (= 自分が振ったが assignees に自分が含まれない) は左側に amber のアクセント
@@ -95,10 +107,21 @@ export function TaskCard({
         className="block w-full text-left"
         data-testid={`task-card-edit-${task.id}`}
       >
-        <div className="flex items-start justify-between gap-2">
-          {/* chimo: タイトル 15px / 600 / #111 / line-height 1.4、下 6px */}
+        {/* chimo 2026-05-21: カテゴリ表示は「今日の記録」 pill と同じ白 + slate border 系に統一。
+            ただし表示のみで非クリック → hover 効果なし、 サイズはカード内なので h-6 / 11px / 700。 */}
+        {categoryName && (
           <div
-            className={`flex-1 text-base font-medium leading-[1.4] text-gray-900 ${
+            className="mb-2 inline-flex h-6 items-center rounded-full border border-vn-border-strong bg-white px-2.5 text-[11px] font-medium leading-none text-slate-700"
+            data-testid={`task-card-category-${task.id}`}
+          >
+            {categoryName}
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-2">
+          {/* chimo 2026-05-20 final-tune: タイトル 14px / 600 / slate-700 / line-height 1.55、下 8px
+              (slate-800 だとボード全体が黒く見えるため 1 段淡く) */}
+          <div
+            className={`mb-2 flex-1 text-[14px] font-semibold leading-[1.55] text-slate-700 ${
               task.status === 'done' ? 'line-through' : ''
             }`}
           >
@@ -114,39 +137,59 @@ export function TaskCard({
           )}
         </div>
 
-        {/* chimo: 担当者は本文相当 13px / 400 / #555 / line-height 1.5 / 上 6px */}
+        {/* chimo 2026-05-20 font-tune: 担当者は 12px / 400 / slate-500 (圧を落とす) */}
         {assigneesLabel && (
-          <div className="mt-1.5 text-[13px] leading-[1.5] text-gray-600">
+          <div className="text-[12px] font-normal leading-[1.5] text-slate-500">
             {delegated && <span className="text-amber-700">→ </span>}
             {assigneesLabel}
           </div>
         )}
 
-        {/* chimo: 期限・補助メタは 12px / 400 / #777 / line-height 1.4 / 上 2px */}
+        {/* chimo 2026-05-21: 期限は 12px / 600。
+            赤マーク (赤ドット + 赤文字) 条件: 今日期限 OR (期限切れ かつ 未完了)。
+            完了済みタスクは赤化しない (= 過去の done が全部赤になるのを防ぐ)。 */}
         {(task.dueDate || task.commentCount > 0) && (
-          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs leading-[1.4] text-gray-500">
-            {task.dueDate && (
-              <span
-                className={
-                  isDueToday(task.dueDate)
-                    ? 'inline-flex items-center gap-1 font-semibold text-vn-red'
-                    : undefined
-                }
-                data-testid={
-                  isDueToday(task.dueDate)
-                    ? `task-card-due-today-${task.id}`
-                    : undefined
-                }
-              >
-                {isDueToday(task.dueDate) && (
-                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-vn-red" />
-                )}
-                期限: {formatDate(task.dueDate)}
-              </span>
-            )}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] font-semibold leading-[1.4]">
+            {task.dueDate &&
+              (() => {
+                const dueToday = isDueToday(task.dueDate);
+                const overdueActive =
+                  isOverdue(task.dueDate) && task.status !== 'done';
+                // chimo 2026-05-21: 期限切れ = 赤 (警告)、 今日期限 = 青 (注意喚起) で区別
+                const dotClass = overdueActive
+                  ? 'bg-red-600'
+                  : dueToday
+                    ? 'bg-vn-accent'
+                    : '';
+                const textClass = overdueActive
+                  ? 'inline-flex items-center gap-1 text-red-600'
+                  : dueToday
+                    ? 'inline-flex items-center gap-1 text-vn-accent'
+                    : 'text-slate-500';
+                return (
+                  <span
+                    className={textClass}
+                    data-testid={
+                      dueToday
+                        ? `task-card-due-today-${task.id}`
+                        : overdueActive
+                          ? `task-card-due-overdue-${task.id}`
+                          : undefined
+                    }
+                  >
+                    {dotClass && (
+                      <span
+                        aria-hidden
+                        className={`h-1.5 w-1.5 rounded-full ${dotClass}`}
+                      />
+                    )}
+                    期限: {formatDate(task.dueDate)}
+                  </span>
+                );
+              })()}
             {task.commentCount > 0 && (
               <span
-                className="inline-flex items-center gap-0.5"
+                className="inline-flex items-center gap-0.5 text-slate-500"
                 data-testid={`task-card-comment-count-${task.id}`}
               >
                 💬 {task.commentCount}

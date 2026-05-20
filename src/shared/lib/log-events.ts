@@ -49,31 +49,9 @@ export const LogEvents = {
   AiCaptureInputStarted: 'ai_capture_input_started',
   AiCaptureSubmitted: 'ai_capture_submitted',
 
-  // H3「今日の見通し」入口カード上のヒント (chimo 2026-05-16 方針転換、
-  // 3 ステップ overlay から各 CTA 個別ヒントへ)
-  MorningPlanHintShown: 'morning_plan_hint_shown',
-  MorningPlanHintDismissed: 'morning_plan_hint_dismissed',
-
-  // CapacityModal「ふつう」ボタン上のヒント (chimo 2026-05-17、離脱対策)
-  CapacityModalDefaultHintShown: 'capacity_modal_default_hint_shown',
-  CapacityModalDefaultHintDismissed: 'capacity_modal_default_hint_dismissed',
-
-  // PlanResultModal の 3 ボタン (余裕があれば / 今日やらない / 完了にする) ヒント
-  // 1 番目カードのみ表示、1 回の dismiss で 3 つ一括非表示
-  PlanResultButtonsHintShown: 'plan_result_buttons_hint_shown',
-  PlanResultButtonsHintDismissed: 'plan_result_buttons_hint_dismissed',
-
-  // PlanResultModal「このタスクで今日の仕事を始める」CTA ヒント
-  PlanResultStartHintShown: 'plan_result_start_hint_shown',
-  PlanResultStartHintDismissed: 'plan_result_start_hint_dismissed',
-
-  // TodayPlanView「今日の見通しは持てましたか?」フィードバック上のヒント
-  TodayPlanFeedbackHintShown: 'today_plan_feedback_hint_shown',
-  TodayPlanFeedbackHintDismissed: 'today_plan_feedback_hint_dismissed',
-
-  // TodayPlanView「完了」ボタン上のヒント (1 番目タスクのみ)
-  TodayPlanDoneHintShown: 'today_plan_done_hint_shown',
-  TodayPlanDoneHintDismissed: 'today_plan_done_hint_dismissed',
+  // chimo 2026-05-20: H3 morning_plan は撤去 (project_h3_reframing_20260520)。
+  // 旧 MorningPlanHint* / CapacityModalDefaultHint* / PlanResultButtonsHint* /
+  // PlanResultStartHint* / TodayPlanFeedbackHint* / TodayPlanDoneHint* は削除。
 
   // F3: フィードバック返信 (片方向スレッド)。全て info 出力、踏み絵で warn 化しない
   FeedbackReplyPosted: 'feedback_reply_posted',
@@ -195,64 +173,10 @@ interface AiCaptureSubmittedPayload extends BaseEventFields {
   inputLength: number;
 }
 
-interface MorningPlanHintShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface MorningPlanHintDismissedPayload extends BaseEventFields {
-  reason: 'close_button' | 'cta_click';
-  version: string;
-}
-
-interface CapacityModalDefaultHintShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface CapacityModalDefaultHintDismissedPayload extends BaseEventFields {
-  // close_button: × クリック / cta_click: いずれかの capacity ボタン押下 (normal 以外も含む)
-  reason: 'close_button' | 'cta_click';
-  version: string;
-}
-
-interface PlanResultButtonsHintShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface PlanResultButtonsHintDismissedPayload extends BaseEventFields {
-  // close_button: × クリック / cta_click: いずれかの 3 ボタン押下
-  reason: 'close_button' | 'cta_click';
-  version: string;
-}
-
-interface PlanResultStartHintShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface PlanResultStartHintDismissedPayload extends BaseEventFields {
-  // close_button: × クリック / cta_click: 「今日の仕事を始める」押下
-  reason: 'close_button' | 'cta_click';
-  version: string;
-}
-
-interface TodayPlanFeedbackHintShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface TodayPlanFeedbackHintDismissedPayload extends BaseEventFields {
-  // close_button: × クリック / cta_click: フィードバックボタン押下 (持てた等) or × 押下
-  reason: 'close_button' | 'cta_click';
-  version: string;
-}
-
-interface TodayPlanDoneHintShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface TodayPlanDoneHintDismissedPayload extends BaseEventFields {
-  // close_button: × クリック / cta_click: 完了ボタン押下
-  reason: 'close_button' | 'cta_click';
-  version: string;
-}
+// chimo 2026-05-20: H3 morning_plan は撤去 (project_h3_reframing_20260520)。
+// 旧 MorningPlanHint*Payload / CapacityModalDefaultHint*Payload /
+// PlanResultButtonsHint*Payload / PlanResultStartHint*Payload /
+// TodayPlanFeedbackHint*Payload / TodayPlanDoneHint*Payload は削除。
 
 // F3: フィードバック返信。 system_admin による返信投稿
 interface FeedbackReplyPostedPayload extends BaseEventFields {
@@ -300,18 +224,6 @@ export interface LogEventPayloads {
   [LogEvents.AiCaptureCoachmarkDismissed]: AiCaptureCoachmarkDismissedPayload;
   [LogEvents.AiCaptureInputStarted]: AiCaptureInputStartedPayload;
   [LogEvents.AiCaptureSubmitted]: AiCaptureSubmittedPayload;
-  [LogEvents.MorningPlanHintShown]: MorningPlanHintShownPayload;
-  [LogEvents.MorningPlanHintDismissed]: MorningPlanHintDismissedPayload;
-  [LogEvents.CapacityModalDefaultHintShown]: CapacityModalDefaultHintShownPayload;
-  [LogEvents.CapacityModalDefaultHintDismissed]: CapacityModalDefaultHintDismissedPayload;
-  [LogEvents.PlanResultButtonsHintShown]: PlanResultButtonsHintShownPayload;
-  [LogEvents.PlanResultButtonsHintDismissed]: PlanResultButtonsHintDismissedPayload;
-  [LogEvents.PlanResultStartHintShown]: PlanResultStartHintShownPayload;
-  [LogEvents.PlanResultStartHintDismissed]: PlanResultStartHintDismissedPayload;
-  [LogEvents.TodayPlanFeedbackHintShown]: TodayPlanFeedbackHintShownPayload;
-  [LogEvents.TodayPlanFeedbackHintDismissed]: TodayPlanFeedbackHintDismissedPayload;
-  [LogEvents.TodayPlanDoneHintShown]: TodayPlanDoneHintShownPayload;
-  [LogEvents.TodayPlanDoneHintDismissed]: TodayPlanDoneHintDismissedPayload;
   [LogEvents.FeedbackReplyPosted]: FeedbackReplyPostedPayload;
   [LogEvents.FeedbackThreadMarkedRead]: FeedbackThreadMarkedReadPayload;
   [LogEvents.FeedbackUnreadHintShown]: FeedbackUnreadHintShownPayload;

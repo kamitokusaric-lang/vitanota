@@ -101,10 +101,7 @@ export default async function handler(
       initializeHeatmap(startUtc, endUtcExclusive),
       ai.quickCapture,
     );
-    const morningPlanHeatmap = fillHeatmap(
-      initializeHeatmap(startUtc, endUtcExclusive),
-      ai.morningPlan,
-    );
+    // chimo 2026-05-20: morning_plan は撤去 (project_h3_reframing_20260520)
     const journalHeatmap = fillHeatmapWithSub(
       initializeHeatmapWithSub(startUtc, endUtcExclusive),
       journal.rows,
@@ -117,13 +114,11 @@ export default async function handler(
     const response: AccessDistributionResponse = {
       uuHeatmap,
       quickCaptureHeatmap,
-      morningPlanHeatmap,
       journalHeatmap,
       taskHeatmap,
       summary: {
         totalUu: uu.totalUu,
         totalQuickCaptureSessions: ai.totalQuickCaptureSessions,
-        totalMorningPlanSessions: ai.totalMorningPlanSessions,
         totalJournalEntries: journal.totalEntries,
         totalJournalPrivateEntries: journal.totalPrivateEntries,
         totalTaskTouches: task.totalTouches,

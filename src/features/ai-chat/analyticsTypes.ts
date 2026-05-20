@@ -58,72 +58,10 @@ export interface AiAnalyticsResponse {
     }>;
   };
   sessions: SessionDetail[];
-  morningPlan: MorningPlanAnalytics;
+  // chimo 2026-05-20: H3 morning_plan は撤去 (project_h3_reframing_20260520)。
+  // 旧 morningPlan: MorningPlanAnalytics / dailyCounts.h3 は削除。
   dailyCounts: {
     h1: Array<{ date: string; count: number }>;
-    h3: Array<{ date: string; count: number }>;
-  };
-}
-
-// H3「朝の見通し作り」の集計 (Phase B 分析画面の H3 セクション)
-export interface MorningPlanAnalytics {
-  funnel: {
-    totalSessions: number;
-    capacitySelectedCount: number;
-    generatedCount: number;
-    startedCount: number;
-    editStartedCount: number;
-    closedWithoutStartCount: number;
-    capacitySelectedRate: number | null;
-    generatedRate: number | null;
-    startedRate: number | null;
-    editStartedRate: number | null;
-    closedAfterGenerationRate: number | null;
-  };
-  done: {
-    totalItemsInStartedSessions: number;
-    doneCount: number;
-    doneRate: number | null;
-    todayBucketDoneCount: number;
-    todayBucketTotal: number;
-    todayBucketDoneRate: number | null;
-    optionalBucketDoneCount: number;
-    optionalBucketTotal: number;
-    optionalBucketDoneRate: number | null;
-    startedSessions: number;
-    zeroDoneSessions: number;
-    zeroDoneSessionRate: number | null;
-  };
-  outlook: {
-    feedbackCount: number;
-    heldCount: number;
-    somewhatCount: number;
-    difficultCount: number;
-    outlookHeldRate: number | null;
-  };
-  buckets: {
-    aiTodayCount: number;
-    aiOptionalCount: number;
-    retainedCount: number;
-    totalItems: number;
-    bucketChangeRate: number | null;
-    todayToOptional: number;
-    optionalToToday: number;
-    excludedCount: number;
-    excludedRate: number | null;
-    userAddedCount: number;
-    userAddedRate: number | null;
-  };
-  capacityCross: Array<{
-    capacity: 'low' | 'normal' | 'high';
-    sessionCount: number;
-    startedRate: number | null;
-    editRate: number | null;
-  }>;
-  nextDayReturn: {
-    uniqueUsers: number;
-    consecutiveUsers: number;
-    nextDayReturnRate: number | null;
   };
 }
 

@@ -23,8 +23,9 @@ function Card({
 }
 
 export function SummaryCards({ summary }: SummaryCardsProps) {
+  // chimo 2026-05-20: 「朝の見通し (H3) 利用数」 カードは撤去 (project_h3_reframing_20260520)
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card
         label="総 UU"
         value={summary.totalUu.toLocaleString()}
@@ -34,11 +35,6 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         label="AI 整理 (H1) 利用数"
         value={summary.totalQuickCaptureSessions.toLocaleString()}
         caption="期間内 quick_capture セッション件数"
-      />
-      <Card
-        label="朝の見通し (H3) 利用数"
-        value={summary.totalMorningPlanSessions.toLocaleString()}
-        caption="期間内 morning_plan セッション件数"
       />
       <Card
         label="日々ノート登録数"

@@ -390,6 +390,52 @@
   - 設計書: `construction/weekly-summary-design.md` § 9.3
 - **再開時に必要**: 週次レポート機能を再設計するなら本項目も再評価
 
+### 🟡 中: H3 リフレーミング (H3-A 見通し仮説 + H3-B 来訪価値仮説)
+
+- **発見日**: 2026-05-20 (chimo の H3 再仮説ブレスト、 午前: 「今日の仕事を始める」 ボタンが押されない観察、 午後: 「機能」 ではなく「体験」 = 朝の入口体験 への深掘り)
+- **背景**: H3 機能そのものではなく、 入口の儀式設計が教員の自然な行動とズレていた。 さらに H3 は本来「朝 vitanota を開く理由を作る」 体験設計だったと判明。 詳細: memory `project_h3_reframing_20260520` / `project_h3_morning_arrival_value`
+- **Phase 構造**:
+  - **Phase 1 (朝カード)** = H3-B「朝の来訪価値仮説」、 教員が朝開いた瞬間に「来てよかった」 と感じる体験。 chat より優先。 [[project_h3_morning_arrival_value]] 設計参照
+  - **Phase 2 (chat 統合)** = H3-A「見通し仮説」、 chat に「今日やること教えて」 と書ける動線。 chat-habit-strategy の延長
+  - **Phase 3 (昼カード / 夕カード)** = 時間帯別の体験、 H3-B 派生
+- **Phase 1 実装スコープ** (朝カード):
+  - 新規 API `/api/dashboard/morning-card` (GET): 自分が assignee の未完了から優先度順 top 3、 昨日の完了数、 表示可否 (時間帯 + dismiss)
+  - 新規 API `/api/dashboard/morning-card-dismiss` (POST): `onboarding_states` に dismiss row を INSERT
+  - 新規 component `MorningGreetingCard`: 挨拶 / 昨日完了数 / 候補 3 件 / 解放メッセージ / 閉じるボタン
+  - dashboard 統合: メイン領域上部に配置
+  - 表示時間帯: 朝 4-11 時 JST
+  - dismiss: 1 日 1 回 (onboarding_states 流用)
+  - AI 不使用、 ルールベース
+- **Phase 2 実装スコープ** (chat 統合、 Phase 1 リリース + 観察期間後に着手):
+  - `pages/api/ai-chat/extract.ts` に意図判定 regex 追加 (「今日やること教えて」 系)
+  - `pages/api/ai-chat/morning-plan.ts` の `handleStart` 廃止、 `handleGenerate` を export 化
+  - Lambda + Next.js の capacity 廃止 (今日午前に実装したが revert 済、 再実装)
+  - 既存 UI (CapacityModal / MorningPlanCard / MorningPlanSection / PlanResultModal / 4 hint) 削除
+  - 分析指標差し替え (capacity 系削除 + quickEditWithin30m 追加)
+  - Phase 1 ブランチ作業中の commit ログ (旧 feature/2026-05-20-h3-reframing) を参照可能
+- **Phase 3 実装スコープ** (昼/夕カード、 Phase 1/2 安定後):
+  - 昼カード (11-15 時 JST): 午前の完了数 + 午後の候補 1-2 件 + 「ここまでで十分」 メッセージ
+  - 夕カード (15-21 時 JST): 今日の完了数 + 明日期限のタスク + 「今日はここまで」 (時間軸の区切り、 評価せず)
+  - 「お疲れさま」 系の感情代弁は禁止 ([[feedback_ai_output_guards]])
+- **既存実装への影響 (軽い)**:
+  - morning_plan Lambda + today_plan_v1 prompt: そのまま流用 (Phase 2 で使用)
+  - today_plan_items schema: Phase 2 で acceptedAt / startedAt の段階廃止、 破壊的変更なし
+  - データモデルはほぼ流用、 UI と入口だけリフレーミング
+- **踏み絵チェック**:
+  - 「確定」 強要は vitanota を承認者ポジションに立たせる、 廃止 (`feedback_observed_moment_broken` の輪郭)
+  - chat 入口統合は `project_chat_habit_strategy` の最初の検証台 (Phase 2 で実装)
+  - 教員の「押し付けられ感がない」 を数値化せず qualitative に残す (数値化した瞬間に踏み絵)
+  - 朝カードは AI 不使用、 ルールベース (AI 判断を排除して観測感を出さない)
+  - 朝カード文言: 「お疲れさま」 「がんばってます」 等の感情代弁禁止
+- **指標** (Phase 1):
+  - 朝の再訪率 (過去 7 日のうち朝アクセス日数 / 7)
+  - 朝カード後のタスク操作率 (30 分以内の status / due_date 変更 or 新規作成)
+  - 翌朝再来訪率
+  - 朝カード dismiss vs 放置率 (放置 = 邪魔ではない signal)
+- **関連 memory**: `project_h3_reframing_20260520` / `project_h3_morning_arrival_value` / `project_chat_habit_strategy` / `project_morning_plan_h3` / `feedback_observed_moment_broken` / `feedback_design_vocab` / `feedback_ai_output_guards`
+
+---
+
 ### 🟡 中: AI 整理 Phase C-E (辞書・カテゴリルール・プロンプトバージョン・フラグの DB 化)
 - **発見日**: 2026-05-13
 - **着手予定**: 2026-05-14 以降 (chimo 指示、明日着手分の延長)

@@ -1,6 +1,9 @@
 // Bedrock Claude Haiku 4.5 を呼び出すサービス。
 // MOCK_BEDROCK=true の場合、固定 fixture を返してローカル/CI 開発を可能にする
 // (chimo 2026-05-11 合意のハイブリッド開発スタイル: 日常開発は mock、プロンプト調整は AWS Console Playground)。
+//
+// chimo 2026-05-20: H3 morning_plan 機能を撤去 (project_h3_reframing_20260520)。
+// 旧 invokeMorningPlan / mockMorningPlan は削除。 今は task_extraction のみ。
 
 import {
   BedrockRuntimeClient,
@@ -8,10 +11,7 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import {
   ExtractionResultSchema,
-  MorningPlanResultSchema,
   type ExtractionResult,
-  type MorningPlanResult,
-  type MorningPlanEvent,
 } from './schemas';
 import type { ZodSchema } from 'zod';
 
@@ -87,23 +87,6 @@ export async function invokeExtraction(args: {
   return { result, modelId: MODEL_ID };
 }
 
-export async function invokeMorningPlan(args: {
-  systemPrompt: string;
-  userMessage: string;
-  event: MorningPlanEvent;
-}): Promise<{ result: MorningPlanResult; modelId: string }> {
-  if (USE_MOCK) {
-    return { result: mockMorningPlan(args.event), modelId: MODEL_ID };
-  }
-  const result = await invokeBedrock({
-    systemPrompt: args.systemPrompt,
-    userMessage: args.userMessage,
-    schema: MorningPlanResultSchema,
-    maxTokens: 1500,
-  });
-  return { result, modelId: MODEL_ID };
-}
-
 // MOCK_BEDROCK=true 用の fixture。実 AI 呼び出しなしで UX 動線を確認できる。
 // 入力に「進路」「テスト」「保護者」等のキーワードがあれば該当カテゴリを返す。
 function mockExtraction(userMessage: string): ExtractionResult {
@@ -159,92 +142,5 @@ function mockExtraction(userMessage: string): ExtractionResult {
   return {
     tasks,
     needsConfirmation: [],
-  };
-}
-
-// MOCK_BEDROCK=true 用の morning_plan fixture。
-// chimo 2026-05-14: 今日期限・期限切れは件数に関わらず全部 today に入れる。
-// それ以外を capacity で振り分け (先生に判断してもらう)。
-function mockMorningPlan(event: MorningPlanEvent): MorningPlanResult {
-  const capacity = event.capacity;
-  const tasks = event.tasks;
-  const todayIso = event.today;
-
-  const additionalByCapacity: Record<
-    typeof capacity,
-    { extraToday: number; optional: number }
-  > = {
-    low: { extraToday: 0, optional: 2 },
-    normal: { extraToday: 2, optional: 3 },
-    high: { extraToday: 3, optional: 3 },
-  };
-  const additional = additionalByCapacity[capacity];
-
-  // 1. 今日期限・期限切れ = 必ず today に入れる
-  const forcedToday = tasks.filter(
-    (t) => t.due_date != null && t.due_date <= todayIso,
-  );
-  const others = tasks.filter(
-    (t) => !(t.due_date != null && t.due_date <= todayIso),
-  );
-
-  // 2. それ以外を score でソート
-  const scored = others.map((t) => {
-    let score = 0;
-    if (t.due_date) score += 5;
-    if (t.status === 'in_progress') score += 3;
-    if (/今日|確認|連絡|提出|相談|締切|至急/.test(t.title + t.description))
-      score += 2;
-    return { task: t, score };
-  });
-  scored.sort((a, b) => b.score - a.score);
-
-  const forcedTodayItems = forcedToday.map((t) => ({
-    task_id: t.id,
-    reason:
-      t.due_date != null && t.due_date < todayIso
-        ? `期限が ${t.due_date} で過ぎています、今日まず見るとよさそうです`
-        : `期限が今日 (${t.due_date}) なので、今日まず見るとよさそうです`,
-    suggested_action:
-      t.status === 'in_progress' ? '続きから少し進める' : '内容を確認する',
-    confidence: 0.8,
-  }));
-
-  const extraTodayItems = scored.slice(0, additional.extraToday).map((s) => ({
-    task_id: s.task.id,
-    reason: '優先度が高そうなので、今日まず見るとよさそうです',
-    suggested_action:
-      s.task.status === 'in_progress' ? '続きから少し進める' : '内容を確認する',
-    confidence: 0.5,
-  }));
-
-  const optional = scored
-    .slice(additional.extraToday, additional.extraToday + additional.optional)
-    .map((s) => ({
-      task_id: s.task.id,
-      reason: '今日できなくても大丈夫ですが、余裕があれば少し進められそうです',
-      suggested_action: '確認だけ先にする',
-      confidence: 0.4,
-    }));
-
-  const notShown = scored
-    .slice(additional.extraToday + additional.optional)
-    .map((s) => s.task.id);
-
-  const summary =
-    forcedToday.length > 0
-      ? `今日期限・期限切れが ${forcedToday.length} 件あります。先生の判断で進めてください。`
-      : capacity === 'low'
-        ? '今日は少なめに絞ってあります'
-        : capacity === 'high'
-          ? '今日の見通し案を出しました'
-          : '今日まず見るとよさそうな案です';
-
-  return {
-    summary,
-    today: [...forcedTodayItems, ...extraTodayItems],
-    optional,
-    not_shown_task_ids: notShown,
-    notes: [],
   };
 }

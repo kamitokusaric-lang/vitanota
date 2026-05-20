@@ -548,6 +548,35 @@
   - 設計書: `construction/weekly-summary-design.md` § 17 (Phase 2)
 - **再開時に必要**: 週次レポート機能を再設計するなら本項目も再評価
 
+### 🟡 中: 「マイノート」 大タブ廃止に伴う E2E test 回帰修正
+
+- **発見日**: 2026-05-21 (H3-B 朝カード v1 リリース後 CI で検出)
+- **背景**: 2026-05-20 commit `fe61ac5` で dashboard 大タブ「マイノート」 を削除し、 右レーン
+  (`PublicTimelineRail`) の「マイノート」 タブに統合した。 これに伴い以下の E2E spec
+  7 件が古い構造 (大タブ「マイノート」 経由) を前提にして失敗
+  - `__tests__/e2e/02-journal-crud.spec.ts`: 4 件 (US-T-010 新規投稿 / 非公開トグル、 US-T-011 編集、 US-T-012 削除)
+  - `__tests__/e2e/03-timeline.spec.ts`: 2 件 (US-T-014 別テナント不可視、 マイノート全エントリ表示)
+  - `__tests__/e2e/04-tags.spec.ts`: 1 件 (US-T-013 / US-T-021 タグ選択投稿)
+- **影響**: 本番アプリの動作には影響なし (= AppRunner image に test は含まれず deploy 自体は success)。
+  ただし journal 系の回帰検知が失われたまま
+- **対応**: 各 spec を右レーン「マイノート」 タブ + `[data-testid="public-timeline-rail-tab-mine"]`
+  クリック → エントリ確認の構造に書き換える
+- **着手判断**: 次に journal 系の機能変更を行う際に併せて修正
+
+### 🟢 低: OSV-Scanner CVE filter 拡張 (next 14.2.35 新規 CVE 群 + brace-expansion + ws)
+
+- **発見日**: 2026-05-21 (本番 deploy 後 CI で検出)
+- **背景**: `osv-scanner.toml` に既存の next 14.2 系 CVE filter があるが、 以下の新規 CVE が
+  filter 漏れで CI failure
+  - next 14.2.35: GHSA-36qx-fr4f-26g5 / -3g8h-86w9-wvmq / -8h8q-6873-q5fj / -c4j6-fc7j-m34r /
+    -ffhc-5mcf-pf4q / -gx5p-jg67-6x7h / -h64f-5h5j-jqjh / -vfv6-92ff-j949 / -wfc6-r584-vfw7 (9 件)
+  - brace-expansion 5.0.5: GHSA-jxxr-4gwj-5jf2
+  - ws 8.20.0: GHSA-58qx-3vcg-4xpx
+- **影響**: production runtime に直接の脆弱性影響なし (= 既存 filter と同じ判定理由が当てはまる)。
+  Next.js 14.2 系継続課題の延長で、 2026-06-30 の Next.js 15 upgrade で解消予定
+- **対応**: 各 CVE を `osv-scanner.toml` で評価 + filter 追加
+- **着手判断**: 次の依存更新 / セキュリティ review 時に併せて
+
 ---
 
 ## 関連リファレンス

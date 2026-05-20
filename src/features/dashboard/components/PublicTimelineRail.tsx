@@ -246,8 +246,8 @@ function RailItem({
           />
         )}
       </div>
-      {/* 2 行目: content (chimo final-tune: 13px / 400 / slate-700 / line-height 1.7、 読む寄せ) */}
-      <p className="mt-1.5 line-clamp-3 text-[13px] font-normal leading-[1.7] text-slate-700">
+      {/* 2 行目: content (chimo 2026-05-21: 字数制限を廃止して全文表示。 改行も尊重) */}
+      <p className="mt-1.5 whitespace-pre-wrap text-[13px] font-normal leading-[1.7] text-slate-700">
         {entry.content}
       </p>
       {/* 3 行目: tags + ナレッジボタン (EntryCard と同じ並び) */}

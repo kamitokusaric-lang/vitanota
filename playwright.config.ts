@@ -33,7 +33,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      // viewport を 1440×900 に明示 (chimo 2026-05-21):
+      // Desktop Chrome default の 1280×720 だと scrollbar 分で実描画幅が
+      // 1280 を下回り、 dashboard 右レーンの xl:block (Tailwind xl = min-width:1280px)
+      // が外れて quick-record-* 入口が非表示になる。 教員の実利用は xl 以上の
+      // 画面が前提なので、 テスト viewport もそれに揃える。
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
   ],
 

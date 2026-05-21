@@ -62,8 +62,8 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await page.getByTestId('entry-form-submit-button').click();
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
+    // 2026-05-21 update: notes タブ配下の subtab 廃止 (TimelineTab がマイノート単独画面)
     await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
     await expect(page.getByText('うれしいことがあった')).toBeVisible();
   });
 

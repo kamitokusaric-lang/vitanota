@@ -100,8 +100,8 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, user, tenant.id);
+    // 2026-05-21 update: notes タブ配下の subtab 廃止 (TimelineTab がマイノート単独画面)
     await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
 
     await expect(page.getByText('自分の公開')).toBeVisible();
     await expect(page.getByText('自分の非公開')).toBeVisible();

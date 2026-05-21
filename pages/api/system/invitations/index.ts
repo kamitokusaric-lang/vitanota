@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { eq, desc, sql } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { getDb } from '@/shared/lib/db';
-import { invitationTokens, sessions, users } from '@/db/schema';
+import { invitationTokens } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
 import {
   bulkInvitationSchema,
@@ -64,14 +64,20 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
         invitedAt: invitationTokens.createdAt,
         expiresAt: invitationTokens.expiresAt,
         usedAt: invitationTokens.usedAt,
-        // accepted 行の運用判定用に「最終アクセス日時」を sub-query で同梱する。
-        // users.email は UNIQUE 制約あり (schema.ts:107) のため sub-query は 1 行確定。
+        // accepted 行の運用判定用に「最終アクセス日時」を相関 sub-query で同梱する。
+        // users.email は UNIQUE 制約あり (schema.ts:90) のため sub-query は 1 行確定。
         // sessions が無い (まだログインしてない / session 全 expire 済 etc.) なら NULL。
+        //
+        // 重要: Drizzle の ${tableObject.column} 補間は sub-query 内で table 修飾子を
+        // 落とすことがあり、 ${users.email} = ${invitationTokens.email} が
+        // "email" = "email" (= 常に true) に compile されて
+        // 「全 invitation が sessions.last_accessed_at の global MAX を返す」 バグになる。
+        // 修飾子付きでカラム名をリテラル記述して回避 (2026-05-21 chimo 報告)。
         lastAccessedAt: sql<Date | null>`(
-          SELECT MAX(${sessions.lastAccessedAt})
-          FROM ${sessions}
-          INNER JOIN ${users} ON ${users.id} = ${sessions.userId}
-          WHERE ${users.email} = ${invitationTokens.email}
+          SELECT MAX(sessions.last_accessed_at)
+          FROM sessions
+          INNER JOIN users ON users.id = sessions.user_id
+          WHERE users.email = invitation_tokens.email
         )`,
       })
       .from(invitationTokens)

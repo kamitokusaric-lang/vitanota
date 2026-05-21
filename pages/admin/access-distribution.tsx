@@ -163,8 +163,8 @@ export default function AccessDistributionPage({ session }: PageProps) {
                   />
                   <HeatmapTable
                     heatmap={data.morningCardHeatmap}
-                    title="朝カード (H3-B) 表示数"
-                    caption="morning_card_events WHERE event_type='shown' の件数 (= 教員が朝に開いた時間帯)"
+                    title="朝カード (H3-B) を見た先生数"
+                    caption="morning_card_events WHERE event_type='shown' のユニーク先生数 (時間帯別、 同一先生は 1 カウント)"
                   />
                   <p className="text-[11px] text-gray-400">
                     生成: {new Date(data.meta.generatedAt).toLocaleString('ja-JP')} / {data.meta.periodDays} 日間

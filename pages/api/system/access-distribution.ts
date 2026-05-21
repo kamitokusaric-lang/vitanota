@@ -134,11 +134,11 @@ export default async function handler(
         totalJournalPrivateEntries: journal.totalPrivateEntries,
         totalTaskTouches: task.totalTouches,
         totalTaskCompletes: task.totalCompletes,
-        totalMorningCardShown: morningCard.totalShown,
-        totalMorningCardDismissed: morningCard.totalDismissed,
-        totalMorningCardCandidateClicked: morningCard.totalCandidateClicked,
-        totalMorningCardCandidateStatusChanged:
-          morningCard.totalCandidateStatusChanged,
+        morningCardShownUu: morningCard.shownUu,
+        morningCardDismissedUu: morningCard.dismissedUu,
+        morningCardCandidateClickedUu: morningCard.candidateClickedUu,
+        morningCardCandidateStatusChangedUu:
+          morningCard.candidateStatusChangedUu,
       },
       meta: {
         start: startStr,

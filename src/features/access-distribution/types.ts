@@ -21,11 +21,12 @@ export interface AccessDistributionSummary {
   totalJournalPrivateEntries: number; // journal 非公開のみ
   totalTaskTouches: number; // task updated_at 件数
   totalTaskCompletes: number; // task completed_at 件数
-  // H3-B 朝カード (morning_card_events、 chimo 2026-05-20):
-  totalMorningCardShown: number; // 「朝に開いた」 回数
-  totalMorningCardDismissed: number; // 「閉じる」 押下
-  totalMorningCardCandidateClicked: number; // 候補タイトル押下 (= 編集モーダル開く)
-  totalMorningCardCandidateStatusChanged: number; // 「今日やるに入れる」 / 「完了にする」 押下
+  // H3-B 朝カード (morning_card_events、 chimo 2026-05-21 UU 化):
+  //   全指標は期間内ユニーク先生数。 反応率 = candidateStatusChangedUu / shownUu (UI で計算)
+  morningCardShownUu: number; // 朝カードを 1 回以上見た先生数 (反応率の分母)
+  morningCardDismissedUu: number; // 「閉じる」 を押した先生数
+  morningCardCandidateClickedUu: number; // 候補タイトルを押した先生数 (= 編集モーダルを開いた)
+  morningCardCandidateStatusChangedUu: number; // 「今日やる」 / 「完了」 に動かした先生数
 }
 
 export interface AccessDistributionMeta {

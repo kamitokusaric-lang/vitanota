@@ -84,15 +84,19 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
 
 function QuickRecordActions({
   onPick,
+  testIdPrefix = 'quick-record',
 }: {
   onPick: (kind: JournalEntryKind) => void;
+  // chimo 2026-05-21: narrow / xl の 2 箇所に同コンポーネントを置くため
+  // testId を出し分け可能にする (Playwright strict mode の重複検出回避)。
+  testIdPrefix?: string;
 }) {
   // chimo 2026-05-21: 「日誌 / ナレッジ / つぶやき」 を「タスクを手動で追加する」 と
   //   同じ indigo pill に統一 (= action 系は indigo / 表示系は slate の使い分け)。
   return (
     <div
       className="mb-3 flex flex-wrap items-center gap-2"
-      data-testid="quick-record-actions"
+      data-testid={`${testIdPrefix}-actions`}
     >
       <span className="text-[13px] font-bold text-slate-500">今日の記録</span>
       {RECORD_KINDS.map(({ kind, label }) => (
@@ -100,7 +104,7 @@ function QuickRecordActions({
           key={kind}
           type="button"
           onClick={() => onPick(kind)}
-          data-testid={`quick-record-${kind}`}
+          data-testid={`${testIdPrefix}-${kind}`}
           className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
         >
           {label}
@@ -237,7 +241,10 @@ export default function DashboardPage({
               {/* narrow (< xl) 専用: 記録入口 pill + 日々ノートモーダル呼出ボタン。
                   xl 以上では右レーン上部に集約 (chimo 2026-05-21) */}
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:hidden">
-                <QuickRecordActions onPick={handleKindPick} />
+                <QuickRecordActions
+                  onPick={handleKindPick}
+                  testIdPrefix="narrow-quick-record"
+                />
                 <button
                   type="button"
                   onClick={() => setNoteRailModalOpen(true)}

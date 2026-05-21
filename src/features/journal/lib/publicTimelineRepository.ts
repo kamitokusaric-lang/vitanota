@@ -32,6 +32,9 @@ export type PublicEntryWithTags = PublicJournalEntry & {
   knowledgeTags: Array<{ id: string; name: string }>;
   knowledgeReactionCount: number;
   hasMyKnowledgeReaction: boolean;
+  // 投稿者が system_admin ロールを持つ場合 true (兼任アカウントによる「AI 風」投稿の判定)。
+  // 現時点判定。chimo の system_admin 兼 school_admin アカウントが書いた投稿はここで true になる。
+  isAiPost: boolean;
 };
 
 export interface TimelineResult {
@@ -127,10 +130,14 @@ export class PublicTimelineRepository {
       knowledgeMap.set(row.entryId, list);
     }
 
+    // isAiPost は handler 側で別 transaction (withSystemAdmin) で enrich する。
+    // user_tenant_roles の teacher / school_admin RLS は tenant_id=NULL の system_admin row を
+    // 見られないため、 teacher 権限の本 trx ではここで判定しても常に false になる。
     const withTags = entries.map((e) => ({
       ...e,
       tags: emotionMap.get(e.id) ?? [],
       knowledgeTags: knowledgeMap.get(e.id) ?? [],
+      isAiPost: false as boolean,
     }));
 
     return attachReactions(tx, withTags, ctx);

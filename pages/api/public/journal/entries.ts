@@ -5,6 +5,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withTenantUser } from '@/shared/lib/db';
 import { publicTimelineRepo } from '@/features/journal/lib/publicTimelineRepository';
+import { fetchSystemAdminUserIds } from '@/features/journal/lib/aiAuthorLookup';
 import { timelineQuerySchema } from '@/features/journal/schemas/journal';
 import { requireAuth, pickDbRole, mapErrorToResponse } from '@/features/journal/lib/apiHelpers';
 import { LogEvents, logEvent } from '@/shared/lib/log-events';
@@ -41,6 +42,22 @@ export default async function handler(
       );
     });
 
+    // isAiPost enrich: 投稿者の中に system_admin 兼任アカウントがあるかを別 trx で判定。
+    // 通常 trx (teacher/school_admin RLS) では tenant_id=NULL の system_admin 行が
+    // SELECT に出ないため、 withSystemAdmin で 1 回だけ読みに行く。
+    const authorUserIds = Array.from(
+      new Set(
+        entries
+          .map((e) => e.userId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const aiUserIds = await fetchSystemAdminUserIds(authorUserIds);
+    const enriched = entries.map((e) => ({
+      ...e,
+      isAiPost: e.userId ? aiUserIds.has(e.userId) : false,
+    }));
+
     // PP-U02-02: エッジキャッシュ対象（CloudFront ホワイトリスト方式）
     // テナント内の教員全員で共有可能なキャッシュ
     res.setHeader(
@@ -53,11 +70,11 @@ export default async function handler(
       tenantId: ctx.tenantId,
       endpoint: 'public',
       page,
-      count: entries.length,
+      count: enriched.length,
     });
 
     return res.status(200).json({
-      entries,
+      entries: enriched,
       page,
       perPage,
     });

@@ -98,17 +98,29 @@ export class TaskRepository {
       conditions.push(inArray(tasks.id, filterAssignedTaskIds));
     }
 
-    // 期間フィルタ (due_date への絞込)
-    // due_date は PostgreSQL DATE 型。column の TS 型は Date なので、string と比較するため
+    // 期間フィルタ (due_date / completed_at への絞込)
+    // due_date は PostgreSQL DATE 型、completed_at は timestamptz 型。
     // sql template で ::date キャストを明示する (timezone shift 事故予防)
+    //
+    // 意味論:
+    //   未完了 (status <> 'done') は due_date ベースで絞る
+    //   完了   (status = 'done')  は completed_at が期間内のものだけ
+    //   → 完了レーンには「期間内に完了したタスク」のみ並ぶ。 期限切れタスクを完了にしても
+    //     朝カードで見た瞬間に消えない (TaskBoard 完了レーンに残る)
     if (filters?.dateFilter?.mode === 'default') {
       const { weekStart, weekEnd } = filters.dateFilter;
-      const inThisWeek = sql`${tasks.dueDate} >= ${weekStart}::date AND ${tasks.dueDate} <= ${weekEnd}::date`;
-      const overdueUnfinished = sql`${tasks.dueDate} < ${weekStart}::date AND ${tasks.status} <> 'done'`;
-      conditions.push(sql`(${inThisWeek} OR ${tasks.dueDate} IS NULL OR ${overdueUnfinished})`);
+      const unfinishedInScope = sql`${tasks.status} <> 'done' AND (
+        (${tasks.dueDate} >= ${weekStart}::date AND ${tasks.dueDate} <= ${weekEnd}::date)
+        OR ${tasks.dueDate} < ${weekStart}::date
+        OR ${tasks.dueDate} IS NULL
+      )`;
+      const doneInRange = sql`${tasks.status} = 'done' AND ${tasks.completedAt}::date >= ${weekStart}::date AND ${tasks.completedAt}::date <= ${weekEnd}::date`;
+      conditions.push(sql`(${unfinishedInScope} OR ${doneInRange})`);
     } else if (filters?.dateFilter?.mode === 'range') {
       const { from, to } = filters.dateFilter;
-      conditions.push(sql`${tasks.dueDate} >= ${from}::date AND ${tasks.dueDate} <= ${to}::date`);
+      const unfinishedInRange = sql`${tasks.status} <> 'done' AND ${tasks.dueDate} >= ${from}::date AND ${tasks.dueDate} <= ${to}::date`;
+      const doneInRange = sql`${tasks.status} = 'done' AND ${tasks.completedAt}::date >= ${from}::date AND ${tasks.completedAt}::date <= ${to}::date`;
+      conditions.push(sql`(${unfinishedInRange} OR ${doneInRange})`);
     }
 
     const rows = await tx

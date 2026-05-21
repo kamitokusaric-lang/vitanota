@@ -148,7 +148,9 @@ export function TaskCard({
         {/* chimo 2026-05-21: 期限は 12px / 600。
             赤マーク (赤ドット + 赤文字) 条件: 今日期限 OR (期限切れ かつ 未完了)。
             完了済みタスクは赤化しない (= 過去の done が全部赤になるのを防ぐ)。 */}
-        {(task.dueDate || task.commentCount > 0) && (
+        {(task.dueDate ||
+          task.commentCount > 0 ||
+          (task.status === 'done' && task.completedAt)) && (
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] font-semibold leading-[1.4]">
             {task.dueDate &&
               (() => {
@@ -187,6 +189,14 @@ export function TaskCard({
                   </span>
                 );
               })()}
+            {task.status === 'done' && task.completedAt && (
+              <span
+                className="text-slate-500"
+                data-testid={`task-card-completed-${task.id}`}
+              >
+                完了: {formatDate(task.completedAt)}
+              </span>
+            )}
             {task.commentCount > 0 && (
               <span
                 className="inline-flex items-center gap-0.5 text-slate-500"

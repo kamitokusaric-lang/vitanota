@@ -9,12 +9,29 @@ import {
   fillHeatmap,
   initializeHeatmapWithSub,
   fillHeatmapWithSub,
+  initializeDailySeries,
+  fillDailySeries,
 } from '@/features/access-distribution/lib/aggregator';
-import { getUuByHourDate } from '@/features/access-distribution/lib/sessionUuRepository';
-import { getAiSessionUsageByHourDate } from '@/features/access-distribution/lib/aiSessionUsageRepository';
-import { getJournalUsageByHourDate } from '@/features/access-distribution/lib/journalUsageRepository';
-import { getTaskUsageByHourDate } from '@/features/access-distribution/lib/taskUsageRepository';
-import { getMorningCardUsageByHourDate } from '@/features/access-distribution/lib/morningCardUsageRepository';
+import {
+  getUuByHourDate,
+  getDailyUu,
+} from '@/features/access-distribution/lib/sessionUuRepository';
+import {
+  getAiSessionUsageByHourDate,
+  getDailyQuickCapture,
+} from '@/features/access-distribution/lib/aiSessionUsageRepository';
+import {
+  getJournalUsageByHourDate,
+  getDailyJournalEntries,
+} from '@/features/access-distribution/lib/journalUsageRepository';
+import {
+  getTaskUsageByHourDate,
+  getDailyTaskTouches,
+} from '@/features/access-distribution/lib/taskUsageRepository';
+import {
+  getMorningCardUsageByHourDate,
+  getDailyMorningCardShownUu,
+} from '@/features/access-distribution/lib/morningCardUsageRepository';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
 import { logger } from '@/shared/lib/logger';
 
@@ -75,7 +92,18 @@ export default async function handler(
   }
 
   try {
-    const [uu, ai, journal, task, morningCard] = await Promise.all([
+    const [
+      uu,
+      ai,
+      journal,
+      task,
+      morningCard,
+      dailyUu,
+      dailyQuickCapture,
+      dailyJournal,
+      dailyTask,
+      dailyMorningCard,
+    ] = await Promise.all([
       getUuByHourDate(session.user.userId, startUtc, endUtcExclusive),
       getAiSessionUsageByHourDate(
         session.user.userId,
@@ -93,6 +121,15 @@ export default async function handler(
         endUtcExclusive,
       ),
       getMorningCardUsageByHourDate(
+        session.user.userId,
+        startUtc,
+        endUtcExclusive,
+      ),
+      getDailyUu(session.user.userId, startUtc, endUtcExclusive),
+      getDailyQuickCapture(session.user.userId, startUtc, endUtcExclusive),
+      getDailyJournalEntries(session.user.userId, startUtc, endUtcExclusive),
+      getDailyTaskTouches(session.user.userId, startUtc, endUtcExclusive),
+      getDailyMorningCardShownUu(
         session.user.userId,
         startUtc,
         endUtcExclusive,
@@ -121,12 +158,37 @@ export default async function handler(
       morningCard.shown,
     );
 
+    // 折れ線グラフ用の日次系列 (期間内すべての JST 日付を 0 埋め)
+    const dailySeries = {
+      uu: fillDailySeries(
+        initializeDailySeries(startUtc, endUtcExclusive),
+        dailyUu,
+      ),
+      quickCapture: fillDailySeries(
+        initializeDailySeries(startUtc, endUtcExclusive),
+        dailyQuickCapture,
+      ),
+      journal: fillDailySeries(
+        initializeDailySeries(startUtc, endUtcExclusive),
+        dailyJournal,
+      ),
+      task: fillDailySeries(
+        initializeDailySeries(startUtc, endUtcExclusive),
+        dailyTask,
+      ),
+      morningCard: fillDailySeries(
+        initializeDailySeries(startUtc, endUtcExclusive),
+        dailyMorningCard,
+      ),
+    };
+
     const response: AccessDistributionResponse = {
       uuHeatmap,
       quickCaptureHeatmap,
       journalHeatmap,
       taskHeatmap,
       morningCardHeatmap,
+      dailySeries,
       summary: {
         totalUu: uu.totalUu,
         totalQuickCaptureSessions: ai.totalQuickCaptureSessions,

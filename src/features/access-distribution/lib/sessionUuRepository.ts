@@ -5,7 +5,7 @@
 import { sql } from 'drizzle-orm';
 import { withSystemAdmin } from '@/shared/lib/db';
 import { sessions } from '@/db/schema';
-import type { HourDateValue } from './aggregator';
+import type { DateCountValue, HourDateValue } from './aggregator';
 
 export async function getUuByHourDate(
   adminUserId: string,
@@ -42,5 +42,28 @@ export async function getUuByHourDate(
         (totalResult.rows[0] as unknown as { total_uu: number } | undefined)
           ?.total_uu ?? 0,
     };
+  });
+}
+
+// 日次 UU (折れ線グラフ用): JST date 単位の COUNT(DISTINCT user_id)。
+// 時間別 UU の sum は同一先生が複数 hour に出ると重複するため、日次は別途取り直す。
+export async function getDailyUu(
+  adminUserId: string,
+  startUtc: Date,
+  endUtcExclusive: Date,
+): Promise<DateCountValue[]> {
+  return withSystemAdmin(adminUserId, async (tx) => {
+    const result = await tx.execute(sql`
+      SELECT
+        TO_CHAR(${sessions.createdAt} AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM-DD') AS date,
+        COUNT(DISTINCT ${sessions.userId})::int AS count
+      FROM ${sessions}
+      WHERE ${sessions.createdAt} >= ${startUtc}
+        AND ${sessions.createdAt} < ${endUtcExclusive}
+        AND ${sessions.userId} IS NOT NULL
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return result.rows as unknown as DateCountValue[];
   });
 }

@@ -36,12 +36,28 @@ export interface AccessDistributionMeta {
   generatedAt: string; // ISO
 }
 
+// 折れ線グラフ用の日次系列 (DailyCountLineChart の data prop に直接渡せる形)
+export interface DailySeriesPoint {
+  date: string; // YYYY-MM-DD (JST)
+  count: number;
+}
+
+// 5 指標の日次系列 (chimo 2026-05-21、 SummaryCards 撤去に伴い追加)
+export interface AccessDistributionDailySeries {
+  uu: DailySeriesPoint[]; // ログイン UU (COUNT DISTINCT user_id)
+  quickCapture: DailySeriesPoint[]; // H1 quick_capture 件数
+  journal: DailySeriesPoint[]; // 日々ノート合算件数
+  task: DailySeriesPoint[]; // タスク touch 件数 (updated_at)
+  morningCard: DailySeriesPoint[]; // 朝カード shown UU
+}
+
 export interface AccessDistributionResponse {
   uuHeatmap: HeatmapRow[];
   quickCaptureHeatmap: HeatmapRow[]; // H1
   journalHeatmap: HeatmapRow[]; // 合算 (hours) + 非公開件数 (subHours)
   taskHeatmap: HeatmapRow[]; // touch 合算 (hours) + 完了件数 (subHours)
   morningCardHeatmap: HeatmapRow[]; // 朝カード「shown」 のみ、 H3-B (chimo 2026-05-20)
+  dailySeries: AccessDistributionDailySeries; // 5 指標の折れ線グラフ用日次系列
   summary: AccessDistributionSummary;
   meta: AccessDistributionMeta;
 }

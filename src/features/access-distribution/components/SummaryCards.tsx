@@ -4,6 +4,13 @@ interface SummaryCardsProps {
   summary: AccessDistributionSummary;
 }
 
+// UU 同士の比率を % 表記。 分母 0 のときは "-" を返す (0 除算を回避)
+function formatRate(numerator: number, denominator: number): string {
+  if (denominator === 0) return '-';
+  const rate = (numerator / denominator) * 100;
+  return `${rate.toFixed(0)}%`;
+}
+
 function Card({
   label,
   value,
@@ -46,9 +53,9 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         caption="updated_at 件数 (うち完了)、 tasks 件数"
       />
       <Card
-        label="朝カード (H3-B) 表示"
-        value={summary.totalMorningCardShown.toLocaleString()}
-        caption={`閉×${summary.totalMorningCardDismissed.toLocaleString()} / 候補押×${summary.totalMorningCardCandidateClicked.toLocaleString()} / 動か×${summary.totalMorningCardCandidateStatusChanged.toLocaleString()}`}
+        label="朝カード (H3-B) を見た先生"
+        value={`${summary.morningCardShownUu.toLocaleString()} 人`}
+        caption={`反応 ${formatRate(summary.morningCardCandidateStatusChangedUu, summary.morningCardShownUu)} (${summary.morningCardCandidateStatusChangedUu}人) / 閉×${formatRate(summary.morningCardDismissedUu, summary.morningCardShownUu)} / 候補押 ${formatRate(summary.morningCardCandidateClickedUu, summary.morningCardShownUu)}`}
       />
     </div>
   );

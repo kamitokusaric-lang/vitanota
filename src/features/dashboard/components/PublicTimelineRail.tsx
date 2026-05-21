@@ -13,7 +13,7 @@
 // 体感は 30-60s 遅延で十分。 50 件超えるテナントが出たら useSWRInfinite で paginate に切替。
 
 import { useEffect, useRef, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { Lightbulb } from 'lucide-react';
 import type {
   JournalEntryKind,
@@ -34,6 +34,9 @@ interface RailEntry {
   userId: string;
   content: string;
   createdAt: string;
+  // isPublic はマイノート subtab で自分の非公開エントリを判別するために使う。
+  // 職員室ノートでは常に true (= 公開のみ流れる) なので省略可。
+  isPublic?: boolean;
   mood?: MoodLevel | null;
   kind?: JournalEntryKind;
   authorName?: string | null;
@@ -53,6 +56,9 @@ const MAX_TAGS_INLINE = 3;
 
 interface PublicTimelineRailProps {
   selfUserId: string;
+  // chimo 2026-05-21: narrow (< xl) 幅ではモーダルで rail を呼び出す。
+  // 'modal' 時は sticky / max-h / border / shadow を外し、 Modal の枠に委ねる。
+  mode?: 'side' | 'modal';
 }
 
 const fetcher = async (url: string): Promise<RailResponse> => {
@@ -83,21 +89,29 @@ const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
   return res.json();
 };
 
-export function PublicTimelineRail({ selfUserId }: PublicTimelineRailProps) {
+export function PublicTimelineRail({
+  selfUserId,
+  mode = 'side',
+}: PublicTimelineRailProps) {
   const [tab, setTab] = useState<RailTab>('staffroom');
   const [modal, setModal] = useState<RailModalState>({ kind: 'closed' });
+  const { mutate: globalMutate } = useSWRConfig();
   // tab で fetch URL を切り替え (SWR は key 別に独立 cache、 切替時に再 fetch)
   const fetchUrl =
     tab === 'staffroom'
       ? `/api/public/journal/entries?page=1&perPage=${RAIL_PAGE_SIZE}`
       : `/api/private/journal/entries/mine?page=1&perPage=${RAIL_PAGE_SIZE}`;
+  // chimo 2026-05-21: refreshInterval / revalidateOnFocus を無効化。
+  // 自動再 fetch が in-flight 古い request の結果で楽観的更新を上書きする
+  // race の原因になっていた。 自分の create / edit / delete は楽観的更新で
+  // 即時反映、 他教員の更新はページ遷移時 / tab 切替時の再 mount で同期。
   const { data, error, isLoading, mutate } = useSWR<RailResponse>(
     fetchUrl,
     fetcher,
     {
-      refreshInterval: 30_000,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
+      refreshInterval: 0,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
     },
   );
 
@@ -135,14 +149,81 @@ export function PublicTimelineRail({ selfUserId }: PublicTimelineRailProps) {
       ? 'まだ公開された投稿はありません'
       : 'まだ投稿はありません';
 
-  const handleModalSuccess = async () => {
+  // 編集 / 削除モーダル成功時の楽観的更新 (chimo 2026-05-21: server fetch を
+  // 待つと体感ラグが出るうえ、 race で楽観的更新が古い結果で上書きされる)。
+  // revalidate: false で勝手に refetch しない (in-flight 古い GET が optimistic を
+  // 上書きする race 防止)。 server 最新は 30s refreshInterval / focus で sync。
+  const handleModalSuccess = async (
+    result?: import('@/features/journal/components/EntryForm').EntrySaveResult,
+  ) => {
+    // モーダル切替前の操作内容を捕捉 (setModal 後は modal が closed になる)
+    const prevModal = modal;
     setModal({ kind: 'closed' });
-    await mutate();
+
+    const MINE_KEY = `/api/private/journal/entries/mine?page=1&perPage=${RAIL_PAGE_SIZE}`;
+    const STAFFROOM_KEY = `/api/public/journal/entries?page=1&perPage=${RAIL_PAGE_SIZE}`;
+    type RailCache = RailResponse | undefined;
+
+    if (prevModal.kind === 'edit' && result?.entry) {
+      // 編集: 該当エントリを map で同フィールド差し替え
+      // (kind / isPublic が変わるケースは server 整形を待つ = 30s revalidate に委ねる)
+      const updated = result.entry;
+      const updateMatching = (current: RailCache): RailCache => {
+        if (!current) return current;
+        return {
+          ...current,
+          entries: current.entries.map((e) =>
+            e.id === updated.id
+              ? {
+                  ...e,
+                  content: updated.content,
+                  isPublic: updated.isPublic,
+                  mood: updated.mood,
+                  kind: updated.kind,
+                  tags: result.tags,
+                }
+              : e,
+          ),
+        };
+      };
+      void globalMutate(MINE_KEY, updateMatching, { revalidate: false });
+      void globalMutate(STAFFROOM_KEY, updateMatching, { revalidate: false });
+      return;
+    }
+
+    if (prevModal.kind === 'confirm-delete') {
+      const deletedId = prevModal.entryId;
+      const removeMatching = (current: RailCache): RailCache => {
+        if (!current) return current;
+        return {
+          ...current,
+          entries: current.entries.filter((e) => e.id !== deletedId),
+        };
+      };
+      void globalMutate(MINE_KEY, removeMatching, { revalidate: false });
+      void globalMutate(STAFFROOM_KEY, removeMatching, { revalidate: false });
+      return;
+    }
+
+    // フォールバック: 想定外の経路は通常 invalidate のみ
+    await globalMutate(
+      (key) =>
+        typeof key === 'string' &&
+        (key.startsWith('/api/private/journal/entries/mine') ||
+          key.startsWith('/api/public/journal/entries')),
+      undefined,
+      { revalidate: true },
+    );
   };
+
+  const asideClass =
+    mode === 'modal'
+      ? 'flex flex-col'
+      : 'sticky top-[104px] flex max-h-[calc(100vh-128px)] flex-col overflow-hidden rounded-[14px] border border-vn-border bg-white shadow-[0_4px_16px_rgba(15,23,42,0.04)]';
 
   return (
     <aside
-      className="sticky top-[104px] flex max-h-[calc(100vh-128px)] flex-col overflow-hidden rounded-[14px] border border-vn-border bg-white shadow-[0_4px_16px_rgba(15,23,42,0.04)]"
+      className={asideClass}
       data-testid="public-timeline-rail"
       aria-label="日々ノート (職員室 / マイ 切替)"
     >
@@ -320,11 +401,21 @@ function RailItem({
           )}
         </div>
         {isMine && (
-          <RailItemMenu
-            entryId={entry.id}
-            onEdit={() => onEdit(entry.id)}
-            onDelete={() => onDelete(entry.id)}
-          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            {entry.isPublic === false && (
+              <span
+                className="text-[10px] text-slate-400"
+                data-testid={`public-timeline-rail-private-${entry.id}`}
+              >
+                自分のみ
+              </span>
+            )}
+            <RailItemMenu
+              entryId={entry.id}
+              onEdit={() => onEdit(entry.id)}
+              onDelete={() => onDelete(entry.id)}
+            />
+          </div>
         )}
       </header>
       {/* 2 行目: content (chimo 2026-05-21: 字数制限を廃止して全文表示。 改行も尊重) */}

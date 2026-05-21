@@ -12,7 +12,7 @@
 // (timelineQuerySchema の max は 50)。 CloudFront 側のキャッシュも s-maxage=30 なので、
 // 体感は 30-60s 遅延で十分。 50 件超えるテナントが出たら useSWRInfinite で paginate に切替。
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Lightbulb } from 'lucide-react';
 import type {
@@ -22,6 +22,12 @@ import type {
 import { KIND_META } from '@/features/journal/components/KindBadge';
 import { formatRelativeTime } from '@/features/journal/lib/relativeTime';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
+import { Modal } from '@/shared/components/Modal';
+import { Button } from '@/shared/components/Button';
+import { ErrorMessage } from '@/shared/components/ErrorMessage';
+import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
+import { EntryForm } from '@/features/journal/components/EntryForm';
+import type { JournalEntry } from '@/db/schema';
 
 interface RailEntry {
   id: string;
@@ -57,8 +63,29 @@ const fetcher = async (url: string): Promise<RailResponse> => {
 
 type RailTab = 'staffroom' | 'mine';
 
+// 編集/削除モーダル状態 (chimo 2026-05-21: 旧 TimelineTab から移管。
+// 自分の投稿カード右上の 3 点リーダー → 編集 / 削除 を開く)
+type RailModalState =
+  | { kind: 'closed' }
+  | { kind: 'edit'; entryId: string }
+  | { kind: 'confirm-delete'; entryId: string };
+
+interface EntryDetailResponse {
+  entry: JournalEntry & {
+    tags?: Array<{ id: string }>;
+    knowledgeTags?: Array<{ id: string }>;
+  };
+}
+
+const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
+
 export function PublicTimelineRail({ selfUserId }: PublicTimelineRailProps) {
   const [tab, setTab] = useState<RailTab>('staffroom');
+  const [modal, setModal] = useState<RailModalState>({ kind: 'closed' });
   // tab で fetch URL を切り替え (SWR は key 別に独立 cache、 切替時に再 fetch)
   const fetchUrl =
     tab === 'staffroom'
@@ -108,6 +135,11 @@ export function PublicTimelineRail({ selfUserId }: PublicTimelineRailProps) {
       ? 'まだ公開された投稿はありません'
       : 'まだ投稿はありません';
 
+  const handleModalSuccess = async () => {
+    setModal({ kind: 'closed' });
+    await mutate();
+  };
+
   return (
     <aside
       className="sticky top-[104px] flex max-h-[calc(100vh-128px)] flex-col overflow-hidden rounded-[14px] border border-vn-border bg-white shadow-[0_4px_16px_rgba(15,23,42,0.04)]"
@@ -144,7 +176,10 @@ export function PublicTimelineRail({ selfUserId }: PublicTimelineRailProps) {
           </p>
         )}
         {data && data.entries.length === 0 && (
-          <p className="px-5 py-6 text-[13px] leading-[1.6] text-slate-400">
+          <p
+            className="px-5 py-6 text-[13px] leading-[1.6] text-slate-400"
+            data-testid="public-timeline-rail-empty"
+          >
             {emptyMessage}
           </p>
         )}
@@ -156,11 +191,43 @@ export function PublicTimelineRail({ selfUserId }: PublicTimelineRailProps) {
                 entry={e}
                 isMine={e.userId === selfUserId}
                 onToggleKnowledge={toggleKnowledgeReaction}
+                onEdit={(id) => setModal({ kind: 'edit', entryId: id })}
+                onDelete={(id) =>
+                  setModal({ kind: 'confirm-delete', entryId: id })
+                }
               />
             ))}
           </ul>
         )}
       </div>
+
+      <Modal
+        open={modal.kind === 'edit'}
+        onClose={() => setModal({ kind: 'closed' })}
+        title="記録の編集"
+      >
+        {modal.kind === 'edit' && (
+          <EditEntryModalBody
+            entryId={modal.entryId}
+            onSuccess={handleModalSuccess}
+            onCancel={() => setModal({ kind: 'closed' })}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={modal.kind === 'confirm-delete'}
+        onClose={() => setModal({ kind: 'closed' })}
+        title="記録を削除しますか?"
+      >
+        {modal.kind === 'confirm-delete' && (
+          <ConfirmDeleteModalBody
+            entryId={modal.entryId}
+            onSuccess={handleModalSuccess}
+            onCancel={() => setModal({ kind: 'closed' })}
+          />
+        )}
+      </Modal>
     </aside>
   );
 }
@@ -198,10 +265,15 @@ function RailItem({
   entry,
   isMine,
   onToggleKnowledge,
+  onEdit,
+  onDelete,
 }: {
   entry: RailEntry;
   isMine: boolean;
   onToggleKnowledge: (entryId: string, next: boolean) => void | Promise<void>;
+  // 編集/削除コールバック (isMine=true のときのみ kebab メニューから発火)
+  onEdit: (entryId: string) => void;
+  onDelete: (entryId: string) => void;
 }) {
   const author = entry.authorNickname ?? entry.authorName ?? '';
   const kind = entry.kind ?? 'diary';
@@ -223,29 +295,38 @@ function RailItem({
       className="px-5 py-3.5"
       data-testid={`public-timeline-rail-item-${entry.id}`}
     >
-      {/* 1 行目: 投稿者 + 時刻 + kind + mood (EntryCard と同じ順序)
+      {/* 1 行目: 投稿者 + 時刻 + kind + mood (左) / 3 点リーダー (右、 isMine のみ)
           chimo 2026-05-20 font-tune: 投稿者 600/slate-600、 メタ (時刻) 400/slate-400 */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-        <span className="font-semibold text-slate-600">{author}</span>
-        <time
-          dateTime={new Date(entry.createdAt).toISOString()}
-          className="font-normal text-slate-400"
-        >
-          {formatRelativeTime(entry.createdAt)}
-        </time>
-        <span className="inline-flex items-center gap-1 rounded-full bg-vn-muted-bg px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-          <KindIcon size={10} strokeWidth={1.75} aria-hidden />
-          {kindLabel}
-        </span>
-        {MoodIcon && (
-          <MoodIcon
-            size={14}
-            className="text-slate-400"
-            aria-label={moodLabel ?? 'mood'}
-            data-testid={`public-timeline-rail-mood-${entry.id}`}
+      <header className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+          <span className="font-semibold text-slate-600">{author}</span>
+          <time
+            dateTime={new Date(entry.createdAt).toISOString()}
+            className="font-normal text-slate-400"
+          >
+            {formatRelativeTime(entry.createdAt)}
+          </time>
+          <span className="inline-flex items-center gap-1 rounded-full bg-vn-muted-bg px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+            <KindIcon size={10} strokeWidth={1.75} aria-hidden />
+            {kindLabel}
+          </span>
+          {MoodIcon && (
+            <MoodIcon
+              size={14}
+              className="text-slate-400"
+              aria-label={moodLabel ?? 'mood'}
+              data-testid={`public-timeline-rail-mood-${entry.id}`}
+            />
+          )}
+        </div>
+        {isMine && (
+          <RailItemMenu
+            entryId={entry.id}
+            onEdit={() => onEdit(entry.id)}
+            onDelete={() => onDelete(entry.id)}
           />
         )}
-      </div>
+      </header>
       {/* 2 行目: content (chimo 2026-05-21: 字数制限を廃止して全文表示。 改行も尊重) */}
       <p className="mt-1.5 whitespace-pre-wrap text-[13px] font-normal leading-[1.7] text-slate-700">
         {entry.content}
@@ -305,5 +386,204 @@ function RailItem({
         </div>
       )}
     </li>
+  );
+}
+
+// 自分の投稿カードの 3 点リーダー (chimo 2026-05-21 復元: 編集/削除導線)。
+// testid は旧 EntryCardMenu と同じパターンを踏襲 (E2E selector と互換)。
+function RailItemMenu({
+  entryId,
+  onEdit,
+  onDelete,
+}: {
+  entryId: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        aria-label="メニュー"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-testid={`entry-card-menu-button-${entryId}`}
+      >
+        <span aria-hidden="true" className="text-base leading-none">
+          ⋮
+        </span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-10 mt-1 min-w-[96px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md"
+          data-testid={`entry-card-menu-${entryId}`}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            className="block w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-100"
+            data-testid={`entry-card-menu-edit-${entryId}`}
+          >
+            編集
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="block w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+            data-testid={`entry-card-menu-delete-${entryId}`}
+          >
+            削除
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 編集モーダル中身 (chimo 2026-05-21: 旧 TimelineTab から移管)。
+// 既存 entry の詳細を fetch → EntryForm の mode='edit' に流す。
+function EditEntryModalBody({
+  entryId,
+  onSuccess,
+  onCancel,
+}: {
+  entryId: string;
+  onSuccess: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const { data, error, isLoading } = useSWR(
+    `/api/private/journal/entries/${entryId}`,
+    detailFetcher,
+  );
+
+  if (isLoading) {
+    return (
+      <div className="py-6 text-center">
+        <LoadingSpinner label="読み込み中" />
+      </div>
+    );
+  }
+  if (error || !data) {
+    return <ErrorMessage message="エントリの取得に失敗しました" />;
+  }
+
+  // edit 時の kind 別 tagIds 振り分け:
+  //   knowledge → knowledgeTags / それ以外 → tags (emotion_tags)
+  const tagIds =
+    data.entry.kind === 'knowledge'
+      ? data.entry.knowledgeTags?.map((t) => t.id) ?? []
+      : data.entry.tags?.map((t) => t.id) ?? [];
+
+  return (
+    <EntryForm
+      mode="edit"
+      kind={data.entry.kind}
+      initialData={{
+        id: data.entry.id,
+        kind: data.entry.kind,
+        content: data.entry.content,
+        tagIds,
+        isPublic: data.entry.isPublic,
+        mood: data.entry.mood,
+      }}
+      onSuccess={onSuccess}
+      onCancel={onCancel}
+    />
+  );
+}
+
+// 削除確認モーダル中身 (chimo 2026-05-21: 旧 TimelineTab から移管)
+function ConfirmDeleteModalBody({
+  entryId,
+  onSuccess,
+  onCancel,
+}: {
+  entryId: string;
+  onSuccess: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setError(null);
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/private/journal/entries/${entryId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        setError('削除に失敗しました');
+        return;
+      }
+      await onSuccess();
+    } catch {
+      setError('ネットワークエラーが発生しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="confirm-delete-body">
+      <p className="text-sm text-slate-700">
+        この操作は取り消せません。削除するとタイムラインとマイ記録の両方から消えます。
+      </p>
+      {error && <ErrorMessage message={error} />}
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          data-testid="confirm-delete-cancel-button"
+        >
+          キャンセル
+        </Button>
+        <Button
+          type="button"
+          variant="danger"
+          onClick={handleConfirm}
+          isLoading={isDeleting}
+          data-testid="confirm-delete-confirm-button"
+        >
+          削除する
+        </Button>
+      </div>
+    </div>
   );
 }

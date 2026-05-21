@@ -3,20 +3,12 @@
 // データ源: ai_sessions.ai_output_json (jsonb 集計、school_admin 不可視)
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { AdminLayout } from '@/shared/components/AdminLayout';
+import { DailyCountLineChart } from '@/shared/components/DailyCountLineChart';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import type { VitanotaSession } from '@/shared/types/auth';
@@ -370,57 +362,6 @@ function ScoreHistogram({
   );
 }
 
-function DailyCountLineChart({
-  data,
-  caption,
-}: {
-  data: Array<{ date: string; count: number }>;
-  caption: string;
-}) {
-  const total = data.reduce((sum, d) => sum + d.count, 0);
-  return (
-    <section>
-      <h2 className="mb-3 text-sm font-semibold text-gray-700">
-        日別利用数 (過去 30 日)
-      </h2>
-      <div className="rounded-lg border border-gray-200 bg-white p-5">
-        <p className="mb-3 text-[11px] text-gray-400">
-          {caption} · 期間合計 {total} 件
-        </p>
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart
-            data={data}
-            margin={{ top: 5, right: 16, bottom: 5, left: -16 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 11, fill: '#6b7280' }}
-              tickFormatter={(v: string) => v.slice(5)}
-            />
-            <YAxis
-              allowDecimals={false}
-              tick={{ fontSize: 11, fill: '#6b7280' }}
-            />
-            <Tooltip
-              labelFormatter={(v) => v}
-              formatter={(value: unknown) => [`${value} 件`, '利用数']}
-            />
-            <Line
-              type="monotone"
-              dataKey="count"
-              stroke="#4f46e5"
-              strokeWidth={2}
-              dot={{ r: 3, fill: '#4f46e5' }}
-              activeDot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </section>
-  );
-}
-
 export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
   const [data, setData] = useState<AiAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -479,6 +420,7 @@ export default function AiAnalyticsPage({ session }: AiAnalyticsPageProps) {
                 <>
                   <div className="space-y-8">
                   <DailyCountLineChart
+                    title="日別利用数 (過去 30 日)"
                     data={data.dailyCounts.h1}
                     caption="テキスト入力 → AI 整理 (整理ボタン)"
                   />

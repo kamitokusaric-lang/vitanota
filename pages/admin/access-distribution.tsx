@@ -9,9 +9,9 @@ import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { AdminLayout } from '@/shared/components/AdminLayout';
+import { DailyCountLineChart } from '@/shared/components/DailyCountLineChart';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
-import { SummaryCards } from '@/features/access-distribution/components/SummaryCards';
 import { HeatmapTable } from '@/features/access-distribution/components/HeatmapTable';
 import type { VitanotaSession } from '@/shared/types/auth';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
@@ -139,7 +139,34 @@ export default function AccessDistributionPage({ session }: PageProps) {
 
               {!loading && !error && data && (
                 <div className="space-y-6">
-                  <SummaryCards summary={data.summary} />
+                  {/* 折れ線グラフ群 (chimo 2026-05-21、 SummaryCards 撤去に伴い追加) */}
+                  <div className="space-y-8">
+                    <DailyCountLineChart
+                      title="総 UU (日別)"
+                      data={data.dailySeries.uu}
+                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / sessions.created_at JST date 別 distinct user_id`}
+                    />
+                    <DailyCountLineChart
+                      title="AI 整理 (H1) 利用数 (日別)"
+                      data={data.dailySeries.quickCapture}
+                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / ai_sessions WHERE type='quick_capture' の件数`}
+                    />
+                    <DailyCountLineChart
+                      title="日々ノート登録数 (日別)"
+                      data={data.dailySeries.journal}
+                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / journal_entries 合算件数 (非公開内訳はヒートマップ参照)`}
+                    />
+                    <DailyCountLineChart
+                      title="タスク操作数 (日別)"
+                      data={data.dailySeries.task}
+                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / tasks.updated_at 件数 (完了内訳はヒートマップ参照)`}
+                    />
+                    <DailyCountLineChart
+                      title="朝カード (H3-B) を見た先生数 (日別)"
+                      data={data.dailySeries.morningCard}
+                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / morning_card_events WHERE event_type='shown' のユニーク先生数`}
+                    />
+                  </div>
                   <HeatmapTable
                     heatmap={data.uuHeatmap}
                     title="UU (ログイン教員数)"

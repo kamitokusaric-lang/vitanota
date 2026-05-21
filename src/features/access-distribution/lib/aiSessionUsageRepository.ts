@@ -6,7 +6,7 @@
 import { sql } from 'drizzle-orm';
 import { withSystemAdmin } from '@/shared/lib/db';
 import { aiSessions } from '@/db/schema';
-import type { HourDateValue } from './aggregator';
+import type { DateCountValue, HourDateValue } from './aggregator';
 
 interface AiSessionTypeRow {
   type: string;
@@ -56,5 +56,27 @@ export async function getAiSessionUsageByHourDate(
       quickCapture,
       totalQuickCaptureSessions,
     };
+  });
+}
+
+// 日次 quick_capture 件数 (折れ線グラフ用)。
+export async function getDailyQuickCapture(
+  adminUserId: string,
+  startUtc: Date,
+  endUtcExclusive: Date,
+): Promise<DateCountValue[]> {
+  return withSystemAdmin(adminUserId, async (tx) => {
+    const result = await tx.execute(sql`
+      SELECT
+        TO_CHAR(${aiSessions.createdAt} AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM-DD') AS date,
+        COUNT(*)::int AS count
+      FROM ${aiSessions}
+      WHERE ${aiSessions.createdAt} >= ${startUtc}
+        AND ${aiSessions.createdAt} < ${endUtcExclusive}
+        AND ${aiSessions.type} = 'quick_capture'
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return result.rows as unknown as DateCountValue[];
   });
 }

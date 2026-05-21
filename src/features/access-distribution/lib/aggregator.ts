@@ -102,3 +102,52 @@ export function fillHeatmapWithSub(
   }
   return initial;
 }
+
+// 日次系列 (折れ線グラフ用): { date, count } の配列
+export interface DateCountValue {
+  date: string;
+  count: number;
+}
+
+// 期間内の JST 日付すべてを count=0 で初期化
+export function initializeDailySeries(
+  startUtc: Date,
+  endUtcExclusive: Date,
+): DateCountValue[] {
+  const startJst = new Date(startUtc.getTime() + JST_OFFSET_MS);
+  const endJst = new Date(endUtcExclusive.getTime() + JST_OFFSET_MS);
+  const cursor = new Date(
+    Date.UTC(
+      startJst.getUTCFullYear(),
+      startJst.getUTCMonth(),
+      startJst.getUTCDate(),
+    ),
+  );
+  const limit = new Date(
+    Date.UTC(endJst.getUTCFullYear(), endJst.getUTCMonth(), endJst.getUTCDate()),
+  );
+
+  const series: DateCountValue[] = [];
+  while (cursor < limit) {
+    series.push({
+      date: cursor.toISOString().slice(0, 10),
+      count: 0,
+    });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return series;
+}
+
+// 初期化済み日次系列に DB rows をマージ (in-place)
+export function fillDailySeries(
+  initial: DateCountValue[],
+  rows: DateCountValue[],
+): DateCountValue[] {
+  const dateIndex = new Map(initial.map((r, i) => [r.date, i]));
+  for (const row of rows) {
+    const idx = dateIndex.get(row.date);
+    if (idx === undefined) continue;
+    initial[idx]!.count = row.count;
+  }
+  return initial;
+}

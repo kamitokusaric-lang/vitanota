@@ -9,7 +9,7 @@
 import { sql } from 'drizzle-orm';
 import { withSystemAdmin } from '@/shared/lib/db';
 import { tasks } from '@/db/schema';
-import type { HourDateValueWithSub } from './aggregator';
+import type { DateCountValue, HourDateValueWithSub } from './aggregator';
 
 export async function getTaskUsageByHourDate(
   adminUserId: string,
@@ -85,5 +85,27 @@ export async function getTaskUsageByHourDate(
       totalTouches: totals?.total_touches ?? 0,
       totalCompletes: totals?.total_completes ?? 0,
     };
+  });
+}
+
+// 日次 タスク touch 件数 (折れ線グラフ用、 updated_at ベース)。
+// 折れ線は touch のみ。完了 (completed_at) はヒートマップ側で確認する。
+export async function getDailyTaskTouches(
+  adminUserId: string,
+  startUtc: Date,
+  endUtcExclusive: Date,
+): Promise<DateCountValue[]> {
+  return withSystemAdmin(adminUserId, async (tx) => {
+    const result = await tx.execute(sql`
+      SELECT
+        TO_CHAR(${tasks.updatedAt} AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM-DD') AS date,
+        COUNT(*)::int AS count
+      FROM ${tasks}
+      WHERE ${tasks.updatedAt} >= ${startUtc}
+        AND ${tasks.updatedAt} < ${endUtcExclusive}
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return result.rows as unknown as DateCountValue[];
   });
 }

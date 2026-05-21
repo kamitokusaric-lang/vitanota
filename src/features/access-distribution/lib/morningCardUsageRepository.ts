@@ -12,7 +12,7 @@
 import { sql } from 'drizzle-orm';
 import { withSystemAdmin } from '@/shared/lib/db';
 import { morningCardEvents } from '@/db/schema';
-import type { HourDateValue } from './aggregator';
+import type { DateCountValue, HourDateValue } from './aggregator';
 
 interface ShownByHourRow {
   date: string;
@@ -84,5 +84,28 @@ export async function getMorningCardUsageByHourDate(
       candidateClickedUu: uuByType.get('candidate_clicked') ?? 0,
       candidateStatusChangedUu: uuByType.get('candidate_status_changed') ?? 0,
     };
+  });
+}
+
+// 日次 朝カード shown UU (折れ線グラフ用): JST date 単位の COUNT(DISTINCT user_id)。
+// 時間別 shown UU の sum は同一先生が複数 hour に出ると重複するため、日次は別途取り直す。
+export async function getDailyMorningCardShownUu(
+  adminUserId: string,
+  startUtc: Date,
+  endUtcExclusive: Date,
+): Promise<DateCountValue[]> {
+  return withSystemAdmin(adminUserId, async (tx) => {
+    const result = await tx.execute(sql`
+      SELECT
+        TO_CHAR(${morningCardEvents.createdAt} AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM-DD') AS date,
+        COUNT(DISTINCT ${morningCardEvents.userId})::int AS count
+      FROM ${morningCardEvents}
+      WHERE ${morningCardEvents.createdAt} >= ${startUtc}
+        AND ${morningCardEvents.createdAt} < ${endUtcExclusive}
+        AND ${morningCardEvents.eventType} = 'shown'
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return result.rows as unknown as DateCountValue[];
   });
 }

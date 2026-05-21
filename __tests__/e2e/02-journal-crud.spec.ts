@@ -30,8 +30,10 @@ test.describe('日誌エントリ CRUD', () => {
     // Modal が閉じる
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
-    // 日々ノートタブ + マイノート子タブ で自分の投稿を確認
-    await page.goto('/dashboard?tab=notes');
+    // 右レーンの「マイノート」 subtab で自分の投稿を確認
+    // (staffroom subtab は Cache-Control public で browser heuristic キャッシュ
+    //  に当たる可能性があり、 mine endpoint = no-store の方が確実)
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
     await expect(page.getByText('今日の授業の振り返り')).toBeVisible();
   });
 

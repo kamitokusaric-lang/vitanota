@@ -79,10 +79,10 @@ export default function AccessDistributionPage({ session }: PageProps) {
               <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">アクセス分布</h1>
                 <p className="mt-2 text-sm text-gray-600">
-                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ)、 日々ノート登録、 タスク操作、 朝カード (H3-B) の利用を時間帯×日付ヒートマップで可視化。
+                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ)、 日々ノート登録、 タスク操作、 朝カード (H3-B) ボタンクリックを時間帯×日付ヒートマップで可視化。
                 </p>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数 / 日々ノートは journal_entries 件数 (括弧内は非公開) / タスクは tasks.updated_at 件数 (括弧内は完了) / 朝カードは morning_card_events shown 件数
+                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数 / 日々ノートは journal_entries 件数 (括弧内は非公開) / タスクは tasks.updated_at 件数 (括弧内は完了) / 朝カードは morning_card_events 候補ボタンクリック件数 (candidate_clicked + candidate_status_changed)
                 </p>
               </div>
 
@@ -162,9 +162,9 @@ export default function AccessDistributionPage({ session }: PageProps) {
                       caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / tasks.updated_at 件数 (完了内訳はヒートマップ参照)`}
                     />
                     <DailyCountLineChart
-                      title="朝カード (H3-B) を見た先生数 (日別)"
+                      title="朝カード (H3-B) ボタンクリック件数 (日別)"
                       data={data.dailySeries.morningCard}
-                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / morning_card_events WHERE event_type='shown' のユニーク先生数`}
+                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / morning_card_events WHERE event_type IN ('candidate_clicked', 'candidate_status_changed') の COUNT(*)`}
                     />
                   </div>
                   <HeatmapTable
@@ -190,8 +190,8 @@ export default function AccessDistributionPage({ session }: PageProps) {
                   />
                   <HeatmapTable
                     heatmap={data.morningCardHeatmap}
-                    title="朝カード (H3-B) を見た先生数"
-                    caption="morning_card_events WHERE event_type='shown' のユニーク先生数 (時間帯別、 同一先生は 1 カウント)"
+                    title="朝カード (H3-B) ボタンクリック件数"
+                    caption="morning_card_events WHERE event_type IN ('candidate_clicked', 'candidate_status_changed') の COUNT(*) (時間帯別、 同一先生の複数回押下も積算)"
                   />
                   <p className="text-[11px] text-gray-400">
                     生成: {new Date(data.meta.generatedAt).toLocaleString('ja-JP')} / {data.meta.periodDays} 日間

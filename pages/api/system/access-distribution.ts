@@ -30,7 +30,7 @@ import {
 } from '@/features/access-distribution/lib/taskUsageRepository';
 import {
   getMorningCardUsageByHourDate,
-  getDailyMorningCardShownUu,
+  getDailyMorningCardClicks,
 } from '@/features/access-distribution/lib/morningCardUsageRepository';
 import type { AccessDistributionResponse } from '@/features/access-distribution/types';
 import { logger } from '@/shared/lib/logger';
@@ -129,7 +129,7 @@ export default async function handler(
       getDailyQuickCapture(session.user.userId, startUtc, endUtcExclusive),
       getDailyJournalEntries(session.user.userId, startUtc, endUtcExclusive),
       getDailyTaskTouches(session.user.userId, startUtc, endUtcExclusive),
-      getDailyMorningCardShownUu(
+      getDailyMorningCardClicks(
         session.user.userId,
         startUtc,
         endUtcExclusive,
@@ -155,7 +155,7 @@ export default async function handler(
     );
     const morningCardHeatmap = fillHeatmap(
       initializeHeatmap(startUtc, endUtcExclusive),
-      morningCard.shown,
+      morningCard.clicks,
     );
 
     // 折れ線グラフ用の日次系列 (期間内すべての JST 日付を 0 埋め)

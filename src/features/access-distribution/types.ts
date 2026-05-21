@@ -48,7 +48,7 @@ export interface AccessDistributionDailySeries {
   quickCapture: DailySeriesPoint[]; // H1 quick_capture 件数
   journal: DailySeriesPoint[]; // 日々ノート合算件数
   task: DailySeriesPoint[]; // タスク touch 件数 (updated_at)
-  morningCard: DailySeriesPoint[]; // 朝カード shown UU
+  morningCard: DailySeriesPoint[]; // 朝カード 候補ボタンクリック件数 (COUNT(*), candidate_clicked + candidate_status_changed)
 }
 
 export interface AccessDistributionResponse {
@@ -56,7 +56,7 @@ export interface AccessDistributionResponse {
   quickCaptureHeatmap: HeatmapRow[]; // H1
   journalHeatmap: HeatmapRow[]; // 合算 (hours) + 非公開件数 (subHours)
   taskHeatmap: HeatmapRow[]; // touch 合算 (hours) + 完了件数 (subHours)
-  morningCardHeatmap: HeatmapRow[]; // 朝カード「shown」 のみ、 H3-B (chimo 2026-05-20)
+  morningCardHeatmap: HeatmapRow[]; // 朝カード 候補ボタンクリック件数 (COUNT(*), candidate_clicked + candidate_status_changed)、 H3-B
   dailySeries: AccessDistributionDailySeries; // 5 指標の折れ線グラフ用日次系列
   summary: AccessDistributionSummary;
   meta: AccessDistributionMeta;

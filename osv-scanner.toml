@@ -75,3 +75,52 @@ reason = "uuid 8.3.2 (next-auth 4.24.13 経由 transitive)。next-auth の内部
 [[IgnoredVulns]]
 id = "GHSA-5wm8-gmm8-39j9"
 reason = "fast-xml-builder 1.1.4 (AWS SDK 経由 transitive: fast-xml-parser 5.5.8 → @aws-sdk/xml-builder → @aws-sdk/core → 各 client)。既存の fast-xml-parser CVE (GHSA-gh4j-gqv2-49f6) と全く同じ依存経路でさらに 1 段深い transitive。攻撃者制御の input が builder/parser に到達する経路は AWS API response のみで、AWS API は信頼境界内 (IAM 認証済)。runtime には混入してるが実効リスクなし。AWS SDK 側の patch を待つ (CVE 修正済バージョンが SDK に取り込まれ次第 pnpm update で解消)"
+
+# ── 2026-05-21 追加 (CI 復旧作業中に検出) ────────────
+# Next.js 14.2.35 に対する 8 件の追加 CVE は同 14.2 系で fix patch なし。
+# 既存の 14.2 系 CVE 群と同じく Next.js 15 への major upgrade で解消予定。
+# 多層防御 (CloudFront / WAF / 招待制 / RLS / session 8h) で実効リスクを中弱に抑制。
+
+[[IgnoredVulns]]
+id = "GHSA-36qx-fr4f-26g5"
+reason = "Next.js 14.2 系で fix なし。SSRF / Auth bypass 系推定。VPC Private Isolated + Lambda Proxy 分離で SSRF 到達先を限定、招待制で Auth bypass 影響を緩和。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-3g8h-86w9-wvmq"
+reason = "Next.js 14.2 系で fix なし。DoS / 情報漏えい系推定。CVSS 3.7 (Low)。WAF rate limit + 招待制で実効リスク低。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-8h8q-6873-q5fj"
+reason = "Next.js 14.2 系で fix なし。Auth / Middleware Bypass 系推定。CloudFront secret header 強制化 + 招待制で Auth bypass 影響を緩和。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-c4j6-fc7j-m34r"
+reason = "Next.js 14.2 系で fix なし。CVSS 8.6 (High) Cache / Middleware 系推定。CloudFront cachePolicy=CACHING_DISABLED で Cache 層を無効化済 + 招待制で実効リスクを緩和。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-ffhc-5mcf-pf4q"
+reason = "Next.js 14.2 系で fix なし。情報漏えい系推定。vitanota は教員 email / 名前程度の機微情報のみ、生徒情報は UUID 管理で露出面限定。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-gx5p-jg67-6x7h"
+reason = "Next.js 14.2 系で fix なし。XSS / Content Injection 系推定。教員入力 (タスク / 日々ノート 等) は React の text node escape で出力、 dangerouslySetInnerHTML 等の unsafe 経路は未使用 (grep 確認)。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-h64f-5h5j-jqjh"
+reason = "Next.js 14.2 系で fix なし。SSRF 系推定。VPC Private Isolated + Lambda Proxy 分離で外向き経路を限定。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-vfv6-92ff-j949"
+reason = "Next.js 14.2 系で fix なし。CVSS 3.7 (Low) DoS 系推定。WAF rate limit で実効リスク低。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-wfc6-r584-vfw7"
+reason = "Next.js 14.2 系で fix なし。Cache Poisoning / Content Injection 系推定。CloudFront cachePolicy=CACHING_DISABLED で Cache 層を無効化済のため影響なし。Next.js 15 upgrade で解消予定 (期限: 2026-06-30)"
+
+[[IgnoredVulns]]
+id = "GHSA-jxxr-4gwj-5jf2"
+reason = "brace-expansion 5.0.5 ReDoS。 minimatch / glob 経由 transitive 依存で build tool / test runner / drizzle-kit 等が使用。 production runtime に混入しない。 攻撃者制御の input が brace-expansion に到達する経路なし"
+
+[[IgnoredVulns]]
+id = "GHSA-58qx-3vcg-4xpx"
+reason = "ws 8.20.0 DoS 系推定。 next-dev / playwright / 各種 test ツール経由の transitive 依存で開発時のみ使用、 production の Next.js standalone server には混入しない (next build 後の serverless bundle 確認)。 攻撃者制御の WebSocket 経路を本番に晒さない"

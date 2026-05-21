@@ -84,15 +84,19 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
 
 function QuickRecordActions({
   onPick,
+  testIdPrefix = 'quick-record',
 }: {
   onPick: (kind: JournalEntryKind) => void;
+  // chimo 2026-05-21: narrow / xl の 2 箇所に同コンポーネントを置くため
+  // testId を出し分け可能にする (Playwright strict mode の重複検出回避)。
+  testIdPrefix?: string;
 }) {
   // chimo 2026-05-21: 「日誌 / ナレッジ / つぶやき」 を「タスクを手動で追加する」 と
   //   同じ indigo pill に統一 (= action 系は indigo / 表示系は slate の使い分け)。
   return (
     <div
       className="mb-3 flex flex-wrap items-center gap-2"
-      data-testid="quick-record-actions"
+      data-testid={`${testIdPrefix}-actions`}
     >
       <span className="text-[13px] font-bold text-slate-500">今日の記録</span>
       {RECORD_KINDS.map(({ kind, label }) => (
@@ -100,7 +104,7 @@ function QuickRecordActions({
           key={kind}
           type="button"
           onClick={() => onPick(kind)}
-          data-testid={`quick-record-${kind}`}
+          data-testid={`${testIdPrefix}-${kind}`}
           className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
         >
           {label}
@@ -122,6 +126,8 @@ export default function DashboardPage({
   const [entryModal, setEntryModal] = useState<
     { open: false } | { open: true; kind: JournalEntryKind }
   >({ open: false });
+  // narrow (< xl) 用の日々ノートモーダル状態 (chimo 2026-05-21)
+  const [noteRailModalOpen, setNoteRailModalOpen] = useState(false);
 
   const handleKindPick = (kind: JournalEntryKind) => {
     setEntryModal({ open: true, kind });
@@ -133,19 +139,68 @@ export default function DashboardPage({
     tweet: '軽いつぶやき',
   };
 
-  const handleEntrySuccess = async () => {
+  // create 後の SWR cache 更新。 chimo 2026-05-21: server fetch を待つと
+  // 体感ラグが出るため、 楽観的更新で新エントリを即座に右レーンへ反映し、
+  // server 整形済みデータは背後で revalidate して上書きする。
+  const handleEntrySuccess = async (
+    result?: import('@/features/journal/components/EntryForm').EntrySaveResult,
+  ) => {
     setEntryModal({ open: false });
-    // 共有タイムライン / マイ記録の SWR キャッシュを invalidate して再 fetch
-    // ($inf$ キーは matcher 関数からは届かないが、TimelineTab 子側が
-    // revalidateOnFocus / revalidateOnMount で natural に再取得する)
-    await globalMutate(
-      (key) =>
-        typeof key === 'string' &&
-        (key.startsWith('/api/private/journal/entries') ||
-          key.startsWith('/api/public/journal/entries')),
-      undefined,
-      { revalidate: true },
-    );
+
+    if (!result?.entry) {
+      void globalMutate(
+        (key) =>
+          typeof key === 'string' &&
+          (key.startsWith('/api/private/journal/entries') ||
+            key.startsWith('/api/public/journal/entries')),
+        undefined,
+        { revalidate: true },
+      );
+      return;
+    }
+
+    const optimistic = {
+      id: result.entry.id,
+      userId: result.entry.userId,
+      content: result.entry.content,
+      createdAt:
+        typeof result.entry.createdAt === 'string'
+          ? result.entry.createdAt
+          : new Date(result.entry.createdAt).toISOString(),
+      isPublic: result.entry.isPublic,
+      mood: result.entry.mood,
+      kind: result.entry.kind,
+      authorName: session.user.name,
+      authorNickname: null,
+      tags: result.tags,
+      knowledgeTags: [],
+      knowledgeReactionCount: 0,
+      hasMyKnowledgeReaction: false,
+    };
+
+    type RailCache = { entries: typeof optimistic[] } | undefined;
+    const prepend = (current: RailCache): RailCache =>
+      current
+        ? {
+            ...current,
+            entries: [
+              optimistic,
+              ...current.entries.filter((e) => e.id !== optimistic.id),
+            ],
+          }
+        : current;
+
+    // SWR key は PublicTimelineRail.tsx の RAIL_PAGE_SIZE=50 と同じ URL 文字列
+    const MINE_KEY = '/api/private/journal/entries/mine?page=1&perPage=50';
+    const STAFFROOM_KEY = '/api/public/journal/entries?page=1&perPage=50';
+
+    // revalidate: false — POST 直前に開始してた古い in-flight GET の結果で
+    // 楽観的更新が上書きされる race を避ける (chimo 2026-05-21 報告)。
+    // server 側の最新は 30s refreshInterval / revalidateOnFocus で sync される。
+    void globalMutate(MINE_KEY, prepend, { revalidate: false });
+    if (result.entry.isPublic) {
+      void globalMutate(STAFFROOM_KEY, prepend, { revalidate: false });
+    }
   };
 
   const mainTabs: TabDef[] = [
@@ -183,6 +238,22 @@ export default function DashboardPage({
             data-testid="dashboard-page"
           >
             <div className="min-w-0">
+              {/* narrow (< xl) 専用: 記録入口 pill + 日々ノートモーダル呼出ボタン。
+                  xl 以上では右レーン上部に集約 (chimo 2026-05-21) */}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:hidden">
+                <QuickRecordActions
+                  onPick={handleKindPick}
+                  testIdPrefix="narrow-quick-record"
+                />
+                <button
+                  type="button"
+                  onClick={() => setNoteRailModalOpen(true)}
+                  className="inline-flex h-9 shrink-0 items-center rounded-full border border-vn-border-strong bg-white px-4 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
+                  data-testid="dashboard-open-note-rail-modal-button"
+                >
+                  職員室ノート / マイノート
+                </button>
+              </div>
               {/* chimo 2026-05-20: タスク追加カード → 朝カードの順 (= 入口を先頭に出す) */}
               <TaskCreateTabs
                 selfUserId={session.user.userId}
@@ -201,6 +272,21 @@ export default function DashboardPage({
               <PublicTimelineRail selfUserId={session.user.userId} />
             </div>
           </div>
+
+          {/* narrow 用日々ノートモーダル (chimo 2026-05-21): xl 未満では右レーンが
+              畳まれるため、 ボタンから rail を呼び出す。 mode='modal' で
+              sticky / max-h を抑制し、 Modal の枠に表示を委ねる。 */}
+          <Modal
+            open={noteRailModalOpen}
+            onClose={() => setNoteRailModalOpen(false)}
+            title="職員室ノート / マイノート"
+            maxWidth="max-w-2xl"
+          >
+            <PublicTimelineRail
+              selfUserId={session.user.userId}
+              mode="modal"
+            />
+          </Modal>
 
           <Modal
             open={entryModal.open}

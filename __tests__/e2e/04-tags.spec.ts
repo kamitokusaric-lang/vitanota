@@ -62,8 +62,8 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await page.getByTestId('entry-form-submit-button').click();
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
-    await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
+    // 右レーンの「マイノート」 subtab で自分の投稿を確認 (mine endpoint = no-store で確実)
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
     await expect(page.getByText('うれしいことがあった')).toBeVisible();
   });
 

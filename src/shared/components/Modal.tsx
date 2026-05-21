@@ -1,6 +1,10 @@
 // 汎用モーダルダイアログ
 // backdrop クリック / Escape で閉じる
-import { useEffect, type ReactNode } from 'react';
+// chimo 2026-05-21: createPortal で document.body 直下にレンダリング。
+//   親側の backdrop-filter / overflow:hidden 等で生まれる stacking context に
+//   阻害されて sticky ヘッダがモーダル前面に被るのを防ぐ。
+import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
@@ -17,6 +21,12 @@ export function Modal({
   children,
   maxWidth = 'max-w-md',
 }: ModalProps) {
+  // SSR 安全のため、 client mount を待ってから portal を返す
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -32,9 +42,9 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={onClose}
@@ -52,6 +62,7 @@ export function Modal({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

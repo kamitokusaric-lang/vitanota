@@ -1,8 +1,11 @@
 // Step 16b - Spec 02: 日誌エントリ CRUD
 // 関連ストーリー: US-T-010 (作成) / US-T-011 (編集) / US-T-012 (削除)
 // 2026-05-18 update: /journal/* page 廃止 → /dashboard 統合に追従。
+// 2026-05-21 update: dashboard リファクタで notes メインタブ廃止、 右レーン
+//   PublicTimelineRail の subtab (職員室 / マイノート) に集約。 編集/削除は
+//   自分の投稿カード右上の kebab (3 点リーダー) から開く。
 // 投稿: QuickRecordActions の pill (quick-record-<kind>) → Modal → EntryForm
-// 表示: /dashboard?tab=notes → timeline-subtab-personal (マイノート)
+// 表示: 右レーンの public-timeline-rail-tab-mine をクリック (マイノート)
 // 編集/削除: entry-card-menu-button → menu-edit / menu-delete → Modal
 // kind は 'tweet' を使う (mood 不要 / maxLength=200 — 旧 spec の `200文字制限` assertion と整合)
 import { test, expect } from '@playwright/test';
@@ -27,9 +30,10 @@ test.describe('日誌エントリ CRUD', () => {
     // Modal が閉じる
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
-    // 日々ノートタブ + マイノート子タブ で自分の投稿を確認
-    await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
+    // 右レーンの「マイノート」 subtab で自分の投稿を確認
+    // (staffroom subtab は Cache-Control public で browser heuristic キャッシュ
+    //  に当たる可能性があり、 mine endpoint = no-store の方が確実)
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
     await expect(page.getByText('今日の授業の振り返り')).toBeVisible();
   });
 
@@ -59,8 +63,9 @@ test.describe('日誌エントリ CRUD', () => {
 
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
-    await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
+    // 非公開エントリは右レーン「マイノート」 subtab でのみ可視
+    await page.goto('/dashboard');
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
     await expect(page.getByText('非公開の日記')).toBeVisible();
   });
 
@@ -72,9 +77,9 @@ test.describe('日誌エントリ CRUD', () => {
     await page.getByTestId('entry-form-submit-button').click();
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
-    // マイノート子タブ → entry-card menu → menu-edit → 編集 Modal
-    await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
+    // 右レーンの「マイノート」 subtab → 自分の投稿の kebab → 編集
+    await page.goto('/dashboard');
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
     await expect(page.getByText('編集前の本文')).toBeVisible();
 
     await page.locator('[data-testid^="entry-card-menu-button-"]').first().click();
@@ -98,9 +103,9 @@ test.describe('日誌エントリ CRUD', () => {
     await page.getByTestId('entry-form-submit-button').click();
     await expect(page.getByTestId('entry-form')).not.toBeVisible();
 
-    // マイノート子タブ → entry-card menu → menu-delete → confirm-delete Modal
-    await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
+    // 右レーンの「マイノート」 subtab → 自分の投稿の kebab → 削除 → confirm Modal
+    await page.goto('/dashboard');
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
     await expect(page.getByText('削除予定')).toBeVisible();
 
     await page.locator('[data-testid^="entry-card-menu-button-"]').first().click();

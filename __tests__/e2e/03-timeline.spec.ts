@@ -1,6 +1,8 @@
 // Step 16b - Spec 03: 共有タイムライン (US-T-014)
 // stories.md 改訂版: 共有タイムラインはテナント内全教員の公開エントリを表示
-// 2026-05-18 update: /journal route 廃止 → /dashboard?tab=notes (子タブ staffroom が default) に追従
+// 2026-05-21 update: dashboard リファクタで notes メインタブ廃止、 右レーン
+//   PublicTimelineRail に集約。 staffroom = 職員室ノート (default 表示) /
+//   mine = マイノート (自分の公開・非公開両方)。
 import { test, expect } from '@playwright/test';
 import { SeedClient } from './helpers/seed';
 import { loginAs } from './helpers/auth';
@@ -74,9 +76,10 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, userA, tenantA.id);
-    await page.goto('/dashboard?tab=notes');
+    await page.goto('/dashboard');
 
-    await expect(page.getByTestId('timeline-list-empty')).toBeVisible();
+    // 右レーン「職員室ノート」 (default) でテナント A の公開投稿は 0 件
+    await expect(page.getByTestId('public-timeline-rail-empty')).toBeVisible();
     await expect(page.getByText('テナント B の公開投稿')).not.toBeVisible();
   });
 
@@ -100,8 +103,9 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, user, tenant.id);
-    await page.goto('/dashboard?tab=notes');
-    await page.getByTestId('timeline-subtab-personal').click();
+    // 右レーン「マイノート」 subtab で自分の公開・非公開両方を確認
+    await page.goto('/dashboard');
+    await page.getByTestId('public-timeline-rail-tab-mine').click();
 
     await expect(page.getByText('自分の公開')).toBeVisible();
     await expect(page.getByText('自分の非公開')).toBeVisible();

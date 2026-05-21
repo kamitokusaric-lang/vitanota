@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { Lightbulb } from 'lucide-react';
+import { Lightbulb, Sparkles } from 'lucide-react';
 import type {
   JournalEntryKind,
   MoodLevel,
@@ -45,6 +45,9 @@ interface RailEntry {
   knowledgeTags?: Array<{ id: string; name: string }>;
   knowledgeReactionCount?: number;
   hasMyKnowledgeReaction?: boolean;
+  // 投稿者が system_admin ロールを持つ「AI 風」投稿のとき true。 RailItem 側で
+  // 別の見た目 (AI 週次日誌 β カード) に切り替える。
+  isAiPost?: boolean;
 }
 
 interface RailResponse {
@@ -356,6 +359,21 @@ function RailItem({
   onEdit: (entryId: string) => void;
   onDelete: (entryId: string) => void;
 }) {
+  // chimo 2026-05-21: system_admin 兼任アカウントの投稿は AI 週次日誌 β カードとして
+  // 描画する。 mood / リアクション / 通常 kind バッジは出さない (踏み絵)。
+  // isMine の閲覧時も AI 風カードのまま — 投稿主 (chimo) が「教員にどう見えるか」を
+  // 本番 UI で自分で確認できる必要がある。 編集 / 削除は AiPostRailItem 内で
+  // 3 点リーダー経由で開ける。
+  if (entry.isAiPost) {
+    return (
+      <AiPostRailItem
+        entry={entry}
+        isMine={isMine}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+  }
   const author = entry.authorNickname ?? entry.authorName ?? '';
   const kind = entry.kind ?? 'diary';
   const { Icon: KindIcon, label: kindLabel } = KIND_META[kind];
@@ -476,6 +494,61 @@ function RailItem({
           )}
         </div>
       )}
+    </li>
+  );
+}
+
+// AI 週次日誌 β カード (chimo 2026-05-21)
+// system_admin 兼任アカウントの投稿だけを別カードとして描画する。
+// 通常カードと違う点: 投稿者「vitanota AI」固定、 kind バッジ → 「AI 週次日誌 β」、
+// 背景薄紫、 本文 serif、 mood / リアクションは出さない。 isMine 編集メニューは出す。
+function AiPostRailItem({
+  entry,
+  isMine,
+  onEdit,
+  onDelete,
+}: {
+  entry: RailEntry;
+  isMine: boolean;
+  onEdit: (entryId: string) => void;
+  onDelete: (entryId: string) => void;
+}) {
+  return (
+    <li
+      className="border-y border-purple-100 bg-purple-50/60 px-5 py-3.5"
+      data-testid={`public-timeline-rail-item-${entry.id}`}
+      data-ai-post="true"
+    >
+      <header className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+          <span className="font-semibold text-purple-800">vitanota AI</span>
+          <time
+            dateTime={new Date(entry.createdAt).toISOString()}
+            className="font-normal text-purple-400"
+          >
+            {formatRelativeTime(entry.createdAt)}
+          </time>
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700"
+            data-testid={`public-timeline-rail-ai-badge-${entry.id}`}
+          >
+            <Sparkles size={10} strokeWidth={1.75} aria-hidden />
+            AI 週次日誌 β
+          </span>
+        </div>
+        {isMine && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <RailItemMenu
+              entryId={entry.id}
+              onEdit={() => onEdit(entry.id)}
+              onDelete={() => onDelete(entry.id)}
+            />
+          </div>
+        )}
+      </header>
+      <p className="mt-2 whitespace-pre-wrap font-ai-card text-[14px] leading-[1.9] text-slate-800">
+        {entry.content}
+      </p>
     </li>
   );
 }

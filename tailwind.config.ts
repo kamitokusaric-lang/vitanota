@@ -61,6 +61,15 @@ const config: Config = {
           'Hiragino Sans',
           'sans-serif',
         ],
+        // AI 週次日誌 β カード本文 (Klee One: 教科書体ベース、 手書き寄りの優しい印象)。
+        // next/font/google で _app.tsx から読み込み、 CSS variable --font-ai-card に注入。
+        'ai-card': [
+          'var(--font-ai-card)',
+          '"Klee One"',
+          '"Hiragino Maru Gothic ProN"',
+          '"Hiragino Maru Gothic Pro"',
+          'sans-serif',
+        ],
       },
     },
   },

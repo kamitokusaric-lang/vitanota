@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'お知らせ管理',  href: '/admin/announcements',    matchPrefix: '/admin/announcements' },
   { label: 'AI 改善',       href: '/admin/ai-analytics',     matchPrefix: '/admin/ai-analytics' },
   { label: 'アクセス分布',  href: '/admin/access-distribution', matchPrefix: '/admin/access-distribution' },
+  { label: 'データエクスポート', href: '/admin/data-export',    matchPrefix: '/admin/data-export' },
 ];
 
 export function AdminLayout({ children, session }: AdminLayoutProps) {

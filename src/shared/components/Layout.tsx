@@ -5,7 +5,6 @@ import type { VitanotaSession } from '@/shared/types/auth';
 import { MyProfileModal } from '@/features/profile/components/MyProfileModal';
 import { AboutVitanotaModal } from '@/shared/components/AboutVitanotaModal';
 import { FeedbackFAB } from '@/features/feedback/components/FeedbackFAB';
-import { DeveloperNoticeWidget } from '@/features/dashboard/components/DeveloperNoticeWidget';
 import { canUseTeacherFeatures, canUseSystemAdminFeatures } from '@/features/auth/lib/role-helpers';
 
 interface LayoutProps {
@@ -25,7 +24,7 @@ export function Layout({ children, session }: LayoutProps) {
     <div className="min-h-screen bg-vn-bg text-slate-900">
       <nav className="fixed inset-x-0 top-0 z-10 bg-vn-header">
         <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-6 lg:px-14">
-          {/* 左: ロゴ + vitanotaとは + 開発者ノート */}
+          {/* 左: ロゴ + vitanotaとは */}
           <div className="flex items-center gap-5">
             <Link
               href="/"
@@ -43,11 +42,9 @@ export function Layout({ children, session }: LayoutProps) {
             >
               vitanotaとは
             </button>
-            <DeveloperNoticeWidget />
           </div>
 
-          {/* 右: 管理画面リンク (兼務時) + ユーザー名 (プロフィール) + ログアウト
-              (開発者ノートはヘッダーからぶら下がる「しおり」 として nav の外に配置) */}
+          {/* 右: 管理画面リンク (兼務時) + ユーザー名 (プロフィール) + ログアウト */}
           <div className="flex items-center gap-3 text-[14px]">
             {canSwitchToAdmin && (
               <Link

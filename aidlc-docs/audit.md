@@ -2485,3 +2485,22 @@ chimo は **ハイブリッド開発スタイル** を採用。
 
 **コンテキスト**: OSV-Scanner fail は backlog 方針通り「red 許容、 upgrade で一括解消」の継続を確認。 新規 2 件も devDependency only で実害なしのため同方針を適用、 backlog に経緯を残すのみで処理完了。
 
+---
+
+## UI からの開発ノート機能削除
+**タイムスタンプ**: 2026-05-25T00:00:00Z
+**ユーザー入力**: "開発ノートと管理画面のお知らせ管理機能を削除したい" → 仕切り直し "やっぱりUIから開発ノート機能だけを削除したい"
+**AI応答**: スコープを「教員ヘッダー右側に出ていた DeveloperNoticeWidget の物理削除」に縮小して実装。管理画面 `/admin/announcements`・API (`/api/announcements`, `/api/system/announcements/*`)・DB (`announcements` テーブル / migration 0035)・Drizzle schema・Zod schema・テストは温存し、ついで掃除はしない (memory [[feedback_no_extra_cleanup]])。
+
+**変更内容**:
+- `src/features/dashboard/components/DeveloperNoticeWidget.tsx` を `git rm` で物理削除
+- `src/shared/components/Layout.tsx` から import (旧 L8)・配置 (旧 L46)・該当コメント 2 箇所 (旧 L28・L49-50) を除去
+
+**検証**:
+- `pnpm tsc --noEmit` クリア (出力なし = エラー 0)
+- `grep -rn "DeveloperNoticeWidget|開発者ノート|開発ノート"` で残存参照ゼロ (audit / MEMORY 除く)
+
+**ブランチ**: `feature/remove-developer-notice-widget` を main から派生 (memory [[feedback_branch_per_feature]])。post-mvp-backlog.md の dirty (別系統の OSV update WIP) は引き続き持ち越し、本 PR には含めない。commit / push / PR 作成タイミングは chimo の明示指示まで保留 (memory [[feedback_commit_push_timing]] [[feedback_local_check_before_commit]])。
+
+**コンテキスト**: 削除対象は教員側に見えていた「ヘッダーぶら下がりのしおり Widget」のみ。投稿動線 (管理画面) と読み取り API は残存するため、DB データはアクセス手段を失った状態で温存される。将来全廃する場合は drop migration + API/管理画面削除の別タスクとして扱う。
+

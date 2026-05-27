@@ -381,7 +381,7 @@ export function EntryForm({
                   <div
                     role="group"
                     aria-label="今の気持ちは？"
-                    className="absolute left-px right-px top-px z-10 flex flex-wrap items-center gap-1.5 rounded-t-md bg-white px-2 py-1.5"
+                    className="absolute left-px right-px top-px z-10 flex flex-wrap items-center gap-1.5 rounded-t-md bg-vn-muted-bg px-2 py-1.5"
                     data-testid="entry-form-mood-picker"
                   >
                       <span className="mr-1 text-xs font-medium text-gray-700">
@@ -398,7 +398,7 @@ export function EntryForm({
                             onClick={() => handleMoodPick(opt.value)}
                             aria-label={opt.label}
                             aria-pressed={isSelected}
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm transition-colors ${
+                            className={`inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-sm transition-colors ${
                               isSelected
                                 ? selectedClass
                                 : 'border-vn-border bg-white text-gray-500 hover:border-gray-400 hover:text-gray-700'

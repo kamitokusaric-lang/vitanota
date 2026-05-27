@@ -11,7 +11,11 @@
 
 ## 未解決バグ
 
-(現在なし)
+### 🟢 低: 日誌 / つぶやき / ナレッジ作成モーダルの textarea を広げるとモーダルが閉じる
+- **発見日**: 2026-05-21 / chimo 報告
+- **現状**: 日誌・つぶやき・ナレッジの新規作成モーダル内の textarea (本文入力欄) の右下 resize handle をドラッグして広げると、モーダル本体が消えてしまう (書きかけ本文も失われる)
+- **影響**: 長文を書きたいときに入力欄を広げる動作がそのまま離脱事故になる。ただし「広げない」で回避可能、頻度は低と推定
+- **対策**: 未着手。再現確認 → 原因特定 (resize 中の pointer event がモーダル outside click 判定に拾われている可能性が一つの仮説、 要コード確認) → 修正
 
 ---
 
@@ -264,6 +268,18 @@
 - **対策**: 各 feature の component / lib に unit test 追加 → 段階的に threshold を 80/70/80/80 (or それ以上) に戻す
 - **暫定下げの注意**: lines/statements 40 は CI 値ぴったり (margin 0.38)、 test が 1 件減る or 0% file が増えると即 fail。 新 PR で UI 追加するときは同時に最低限の render test を入れる運用が望ましい
 - **着手判断**: β ローンチ後の安定期、 coverage 厳守ポリシー復元
+
+### 🟢 低: GitHub Actions の Node.js 20 actions を Node.js 24 対応版へ更新
+- **発見日**: 2026-05-25 / 開発者ノート Widget 削除 deploy 中の workflow warning で検出
+- **期限**: 2026-09-16 (Node.js 20 が GitHub Actions runner から削除される日付)。 2026-06-02 以降は強制的に Node.js 24 で実行される (= 互換性問題発生の可能性)
+- **対象 actions** (deploy.yml で使用、 pinned SHA で固定中):
+  - `actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11`
+  - `aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076`
+  - `aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a`
+- **対策**: 各 action の Node.js 24 対応版に bump (SHA pin は維持)。 ci.yml 側も同様に使われていないか同時確認
+- **検証手順**: `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` を workflow env に一時設定して dry run で互換性検証 → OK なら SHA bump
+- **緊急回避**: 万が一 Node.js 24 移行で死んだら `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true` で一時的に opt-out 可 (短期しのぎのみ、 2026-09-16 までに恒久対応)
+- **着手判断**: Next.js 15 upgrade と独立、 ci.yml fix の延長で同時にやるのが筋
 
 ### 🟢 低: E2E test (Playwright) の継続的整備 (2026-05-18 ほぼ resolve)
 - **発見日**: 2026-05-04 (fix/ci-green 着手中、ローカル実走 16 failed / 10 passed を確認)

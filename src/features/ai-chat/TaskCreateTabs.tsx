@@ -36,7 +36,7 @@ export function TaskCreateTabs({
             type="button"
             onClick={() => setActive('manual')}
             data-testid="task-create-tabs-to-manual"
-            className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
+            className="text-[13px] font-medium text-indigo-600 underline underline-offset-2 transition-colors hover:text-indigo-800"
           >
             タスクを手動で追加する
           </button>
@@ -56,7 +56,7 @@ export function TaskCreateTabs({
             type="button"
             onClick={() => setActive('ai')}
             data-testid="task-create-tabs-to-ai"
-            className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
+            className="text-[13px] font-medium text-indigo-600 underline underline-offset-2 transition-colors hover:text-indigo-800"
           >
             タスクをAIで整理する
           </button>

@@ -1,13 +1,20 @@
-// 投稿に対するナレッジリアクション (1 ユーザー × 1 投稿、toggle)
-//   POST   /api/private/journal/entries/:id/knowledge-reaction → 自分の reaction ON
-//   DELETE /api/private/journal/entries/:id/knowledge-reaction → 自分の reaction OFF
+// 投稿カードのリアクション 3 種類 (knowledge / appreciation / endorsement) の toggle endpoint
+//   POST   /api/private/journal/entries/:id/reactions       body { type } → ON
+//   DELETE /api/private/journal/entries/:id/reactions?type=... → OFF
 //
-// 自分の投稿への reaction は 403 (= 「他の人がナレッジと感じた」場合のみ)
+// 2026-05-27 (H9 検証):
+//   - 既存 knowledge-reaction.ts を generalize、 reaction_type 列に対応
+//   - **自分の投稿への reaction も許可** (= セルフ労い動線、 旧 self-block 撤廃)
+//   - 1 ユーザー × 1 投稿 × 1 reaction_type で 1 行、 3 種別とも独立 toggle
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { and, eq } from 'drizzle-orm';
 import { requireAuth, pickDbRole } from '@/features/journal/lib/apiHelpers';
 import { withTenantUser } from '@/shared/lib/db';
 import { journalEntries, journalKnowledgeReactions } from '@/db/schema';
+import {
+  journalReactionTypeSchema,
+  type JournalReactionType,
+} from '@/features/journal/schemas/journal';
 import { logger } from '@/shared/lib/logger';
 
 export default async function handler(
@@ -23,10 +30,20 @@ export default async function handler(
   }
 
   if (req.method === 'POST') {
-    return handleAdd(res, ctx, entryId);
+    const parsed = journalReactionTypeSchema.safeParse(
+      (req.body ?? {})?.type,
+    );
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'INVALID_REACTION_TYPE' });
+    }
+    return handleAdd(res, ctx, entryId, parsed.data);
   }
   if (req.method === 'DELETE') {
-    return handleRemove(res, ctx, entryId);
+    const parsed = journalReactionTypeSchema.safeParse(req.query.type);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'INVALID_REACTION_TYPE' });
+    }
+    return handleRemove(res, ctx, entryId, parsed.data);
   }
   res.setHeader('Allow', 'POST, DELETE');
   return res.status(405).end();
@@ -36,6 +53,7 @@ async function handleAdd(
   res: NextApiResponse,
   ctx: { tenantId: string; userId: string; roles: string[] },
   entryId: string,
+  type: JournalReactionType,
 ) {
   try {
     const result = await withTenantUser(
@@ -43,9 +61,9 @@ async function handleAdd(
       ctx.userId,
       pickDbRole(ctx),
       async (tx) => {
-        // entry の存在 + 自分の投稿でないことを確認
+        // entry の存在確認のみ (自分の投稿への reaction も許可)
         const [entry] = await tx
-          .select({ userId: journalEntries.userId })
+          .select({ id: journalEntries.id })
           .from(journalEntries)
           .where(
             and(
@@ -54,7 +72,6 @@ async function handleAdd(
             ),
           );
         if (!entry) return { status: 404 as const };
-        if (entry.userId === ctx.userId) return { status: 403 as const };
 
         // reaction を INSERT (重複は ON CONFLICT で無視)
         await tx
@@ -63,6 +80,7 @@ async function handleAdd(
             journalEntryId: entryId,
             userId: ctx.userId,
             tenantId: ctx.tenantId,
+            reactionType: type,
           })
           .onConflictDoNothing();
         return { status: 201 as const };
@@ -72,15 +90,9 @@ async function handleAdd(
     if (result.status === 404) {
       return res.status(404).json({ error: 'ENTRY_NOT_FOUND' });
     }
-    if (result.status === 403) {
-      return res.status(403).json({
-        error: 'CANNOT_REACT_TO_OWN_ENTRY',
-        message: '自分の投稿にはリアクションできません',
-      });
-    }
     return res.status(201).end();
   } catch (err) {
-    logger.error({ event: 'knowledge-reaction.add.error', err });
+    logger.error({ event: 'journal-reaction.add.error', err, type });
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 }
@@ -89,6 +101,7 @@ async function handleRemove(
   res: NextApiResponse,
   ctx: { tenantId: string; userId: string; roles: string[] },
   entryId: string,
+  type: JournalReactionType,
 ) {
   try {
     await withTenantUser(
@@ -102,13 +115,14 @@ async function handleRemove(
             and(
               eq(journalKnowledgeReactions.journalEntryId, entryId),
               eq(journalKnowledgeReactions.userId, ctx.userId),
+              eq(journalKnowledgeReactions.reactionType, type),
             ),
           );
       },
     );
     return res.status(204).end();
   } catch (err) {
-    logger.error({ event: 'knowledge-reaction.remove.error', err });
+    logger.error({ event: 'journal-reaction.remove.error', err, type });
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 }

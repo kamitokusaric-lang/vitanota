@@ -73,6 +73,16 @@ export const morningCardEventTypeEnum = pgEnum('morning_card_event_type', [
   'candidate_status_changed',
 ]);
 
+// H9 検証 (2026-05-27): 投稿カードの reaction 種別 (migration 0046)
+//   knowledge    : 参考になった (旧「ナレッジリアクション」, 既存データはこれ)
+//   appreciation : お疲れ様です
+//   endorsement  : すてきです
+export const journalReactionTypeEnum = pgEnum('journal_reaction_type', [
+  'knowledge',
+  'appreciation',
+  'endorsement',
+]);
+
 // ── tenants ────────────────────────────────────────────────────
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -596,9 +606,11 @@ export const journalEntryKnowledgeTags = pgTable(
   }),
 );
 
-// ── journal_knowledge_reactions (migration 0033) ───────────────
-// 投稿に対する「ナレッジリアクション」。1 ユーザー × 1 投稿 で 1 リアクション。
-// 自分の投稿への reaction は API 層で 403 (DB 制約なし)。
+// ── journal_knowledge_reactions (migration 0033 → 0046 で 3 種化) ───────────────
+// 投稿カードの reaction テーブル。1 ユーザー × 1 投稿 × 1 reaction_type で 1 行。
+// 自分の投稿への reaction も許可 (2026-05-27: API self-block を撤廃、 セルフ労い動線)。
+// テーブル名は歴史的経緯で knowledge_reactions のまま (rename は破壊的なため)、
+//   reaction_type 列で複数種別を表現する。
 export const journalKnowledgeReactions = pgTable(
   'journal_knowledge_reactions',
   {
@@ -611,10 +623,15 @@ export const journalKnowledgeReactions = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
+    reactionType: journalReactionTypeEnum('reaction_type')
+      .notNull()
+      .default('knowledge'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.journalEntryId, table.userId] }),
+    pk: primaryKey({
+      columns: [table.journalEntryId, table.userId, table.reactionType],
+    }),
     entryIdx: index('journal_knowledge_reactions_entry_idx').on(
       table.journalEntryId,
     ),

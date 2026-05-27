@@ -1,15 +1,16 @@
-// /dashboard - 統合ダッシュボード (大タブ切替: タスクボード / 日々ノート / 学校全体の温度)
+// /dashboard - 統合ダッシュボード (大タブ切替: タスクボード / マイレポート / 学校レポート)
 // 大タブはシンプルな underline スタイル (Tabs default variant)
 // 各タブ内の構造:
 //   - タスクボード: デフォルト「自分」フィルタ、期限早い順、今日期限赤マーク
-//   - 日々ノート: 投稿フォーム sticky + 子タブ「みんなの投稿 / わたしの投稿」
-//   - 学校全体の温度 (school_admin のみ)
+//   - マイレポート (準備中・disabled)
+//   - 学校レポート (school_admin のみ)
 // 全タブ共通:
-//   - H1 検証中: AI タスク整理を主役に。哲学挨拶 (PhilosophyGreeting) は一旦外し、
-//     3 種別の投稿入口は右上の小さい補助導線 (pill) に縮約。
-//   - ピルクリックで Modal が開き、EntryForm に kind pre-set 状態で投稿できる
+//   - H6/H8/H9 検証中 (2026-05-27): 投稿入口を「ひとこと残す」単一 CTA に統合。
+//     旧 3 種別 (日誌 / ナレッジ / つぶやき) は撤去、 新規投稿は kind='tweet' 固定。
+//     CTA クリックで Modal が開き、 EntryForm が default 'tweet' で起動する。
 import { useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { PenLine } from 'lucide-react';
 import { eq } from 'drizzle-orm';
 import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { isAiChatEnabledForTenant } from '@/features/ai-chat/featureFlag';
@@ -33,10 +34,7 @@ import {
   pickRandomPromptFor,
 } from '@/features/journal/lib/mood-options';
 import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
-import type {
-  JournalEntryKind,
-  MoodLevel,
-} from '@/features/journal/schemas/journal';
+import type { MoodLevel } from '@/features/journal/schemas/journal';
 import type { VitanotaSession } from '@/shared/types/auth';
 
 interface DashboardPageProps {
@@ -52,13 +50,6 @@ function ComingSoonTab({ label }: { label: string }) {
     </div>
   );
 }
-
-// H1 検証中の補助導線: 日誌・ナレッジ・つぶやきを右上に小さく寄せる
-const RECORD_KINDS: { kind: JournalEntryKind; label: string }[] = [
-  { kind: 'diary', label: '日誌' },
-  { kind: 'knowledge', label: 'ナレッジ' },
-  { kind: 'tweet', label: 'つぶやき' },
-];
 
 // H1 検証中: 教員に「AI が育つ過程である」ことを伝える注意書き。
 // 「観測されてる」感ではなく「教員 → AI」方向の関係を提示するための文言 (chimo 設計 2026-05-13)。
@@ -82,34 +73,34 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
   );
 }
 
-function QuickRecordActions({
-  onPick,
+function QuickRecordCta({
+  onClick,
   testIdPrefix = 'quick-record',
 }: {
-  onPick: (kind: JournalEntryKind) => void;
-  // chimo 2026-05-21: narrow / xl の 2 箇所に同コンポーネントを置くため
-  // testId を出し分け可能にする (Playwright strict mode の重複検出回避)。
+  onClick: () => void;
+  // narrow / xl の 2 箇所に同コンポーネントを置くため testId を出し分け
+  // (Playwright strict mode の重複検出回避)。
   testIdPrefix?: string;
 }) {
-  // chimo 2026-05-21: 「日誌 / ナレッジ / つぶやき」 を「タスクを手動で追加する」 と
-  //   同じ indigo pill に統一 (= action 系は indigo / 表示系は slate の使い分け)。
+  // 2026-05-27: 旧 3 ボタン (日誌 / ナレッジ / つぶやき) を単一 CTA に統合 (H6/H8 検証)。
+  // testId は `${prefix}-tweet` を維持して既存 e2e (02-journal-crud, 04-tags) との互換を保つ。
+  // ボタン下に補助文を表示し、 「何を書く場所か」 を Modal を開く前に伝える (chimo 指示)。
   return (
-    <div
-      className="mb-3 flex flex-wrap items-center gap-2"
-      data-testid={`${testIdPrefix}-actions`}
-    >
-      <span className="text-[13px] font-bold text-slate-500">今日の記録</span>
-      {RECORD_KINDS.map(({ kind, label }) => (
-        <button
-          key={kind}
-          type="button"
-          onClick={() => onPick(kind)}
-          data-testid={`${testIdPrefix}-${kind}`}
-          className="inline-flex h-9 items-center rounded-full border border-indigo-300 bg-indigo-50 px-4 text-[13px] font-medium text-indigo-700 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100"
-        >
-          {label}
-        </button>
-      ))}
+    <div className="mb-3" data-testid={`${testIdPrefix}-actions`}>
+      <button
+        type="button"
+        onClick={onClick}
+        data-testid={`${testIdPrefix}-tweet`}
+        className="inline-flex items-center gap-2 rounded-[20px] bg-vn-accent px-4 py-2.5 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md"
+      >
+        <PenLine size={14} strokeWidth={1.75} aria-hidden />
+        今日の出来事を書く
+      </button>
+      <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
+        生徒の様子、 よかったこと、 気になったことなどを残せます。
+        <br />
+        小さな出来事が、 他の先生の気づきになることも。
+      </p>
     </div>
   );
 }
@@ -122,22 +113,13 @@ export default function DashboardPage({
   const isAdmin = canUseAdminFeatures(session.user.roles);
   const { mutate: globalMutate } = useSWRConfig();
 
-  // 投稿入口 (PhilosophyGreeting 内の 3 アイコン) 経由のモーダル状態 (kind 別に Modal を切替)
-  const [entryModal, setEntryModal] = useState<
-    { open: false } | { open: true; kind: JournalEntryKind }
-  >({ open: false });
+  // 投稿入口 (右上「ひとこと残す」CTA) 経由のモーダル状態。
+  // 2026-05-27: 旧 kind 別 modal を単一 CTA + 単一 Modal に統合。
+  const [entryModalOpen, setEntryModalOpen] = useState(false);
   // narrow (< xl) 用の日々ノートモーダル状態 (chimo 2026-05-21)
   const [noteRailModalOpen, setNoteRailModalOpen] = useState(false);
 
-  const handleKindPick = (kind: JournalEntryKind) => {
-    setEntryModal({ open: true, kind });
-  };
-
-  const modalTitleByKind: Record<JournalEntryKind, string> = {
-    diary: '今の気分を選んでください',
-    knowledge: 'ナレッジノート',
-    tweet: '軽いつぶやき',
-  };
+  const handleOpenEntryModal = () => setEntryModalOpen(true);
 
   // create 後の SWR cache 更新。 chimo 2026-05-21: server fetch を待つと
   // 体感ラグが出るため、 楽観的更新で新エントリを即座に右レーンへ反映し、
@@ -145,7 +127,7 @@ export default function DashboardPage({
   const handleEntrySuccess = async (
     result?: import('@/features/journal/components/EntryForm').EntrySaveResult,
   ) => {
-    setEntryModal({ open: false });
+    setEntryModalOpen(false);
 
     if (!result?.entry) {
       void globalMutate(
@@ -174,8 +156,11 @@ export default function DashboardPage({
       authorNickname: null,
       tags: result.tags,
       knowledgeTags: [],
-      knowledgeReactionCount: 0,
-      hasMyKnowledgeReaction: false,
+      reactions: {
+        knowledge:    { count: 0, mine: false },
+        appreciation: { count: 0, mine: false },
+        endorsement:  { count: 0, mine: false },
+      },
     };
 
     type RailCache = { entries: typeof optimistic[] } | undefined;
@@ -241,8 +226,8 @@ export default function DashboardPage({
               {/* narrow (< xl) 専用: 記録入口 pill + 日々ノートモーダル呼出ボタン。
                   xl 以上では右レーン上部に集約 (chimo 2026-05-21) */}
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:hidden">
-                <QuickRecordActions
-                  onPick={handleKindPick}
+                <QuickRecordCta
+                  onClick={handleOpenEntryModal}
                   testIdPrefix="narrow-quick-record"
                 />
                 <button
@@ -268,7 +253,7 @@ export default function DashboardPage({
             <div className="hidden xl:block">
               {/* 記録入口は右レーン上部に集約 (chimo 2026-05-20)。
                   「書く → 公開する → 職員室ノートに並ぶ」 動線を視覚的に直結。 */}
-              <QuickRecordActions onPick={handleKindPick} />
+              <QuickRecordCta onClick={handleOpenEntryModal} />
               <PublicTimelineRail selfUserId={session.user.userId} />
             </div>
           </div>
@@ -289,19 +274,16 @@ export default function DashboardPage({
           </Modal>
 
           <Modal
-            open={entryModal.open}
-            onClose={() => setEntryModal({ open: false })}
-            title={
-              entryModal.open ? modalTitleByKind[entryModal.kind] : undefined
-            }
+            open={entryModalOpen}
+            onClose={() => setEntryModalOpen(false)}
+            title="今日の出来事を書く"
             maxWidth="max-w-xl"
           >
-            {entryModal.open && (
+            {entryModalOpen && (
               <EntryForm
                 mode="create"
-                kind={entryModal.kind}
                 onSuccess={handleEntrySuccess}
-                onCancel={() => setEntryModal({ open: false })}
+                onCancel={() => setEntryModalOpen(false)}
               />
             )}
           </Modal>

@@ -56,42 +56,73 @@ export interface PaginationOptions {
   offset: number;
 }
 
+// H9 検証 (2026-05-27): リアクションを 3 種化 (knowledge / appreciation / endorsement)。
+// 1 ユーザー × 1 投稿 × 1 reaction_type で 1 行、 3 種別とも独立 toggle 可能。
+export const REACTION_TYPES = [
+  'knowledge',
+  'appreciation',
+  'endorsement',
+] as const;
+export type JournalReactionType = (typeof REACTION_TYPES)[number];
+
+export interface ReactionState {
+  count: number;
+  mine: boolean;
+}
+
+export type Reactions = Record<JournalReactionType, ReactionState>;
+
+function emptyReactions(): Reactions {
+  return {
+    knowledge:    { count: 0, mine: false },
+    appreciation: { count: 0, mine: false },
+    endorsement:  { count: 0, mine: false },
+  };
+}
+
 export type EntryWithTags = JournalEntry & {
   tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
   knowledgeTags: Array<{ id: string; name: string }>;
-  knowledgeReactionCount: number;
-  hasMyKnowledgeReaction: boolean;
+  reactions: Reactions;
 };
 
-// reaction の count + 自分の有無 を merge
+// reaction の count + 自分の有無 を 3 種類分まとめて merge
 // public/private 両方で使うため export
 export async function attachReactions<T extends { id: string }>(
   tx: DrizzleDb,
   entries: T[],
   ctx: Context,
-): Promise<Array<T & {
-  knowledgeReactionCount: number;
-  hasMyKnowledgeReaction: boolean;
-}>> {
+): Promise<Array<T & { reactions: Reactions }>> {
   if (entries.length === 0) return [];
   const entryIds = entries.map((e) => e.id);
 
-  // entry 別の count
+  // entry × type 別の count (1 query で GROUP BY)
   const countRows = await tx
     .select({
       entryId: journalKnowledgeReactions.journalEntryId,
+      type: journalKnowledgeReactions.reactionType,
       count: sql<number>`COUNT(*)::int`,
     })
     .from(journalKnowledgeReactions)
     .where(inArray(journalKnowledgeReactions.journalEntryId, entryIds))
-    .groupBy(journalKnowledgeReactions.journalEntryId);
+    .groupBy(
+      journalKnowledgeReactions.journalEntryId,
+      journalKnowledgeReactions.reactionType,
+    );
 
-  const countMap = new Map<string, number>();
-  for (const row of countRows) countMap.set(row.entryId, row.count);
+  const countMap = new Map<string, Partial<Record<JournalReactionType, number>>>();
+  for (const row of countRows) {
+    const map = countMap.get(row.entryId) ?? {};
+    map[row.type as JournalReactionType] = row.count;
+    countMap.set(row.entryId, map);
+  }
 
-  // 自分が ON にしてる entry
+  // 自分が ON にしてる (entry, type) ペア
   const myRows = await tx
-    .select({ entryId: journalKnowledgeReactions.journalEntryId })
+    .select({
+      entryId: journalKnowledgeReactions.journalEntryId,
+      type: journalKnowledgeReactions.reactionType,
+    })
     .from(journalKnowledgeReactions)
     .where(
       and(
@@ -99,13 +130,20 @@ export async function attachReactions<T extends { id: string }>(
         inArray(journalKnowledgeReactions.journalEntryId, entryIds),
       ),
     );
-  const mySet = new Set<string>(myRows.map((r) => r.entryId));
+  const mySet = new Set<string>();
+  for (const row of myRows) mySet.add(`${row.entryId}:${row.type}`);
 
-  return entries.map((e) => ({
-    ...e,
-    knowledgeReactionCount: countMap.get(e.id) ?? 0,
-    hasMyKnowledgeReaction: mySet.has(e.id),
-  }));
+  return entries.map((e) => {
+    const reactions = emptyReactions();
+    const counts = countMap.get(e.id) ?? {};
+    for (const type of REACTION_TYPES) {
+      reactions[type] = {
+        count: counts[type] ?? 0,
+        mine: mySet.has(`${e.id}:${type}`),
+      };
+    }
+    return { ...e, reactions };
+  });
 }
 
 async function attachTags(

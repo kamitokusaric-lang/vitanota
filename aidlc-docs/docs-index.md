@@ -133,6 +133,7 @@
 | [CURRENT] | [`operations/post-mvp-backlog.md`](operations/post-mvp-backlog.md) | **正本**: MVP 後の継続タスク一元管理 |
 | [CURRENT] | [`operations/claude-code-review-rollout.md`](operations/claude-code-review-rollout.md) | Claude Code Review 段階導入計画 |
 | [CURRENT] | [`operations/infrastructure-audit-20260419.md`](operations/infrastructure-audit-20260419.md) | インフラ監査（再掲） |
+| [CURRENT] | [`operations/rollback/0046_revert.sql`](operations/rollback/0046_revert.sql) | migration 0046 (journal reactions 3 種化) のロールバック SQL — 手動適用 |
 | [HISTORY] | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) | Auth 実装時の引き継ぎスナップショット |
 
 ## 🔒 セキュリティ

@@ -70,8 +70,9 @@ describe('PublicTimelineRepository', () => {
       expect(result[0]).toMatchObject({ id: 'entry-1' });
       expect(result[0].tags).toEqual([]);
       expect(result[0].knowledgeTags).toEqual([]);
-      expect(result[0].knowledgeReactionCount).toBe(0);
-      expect(result[0].hasMyKnowledgeReaction).toBe(false);
+      expect(result[0].reactions.knowledge).toEqual({ count: 0, mine: false });
+      expect(result[0].reactions.appreciation).toEqual({ count: 0, mine: false });
+      expect(result[0].reactions.endorsement).toEqual({ count: 0, mine: false });
     });
 
     it('結果が空の場合は空配列を返す', async () => {

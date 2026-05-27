@@ -1,8 +1,9 @@
 // H9 検証 (2026-05-27): 投稿カードの reaction 3 種類のメタ情報。
-//   knowledge    : 参考になった (旧「ナレッジリアクション」, Lightbulb 既存維持)
-//   appreciation : お疲れ様です (Coffee)
-//   endorsement  : すてきです (ThumbsUp)
+//   knowledge    : なるほど (Lightbulb、 旧「ナレッジリアクション/参考になった」)
+//   appreciation : お疲れ様 (Coffee)
+//   endorsement  : いいね (ThumbsUp)
 // アイコンは lucide-react に統一 (chimo 決定、 emoji 不使用)。
+// 2026-05-27 リリース後微調整: ラベルをカジュアル化 (です/参考になった → 短く)。
 import { Lightbulb, Coffee, ThumbsUp, type LucideIcon } from 'lucide-react';
 import type { JournalReactionType } from '@/features/journal/schemas/journal';
 
@@ -13,9 +14,9 @@ export interface ReactionMeta {
 }
 
 export const REACTION_META: Record<JournalReactionType, ReactionMeta> = {
-  knowledge:    { Icon: Lightbulb, label: '参考になった', ariaLabel: '参考になったをつける' },
-  appreciation: { Icon: Coffee,    label: 'お疲れ様です', ariaLabel: 'お疲れ様ですをつける' },
-  endorsement:  { Icon: ThumbsUp,  label: 'すてきです',   ariaLabel: 'すてきですをつける' },
+  knowledge:    { Icon: Lightbulb, label: 'なるほど', ariaLabel: 'なるほどをつける' },
+  appreciation: { Icon: Coffee,    label: 'お疲れ様', ariaLabel: 'お疲れ様をつける' },
+  endorsement:  { Icon: ThumbsUp,  label: 'いいね',   ariaLabel: 'いいねをつける' },
 };
 
 // UI で 3 ボタンを並べる順序 (左 → 右)

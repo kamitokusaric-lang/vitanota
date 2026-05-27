@@ -37,12 +37,12 @@ test.describe('日誌エントリ CRUD', () => {
     await expect(page.getByText('今日の授業の振り返り')).toBeVisible();
   });
 
-  test('US-T-010: 200文字制限のクライアント側バリデーション', async ({ page }) => {
+  test('US-T-010: 1000文字制限のクライアント側バリデーション', async ({ page }) => {
     await page.goto('/dashboard');
     await page.getByTestId('quick-record-tweet').click();
     const textarea = page.getByTestId('entry-form-content-input');
-    // tweet は maxLength=200 (kind 別ロジックは EntryForm.tsx 参照)
-    expect(await textarea.getAttribute('maxlength')).toBe('200');
+    // 2026-05-27: tweet の 200 字制限を撤廃、 全 kind 1000 字統一 (H6/H8 検証)
+    expect(await textarea.getAttribute('maxlength')).toBe('1000');
   });
 
   test('US-T-010: 空文字状態では submit ボタンが disabled', async ({ page }) => {

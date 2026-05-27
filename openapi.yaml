@@ -131,7 +131,7 @@ components:
             - diary
             - knowledge
             - tweet
-          example: diary
+          example: tweet
         content:
           type: string
           maxLength: 1000
@@ -167,7 +167,7 @@ components:
         kind:
           type: string
           enum: *a1
-          example: diary
+          example: tweet
         content:
           type: string
           maxLength: 1000

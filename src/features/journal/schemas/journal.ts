@@ -14,17 +14,19 @@ export const moodLevelSchema = z
 export type MoodLevel = z.infer<typeof moodLevelSchema>;
 
 // 投稿種別 (migration 0030)
-//   diary     : 日々ノート (mood 必須 + content 1000字、タグ不可)
-//   knowledge : ナレッジノート (content 1000字 + knowledge_tags 任意)
-//   tweet     : つぶやき (content 200字 + emotion_tags 任意)
+//   diary     : 日々ノート (mood 必須 + content 1000字、タグ不可) — edit 経路のみで使用
+//   knowledge : ナレッジノート (content 1000字 + knowledge_tags 任意) — edit 経路のみで使用
+//   tweet     : 「ひとこと残す」(content 1000字 + emotion_tags 任意) — 新規投稿のデフォルト
+// 2026-05-27: 新規投稿入口を tweet 単一 CTA に統合 (H6/H8 仮説検証)。
+//   diary / knowledge は既存レコードの edit 経路で kind を保持する目的でのみ enum に残る。
 export const journalEntryKindSchema = z
   .enum(['diary', 'knowledge', 'tweet'])
-  .openapi({ example: 'diary' });
+  .openapi({ example: 'tweet' });
 
 export type JournalEntryKind = z.infer<typeof journalEntryKindSchema>;
 
 // エントリ作成入力 (kind 別制約は superRefine で担保、DB CHECK は付けない)
-// content の max は diary/knowledge=1000、tweet は superRefine で 200 に絞る
+// content の max は全 kind 1000 字統一 (2026-05-27 tweet を 200→1000 に拡張)
 // tagIds は kind=tweet → emotion_tags ID / kind=knowledge → knowledge_tags ID
 //   (どちらの tag store を参照するかは API 層で kind を見て分岐)
 const createEntryBaseSchema = z.object({
@@ -42,41 +44,11 @@ const createEntryBaseSchema = z.object({
   mood: moodLevelSchema.nullable().optional(),
 });
 
-export const createEntrySchema = createEntryBaseSchema
-  .superRefine((data, ctx) => {
-    // tweet は 200 字
-    if (data.kind === 'tweet' && data.content.length > 200) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['content'],
-        message: 'つぶやきは200文字以内で入力してください',
-      });
-    }
-    // mood は diary 必須、それ以外で禁止
-    if (data.kind === 'diary' && !data.mood) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['mood'],
-        message: '日誌には気分の選択が必要です',
-      });
-    }
-    if (data.kind !== 'diary' && data.mood) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['mood'],
-        message: 'この種別には気分は付けられません',
-      });
-    }
-    // tagIds は diary で禁止 (knowledge/tweet は許容)
-    if (data.kind === 'diary' && data.tagIds.length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['tagIds'],
-        message: '日誌にはタグは付けられません',
-      });
-    }
-  })
-  .openapi('CreateEntryInput');
+// 2026-05-27 chimo 指示: kind 分岐撤廃、 全 kind 共通仕様 (mood 任意 + tag 任意)。
+// 旧 diary mood 必須 / diary タグ禁止ルールは削除。
+export const createEntrySchema = createEntryBaseSchema.openapi(
+  'CreateEntryInput',
+);
 
 export type CreateEntryInput = z.infer<typeof createEntrySchema>;
 
@@ -97,3 +69,18 @@ export const timelineQuerySchema = z
   .openapi('TimelineQuery');
 
 export type TimelineQueryInput = z.infer<typeof timelineQuerySchema>;
+
+// H9 検証 (2026-05-27): 投稿カードの reaction 種別 (migration 0046)
+//   knowledge    : 参考になった (旧「ナレッジリアクション」)
+//   appreciation : お疲れ様です
+//   endorsement  : すてきです
+export const journalReactionTypeSchema = z
+  .enum(['knowledge', 'appreciation', 'endorsement'])
+  .openapi({ example: 'knowledge' });
+
+export type JournalReactionType = z.infer<typeof journalReactionTypeSchema>;
+
+// POST body / DELETE query 共通: reaction の種別を 1 つ受ける
+export const reactionTypeQuerySchema = z
+  .object({ type: journalReactionTypeSchema })
+  .openapi('ReactionTypeQuery');

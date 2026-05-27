@@ -16,7 +16,7 @@ import {
 import type * as schema from '@/db/schema';
 import type { EmotionTag } from '@/db/schema';
 import type { PublicJournalEntry } from '@/shared/types/brand';
-import { attachReactions } from './privateJournalRepository';
+import { attachReactions, type Reactions } from './privateJournalRepository';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -30,8 +30,7 @@ export type PublicEntryWithTags = PublicJournalEntry & {
   authorNickname: string | null;
   tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
   knowledgeTags: Array<{ id: string; name: string }>;
-  knowledgeReactionCount: number;
-  hasMyKnowledgeReaction: boolean;
+  reactions: Reactions;
   // 投稿者が system_admin ロールを持つ場合 true (兼任アカウントによる「AI 風」投稿の判定)。
   // 現時点判定。chimo の system_admin 兼 school_admin アカウントが書いた投稿はここで true になる。
   isAiPost: boolean;

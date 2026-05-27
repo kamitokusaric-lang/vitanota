@@ -61,13 +61,14 @@ export function MyJournalList({
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const allEntries = data?.flatMap((p) => p.entries) ?? [];
-  // kind filter 適用 (knowledge filter ON 時は reaction>0 entry も含める)
+  // kind filter 適用 (knowledge filter ON 時は ナレッジ reaction>0 entry も含める)
+  // 2026-05-27 (H9): reaction 3 種化、 ここでは knowledge reaction のみ参照。
   const entries = kindFilter
     ? allEntries.filter((e) => {
         if (kindFilter.includes(e.kind ?? 'diary')) return true;
         if (
           kindFilter.includes('knowledge') &&
-          (e.knowledgeReactionCount ?? 0) > 0
+          (e.reactions?.knowledge.count ?? 0) > 0
         ) {
           return true;
         }

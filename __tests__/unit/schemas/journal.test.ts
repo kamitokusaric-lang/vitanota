@@ -101,7 +101,7 @@ describe('createEntrySchema', () => {
   });
 
   describe('異常系', () => {
-    it('diary で mood なしを拒否する', () => {
+    it('diary で mood なしを受理する (2026-05-27: kind 分岐撤廃、 mood は全 kind 任意)', () => {
       const result = createEntrySchema.safeParse({
         kind: 'diary',
         content: 'test',
@@ -109,10 +109,10 @@ describe('createEntrySchema', () => {
         isPublic: true,
         // mood なし
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
-    it('knowledge で mood ありを拒否する (diary 以外 mood 禁止)', () => {
+    it('knowledge で mood ありを受理する (2026-05-27: 任意化、 旧禁止ルール撤廃)', () => {
       const result = createEntrySchema.safeParse({
         kind: 'knowledge',
         content: 'test',
@@ -120,10 +120,10 @@ describe('createEntrySchema', () => {
         mood: 'neutral',
         isPublic: true,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
-    it('tweet で mood ありを拒否する (diary 以外 mood 禁止)', () => {
+    it('tweet で mood ありを受理する (2026-05-27: 任意化、 旧禁止ルール撤廃)', () => {
       const result = createEntrySchema.safeParse({
         kind: 'tweet',
         content: 'test',
@@ -131,10 +131,10 @@ describe('createEntrySchema', () => {
         mood: 'neutral',
         isPublic: true,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
-    it('diary で tagIds ありを拒否する (diary タグ禁止)', () => {
+    it('diary で tagIds ありを受理する (2026-05-27: kind 分岐撤廃、 tag は全 kind 任意)', () => {
       const result = createEntrySchema.safeParse({
         kind: 'diary',
         content: 'test',
@@ -142,17 +142,27 @@ describe('createEntrySchema', () => {
         mood: 'neutral',
         isPublic: true,
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
-    it('tweet で 201 文字 content を拒否する', () => {
+    it('tweet で 1001 文字 content を拒否する (2026-05-27: 200→1000 字制約に統一)', () => {
       const result = createEntrySchema.safeParse({
         kind: 'tweet',
-        content: 'x'.repeat(201),
+        content: 'x'.repeat(1001),
         tagIds: [],
         isPublic: true,
       });
       expect(result.success).toBe(false);
+    });
+
+    it('tweet で 1000 文字 content は受理する (200 字制約は撤廃済)', () => {
+      const result = createEntrySchema.safeParse({
+        kind: 'tweet',
+        content: 'x'.repeat(1000),
+        tagIds: [],
+        isPublic: true,
+      });
+      expect(result.success).toBe(true);
     });
 
     it('diary で 1001 文字 content を拒否する (base max 1000)', () => {

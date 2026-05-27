@@ -17,11 +17,6 @@ import {
 import { pickRandomMoodPrompt } from '@/features/journal/lib/mood-prompts';
 import { MOOD_OPTIONS } from '@/features/journal/lib/mood-options';
 import { TagFilter } from './TagFilter';
-import { TagPicker, type TagPickerHandle } from '@/shared/components/TagPicker';
-import {
-  useKnowledgeTags,
-  type KnowledgeTag,
-} from '@/features/journal/hooks/useKnowledgeTags';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { IconTooltip } from '@/shared/components/IconTooltip';
@@ -34,7 +29,8 @@ export interface EntrySaveResult {
 
 interface EntryFormProps {
   mode: 'create' | 'edit';
-  // create 時の投稿種別。dashboard 側の kind picker から渡される。default 'diary'。
+  // create 時の投稿種別。新規投稿は単一 CTA「ひとこと残す」経由で default 'tweet'。
+  // edit 時は initialData.kind を優先 (diary/knowledge 既存レコードを保持)。
   kind?: JournalEntryKind;
   initialData?: {
     id: string;
@@ -63,19 +59,38 @@ const fetcher = async (url: string) => {
   return res.json() as Promise<{ tags: EmotionTag[] }>;
 };
 
+// 選択時の mood ごと淡い背景色 (chimo アドバイス 2026-05-27)。
+// 「危険・警告・評価」 に見えないよう赤系は控えめ、 学校現場向けに彩度低め。
+// 2026-05-27 chimo 指示: 5 → 3 種化、 旧 very_positive/very_negative は UI から除外。
+const MOOD_SELECTED_CLASS: Partial<Record<MoodLevel, string>> = {
+  positive: 'border-lime-200 bg-lime-50 text-lime-700',
+  neutral:  'border-sky-200 bg-sky-50 text-sky-700',
+  negative: 'border-amber-200 bg-amber-50 text-amber-700',
+};
+
+// textarea 全体の背景色 (mood 選択に連動、 chimo 指示 2026-05-27)。
+// 選択した mood の世界観を textarea にも染み込ませる、 一体感を強化。
+const MOOD_TEXTAREA_BG: Partial<Record<MoodLevel, string>> = {
+  positive: 'bg-lime-50',
+  neutral:  'bg-sky-50',
+  negative: 'bg-amber-50',
+};
+
 const DEFAULT_VALUES: CreateEntryInput = {
-  kind: 'diary',
+  // 2026-05-27: 新規投稿は「ひとこと残す」単一 CTA に統合、 default 'tweet' (H6/H8 検証)。
+  // diary/knowledge は edit 経路でのみ使用される (初期値ではなく initialData.kind 経由で復元)。
+  kind: 'tweet',
   content: '',
   tagIds: [],
   isPublic: true,
-  // mood は未選択状態で開く (5 アイコンどれも highlight されない)。
-  // ユーザーが picker から能動的に選ぶ必要がある (moodPicked=true で submit 可)。
-  mood: null,
+  // mood の default は 'positive' (= 良い)。 ポジティブを起点にして投稿のハードルを下げる。
+  // 違う気分なら 3 チップから選び直せる、 同じチップ再クリックで解除も可能。
+  mood: 'positive',
 };
 
 export function EntryForm({
   mode,
-  kind = 'diary',
+  kind = 'tweet',
   initialData,
   initialMood,
   onSuccess,
@@ -86,28 +101,6 @@ export function EntryForm({
     '/api/private/journal/tags',
     fetcher
   );
-  // ナレッジタグ (kind='knowledge' の時のみ画面で使う、ただし fetch は常に走る)
-  const { tags: knowledgeTags, mutate: mutateKnowledgeTags } = useKnowledgeTags();
-
-  async function handleCreateKnowledgeTag(
-    name: string,
-  ): Promise<KnowledgeTag | null> {
-    const res = await fetch('/api/private/journal/knowledge-tags', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      if (res.status === 409) {
-        throw new Error('同じ名前のタグが既にあります');
-      }
-      throw new Error('タグ作成に失敗しました');
-    }
-    const data = (await res.json()) as { tag: KnowledgeTag };
-    await mutateKnowledgeTags();
-    return data.tag;
-  }
-
   const {
     register,
     handleSubmit,
@@ -171,15 +164,19 @@ export function EntryForm({
     }
   }, [initialMood]);
 
-  // kind が diary 以外なら mood を null にクリア (Zod superRefine で
-  // 「この種別には気分は付けられません」を回避するため)
-  useEffect(() => {
-    if (kind !== 'diary') {
-      setValue('mood', null, { shouldValidate: false });
-    }
-  }, [kind, setValue]);
+  // 2026-05-27: 旧仕様で kind!=='diary' なら mood を null クリアしていたが、
+  // tweet/knowledge にも mood を任意で付けられるようにしたため、 強制クリアは廃止。
+  // mood は本人選択のみ ([[feedback_mood_ai_untouchable]] AI 非関与の原則は維持)。
 
   const handleMoodPick = (m: MoodLevel) => {
+    // 2026-05-27: tweet/knowledge では任意なので、 同じ絵文字を再クリックで解除可能。
+    // diary では「必須」 ロジック維持のため、 解除すると submit がロックされる。
+    if (mood === m) {
+      setValue('mood', null, { shouldValidate: true });
+      setMoodPlaceholder('');
+      setMoodPicked(false);
+      return;
+    }
     setValue('mood', m, { shouldValidate: true });
     setMoodPlaceholder(pickPromptFor(m));
     setStep('expand');
@@ -199,18 +196,7 @@ export function EntryForm({
     setPrompt(pickRandomMoodPrompt());
   };
 
-  const tagPickerRef = useRef<TagPickerHandle>(null);
-
   const onSubmit = async (data: CreateEntryInput) => {
-    // TagPicker の input に保留中の文字があれば、submit 直前に作成 + 紐付け
-    // (= 「作成」ボタンを押し忘れた場合の救済)
-    let finalTagIds = data.tagIds;
-    if (tagPickerRef.current) {
-      const flushed = await tagPickerRef.current.flushPending();
-      if (flushed && !finalTagIds.includes(flushed.id)) {
-        finalTagIds = [...finalTagIds, flushed.id];
-      }
-    }
     try {
       const url =
         mode === 'create'
@@ -221,7 +207,7 @@ export function EntryForm({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, tagIds: finalTagIds }),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
@@ -339,7 +325,7 @@ export function EntryForm({
             <textarea
               id="entry-form-content"
               rows={2}
-              maxLength={200}
+              maxLength={1000}
               placeholder={moodPlaceholder || selectedMoodOption.caption}
               className="flex-1 resize-none rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200 focus:placeholder:text-transparent"
               data-testid="entry-form-content-input"
@@ -365,80 +351,79 @@ export function EntryForm({
             </span>
             <span
               className={
-                (content?.length ?? 0) > 200
+                (content?.length ?? 0) > 1000
                   ? 'text-red-600'
                   : 'text-gray-400'
               }
               data-testid="entry-form-content-counter"
             >
-              {content?.length ?? 0} / 200
+              {content?.length ?? 0} / 1000
             </span>
           </div>
         </div>
       )}
 
-      {/* 非 compact (edit モーダル / create モーダル): mood picker + textarea。
-          mood picker は kind='diary' の create モードのみ表示。
-          textarea の maxLength / placeholder / counter は kind 別に分岐。 */}
+      {/* 非 compact (edit モーダル / create モーダル): textarea + 内側上部に mood チップ群。
+          2026-05-27 chimo 指示 (アドバイス採用 + textarea 内配置):
+          - mood チップ群を textarea の上部 absolute で重ね、 textarea と一体化
+          - 別 section にすると「入力しなくていいもの」 と思われる懸念回避
+          - 初期未選択、 何も選ばずに投稿しても OK */}
       {!compact && showFullForm && (
         <div>
-          {/* mood 選択 (kind='diary' の create モードでのみ表示) */}
-          {mode === 'create' && kind === 'diary' && (
-            <div
-              role="group"
-              aria-label="ムード選択"
-              className="mb-3 flex items-center gap-2"
-              data-testid="entry-form-mood-picker"
-            >
-              {MOOD_OPTIONS.map((opt) => {
-                const Icon = opt.Icon;
-                const isSelected = mood === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => handleMoodPick(opt.value)}
-                    aria-label={opt.label}
-                    aria-pressed={isSelected}
-                    className={`group relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-                      isSelected
-                        ? 'border-vn-accent bg-vn-accent/10 text-vn-accent'
-                        : 'border-vn-border bg-white text-gray-500 hover:border-gray-400 hover:text-gray-700'
-                    }`}
-                    data-testid={`entry-form-mood-${opt.value}`}
-                  >
-                    <Icon size={20} strokeWidth={1.75} aria-hidden />
-                    <span
-                      role="tooltip"
-                      className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-                    >
-                      {opt.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
           {(() => {
-            const maxLength = kind === 'tweet' ? 200 : 1000;
-            const placeholder =
-              kind === 'knowledge'
-                ? '気づきや知見をシェア'
-                : kind === 'tweet'
-                  ? 'いまの気持ちをひとこと'
-                  : moodPlaceholder || selectedMoodOption?.caption || '';
+            const maxLength = 1000;
+            // 2026-05-27 chimo 指示: kind 分岐撤廃、 placeholder 単一化
+            const placeholder = '生徒の様子、よかった出来事、ちょっとした気づきなど...';
             return (
               <>
-                <textarea
-                  id="entry-form-content"
-                  rows={4}
-                  maxLength={maxLength}
-                  aria-label="記録内容"
-                  placeholder={placeholder}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  data-testid="entry-form-content-input"
-                  {...register('content')}
-                />
+                <div className="relative">
+                  {/* 2026-05-27 chimo 指示: edit 経路でも mood picker 表示 (作成画面と完全統一) */}
+                  <div
+                    role="group"
+                    aria-label="今の気持ちは？"
+                    className="absolute left-px right-px top-px z-10 flex flex-wrap items-center gap-1.5 rounded-t-md bg-white px-2 py-1.5"
+                    data-testid="entry-form-mood-picker"
+                  >
+                      <span className="mr-1 text-xs font-medium text-gray-700">
+                        今の気持ちは？
+                      </span>
+                      {MOOD_OPTIONS.map((opt) => {
+                        const Icon = opt.Icon;
+                        const isSelected = mood === opt.value;
+                        const selectedClass = MOOD_SELECTED_CLASS[opt.value] ?? '';
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleMoodPick(opt.value)}
+                            aria-label={opt.label}
+                            aria-pressed={isSelected}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm transition-colors ${
+                              isSelected
+                                ? selectedClass
+                                : 'border-vn-border bg-white text-gray-500 hover:border-gray-400 hover:text-gray-700'
+                            }`}
+                            data-testid={`entry-form-mood-${opt.value}`}
+                          >
+                            <Icon size={16} strokeWidth={1.75} aria-hidden />
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                  <textarea
+                    id="entry-form-content"
+                    rows={8}
+                    maxLength={maxLength}
+                    aria-label="記録内容"
+                    placeholder={placeholder}
+                    className={`w-full rounded-md border border-gray-300 pt-12 px-3 pb-2 text-sm transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:outline-none ${
+                      (mood && MOOD_TEXTAREA_BG[mood]) || 'bg-white'
+                    }`}
+                    data-testid="entry-form-content-input"
+                    {...register('content')}
+                  />
+                </div>
                 <div className="mt-1 flex items-center justify-between text-xs">
                   <span
                     className={
@@ -467,85 +452,30 @@ export function EntryForm({
 
       {showFullForm && (
         <>
-          {/* タグ選択 (kind 別)
-              compact (旧 sticky form、現状未使用): emotion_tags の TagFilter
-              !compact + kind=tweet: emotion_tags の TagFilter
-              !compact + kind=knowledge: knowledge_tags の TagPicker (タスクと同 UI)
-              !compact + kind=diary: 表示なし (Zod superRefine でタグ禁止) */}
-          {compact && (
-            <div className="mt-3">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                タグを選ぶ
-              </label>
-              {tagsData ? (
-                <TagFilter
-                  tags={tagsData.tags}
-                  selectedTagIds={tagIds}
-                  onChange={(ids) =>
-                    setValue('tagIds', ids, { shouldValidate: true })
-                  }
-                />
-              ) : (
-                <p className="text-xs text-gray-400">タグを読み込み中...</p>
-              )}
-              {errors.tagIds && (
-                <p className="mt-1 text-xs text-red-600">
-                  {errors.tagIds.message}
-                </p>
-              )}
-            </div>
-          )}
-          {!compact && kind === 'tweet' && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                今の気分を選んでください
-              </label>
-              {tagsData ? (
-                <TagFilter
-                  tags={tagsData.tags}
-                  selectedTagIds={tagIds}
-                  onChange={(ids) =>
-                    setValue('tagIds', ids, { shouldValidate: true })
-                  }
-                />
-              ) : (
-                <p className="text-xs text-gray-400">タグを読み込み中...</p>
-              )}
-              {errors.tagIds && (
-                <p className="mt-1 text-xs text-red-600">
-                  {errors.tagIds.message}
-                </p>
-              )}
-            </div>
-          )}
-          {!compact && kind === 'knowledge' && (
-            <div>
-              {knowledgeTags === undefined ? (
-                <p className="text-xs text-gray-400">タグを読み込み中...</p>
-              ) : (
-                <TagPicker
-                  ref={tagPickerRef}
-                  selectedTagIds={tagIds}
-                  onToggle={(tagId) => {
-                    const next = tagIds.includes(tagId)
-                      ? tagIds.filter((id) => id !== tagId)
-                      : [...tagIds, tagId];
-                    setValue('tagIds', next, { shouldValidate: true });
-                  }}
-                  availableTags={knowledgeTags}
-                  onCreateTag={handleCreateKnowledgeTag}
-                  testIdPrefix="entry-form"
-                  label="タグ (任意)"
-                  inputPlaceholder="新規タグ名 or 既存タグから選択"
-                />
-              )}
-              {errors.tagIds && (
-                <p className="mt-1 text-xs text-red-600">
-                  {errors.tagIds.message}
-                </p>
-              )}
-            </div>
-          )}
+          {/* 2026-05-27 chimo 指示: タグ選択は kind 分岐撤廃、 emotion_tags TagFilter で統一。
+              旧 knowledge_tags TagPicker / compact 別ラベル は廃止。
+              既存 knowledge レコードの knowledge_tags 編集 UI は無くなる (DB データは残る)。 */}
+          <div className={compact ? 'mt-3' : ''}>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              気持ちタグ
+            </label>
+            {tagsData ? (
+              <TagFilter
+                tags={tagsData.tags}
+                selectedTagIds={tagIds}
+                onChange={(ids) =>
+                  setValue('tagIds', ids, { shouldValidate: true })
+                }
+              />
+            ) : (
+              <p className="text-xs text-gray-400">タグを読み込み中...</p>
+            )}
+            {errors.tagIds && (
+              <p className="mt-1 text-xs text-red-600">
+                {errors.tagIds.message}
+              </p>
+            )}
+          </div>
 
           {/* 公開設定 */}
           <div className={compact ? 'mt-3' : ''}>
@@ -615,15 +545,15 @@ export function EntryForm({
             type="submit"
             isLoading={isSubmitting}
             disabled={
-              (mode === 'create' && kind === 'diary' && !moodPicked) ||
               !(content?.trim().length ?? 0)
             }
             data-testid="entry-form-submit-button"
           >
-            {mode === 'create' ? '投稿' : '保存'}
+            共有する
           </Button>
         </div>
       )}
     </form>
   );
 }
+

@@ -265,8 +265,9 @@ describe('PrivateJournalRepository.findById', () => {
       { id: 't1', name: 'うれしい', category: 'positive' },
     ]);
     expect(result?.knowledgeTags).toEqual([]);
-    expect(result?.knowledgeReactionCount).toBe(0);
-    expect(result?.hasMyKnowledgeReaction).toBe(false);
+    expect(result?.reactions.knowledge).toEqual({ count: 0, mine: false });
+    expect(result?.reactions.appreciation).toEqual({ count: 0, mine: false });
+    expect(result?.reactions.endorsement).toEqual({ count: 0, mine: false });
   });
 
   it('見つからない場合は null を返す', async () => {
@@ -302,7 +303,8 @@ describe('PrivateJournalRepository.findMine', () => {
     expect(result[0].id).toBe('e1');
     expect(result[0].tags).toEqual([]);
     expect(result[0].knowledgeTags).toEqual([]);
-    expect(result[0].knowledgeReactionCount).toBe(0);
-    expect(result[0].hasMyKnowledgeReaction).toBe(false);
+    expect(result[0].reactions.knowledge).toEqual({ count: 0, mine: false });
+    expect(result[0].reactions.appreciation).toEqual({ count: 0, mine: false });
+    expect(result[0].reactions.endorsement).toEqual({ count: 0, mine: false });
   });
 });

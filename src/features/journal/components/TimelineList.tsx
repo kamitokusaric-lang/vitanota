@@ -70,14 +70,15 @@ export function TimelineList({
   const allEntries = data?.flatMap((p) => p.entries) ?? [];
   // kind filter 適用:
   //   - kind が filter に含まれる → 表示
-  //   - filter に 'knowledge' が含まれる場合、reaction>0 の他種別 entry も表示
-  //     (= 他の人が「ナレッジ」と思った投稿は kind に関わらずナレッジ扱い)
+  //   - filter に 'knowledge' が含まれる場合、ナレッジ reaction>0 の他種別 entry も表示
+  //     (= 他の人が「ナレッジ」と感じた投稿は kind に関わらずナレッジ扱い)
+  //     2026-05-27 (H9): reaction が 3 種化、 ここでは knowledge reaction のみ参照。
   const entries = kindFilter
     ? allEntries.filter((e) => {
         if (kindFilter.includes(e.kind ?? 'diary')) return true;
         if (
           kindFilter.includes('knowledge') &&
-          (e.knowledgeReactionCount ?? 0) > 0
+          (e.reactions?.knowledge.count ?? 0) > 0
         ) {
           return true;
         }
@@ -143,43 +144,50 @@ export function TimelineList({
               entry={entry}
               onEdit={isMine ? onEdit : undefined}
               onDelete={isMine ? onDelete : undefined}
-              onKnowledgeReactionToggle={
-                isMine
-                  ? undefined
-                  : async (e, next) => {
-                      // 楽観的更新: 即座に UI 反映 (revalidate=false)
-                      await mutate(
-                        (pages) =>
-                          pages?.map((page) => ({
-                            ...page,
-                            entries: page.entries.map((it) =>
-                              it.id === e.id
-                                ? {
-                                    ...it,
-                                    hasMyKnowledgeReaction: next,
-                                    knowledgeReactionCount:
-                                      (it.knowledgeReactionCount ?? 0) +
-                                      (next ? 1 : -1),
-                                  }
-                                : it,
-                            ),
-                          })),
-                        { revalidate: false },
-                      );
-                      // API 呼び出し。成功時は楽観的更新を信じて revalidate しない
-                      // (revalidate すると ETag 304 で cache 古い値が戻ってしまう問題回避)
-                      // エラー時のみ revalidate で正しい状態に戻す
-                      const url = `/api/private/journal/entries/${e.id}/knowledge-reaction`;
-                      try {
-                        const res = await fetch(url, {
-                          method: next ? 'POST' : 'DELETE',
-                        });
-                        if (!res.ok) await mutate();
-                      } catch {
-                        await mutate();
-                      }
-                    }
-              }
+              onReactionToggle={async (e, type, next) => {
+                // 2026-05-27 (H9): リアクション 3 種化、 isMine でも押下可能 (セルフ労い)。
+                // 楽観的更新は該当 type の count / mine のみ反転、 他 type は保持。
+                await mutate(
+                  (pages) =>
+                    pages?.map((page) => ({
+                      ...page,
+                      entries: page.entries.map((it) => {
+                        if (it.id !== e.id) return it;
+                        const current = it.reactions ?? {
+                          knowledge:    { count: 0, mine: false },
+                          appreciation: { count: 0, mine: false },
+                          endorsement:  { count: 0, mine: false },
+                        };
+                        return {
+                          ...it,
+                          reactions: {
+                            ...current,
+                            [type]: {
+                              count: current[type].count + (next ? 1 : -1),
+                              mine: next,
+                            },
+                          },
+                        };
+                      }),
+                    })),
+                  { revalidate: false },
+                );
+                // API 呼び出し。 成功時は楽観的更新を信じて revalidate しない
+                // (revalidate すると ETag 304 で cache 古い値が戻る問題回避)。
+                const url = `/api/private/journal/entries/${e.id}/reactions`;
+                try {
+                  const res = next
+                    ? await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type }),
+                      })
+                    : await fetch(`${url}?type=${type}`, { method: 'DELETE' });
+                  if (!res.ok) await mutate();
+                } catch {
+                  await mutate();
+                }
+              }}
             />
           </Fragment>
         );

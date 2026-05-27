@@ -1,7 +1,7 @@
 // mood (5 段階感情) のラベル / アイコン / プロンプト集約
 // EntryForm の選択 UI と EntryCard の表示で同一のアイコンを使うため共通化
 // emoji は通知メールなど text コンテキスト用に保持、UI 表示は Icon component を使う
-import { Annoyed, Frown, Meh, Smile, SmilePlus, type LucideIcon } from 'lucide-react';
+import { Frown, Meh, Smile, type LucideIcon } from 'lucide-react';
 import type { MoodLevel } from '@/features/journal/schemas/journal';
 
 export interface MoodOption {
@@ -13,27 +13,18 @@ export interface MoodOption {
   prompts: string[];
 }
 
+// 2026-05-27 chimo 指示: mood UI を 5 → 3 種化「良い / ふつう / 大変」。
+// DB enum は 5 値そのまま温存 (revert 可能)、 既存データは fallback で 3 値にマッピング表示。
 export const MOOD_OPTIONS: MoodOption[] = [
-  {
-    value: 'very_positive',
-    emoji: '😊',
-    Icon: SmilePlus,
-    label: 'とても良い',
-    caption: 'すごくいい感じでした',
-    prompts: [
-      'どんなことがよかった?',
-      '何が嬉しかった?',
-      '今日の良かったこと、一つあげるなら?',
-    ],
-  },
   {
     value: 'positive',
     emoji: '🙂',
     Icon: Smile,
-    label: '良い',
+    label: 'いい感じ',
     caption: 'いい感じでした',
     prompts: [
       'いい感じだったこと、ちょっと教えて',
+      '何が嬉しかった?',
       '誰かに感謝したいこと、ある?',
     ],
   },
@@ -41,8 +32,8 @@ export const MOOD_OPTIONS: MoodOption[] = [
     value: 'neutral',
     emoji: '😐',
     Icon: Meh,
-    label: 'ふつう',
-    caption: 'ふつうでした',
+    label: 'いつも通り',
+    caption: 'いつも通りでした',
     prompts: [
       '今日はどんな一日だった?',
       'なんとなく印象に残ってることある?',
@@ -52,40 +43,38 @@ export const MOOD_OPTIONS: MoodOption[] = [
   },
   {
     value: 'negative',
-    emoji: '😥',
-    Icon: Annoyed,
+    emoji: '😣',
+    Icon: Frown,
     label: 'ちょっと大変',
     caption: 'ちょっと大変でした',
     prompts: [
       '少し疲れた場面、どこだった?',
       'うまくいかなかったこと、書いてみる?',
-    ],
-  },
-  {
-    value: 'very_negative',
-    emoji: '😣',
-    Icon: Frown,
-    label: 'かなり大変',
-    caption: 'かなり大変でした',
-    prompts: [
-      'ちょっとつらかったことは?',
       '誰かに聞いてほしいこと、ある?',
       '無理してない?',
     ],
   },
 ];
 
-const MOOD_BY_VALUE: Record<MoodLevel, MoodOption> = MOOD_OPTIONS.reduce(
+// 既存データ fallback: very_positive → positive、 very_negative → negative として表示扱い。
+// 投稿時の選択肢からは外れたが、 DB 上の旧 5 値データを timeline で見せる必要があるため。
+const MOOD_FALLBACK: Partial<Record<MoodLevel, MoodLevel>> = {
+  very_positive: 'positive',
+  very_negative: 'negative',
+};
+
+const MOOD_BY_VALUE: Record<string, MoodOption> = MOOD_OPTIONS.reduce(
   (acc, opt) => {
     acc[opt.value] = opt;
     return acc;
   },
-  {} as Record<MoodLevel, MoodOption>,
+  {} as Record<string, MoodOption>,
 );
 
 export function getMoodOption(mood: MoodLevel | null | undefined): MoodOption | null {
   if (!mood) return null;
-  return MOOD_BY_VALUE[mood] ?? null;
+  const normalized = MOOD_FALLBACK[mood] ?? mood;
+  return MOOD_BY_VALUE[normalized] ?? null;
 }
 
 export function getMoodEmoji(mood: MoodLevel | null | undefined): string | null {

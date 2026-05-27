@@ -14,12 +14,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { Lightbulb, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import type {
   JournalEntryKind,
+  JournalReactionType,
   MoodLevel,
 } from '@/features/journal/schemas/journal';
-import { KIND_META } from '@/features/journal/components/KindBadge';
+import {
+  REACTION_META,
+  REACTION_TYPES_ORDER,
+} from '@/features/journal/components/reactionMeta';
+import type { Reactions } from '@/features/journal/lib/privateJournalRepository';
 import { formatRelativeTime } from '@/features/journal/lib/relativeTime';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
 import { Modal } from '@/shared/components/Modal';
@@ -28,6 +33,14 @@ import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { EntryForm } from '@/features/journal/components/EntryForm';
 import type { JournalEntry } from '@/db/schema';
+
+function emptyReactions(): Reactions {
+  return {
+    knowledge:    { count: 0, mine: false },
+    appreciation: { count: 0, mine: false },
+    endorsement:  { count: 0, mine: false },
+  };
+}
 
 interface RailEntry {
   id: string;
@@ -43,8 +56,8 @@ interface RailEntry {
   authorNickname?: string | null;
   tags?: Array<{ id: string; name: string; category?: string | null }>;
   knowledgeTags?: Array<{ id: string; name: string }>;
-  knowledgeReactionCount?: number;
-  hasMyKnowledgeReaction?: boolean;
+  // H9 (2026-05-27): リアクション 3 種類。 自分の投稿でも自分で押せる (セルフ労い)。
+  reactions?: Reactions;
   // 投稿者が system_admin ロールを持つ「AI 風」投稿のとき true。 RailItem 側で
   // 別の見た目 (AI 週次日誌 β カード) に切り替える。
   isAiPost?: boolean;
@@ -121,26 +134,40 @@ export function PublicTimelineRail({
   // 楽観的更新パターン (TimelineList と同じ): mutate(更新後 cache, revalidate=false)
   //   → API → 成功時は楽観的更新を信じて revalidate しない (ETag 304 cache 問題回避)
   //   → 失敗時のみ mutate() で正しい状態に戻す
-  const toggleKnowledgeReaction = async (entryId: string, next: boolean) => {
+  // H9 (2026-05-27): reaction 3 種類対応、 該当 type の count / mine のみ反転 (他 type 保持)。
+  const toggleReaction = async (
+    entryId: string,
+    type: JournalReactionType,
+    next: boolean,
+  ) => {
     if (!data) return;
     const optimistic: RailResponse = {
-      entries: data.entries.map((it) =>
-        it.id === entryId
-          ? {
-              ...it,
-              hasMyKnowledgeReaction: next,
-              knowledgeReactionCount:
-                (it.knowledgeReactionCount ?? 0) + (next ? 1 : -1),
-            }
-          : it,
-      ),
+      entries: data.entries.map((it) => {
+        if (it.id !== entryId) return it;
+        const current = it.reactions ?? emptyReactions();
+        return {
+          ...it,
+          reactions: {
+            ...current,
+            [type]: {
+              count: current[type].count + (next ? 1 : -1),
+              mine: next,
+            },
+          },
+        };
+      }),
     };
     await mutate(optimistic, { revalidate: false });
     try {
-      const res = await fetch(
-        `/api/private/journal/entries/${entryId}/knowledge-reaction`,
-        { method: next ? 'POST' : 'DELETE' },
-      );
+      const url = `/api/private/journal/entries/${entryId}/reactions`;
+      const res =
+        next
+          ? await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type }),
+            })
+          : await fetch(`${url}?type=${type}`, { method: 'DELETE' });
       if (!res.ok) await mutate();
     } catch {
       await mutate();
@@ -274,7 +301,7 @@ export function PublicTimelineRail({
                 key={e.id}
                 entry={e}
                 isMine={e.userId === selfUserId}
-                onToggleKnowledge={toggleKnowledgeReaction}
+                onToggleReaction={toggleReaction}
                 onEdit={(id) => setModal({ kind: 'edit', entryId: id })}
                 onDelete={(id) =>
                   setModal({ kind: 'confirm-delete', entryId: id })
@@ -288,7 +315,8 @@ export function PublicTimelineRail({
       <Modal
         open={modal.kind === 'edit'}
         onClose={() => setModal({ kind: 'closed' })}
-        title="記録の編集"
+        title="今日の出来事を書く"
+        maxWidth="max-w-xl"
       >
         {modal.kind === 'edit' && (
           <EditEntryModalBody
@@ -348,13 +376,17 @@ function RailTabButton({
 function RailItem({
   entry,
   isMine,
-  onToggleKnowledge,
+  onToggleReaction,
   onEdit,
   onDelete,
 }: {
   entry: RailEntry;
   isMine: boolean;
-  onToggleKnowledge: (entryId: string, next: boolean) => void | Promise<void>;
+  onToggleReaction: (
+    entryId: string,
+    type: JournalReactionType,
+    next: boolean,
+  ) => void | Promise<void>;
   // 編集/削除コールバック (isMine=true のときのみ kebab メニューから発火)
   onEdit: (entryId: string) => void;
   onDelete: (entryId: string) => void;
@@ -369,6 +401,7 @@ function RailItem({
       <AiPostRailItem
         entry={entry}
         isMine={isMine}
+        onToggleReaction={onToggleReaction}
         onEdit={onEdit}
         onDelete={onDelete}
       />
@@ -376,7 +409,8 @@ function RailItem({
   }
   const author = entry.authorNickname ?? entry.authorName ?? '';
   const kind = entry.kind ?? 'diary';
-  const { Icon: KindIcon, label: kindLabel } = KIND_META[kind];
+  // 2026-05-27 chimo 指示: kind バッジは timeline 表示で意味が伝わらないため非表示
+  //   (新仕様で投稿時に kind を選ばないため。 既存 knowledge レコードのタグ表示分岐は維持)。
   const MoodIcon = getMoodIcon(entry.mood);
   const moodLabel = getMoodLabel(entry.mood);
   // 表示タグ: knowledge は knowledgeTags、 それ以外は emotion_tags
@@ -386,8 +420,7 @@ function RailItem({
       : entry.tags ?? [];
   const visibleTags = tagList.slice(0, MAX_TAGS_INLINE);
   const overflowCount = Math.max(0, tagList.length - visibleTags.length);
-  const reactionCount = entry.knowledgeReactionCount ?? 0;
-  const reacted = entry.hasMyKnowledgeReaction ?? false;
+  const reactions = entry.reactions ?? emptyReactions();
 
   return (
     <li
@@ -405,10 +438,6 @@ function RailItem({
           >
             {formatRelativeTime(entry.createdAt)}
           </time>
-          <span className="inline-flex items-center gap-1 rounded-full bg-vn-muted-bg px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-            <KindIcon size={10} strokeWidth={1.75} aria-hidden />
-            {kindLabel}
-          </span>
           {MoodIcon && (
             <MoodIcon
               size={14}
@@ -440,60 +469,61 @@ function RailItem({
       <p className="mt-1.5 whitespace-pre-wrap text-[13px] font-normal leading-[1.7] text-slate-700">
         {entry.content}
       </p>
-      {/* 3 行目: tags + ナレッジボタン (EntryCard と同じ並び) */}
-      {(visibleTags.length > 0 || !isMine || reactionCount > 0) && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {visibleTags.length > 0 && (
+      {/* 3 行目: tags + リアクション 3 ボタン (knowledge / appreciation / endorsement)
+          2026-05-27 (H9): 自分の投稿でも 3 ボタン全部表示 + 押下可能 (セルフ労い動線、 chimo 指示)。
+          [[feedback_no_ismine_view_branch]] 徹底版: 投稿者・閲覧者で世界観の見え方を分けない。
+          reaction セクションは常時表示 (isMine 関係なく)、 chip も常に存在する。 */}
+      {visibleTags.length > 0 && (
+        <div
+          className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5"
+          data-testid={`public-timeline-rail-tags-${entry.id}`}
+        >
+          {visibleTags.map((t) => (
             <span
-              className="flex flex-wrap gap-x-2 gap-y-0.5"
-              data-testid={`public-timeline-rail-tags-${entry.id}`}
+              key={t.id}
+              className="text-[11px] font-medium text-slate-500"
             >
-              {visibleTags.map((t) => (
-                <span
-                  key={t.id}
-                  className="text-[11px] font-medium text-slate-500"
-                >
-                  #{t.name}
-                </span>
-              ))}
-              {overflowCount > 0 && (
-                <span className="text-[11px] text-slate-400">
-                  +{overflowCount}
-                </span>
-              )}
+              #{t.name}
             </span>
-          )}
-          {/* ナレッジリアクション: 自分の投稿には出さない (= 自分には反応しない設計) */}
-          {!isMine && (
-            <button
-              type="button"
-              onClick={() => void onToggleKnowledge(entry.id, !reacted)}
-              aria-pressed={reacted}
-              aria-label="ナレッジ"
-              title="ナレッジ"
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium transition-colors ${
-                reacted
-                  ? 'bg-vn-accent/10 text-vn-accent'
-                  : 'bg-vn-muted-bg text-slate-500 hover:text-slate-700'
-              }`}
-              data-testid={`public-timeline-rail-knowledge-reaction-${entry.id}`}
-            >
-              <Lightbulb size={12} strokeWidth={1.75} aria-hidden />
-              {reactionCount > 0 && <span>{reactionCount}</span>}
-            </button>
-          )}
-          {/* 自分の投稿でリアクションが付いてるときは「読まれたか」 を控えめに表示 */}
-          {isMine && reactionCount > 0 && (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] text-slate-400"
-              data-testid={`public-timeline-rail-knowledge-reaction-count-${entry.id}`}
-            >
-              <Lightbulb size={12} strokeWidth={1.75} aria-hidden />
-              {reactionCount}
+          ))}
+          {overflowCount > 0 && (
+            <span className="text-[11px] text-slate-400">
+              +{overflowCount}
             </span>
           )}
         </div>
       )}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        {REACTION_TYPES_ORDER.map((type) => {
+          const meta = REACTION_META[type];
+          const r = reactions[type];
+          const Icon = meta.Icon;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => void onToggleReaction(entry.id, type, !r.mine)}
+              aria-pressed={r.mine}
+              aria-label={meta.ariaLabel}
+              className={`group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors ${
+                r.mine
+                  ? 'border-indigo-300 bg-indigo-50 text-vn-accent'
+                  : 'border-slate-300 bg-slate-50 text-slate-500 hover:text-slate-700'
+              }`}
+              data-testid={`public-timeline-rail-reaction-${type}-${entry.id}`}
+            >
+              <Icon size={16} strokeWidth={1.75} aria-hidden />
+              {r.count > 0 && <span>{r.count}</span>}
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-visible/reaction:opacity-100"
+              >
+                {meta.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </li>
   );
 }
@@ -501,18 +531,26 @@ function RailItem({
 // AI 週次日誌 β カード (chimo 2026-05-21)
 // system_admin 兼任アカウントの投稿だけを別カードとして描画する。
 // 通常カードと違う点: 投稿者「vitanota AI」固定、 kind バッジ → 「AI 週次日誌 β」、
-// 背景薄紫、 本文 serif、 mood / リアクションは出さない。 isMine 編集メニューは出す。
+// 背景薄紫、 本文 serif。 isMine 編集メニューは出す。
+// 2026-05-27 chimo 指示: AI 投稿にも 3 種 reaction を押せるように追加 (通常カードと同じ動線)。
 function AiPostRailItem({
   entry,
   isMine,
+  onToggleReaction,
   onEdit,
   onDelete,
 }: {
   entry: RailEntry;
   isMine: boolean;
+  onToggleReaction: (
+    entryId: string,
+    type: JournalReactionType,
+    next: boolean,
+  ) => void | Promise<void>;
   onEdit: (entryId: string) => void;
   onDelete: (entryId: string) => void;
 }) {
+  const reactions = entry.reactions ?? emptyReactions();
   return (
     <li
       className="border-y border-purple-100 bg-purple-50/60 px-5 py-3.5"
@@ -549,6 +587,37 @@ function AiPostRailItem({
       <p className="mt-2 whitespace-pre-wrap font-ai-card text-[14px] leading-[1.9] text-slate-800">
         {entry.content}
       </p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        {REACTION_TYPES_ORDER.map((type) => {
+          const meta = REACTION_META[type];
+          const r = reactions[type];
+          const Icon = meta.Icon;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => void onToggleReaction(entry.id, type, !r.mine)}
+              aria-pressed={r.mine}
+              aria-label={meta.ariaLabel}
+              className={`group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors ${
+                r.mine
+                  ? 'border-indigo-300 bg-indigo-50 text-vn-accent'
+                  : 'border-purple-200 bg-white/70 text-purple-700 hover:bg-white'
+              }`}
+              data-testid={`public-timeline-rail-reaction-${type}-${entry.id}`}
+            >
+              <Icon size={16} strokeWidth={1.75} aria-hidden />
+              {r.count > 0 && <span>{r.count}</span>}
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-visible/reaction:opacity-100"
+              >
+                {meta.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </li>
   );
 }

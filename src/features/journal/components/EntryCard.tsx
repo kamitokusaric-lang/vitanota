@@ -6,16 +6,20 @@ import { useEffect, useRef, useState } from 'react';
 import type { EmotionTag } from '@/db/schema';
 import type {
   JournalEntryKind,
+  JournalReactionType,
   MoodLevel,
 } from '@/features/journal/schemas/journal';
-import { Lightbulb } from 'lucide-react';
+import {
+  REACTION_META,
+  REACTION_TYPES_ORDER,
+} from '@/features/journal/components/reactionMeta';
+import type { Reactions } from '@/features/journal/lib/privateJournalRepository';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
 import {
   formatAbsoluteTime,
   formatRelativeTime,
 } from '@/features/journal/lib/relativeTime';
 import { AuthorAvatar } from './AuthorAvatar';
-import { KindBadge } from './KindBadge';
 
 // アバターは機能 (component / 配色ロジック) を残しつつ、現状は表示しない方針 (chimo)。
 // 将来 ON にする時は true にする。flex 構造はこのまま (1 child のみで gap は無効化される)
@@ -37,9 +41,8 @@ export interface EntryCardData {
   tags?: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
   // knowledgeTags: kind=knowledge 用 (knowledge_tags、category なし)
   knowledgeTags?: Array<{ id: string; name: string }>;
-  // ナレッジリアクション (= 他の教員が「これはナレッジ」と感じた数 + 自分が ON か)
-  knowledgeReactionCount?: number;
-  hasMyKnowledgeReaction?: boolean;
+  // H9 (2026-05-27): リアクション 3 種類 (knowledge / appreciation / endorsement)
+  reactions?: Reactions;
 }
 
 interface EntryCardProps {
@@ -47,9 +50,12 @@ interface EntryCardProps {
   showPrivacyBadge?: boolean;
   onEdit?: (entry: EntryCardData) => void;
   onDelete?: (entry: EntryCardData) => void;
-  // ナレッジリアクション切替 (他人の投稿のみ親から渡す。自分の投稿では undefined)
-  onKnowledgeReactionToggle?: (
+  // リアクション切替 (2026-05-27 H9: 3 種類フル共存、 isMine でも押下可能なので
+  // 親は自分の投稿でも callback を渡す)。 undefined のときはボタン非表示 (旧マイ記録
+  // 単独 view 等の互換用)。
+  onReactionToggle?: (
     entry: EntryCardData,
+    type: JournalReactionType,
     next: boolean,
   ) => void | Promise<void>;
 }
@@ -59,7 +65,7 @@ export function EntryCard({
   showPrivacyBadge = false,
   onEdit,
   onDelete,
-  onKnowledgeReactionToggle,
+  onReactionToggle,
 }: EntryCardProps) {
   const hasMenu = Boolean(onEdit || onDelete);
   const MoodIcon = getMoodIcon(entry.mood);
@@ -99,7 +105,7 @@ export function EntryCard({
             >
               {relative}
             </time>
-            {entry.kind && <KindBadge kind={entry.kind} />}
+            {/* 2026-05-27 chimo 指示: kind バッジ削除 (新仕様で投稿時に kind 選ばないため) */}
             {MoodIcon && (
               <MoodIcon
                 size={14}
@@ -142,8 +148,9 @@ export function EntryCard({
           const displayTags =
             entry.kind === 'knowledge' ? entry.knowledgeTags : entry.tags;
           const hasTags = displayTags && displayTags.length > 0;
-          const showReaction = Boolean(onKnowledgeReactionToggle);
-          if (!hasTags && !showReaction) return null;
+          const showReactions = Boolean(onReactionToggle);
+          if (!hasTags && !showReactions) return null;
+          const reactions = entry.reactions;
           return (
             <div
               className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"
@@ -158,36 +165,38 @@ export function EntryCard({
                     #{tag.name}
                   </span>
                 ))}
-              {showReaction && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onKnowledgeReactionToggle!(
-                      entry,
-                      !entry.hasMyKnowledgeReaction,
-                    )
-                  }
-                  aria-pressed={entry.hasMyKnowledgeReaction ?? false}
-                  aria-label="ナレッジ"
-                  className={`group/reaction relative inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
-                    entry.hasMyKnowledgeReaction
-                      ? 'bg-vn-accent/10 text-vn-accent'
-                      : 'bg-vn-muted-bg text-gray-500 hover:text-gray-700'
-                  }`}
-                  data-testid={`entry-card-knowledge-reaction-${entry.id}`}
-                >
-                  <Lightbulb size={13} strokeWidth={1.75} aria-hidden />
-                  {(entry.knowledgeReactionCount ?? 0) > 0 && (
-                    <span>{entry.knowledgeReactionCount}</span>
-                  )}
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-within/reaction:opacity-100"
-                  >
-                    ナレッジ
-                  </span>
-                </button>
-              )}
+              {showReactions &&
+                REACTION_TYPES_ORDER.map((type) => {
+                  const meta = REACTION_META[type];
+                  const r = reactions?.[type] ?? { count: 0, mine: false };
+                  const Icon = meta.Icon;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() =>
+                        onReactionToggle!(entry, type, !r.mine)
+                      }
+                      aria-pressed={r.mine}
+                      aria-label={meta.ariaLabel}
+                      className={`group/reaction relative inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+                        r.mine
+                          ? 'bg-vn-accent/10 text-vn-accent'
+                          : 'bg-vn-muted-bg text-gray-500 hover:text-gray-700'
+                      }`}
+                      data-testid={`entry-card-reaction-${type}-${entry.id}`}
+                    >
+                      <Icon size={13} strokeWidth={1.75} aria-hidden />
+                      {r.count > 0 && <span>{r.count}</span>}
+                      <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-within/reaction:opacity-100"
+                      >
+                        {meta.label}
+                      </span>
+                    </button>
+                  );
+                })}
             </div>
           );
         })()}

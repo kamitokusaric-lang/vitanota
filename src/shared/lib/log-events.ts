@@ -40,12 +40,8 @@ export const LogEvents = {
   SessionRevoked: 'session_revoked',
   SessionExpired: 'session_expired',
 
-  // AI 整理 (Phase 1 コア体験) のオンボーディング + 利用イベント
-  // 注: 全て logEvent (info) のみ使用。「閉じる」を負シグナル扱いしない
-  // (feedback_observed_moment_broken / feedback_design_vocab 踏み絵)。
-  AiCaptureCoachmarkShown: 'ai_capture_coachmark_shown',
-  AiCaptureCoachmarkAdvanced: 'ai_capture_coachmark_advanced',
-  AiCaptureCoachmarkDismissed: 'ai_capture_coachmark_dismissed',
+  // AI 整理 (Phase 1 コア体験) の利用イベント
+  // 注: 全て logEvent (info) のみ使用 (feedback_observed_moment_broken 踏み絵)。
   AiCaptureInputStarted: 'ai_capture_input_started',
   AiCaptureSubmitted: 'ai_capture_submitted',
 
@@ -155,22 +151,7 @@ interface SessionExpiredPayload extends BaseEventFields {
   reason: 'idle_timeout' | 'absolute_max';
 }
 
-// AI 整理コーチマーク + 入力イベント
-interface AiCaptureCoachmarkShownPayload extends BaseEventFields {
-  version: string;
-}
-
-interface AiCaptureCoachmarkAdvancedPayload extends BaseEventFields {
-  step: 1 | 2 | 3;
-  version: string;
-}
-
-interface AiCaptureCoachmarkDismissedPayload extends BaseEventFields {
-  step: 1 | 2 | 3;
-  reason: 'skip' | 'completed' | 'outside_click';
-  version: string;
-}
-
+// AI 整理 入力イベント
 interface AiCaptureInputStartedPayload extends BaseEventFields {
   // textarea で初めて 1 文字以上入力された瞬間。同セッションで 1 回のみ発火想定。
   source: 'rough_capture';
@@ -265,9 +246,6 @@ export interface LogEventPayloads {
   [LogEvents.SessionCreated]: SessionCreatedPayload;
   [LogEvents.SessionRevoked]: SessionRevokedPayload;
   [LogEvents.SessionExpired]: SessionExpiredPayload;
-  [LogEvents.AiCaptureCoachmarkShown]: AiCaptureCoachmarkShownPayload;
-  [LogEvents.AiCaptureCoachmarkAdvanced]: AiCaptureCoachmarkAdvancedPayload;
-  [LogEvents.AiCaptureCoachmarkDismissed]: AiCaptureCoachmarkDismissedPayload;
   [LogEvents.AiCaptureInputStarted]: AiCaptureInputStartedPayload;
   [LogEvents.AiCaptureSubmitted]: AiCaptureSubmittedPayload;
   [LogEvents.FeedbackReplyPosted]: FeedbackReplyPostedPayload;

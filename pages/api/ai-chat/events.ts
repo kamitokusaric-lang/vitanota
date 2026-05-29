@@ -22,21 +22,6 @@ import { logger } from '@/shared/lib/logger';
 
 const RequestSchema = z.discriminatedUnion('event', [
   z.object({
-    event: z.literal('ai_capture_coachmark_shown'),
-    version: z.string().min(1),
-  }),
-  z.object({
-    event: z.literal('ai_capture_coachmark_advanced'),
-    step: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-    version: z.string().min(1),
-  }),
-  z.object({
-    event: z.literal('ai_capture_coachmark_dismissed'),
-    step: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-    reason: z.enum(['skip', 'completed', 'outside_click']),
-    version: z.string().min(1),
-  }),
-  z.object({
     event: z.literal('ai_capture_input_started'),
     source: z.literal('rough_capture'),
   }),
@@ -112,27 +97,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const base = { userId: ctx.userId, tenantId: ctx.tenantId };
   switch (parsed.data.event) {
-    case 'ai_capture_coachmark_shown':
-      logEvent(LogEvents.AiCaptureCoachmarkShown, {
-        ...base,
-        version: parsed.data.version,
-      });
-      break;
-    case 'ai_capture_coachmark_advanced':
-      logEvent(LogEvents.AiCaptureCoachmarkAdvanced, {
-        ...base,
-        step: parsed.data.step,
-        version: parsed.data.version,
-      });
-      break;
-    case 'ai_capture_coachmark_dismissed':
-      logEvent(LogEvents.AiCaptureCoachmarkDismissed, {
-        ...base,
-        step: parsed.data.step,
-        reason: parsed.data.reason,
-        version: parsed.data.version,
-      });
-      break;
     case 'ai_capture_input_started':
       logEvent(LogEvents.AiCaptureInputStarted, {
         ...base,

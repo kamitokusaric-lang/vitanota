@@ -22,7 +22,7 @@ import { Layout } from '@/shared/components/Layout';
 import { Modal } from '@/shared/components/Modal';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { PhilosophyGreeting } from '@/features/dashboard/components/PhilosophyGreeting';
-import { TaskBoard } from '@/features/tasks/components/TaskBoard';
+import { TasksTabWithCalendar } from '@/features/calendar/components/TasksTabWithCalendar';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
 import { TaskCreateTabs } from '@/features/ai-chat/TaskCreateTabs';
@@ -192,7 +192,7 @@ export default function DashboardPage({
     {
       id: 'tasks',
       label: 'タスクボード',
-      content: <TaskBoard selfUserId={session.user.userId} />,
+      content: <TasksTabWithCalendar selfUserId={session.user.userId} />,
     },
     {
       // chimo 2026-05-20: マイノートタブ削除 (右レーンの「マイノート」 タブで代替) →

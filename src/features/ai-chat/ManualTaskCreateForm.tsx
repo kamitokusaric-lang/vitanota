@@ -65,12 +65,19 @@ function emptyRow(selfUserId: string): ManualRow {
 
 export function ManualTaskCreateForm({
   selfUserId,
+  initialDueDate,
   onSuccess,
 }: {
   selfUserId: string;
+  // Phase 6 (chimo 2026-05-29): カレンダーの日付セル「+」 から呼ぶときに
+  // YYYY-MM-DD を渡して dueDate プリフィル。 dashboard 上部の TaskCreateTabs
+  // 経由は渡さないので空文字列のまま (挙動不変)。
+  initialDueDate?: string;
   onSuccess?: () => void;
 }) {
-  const [rows, setRows] = useState<ManualRow[]>(() => [emptyRow(selfUserId)]);
+  const [rows, setRows] = useState<ManualRow[]>(() => [
+    { ...emptyRow(selfUserId), dueDate: initialDueDate ?? '' },
+  ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

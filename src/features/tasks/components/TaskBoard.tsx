@@ -3,8 +3,7 @@
 // 絞込・新規/編集モーダルはこのコンポーネントで管理
 // デフォルトは「自分」(= scope='mine'、assignee + requester 両方を含む)
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Save } from 'lucide-react';
-import { Button } from '@/shared/components/Button';
+import { useSWRConfig } from 'swr';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
@@ -12,11 +11,7 @@ import { useToast } from '@/shared/components/Toast';
 import { useTasks, type TaskWithAssignees } from '../hooks/useTasks';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
-import { useTaskFilterPreferences } from '../hooks/useTaskFilterPreferences';
-import { AssigneeFilter } from './AssigneeFilter';
-import { CategoryFilter } from './CategoryFilter';
-import { TagFilter } from './TagFilter';
-import { PeriodFilter, type PeriodValue } from './PeriodFilter';
+import { type PeriodValue } from './PeriodFilter';
 import { getToday } from '../lib/periodCalc';
 import { TaskMatrix, type MatrixGroup } from './TaskMatrix';
 import { useTaskTags } from '../hooks/useTaskTags';
@@ -24,62 +19,31 @@ import { TaskForm, toFormInitial, type TaskFormValues } from './TaskForm';
 import { TaskCommentSection } from './TaskCommentSection';
 
 // 新規作成 modal は廃止 (chimo 2026-05-13、Dashboard 上部 TaskCreateTabs に移管)
-type ModalState =
-  | { kind: 'closed' }
-  | { kind: 'edit'; task: TaskWithAssignees }
-  | { kind: 'duplicate'; sourceTask: TaskWithAssignees };
+// 編集モーダルは TaskEditModal に集約 (chimo 2026-05-30、 calendar 経由でも共有)。
+
+// Phase 7 (chimo 2026-05-30): フィルタ state は TasksTabWithCalendar に上げて
+// board / week / month で共有する。 TaskBoard はそれを props として受け取る。
+// PeriodFilter (期間) は board のみ参照、 calendar 側は週/月ナビで期間制御。
+export interface SharedFilters {
+  filterOwner: string | undefined;
+  filterTagIds: string[];
+  filterCategoryIds: string[];
+  showDelegated: boolean;
+  period: PeriodValue;
+}
 
 interface TaskBoardProps {
   selfUserId: string;
+  filters: SharedFilters;
 }
 
-export function TaskBoard({ selfUserId }: TaskBoardProps) {
-  // フィルタの意味:
-  //   filterOwner === selfUserId → scope='mine' (assignee OR requester 両方)
-  //   filterOwner === <他ユーザーID> → ownerUserId 指定 (その人が assignee のもののみ)
-  //   filterOwner === undefined → 全員
-  const [filterOwner, setFilterOwner] = useState<string | undefined>(selfUserId);
-  // タグフィルタ (multi-select、空配列 = 全タグ、OR 条件)
-  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
-  // カテゴリフィルタ (multi-select、空配列 = 全カテゴリ、OR 条件)
-  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
-  // 「自分」フィルタ時、自分が依頼した (createdBy=self, owner!=self) タスクを表示するか
-  const [showDelegated, setShowDelegated] = useState(false);
-  // 期間フィルタ (default = 今週 + null + 期限切れ未完了 / range = 純粋 due_date 範囲)
-  const [period, setPeriod] = useState<PeriodValue>({ mode: 'default' });
-  const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+export function TaskBoard({ selfUserId, filters }: TaskBoardProps) {
+  // Phase 7: フィルタ state は親 (TasksTabWithCalendar) で管理、 props で受け取る。
+  // filterOwner === selfUserId → scope='mine' / undefined → 全員 / 他 → ownerUserId 指定
+  const { filterOwner, filterTagIds, filterCategoryIds, showDelegated, period } =
+    filters;
+  const [editTask, setEditTask] = useState<TaskWithAssignees | null>(null);
   const { showToast } = useToast();
-
-  // 教員ごとの保存済みフィルタ設定 (1 フィルタ上書き、画面開いた瞬間に自動適用)
-  const { preference, save: savePreference } = useTaskFilterPreferences();
-  const preferenceAppliedRef = useRef(false);
-  useEffect(() => {
-    if (preferenceAppliedRef.current) return;
-    if (preference === null) return;
-    setFilterOwner(preference.filterOwner ?? undefined);
-    setFilterTagIds(preference.filterTagIds);
-    setFilterCategoryIds(preference.filterCategoryIds);
-    setShowDelegated(preference.showDelegated);
-    setPeriod(preference.period);
-    preferenceAppliedRef.current = true;
-  }, [preference]);
-
-  const handleSaveFilter = async () => {
-    try {
-      await savePreference({
-        filterOwner: filterOwner ?? null,
-        filterTagIds,
-        filterCategoryIds,
-        showDelegated,
-        period,
-      });
-      showToast('フィルタを保存しました', 'success');
-    } catch (_e) {
-      showToast('保存に失敗しました', 'error');
-    }
-  };
 
   // useTasks に渡す dateFilter: default mode は「今日以降 + 期限なし + 期限切れ未完了」
   // 内部的には range の上限を遠未来に倒すことで API 側 default ロジックを流用している
@@ -128,132 +92,9 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     return m;
   }, [categories]);
 
-  const closeModal = () => {
-    setModal({ kind: 'closed' });
-    setFormError(null);
-  };
-
   // 旧 handleBulkCreate (新規一括作成) は ManualTaskCreateForm に移管済 (chimo 2026-05-13)
-
-  const handleUpdate = async (taskId: string, values: TaskFormValues) => {
-    setSubmitting(true);
-    setFormError(null);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          categoryId: values.categoryId,
-          title: values.title,
-          description: values.description || null,
-          dueDate: values.dueDate || null,
-          status: values.status,
-          assigneeUserIds: values.assigneeUserIds,
-        }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        setFormError(body.message ?? 'タスクの更新に失敗しました');
-        return;
-      }
-      // タグ差分更新 (空配列でも全削除を意味するので常に PUT)
-      await fetch(`/api/tasks/${taskId}/tags`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagIds: values.tagIds }),
-      });
-      await mutateTasks();
-      closeModal();
-      showToast('タスクを更新しました', 'success');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // タグ作成 (TaskForm から呼ぶ)
-  const handleCreateTag = async (name: string) => {
-    const res = await fetch('/api/task-tags', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(body.message ?? 'タグ作成に失敗しました');
-    }
-    const { tag } = (await res.json()) as {
-      tag: import('../hooks/useTaskTags').TaskTag;
-    };
-    await mutateTags();
-    return tag;
-  };
-
-  const handleDelete = async (taskId: string) => {
-    if (!confirm('このタスクを削除しますか?')) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
-      if (!res.ok) {
-        showToast('削除に失敗しました', 'error');
-        return;
-      }
-      await mutateTasks();
-      closeModal();
-      showToast('タスクを削除しました', 'success');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDuplicate = async (sourceTaskId: string, values: TaskFormValues) => {
-    setSubmitting(true);
-    setFormError(null);
-    try {
-      const res = await fetch(`/api/tasks/${sourceTaskId}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assigneeUserIds: values.assigneeUserIds,
-          categoryId: values.categoryId,
-          title: values.title,
-          description: values.description || null,
-          dueDate: values.dueDate || null,
-        }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        setFormError(body.message ?? 'タスクの複製に失敗しました');
-        return;
-      }
-      const { task } = (await res.json()) as { task: { id: string } };
-      // 複製先にタグも継承する (フォームで操作した結果の tagIds)
-      if (values.tagIds.length > 0) {
-        await fetch(`/api/tasks/${task.id}/tags`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tagIds: values.tagIds }),
-        });
-      }
-      await mutateTasks();
-      closeModal();
-      const assigneesLabel = (() => {
-        if (values.assigneeUserIds.length === 0) return '誰か';
-        const names = values.assigneeUserIds.map((uid) => {
-          if (uid === selfUserId) return '自分';
-          const a = (assignees ?? []).find((x) => x.userId === uid);
-          return a?.name ?? '他の先生';
-        });
-        if (names.length <= 3) return names.join(', ');
-        return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
-      })();
-      showToast(
-        `${assigneesLabel}のタスクとして「${values.title}」を複製しました`,
-        'success',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  // 旧 handleUpdate / handleDelete / handleDuplicate / handleCreateTag は TaskEditModal に集約
+  // (chimo 2026-05-30、 calendar 経由でも共有)。
 
   // 横方向ドラッグ&ドロップで status 変更
   const handleDropStatus = async (
@@ -315,140 +156,32 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     <div data-testid="task-board">
       {/* Linear 風 filter row: chip 4 つを左寄せ + 右端に新規ボタン
           chimo 2026-05-20: 高さ 34px / 14px / pill、 wrap 下余白 28px */}
-      <div className="mb-7 flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <AssigneeFilter
-            value={filterOwner}
-            onChange={setFilterOwner}
-            assignees={assignees ?? []}
-            selfUserId={selfUserId}
-            showDelegated={showDelegated}
-            onShowDelegatedChange={setShowDelegated}
-          />
-          <CategoryFilter
-            value={filterCategoryIds}
-            onChange={setFilterCategoryIds}
-            categories={categories}
-          />
-          <TagFilter
-            value={filterTagIds}
-            onChange={setFilterTagIds}
-            tags={taskTags ?? []}
-          />
-          <PeriodFilter value={period} onChange={setPeriod} />
-          <button
-            type="button"
-            onClick={handleSaveFilter}
-            className="inline-flex h-[30px] items-center gap-1 rounded-full border border-vn-border-strong bg-white px-[11px] text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
-            data-testid="task-board-save-filter-button"
-            title="現在のフィルタを次回以降のデフォルトとして保存"
-          >
-            <Save size={14} aria-hidden />
-            フィルタを保存
-          </button>
-        </div>
-        {/* 新規タスクボタンはダッシュボード上部の TaskCreateTabs (AI 整理 / 手動追加) に移管 (chimo 2026-05-13) */}
-      </div>
-
+      {/* Phase 7: filter UI は親 (TasksTabWithCalendar) に上げて board / week / month で共有 */}
       <TaskMatrix
         tasks={filteredTasks}
         rows={rows}
         assignTaskToRows={assignTaskToRows}
         selfUserId={selfUserId}
-        onEdit={(task) => setModal({ kind: 'edit', task })}
+        onEdit={setEditTask}
         onTaskDropStatus={handleDropStatus}
         // 「全員」フィルタ時のみ自分のタスクを薄い黄色 + カード左の赤ラインでハイライト
         highlightMineTasks={filterOwner === undefined}
         categoryNameById={categoryNameById}
       />
 
-      <Modal
-        open={modal.kind === 'edit'}
-        onClose={closeModal}
-        title={
-          modal.kind === 'edit' ? (
-            <div className="flex items-center justify-between">
-              <span>
-                {modal.task.assignees.some((a) => a.userId === selfUserId)
-                  ? 'タスクの編集'
-                  : 'タスクを見る'}
-              </span>
-              {modal.task.assignees.some((a) => a.userId === selfUserId) && (
-                <TaskEditKebabMenu
-                  onDuplicate={() =>
-                    modal.kind === 'edit' &&
-                    setModal({ kind: 'duplicate', sourceTask: modal.task })
-                  }
-                  onDelete={() =>
-                    modal.kind === 'edit' && handleDelete(modal.task.id)
-                  }
-                />
-              )}
-            </div>
-          ) : undefined
-        }
-        maxWidth="max-w-xl"
-      >
-        {modal.kind === 'edit' && (
-          <>
-            <TaskForm
-              mode="edit"
-              initial={toFormInitial(modal.task)}
-              categories={categories}
-              assignees={assignees ?? []}
-              canAssignToOthers
-              selfUserId={selfUserId}
-              submitting={submitting}
-              error={formError}
-              readonly={!modal.task.assignees.some((a) => a.userId === selfUserId)}
-              taskTags={taskTags ?? []}
-              onCreateTag={handleCreateTag}
-              onSubmit={(values) => handleUpdate(modal.task.id, values)}
-              onCancel={closeModal}
-            />
-            <TaskCommentSection
-              taskId={modal.task.id}
-              selfUserId={selfUserId}
-              canDeleteAny={false}
-            />
-          </>
-        )}
-      </Modal>
-
-      <Modal
-        open={modal.kind === 'duplicate'}
-        onClose={closeModal}
-        title="タスクを複製"
-        maxWidth="max-w-lg"
-      >
-        {modal.kind === 'duplicate' && (
-          <>
-            <p className="mb-3 text-xs text-gray-600" data-testid="task-duplicate-source">
-              元タスク「{modal.sourceTask.title}」をコピーします。担当者を選択してください。
-            </p>
-            <TaskForm
-              mode="duplicate"
-              initial={{ ...toFormInitial(modal.sourceTask), assigneeUserIds: [] }}
-              categories={categories}
-              assignees={assignees ?? []}
-              canAssignToOthers
-              selfUserId={selfUserId}
-              submitting={submitting}
-              error={formError}
-              taskTags={taskTags ?? []}
-              onCreateTag={handleCreateTag}
-              onSubmit={(values) => handleDuplicate(modal.sourceTask.id, values)}
-              onCancel={closeModal}
-            />
-          </>
-        )}
-      </Modal>
+      <TaskEditModal
+        task={editTask}
+        selfUserId={selfUserId}
+        onClose={() => setEditTask(null)}
+      />
     </div>
   );
 }
 
 // 編集モーダル右上の 3 点リーダーメニュー (複製 / 削除)
-function TaskEditKebabMenu({
+// Phase 6 (chimo 2026-05-30): カレンダー経由の編集モーダルでも同じ動線を出すため
+// export 化、 TasksTabWithCalendar からも import 可能に。
+export function TaskEditKebabMenu({
   onDuplicate,
   onDelete,
 }: {
@@ -507,5 +240,252 @@ function TaskEditKebabMenu({
         </div>
       )}
     </div>
+  );
+}
+
+// 編集モーダル本体 (Phase 6 で TaskBoard 内から共通化、 chimo 2026-05-30)。
+// edit + duplicate + delete + コメント + KebabMenu + readonly 判定をまとめて持つ。
+// TaskBoard と TasksTabWithCalendar (calendar 経由) 両方が import して使う。
+// `topSlot` で各呼び出し元固有の追加 button (例: calendar の「来週に渡す」) を挿入できる。
+export function TaskEditModal({
+  task,
+  selfUserId,
+  onClose,
+  topSlot,
+}: {
+  task: TaskWithAssignees | null;
+  selfUserId: string;
+  onClose: () => void;
+  topSlot?: (task: TaskWithAssignees) => React.ReactNode;
+}) {
+  const { mutate: globalMutate } = useSWRConfig();
+  const { showToast } = useToast();
+  const { categories } = useTaskCategories();
+  const { assignees } = useAssignees();
+  const { tags: taskTags, mutate: mutateTags } = useTaskTags();
+  const [duplicateSource, setDuplicateSource] =
+    useState<TaskWithAssignees | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const close = () => {
+    setDuplicateSource(null);
+    setFormError(null);
+    onClose();
+  };
+
+  const invalidateTasks = () =>
+    globalMutate(
+      (key: unknown) =>
+        typeof key === 'string' && key.startsWith('/api/tasks'),
+    );
+
+  const handleUpdate = async (taskId: string, values: TaskFormValues) => {
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryId: values.categoryId,
+          title: values.title,
+          description: values.description || null,
+          dueDate: values.dueDate || null,
+          status: values.status,
+          assigneeUserIds: values.assigneeUserIds,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        setFormError(body.message ?? 'タスクの更新に失敗しました');
+        return;
+      }
+      await fetch(`/api/tasks/${taskId}/tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagIds: values.tagIds }),
+      });
+      await invalidateTasks();
+      close();
+      showToast('タスクを更新しました', 'success');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (typeof window !== 'undefined' && !window.confirm('このタスクを削除しますか?')) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        showToast('削除に失敗しました', 'error');
+        return;
+      }
+      await invalidateTasks();
+      close();
+      showToast('タスクを削除しました', 'success');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDuplicate = async (
+    sourceTaskId: string,
+    values: TaskFormValues,
+  ) => {
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const res = await fetch(`/api/tasks/${sourceTaskId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assigneeUserIds: values.assigneeUserIds,
+          categoryId: values.categoryId,
+          title: values.title,
+          description: values.description || null,
+          dueDate: values.dueDate || null,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        setFormError(body.message ?? 'タスクの複製に失敗しました');
+        return;
+      }
+      const { task: created } = (await res.json()) as { task: { id: string } };
+      if (values.tagIds.length > 0) {
+        await fetch(`/api/tasks/${created.id}/tags`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tagIds: values.tagIds }),
+        });
+      }
+      await invalidateTasks();
+      close();
+      const assigneesLabel = (() => {
+        if (values.assigneeUserIds.length === 0) return '誰か';
+        const names = values.assigneeUserIds.map((uid) => {
+          if (uid === selfUserId) return '自分';
+          const a = (assignees ?? []).find((x) => x.userId === uid);
+          return a?.name ?? '他の先生';
+        });
+        if (names.length <= 3) return names.join(', ');
+        return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+      })();
+      showToast(
+        `${assigneesLabel}のタスクとして「${values.title}」を複製しました`,
+        'success',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateTag = async (name: string) => {
+    const res = await fetch('/api/task-tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
+      throw new Error(body.message ?? 'タグ作成に失敗しました');
+    }
+    const { tag } = (await res.json()) as {
+      tag: import('../hooks/useTaskTags').TaskTag;
+    };
+    await mutateTags();
+    return tag;
+  };
+
+  const isSelfAssignee = !!task && task.assignees.some((a) => a.userId === selfUserId);
+
+  return (
+    <>
+      <Modal
+        open={!!task && !duplicateSource}
+        onClose={close}
+        title={
+          task ? (
+            <div className="flex items-center justify-between">
+              <span>{isSelfAssignee ? 'タスクの編集' : 'タスクを見る'}</span>
+              {isSelfAssignee && (
+                <TaskEditKebabMenu
+                  onDuplicate={() => setDuplicateSource(task)}
+                  onDelete={() => handleDelete(task.id)}
+                />
+              )}
+            </div>
+          ) : undefined
+        }
+        maxWidth="max-w-xl"
+      >
+        {task && (
+          <>
+            {topSlot?.(task)}
+            <TaskForm
+              mode="edit"
+              initial={toFormInitial(task)}
+              categories={categories ?? []}
+              assignees={assignees ?? []}
+              canAssignToOthers
+              selfUserId={selfUserId}
+              submitting={submitting}
+              error={formError}
+              readonly={!isSelfAssignee}
+              taskTags={taskTags ?? []}
+              onCreateTag={handleCreateTag}
+              onSubmit={(values) => handleUpdate(task.id, values)}
+              onCancel={close}
+            />
+            <TaskCommentSection
+              taskId={task.id}
+              selfUserId={selfUserId}
+              canDeleteAny={false}
+            />
+          </>
+        )}
+      </Modal>
+      <Modal
+        open={!!duplicateSource}
+        onClose={close}
+        title="タスクを複製"
+        maxWidth="max-w-lg"
+      >
+        {duplicateSource && (
+          <>
+            <p
+              className="mb-3 text-xs text-gray-600"
+              data-testid="task-duplicate-source"
+            >
+              元タスク「{duplicateSource.title}」をコピーします。担当者を選択してください。
+            </p>
+            <TaskForm
+              mode="duplicate"
+              initial={{
+                ...toFormInitial(duplicateSource),
+                assigneeUserIds: [],
+              }}
+              categories={categories ?? []}
+              assignees={assignees ?? []}
+              canAssignToOthers
+              selfUserId={selfUserId}
+              submitting={submitting}
+              error={formError}
+              taskTags={taskTags ?? []}
+              onCreateTag={handleCreateTag}
+              onSubmit={(values) => handleDuplicate(duplicateSource.id, values)}
+              onCancel={close}
+            />
+          </>
+        )}
+      </Modal>
+    </>
   );
 }

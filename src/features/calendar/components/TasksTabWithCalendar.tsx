@@ -1,0 +1,276 @@
+// タスクボード大タブ内の view 切り替え wrapper。
+// URL ?tab=tasks&view=board|week|month で view 状態を保持。
+//
+// 編集モーダルは TaskEditModal (TaskBoard.tsx 内、 chimo 2026-05-30 で共通化) を import。
+// 新規追加 modal (Phase 6 「+」 button から) は ManualTaskCreateForm をそのまま使用。
+//
+// Phase 7 (chimo 2026-05-30): フィルタ state は本ファイルに集約、 board / week / month
+// で共有。 PeriodFilter は view='board' のときのみ表示 (calendar は週/月ナビが期間制御)。
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useSWRConfig } from 'swr';
+import { ArrowRight, Save, Columns3, Calendar } from 'lucide-react';
+import { Modal } from '@/shared/components/Modal';
+import { useToast } from '@/shared/components/Toast';
+import {
+  TaskBoard,
+  TaskEditModal,
+  type SharedFilters,
+} from '@/features/tasks/components/TaskBoard';
+import { Tabs, type TabDef } from '@/shared/components/Tabs';
+import { AssigneeFilter } from '@/features/tasks/components/AssigneeFilter';
+import { CategoryFilter } from '@/features/tasks/components/CategoryFilter';
+import { TagFilter } from '@/features/tasks/components/TagFilter';
+import { PeriodFilter } from '@/features/tasks/components/PeriodFilter';
+import { useTaskCategories } from '@/features/tasks/hooks/useTaskCategories';
+import { useAssignees } from '@/features/tasks/hooks/useAssignees';
+import { useTaskTags } from '@/features/tasks/hooks/useTaskTags';
+import { useTaskFilterPreferences } from '@/features/tasks/hooks/useTaskFilterPreferences';
+import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
+import { ManualTaskCreateForm } from '@/features/ai-chat/ManualTaskCreateForm';
+import { CalendarMonthView } from './CalendarMonthView';
+import { getNextMondayFromDate } from '../lib/calendarDateRange';
+
+const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
+
+function formatMoveLabel(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return `${m}/${d} (${WEEK_LABELS[date.getDay()]})`;
+}
+
+function dueDateToBase(value: string | Date | null): Date | string {
+  if (!value) return new Date();
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value;
+}
+
+interface TasksTabWithCalendarProps {
+  selfUserId: string;
+}
+
+export function TasksTabWithCalendar({
+  selfUserId,
+}: TasksTabWithCalendarProps) {
+  const router = useRouter();
+  const { mutate: globalMutate } = useSWRConfig();
+  const { showToast } = useToast();
+  const { categories } = useTaskCategories();
+  const { assignees } = useAssignees();
+  const { tags: taskTags } = useTaskTags();
+  const { preference, save: savePreference } = useTaskFilterPreferences();
+
+  const [filters, setFilters] = useState<SharedFilters>({
+    filterOwner: selfUserId,
+    filterTagIds: [],
+    filterCategoryIds: [],
+    showDelegated: false,
+    period: { mode: 'default' },
+  });
+
+  // 初回のみ保存済み preference を反映 (TaskBoard 旧実装と同 pattern)
+  const preferenceAppliedRef = useRef(false);
+  useEffect(() => {
+    if (preferenceAppliedRef.current) return;
+    if (preference === null) return;
+    setFilters({
+      filterOwner: preference.filterOwner ?? undefined,
+      filterTagIds: preference.filterTagIds,
+      filterCategoryIds: preference.filterCategoryIds,
+      showDelegated: preference.showDelegated,
+      period: preference.period,
+    });
+    preferenceAppliedRef.current = true;
+  }, [preference]);
+
+  const [editing, setEditing] = useState<TaskWithAssignees | null>(null);
+  const [createDate, setCreateDate] = useState<string | null>(null);
+
+  const handleEditTask = (task: TaskWithAssignees) => setEditing(task);
+  const handleCloseEdit = () => setEditing(null);
+  const handleAddTask = (date: string) => setCreateDate(date);
+  const handleCloseCreate = () => setCreateDate(null);
+
+  const invalidateTasks = () =>
+    globalMutate(
+      (key: unknown) =>
+        typeof key === 'string' && key.startsWith('/api/tasks'),
+    );
+
+  const handleMoveTask = async (taskId: string, newDate: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: newDate }),
+      });
+      if (!res.ok) {
+        showToast('日付の変更に失敗しました', 'error');
+        return;
+      }
+      await invalidateTasks();
+      showToast(`${formatMoveLabel(newDate)} に移動しました`, 'success');
+    } catch {
+      showToast('日付の変更に失敗しました', 'error');
+    }
+  };
+
+  const handlePushToNextWeek = async (task: TaskWithAssignees) => {
+    const nextMonday = getNextMondayFromDate(dueDateToBase(task.dueDate));
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: nextMonday }),
+      });
+      if (!res.ok) {
+        showToast('来週への移動に失敗しました', 'error');
+        return;
+      }
+      await invalidateTasks();
+      handleCloseEdit();
+      showToast('来週に渡しました', 'success');
+    } catch {
+      showToast('来週への移動に失敗しました', 'error');
+    }
+  };
+
+  const handleSaveFilter = async () => {
+    try {
+      await savePreference({
+        filterOwner: filters.filterOwner ?? null,
+        filterTagIds: filters.filterTagIds,
+        filterCategoryIds: filters.filterCategoryIds,
+        showDelegated: filters.showDelegated,
+        period: filters.period,
+      });
+      showToast('フィルタを保存しました', 'success');
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    }
+  };
+
+  // PeriodFilter は board のみ表示 (calendar は週/月ナビが期間制御)
+  const viewQuery = router.query.view;
+  const activeView = typeof viewQuery === 'string' ? viewQuery : 'board';
+  const showPeriodFilter = activeView === 'board';
+
+  const tabs: TabDef[] = [
+    {
+      id: 'board',
+      label: 'ボード',
+      icon: <Columns3 size={16} strokeWidth={1.75} aria-hidden />,
+      content: <TaskBoard selfUserId={selfUserId} filters={filters} />,
+    },
+    {
+      id: 'calendar',
+      label: 'カレンダー',
+      icon: <Calendar size={16} strokeWidth={1.75} aria-hidden />,
+      content: (
+        <CalendarMonthView
+          selfUserId={selfUserId}
+          filters={filters}
+          onEditTask={handleEditTask}
+          onMoveTask={handleMoveTask}
+          onAddTask={handleAddTask}
+        />
+      ),
+    },
+  ];
+
+  // Phase 7: filter UI は Tabs の rightSlot に渡して同一 row に
+  const filterBar = (
+    <>
+      <AssigneeFilter
+        value={filters.filterOwner}
+        onChange={(filterOwner) =>
+          setFilters((f) => ({ ...f, filterOwner }))
+        }
+        assignees={assignees ?? []}
+        selfUserId={selfUserId}
+        showDelegated={filters.showDelegated}
+        onShowDelegatedChange={(showDelegated) =>
+          setFilters((f) => ({ ...f, showDelegated }))
+        }
+      />
+      <CategoryFilter
+        value={filters.filterCategoryIds}
+        onChange={(filterCategoryIds) =>
+          setFilters((f) => ({ ...f, filterCategoryIds }))
+        }
+        categories={categories ?? []}
+      />
+      <TagFilter
+        value={filters.filterTagIds}
+        onChange={(filterTagIds) =>
+          setFilters((f) => ({ ...f, filterTagIds }))
+        }
+        tags={taskTags ?? []}
+      />
+      {showPeriodFilter && (
+        <PeriodFilter
+          value={filters.period}
+          onChange={(period) => setFilters((f) => ({ ...f, period }))}
+        />
+      )}
+      <button
+        type="button"
+        onClick={handleSaveFilter}
+        className="inline-flex h-[30px] items-center gap-1 rounded-full border border-vn-border-strong bg-white px-[11px] text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
+        data-testid="task-board-save-filter-button"
+        title="現在のフィルタを次回以降のデフォルトとして保存"
+      >
+        <Save size={14} aria-hidden />
+        フィルタを保存
+      </button>
+    </>
+  );
+
+  return (
+    <>
+      <Tabs
+        tabs={tabs}
+        defaultTabId="board"
+        queryParam="view"
+        variant="pill"
+        rightSlot={filterBar}
+      />
+      <TaskEditModal
+        task={editing}
+        selfUserId={selfUserId}
+        onClose={handleCloseEdit}
+        topSlot={(task) => {
+          if (task.status === 'done') return null;
+          if (!task.assignees.some((a) => a.userId === selfUserId)) return null;
+          return (
+            <div className="mb-3 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => handlePushToNextWeek(task)}
+                data-testid="calendar-push-to-next-week"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-vn-accent px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow-md"
+              >
+                <ArrowRight size={16} strokeWidth={2} aria-hidden />
+                来週に渡す
+              </button>
+            </div>
+          );
+        }}
+      />
+      <Modal
+        open={createDate !== null}
+        onClose={handleCloseCreate}
+        title="タスクを追加"
+        maxWidth="max-w-3xl"
+      >
+        {createDate && (
+          <ManualTaskCreateForm
+            selfUserId={selfUserId}
+            initialDueDate={createDate}
+            onSuccess={handleCloseCreate}
+          />
+        )}
+      </Modal>
+    </>
+  );
+}

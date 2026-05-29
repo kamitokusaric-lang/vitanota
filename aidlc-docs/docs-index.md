@@ -19,7 +19,7 @@
 |---|---|---|
 | [CURRENT] | [`construction/user-onboarding-flow.md`](construction/user-onboarding-flow.md) | **正本**: 招待フロー仕様（Step 0〜5）・役割権限・セキュリティ制御 |
 | [LEGACY] | [`construction/auth-externalization.md`](construction/auth-externalization.md) | 旧認証外部化設計。Lambda Proxy 前の「ブラウザから Google /token 直接」前提。冒頭注記で誘導中 |
-| [HISTORY] | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) | Lambda Proxy 実装時のスナップショット |
+| [HISTORY] | [`operations/history/session-handoff-20260420.md`](operations/history/session-handoff-20260420.md) | Lambda Proxy 実装時のスナップショット |
 | [CURRENT] | [`construction/security/role-definitions.md`](construction/security/role-definitions.md) | 4 ロール (system_admin / school_admin / teacher / bootstrap) の定義 |
 | [CURRENT] | [`construction/auth-error-catalog.md`](construction/auth-error-catalog.md) | **正本**: 認証エラーコード 25 種の仕様書 (発生源・領域・実発生原因・ユーザー表示メッセージ) |
 
@@ -134,7 +134,7 @@
 | [CURRENT] | [`operations/claude-code-review-rollout.md`](operations/claude-code-review-rollout.md) | Claude Code Review 段階導入計画 |
 | [CURRENT] | [`operations/infrastructure-audit-20260419.md`](operations/infrastructure-audit-20260419.md) | インフラ監査（再掲） |
 | [CURRENT] | [`operations/rollback/0046_revert.sql`](operations/rollback/0046_revert.sql) | migration 0046 (journal reactions 3 種化) のロールバック SQL — 手動適用 |
-| [HISTORY] | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) | Auth 実装時の引き継ぎスナップショット |
+| [HISTORY] | [`operations/history/session-handoff-20260420.md`](operations/history/session-handoff-20260420.md) | Auth 実装時の引き継ぎスナップショット |
 
 ## 🔒 セキュリティ
 
@@ -156,9 +156,9 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | [PROCESS] | [`inception/plans/`](inception/plans/) | インセプション各ステージのプラン (execution-plan.md 等) |
 | [CURRENT] | [`inception/plans/2026-05-07-meeting-features-plan.md`](inception/plans/2026-05-07-meeting-features-plan.md) | 5/7 教員向け説明会向け機能追加の実装プラン (機能 A/B/C のステップチェックリスト + デプロイ + ロールバック手順) |
 | [CURRENT] | [`inception/plans/2026-05-07-multi-assignee-handoff.md`](inception/plans/2026-05-07-multi-assignee-handoff.md) | 5/7 説明会向け 複数アサイン本実装 (post-MVP 繰り上げ) — 引き継ぎノート (確定設計 / 既存 RLS パターン / MA-1〜11 詳細 / 次セッション開始手順) |
-| [CURRENT] | [`inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md`](inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md) | AI 連携第一弾のユーザーストーリー実行判定アセスメント (High Priority 4 項目該当、Execute: Yes) |
-| [CURRENT] | [`inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md`](inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md) | AI 連携第一弾のストーリー生成プラン (chimo 合意済み方針 + ストーリー一覧 + INVEST チェックリスト) |
-| [CURRENT] | [`inception/plans/2026-05-11-ai-chat-extraction-plan.md`](inception/plans/2026-05-11-ai-chat-extraction-plan.md) | **AI 連携第一弾の実装プラン** (Unit-05、Mermaid 可視化 + Phase 0-7 段階的着手 + ブランチ戦略 + ロールバック手順) |
+| [HISTORY] | [`inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md`](inception/plans/2026-05-11-ai-chat-extraction-stories-assessment.md) | AI 連携第一弾のユーザーストーリー実行判定アセスメント (EPIC-T-07 実装完了 2026-05-13) |
+| [HISTORY] | [`inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md`](inception/plans/2026-05-11-ai-chat-extraction-stories-plan.md) | AI 連携第一弾のストーリー生成プラン (EPIC-T-07 実装完了 2026-05-13) |
+| [HISTORY] | [`inception/plans/2026-05-11-ai-chat-extraction-plan.md`](inception/plans/2026-05-11-ai-chat-extraction-plan.md) | **AI 連携第一弾の実装プラン** (Unit-05、 EPIC-T-07 実装完了 2026-05-13) |
 | [PROCESS] | [`construction/plans/`](construction/plans/) | Unit 別の functional/nfr/infra/code 生成プラン (20 ファイル) |
 | [PROCESS] | `construction/unit-XX-*-questions.md` | 質問・回答の記録 |
 
@@ -168,7 +168,7 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 
 | 状態 | ファイル | 役割 |
 |---|---|---|
-| [HISTORY] | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) | Auth 修正セッションのスナップショット |
+| [HISTORY] | [`operations/history/session-handoff-20260420.md`](operations/history/session-handoff-20260420.md) | Auth 修正セッションのスナップショット |
 
 ---
 
@@ -177,7 +177,7 @@ AIDLC ワークフローの進行に伴う内部成果物。**仕様参照には
 | 質問 | 見るファイル |
 |---|---|
 | 認証・ログインの全体フロー | [`construction/user-onboarding-flow.md`](construction/user-onboarding-flow.md) |
-| Google OAuth の Lambda Proxy 経由の理由 | [`operations/session-handoff-20260420.md`](operations/session-handoff-20260420.md) |
+| Google OAuth の Lambda Proxy 経由の理由 | [`operations/history/session-handoff-20260420.md`](operations/history/session-handoff-20260420.md) |
 | 何を作るか (要件) | [`inception/requirements/requirements.md`](inception/requirements/requirements.md) |
 | 誰のために作るか (ペルソナ) | [`inception/user-stories/personas.md`](inception/user-stories/personas.md) |
 | どう作るか (アーキテクチャ) | [`inception/application-design/application-design.md`](inception/application-design/application-design.md) |
@@ -229,6 +229,7 @@ aidlc-docs/
 └── operations/                      # 🟡 運用フェーズ
     ├── post-mvp-backlog.md          # 継続タスク
     ├── infrastructure-audit-20260419.md
-    ├── session-handoff-20260420.md
-    └── claude-code-review-rollout.md
+    ├── claude-code-review-rollout.md
+    └── history/                     # 過去スナップショット
+        └── session-handoff-20260420.md
 ```

@@ -1,5 +1,7 @@
 # Story Generation Plan — 2026-05-11 AI 連携第一弾
 
+> **🟢 実装完了**: EPIC-T-07 は 2026-05-13 に Phase 1 として本番リリース済 (memory `project_ai_chat_feature_flag`)。本ドキュメントは当時のストーリー生成方針記録として保持。
+
 > **作成日**: 2026-05-11
 > **目的**: AI チャット抽出機能 (EPIC-T-07) のユーザーストーリー生成プラン
 > **承認**: 本プランの方針は AskUserQuestion で chimo と合意済み (2026-05-11)

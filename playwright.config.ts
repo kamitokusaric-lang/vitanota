@@ -54,7 +54,7 @@ export default defineConfig({
       ...process.env,
       NODE_ENV: 'test',
       DATABASE_URL: process.env.DATABASE_URL ?? 'postgresql://test:test@localhost:5432/vitanota_test',
-      RDS_PROXY_ENDPOINT: process.env.RDS_PROXY_ENDPOINT ?? 'localhost',
+      RDS_ENDPOINT: process.env.RDS_ENDPOINT ?? 'localhost',
       DB_USER: process.env.DB_USER ?? 'vitanota_app',
       DB_NAME: process.env.DB_NAME ?? 'vitanota_test',
       DB_PASSWORD: process.env.DB_PASSWORD ?? 'vitanota_app_local',

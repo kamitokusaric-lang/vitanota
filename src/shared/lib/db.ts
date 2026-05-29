@@ -180,13 +180,13 @@ function getPool(): Pool {
   // IAM トークンは 15 分で expire するため、Pool 側で保持すると
   // 新規 backend connection 時に古い token で PAM 認証失敗する。
   // pg は password に関数を渡すと新規 Client 毎に評価する仕様なので、
-  // getDbAuthToken (12 分 TTL キャッシュ) を毎回呼ばせて fresh token を使わせる。
+  // getDbAuthToken (8 分 TTL キャッシュ) を毎回呼ばせて fresh token を使わせる。
   const password: string | (() => Promise<string>) = process.env.DB_PASSWORD
     ? process.env.DB_PASSWORD
     : () => getDbAuthToken();
 
   pool = new ObservablePool({
-    host: process.env.RDS_PROXY_ENDPOINT,
+    host: process.env.RDS_ENDPOINT,
     port: 5432,
     user: process.env.DB_USER,
     password,
@@ -195,7 +195,7 @@ function getPool(): Pool {
     // を検証せず接続する。通信は VPC 内で閉じており MITM リスクは実質ゼロ。
     // Phase 2 で RDS CA bundle を Docker に同梱して rejectUnauthorized: true に戻す。
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    max: 10,              // RDS Proxy がプール管理するためアプリ側は小さく
+    max: 10,              // アプリ側のみで pool 管理 (RDS Proxy 等の中間層なし)
     idleTimeoutMillis: 30_000,
   });
 

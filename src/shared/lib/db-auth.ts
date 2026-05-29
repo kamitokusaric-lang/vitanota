@@ -1,5 +1,5 @@
 // SP-02: IAM トークン認証パターン（SECURITY-06・SECURITY-12 準拠）
-// 静的パスワード不要。IAM ロールで RDS Proxy に接続する
+// 静的パスワード不要。IAM ロールで RDS に直接接続する (RDS Proxy 経由ではない)
 import { Signer } from '@aws-sdk/rds-signer';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger';
@@ -30,7 +30,7 @@ let tokenCache: TokenCache | null = null;
 let inflight: Promise<string> | null = null;
 
 const signer = new Signer({
-  hostname: process.env.RDS_PROXY_ENDPOINT ?? '',
+  hostname: process.env.RDS_ENDPOINT ?? '',
   port: 5432,
   region: process.env.AWS_REGION ?? 'ap-northeast-1',
   username: process.env.DB_USER ?? '',

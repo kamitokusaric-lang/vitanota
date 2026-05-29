@@ -56,3 +56,60 @@ export function shiftWeek(weekStart: string, deltaWeeks: number): WeekRange {
 export function todayYmd(now: Date = new Date()): string {
   return toYmd(now);
 }
+
+// ────────────────────────────────────────────────────────
+// 月 view 用 (Phase 2)
+// ────────────────────────────────────────────────────────
+
+export interface MonthGrid {
+  monthStart: string; // YYYY-MM-DD (当月 1 日)
+  monthEnd: string;   // YYYY-MM-DD (当月末日)
+  gridFrom: string;   // YYYY-MM-DD (月初の週の月曜、 前月末を含む)
+  gridTo: string;     // YYYY-MM-DD (月末の週の日曜、 翌月頭を含む)
+  weeks: string[][];  // 5 or 6 週 × 7 日
+  monthLabel: string; // "2026 年 5 月"
+}
+
+function buildMonthGrid(monthBase: Date): MonthGrid {
+  const year = monthBase.getFullYear();
+  const month = monthBase.getMonth(); // 0-11
+  const monthStartDate = new Date(year, month, 1);
+  const monthEndDate = new Date(year, month + 1, 0);
+  const gridFromDate = mondayOf(monthStartDate);
+  const gridToDate = new Date(mondayOf(monthEndDate));
+  gridToDate.setDate(gridToDate.getDate() + 6);
+
+  const weeks: string[][] = [];
+  const cursor = new Date(gridFromDate);
+  while (cursor.getTime() <= gridToDate.getTime()) {
+    const week: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(toYmd(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  return {
+    monthStart: toYmd(monthStartDate),
+    monthEnd: toYmd(monthEndDate),
+    gridFrom: toYmd(gridFromDate),
+    gridTo: toYmd(gridToDate),
+    weeks,
+    monthLabel: `${year} 年 ${month + 1} 月`,
+  };
+}
+
+export function getMonthGrid(base: Date = new Date()): MonthGrid {
+  return buildMonthGrid(new Date(base.getFullYear(), base.getMonth(), 1));
+}
+
+export function shiftMonth(monthStart: string, deltaMonths: number): MonthGrid {
+  const monthBase = parseYmd(monthStart);
+  monthBase.setMonth(monthBase.getMonth() + deltaMonths);
+  return buildMonthGrid(new Date(monthBase.getFullYear(), monthBase.getMonth(), 1));
+}
+
+export function isOutOfMonth(date: string, monthStart: string): boolean {
+  return date.slice(0, 7) !== monthStart.slice(0, 7);
+}

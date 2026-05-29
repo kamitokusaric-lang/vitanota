@@ -38,22 +38,31 @@ describe('CalendarWeekView', () => {
     global.fetch = vi.fn().mockImplementation(
       () => new Promise(() => undefined), // 永遠に pending
     );
-    renderWithSwr(<CalendarWeekView />);
+    renderWithSwr(<CalendarWeekView onEditTask={vi.fn()} />);
     expect(screen.getByTestId('calendar-week-loading')).toBeInTheDocument();
   });
 
   it('取得成功で日付セルが 7 つ並ぶ (PC + mobile = 14 個)', async () => {
     global.fetch = vi.fn().mockResolvedValue(mockJson({ tasks: [] }));
-    renderWithSwr(<CalendarWeekView />);
+    renderWithSwr(<CalendarWeekView onEditTask={vi.fn()} />);
     await waitFor(() => {
       expect(screen.queryByTestId('calendar-week-loading')).toBeNull();
     });
     // testid を data-testid="calendar-day-{YYYY-MM-DD}" pattern で 7 つ + mobile 7 つ
-    const pcCells = document.querySelectorAll('[data-testid^="calendar-day-"]');
+    // (header / overflow は別 testid なので、 セル本体のみ filter)
+    const pcCells = Array.from(
+      document.querySelectorAll('[data-testid^="calendar-day-"]'),
+    ).filter((el) => {
+      const tid = el.getAttribute('data-testid') ?? '';
+      return /^calendar-day-\d{4}-\d{2}-\d{2}$/.test(tid);
+    });
     expect(pcCells.length).toBe(7);
-    const mobileSections = document.querySelectorAll(
-      '[data-testid^="calendar-mobile-day-"]',
-    );
+    const mobileSections = Array.from(
+      document.querySelectorAll('[data-testid^="calendar-mobile-day-"]'),
+    ).filter((el) => {
+      const tid = el.getAttribute('data-testid') ?? '';
+      return /^calendar-mobile-day-\d{4}-\d{2}-\d{2}$/.test(tid);
+    });
     expect(mobileSections.length).toBe(7);
   });
 
@@ -89,7 +98,7 @@ describe('CalendarWeekView', () => {
         ],
       }),
     );
-    renderWithSwr(<CalendarWeekView />);
+    renderWithSwr(<CalendarWeekView onEditTask={vi.fn()} />);
     await waitFor(() => {
       // PC セル + mobile セクションの 2 箇所に表示される
       const matches = screen.queryAllByText('今週月曜のタスク');
@@ -100,7 +109,7 @@ describe('CalendarWeekView', () => {
   it('「翌週」 ボタンで fetch が異なる URL で再呼び出しされる', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockJson({ tasks: [] }));
     global.fetch = fetchMock;
-    renderWithSwr(<CalendarWeekView />);
+    renderWithSwr(<CalendarWeekView onEditTask={vi.fn()} />);
     await waitFor(() => {
       expect(screen.queryByTestId('calendar-week-loading')).toBeNull();
     });

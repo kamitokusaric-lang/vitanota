@@ -1,6 +1,6 @@
-// スマホ縦リスト用の 1 日セクション。 1 日 = 1 section、 7 つを縦に並べる。
+// スマホ縦リスト用の 1 日セクション。 1 日 = 1 section、 月 view では 35-42 個を縦に並べる。
 // 通常の TaskCard を流用 (スマホは横幅があるので情報量を落とさず表示)。
-// onEdit / categoryName 統合は Phase 3 で対応。
+// タスクカードクリックで親に onEditTask 発火、 日付ヘッダ / 「+N 件」 で onSelectDate 発火 (詳細モーダル動線)。
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 import { TaskCard } from '@/features/tasks/components/TaskCard';
 
@@ -8,9 +8,12 @@ interface CalendarMobileDaySectionProps {
   date: string;
   tasks: TaskWithAssignees[];
   isToday?: boolean;
+  outOfMonth?: boolean;
+  maxVisible?: number;
+  onSelectDate?: (date: string) => void;
+  onEditTask?: (task: TaskWithAssignees) => void;
 }
 
-const MAX_VISIBLE = 4;
 const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 function formatDateLabel(ymd: string): string {
@@ -19,48 +22,69 @@ function formatDateLabel(ymd: string): string {
   return `${m}/${d} (${WEEK_LABELS[date.getDay()]})`;
 }
 
-function noopEdit() {
-  // Phase 3 で TaskBoard の編集モーダルと integrate する。
-}
-
 export function CalendarMobileDaySection({
   date,
   tasks,
   isToday = false,
+  outOfMonth = false,
+  maxVisible = 4,
+  onSelectDate,
+  onEditTask,
 }: CalendarMobileDaySectionProps) {
-  const visible = tasks.slice(0, MAX_VISIBLE);
-  const overflow = Math.max(0, tasks.length - MAX_VISIBLE);
+  const visible = tasks.slice(0, maxVisible);
+  const overflow = Math.max(0, tasks.length - maxVisible);
+
+  const handleSelect = onSelectDate ? () => onSelectDate(date) : undefined;
+  const handleEdit = (task: TaskWithAssignees) => {
+    if (onEditTask) onEditTask(task);
+  };
 
   return (
     <section
       data-testid={`calendar-mobile-day-${date}`}
       className={[
         'rounded-xl border border-slate-200/85 p-3',
-        isToday ? 'bg-indigo-50/30' : 'bg-white',
+        isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white',
       ].join(' ')}
     >
-      <h3
+      <button
+        type="button"
+        onClick={handleSelect}
+        disabled={!handleSelect}
+        data-testid={`calendar-mobile-day-header-${date}`}
         className={[
-          'mb-2 text-[13px] font-bold',
-          isToday ? 'text-vn-accent' : 'text-slate-700',
+          'mb-2 block text-left text-[13px] font-bold',
+          handleSelect ? 'cursor-pointer hover:underline' : 'cursor-default',
+          outOfMonth
+            ? 'text-slate-300'
+            : isToday
+              ? 'text-vn-accent'
+              : 'text-slate-700',
         ].join(' ')}
       >
         {formatDateLabel(date)}
-      </h3>
+      </button>
       {tasks.length === 0 ? (
         <p className="text-[11px] text-slate-400">なし</p>
       ) : (
         <div className="flex flex-col gap-2">
           {visible.map((task) => (
-            <TaskCard key={task.id} task={task} onEdit={noopEdit} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onEdit={handleEdit}
+            />
           ))}
           {overflow > 0 && (
-            <div
+            <button
+              type="button"
+              onClick={handleSelect}
+              disabled={!handleSelect}
               data-testid={`calendar-mobile-overflow-${date}`}
-              className="px-1.5 py-1 text-[11px] text-slate-500"
+              className="self-start px-1.5 py-1 text-[11px] text-slate-500 hover:underline"
             >
               +{overflow} 件
-            </div>
+            </button>
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 // 週表示の統合 view。 PC = 7 列 grid、 mobile (xl 未満) = 縦リスト。
 // tasks は scope='mine' + dueDate が週内のものを useCalendarTasks で取得。
 // dueDate=null のタスクは calendar に出ない (タスクボード経由で扱う)。
+// 編集動線 (onEditTask) は親 TasksTabWithCalendar から prop で受け、 セル/section から発火。
 import { useState } from 'react';
 import { useCalendarTasks } from '../hooks/useCalendarTasks';
 import {
@@ -12,7 +13,12 @@ import {
 import { CalendarDayCell } from './CalendarDayCell';
 import { CalendarMobileDaySection } from './CalendarMobileDaySection';
 import { CalendarWeekNav } from './CalendarWeekNav';
+import { CalendarDayDetailModal } from './CalendarDayDetailModal';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
+
+interface CalendarWeekViewProps {
+  onEditTask: (task: TaskWithAssignees) => void;
+}
 
 function dueDateToYmd(value: string | Date | null): string | null {
   if (!value) return null;
@@ -34,8 +40,9 @@ function groupByDate(
   return map;
 }
 
-export function CalendarWeekView() {
+export function CalendarWeekView({ onEditTask }: CalendarWeekViewProps) {
   const [range, setRange] = useState<WeekRange>(() => getWeekRange());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const today = todayYmd();
 
   const { tasks, isLoading, error } = useCalendarTasks({
@@ -43,7 +50,13 @@ export function CalendarWeekView() {
     to: range.weekEnd,
   });
 
-  const grouped = tasks ? groupByDate(tasks) : new Map<string, TaskWithAssignees[]>();
+  const grouped = tasks
+    ? groupByDate(tasks)
+    : new Map<string, TaskWithAssignees[]>();
+  const selectedTasks = selectedDate ? (grouped.get(selectedDate) ?? []) : [];
+
+  const handleSelectDate = (date: string) => setSelectedDate(date);
+  const handleCloseModal = () => setSelectedDate(null);
 
   return (
     <div data-testid="calendar-week-view">
@@ -82,6 +95,9 @@ export function CalendarWeekView() {
                 date={date}
                 tasks={grouped.get(date) ?? []}
                 isToday={date === today}
+                maxVisible={4}
+                onSelectDate={handleSelectDate}
+                onEditTask={onEditTask}
               />
             ))}
           </div>
@@ -93,11 +109,22 @@ export function CalendarWeekView() {
                 date={date}
                 tasks={grouped.get(date) ?? []}
                 isToday={date === today}
+                maxVisible={4}
+                onSelectDate={handleSelectDate}
+                onEditTask={onEditTask}
               />
             ))}
           </div>
         </>
       )}
+
+      <CalendarDayDetailModal
+        open={selectedDate !== null}
+        date={selectedDate}
+        tasks={selectedTasks}
+        onClose={handleCloseModal}
+        onEditTask={onEditTask}
+      />
     </div>
   );
 }

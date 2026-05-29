@@ -1,8 +1,8 @@
-// PC 7 列 grid の 1 日セル (週 view)。 タスクをコンパクトに最大 N 件 + 「+N 件」。
-// タスク行クリックで親に onEditTask 発火、 日付ヘッダ / 「+N 件」 で onSelectDate 発火。
+// PC 月 grid の 1 日セル。 compact タスク行を最大 N 件 + 「+N 件」。
+// タスク行クリックで親に onEditTask、 日付ヘッダ / 「+N 件」 で onSelectDate (詳細モーダル動線)。
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 
-interface CalendarDayCellProps {
+interface CalendarMonthCellProps {
   date: string; // YYYY-MM-DD
   tasks: TaskWithAssignees[];
   isToday?: boolean;
@@ -12,26 +12,18 @@ interface CalendarDayCellProps {
   onEditTask?: (task: TaskWithAssignees) => void;
 }
 
-const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
-
-function formatDateLabel(ymd: string): string {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return `${m}/${d} (${WEEK_LABELS[date.getDay()]})`;
-}
-
 function dueDateToYmd(value: string | Date | null): string | null {
   if (!value) return null;
   if (typeof value === 'string') return value.slice(0, 10);
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
-function todayYmd(): string {
+function todayYmdStr(): string {
   const t = new Date();
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
-function CalendarTaskRow({
+function MonthCompactTaskRow({
   task,
   onEdit,
 }: {
@@ -39,7 +31,7 @@ function CalendarTaskRow({
   onEdit?: (task: TaskWithAssignees) => void;
 }) {
   const dueYmd = dueDateToYmd(task.dueDate);
-  const today = todayYmd();
+  const today = todayYmdStr();
   const isDone = task.status === 'done';
   const overdueActive = !!dueYmd && !isDone && dueYmd < today;
   const dueToday = !!dueYmd && dueYmd === today;
@@ -53,9 +45,9 @@ function CalendarTaskRow({
       type="button"
       onClick={onEdit ? () => onEdit(task) : undefined}
       disabled={!onEdit}
-      data-testid={`calendar-task-row-${task.id}`}
+      data-testid={`calendar-month-task-row-${task.id}`}
       className={[
-        'flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[12px] leading-snug transition',
+        'flex w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-[11px] leading-snug transition',
         onEdit ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default',
         isDone
           ? 'text-slate-400 line-through opacity-60'
@@ -67,7 +59,7 @@ function CalendarTaskRow({
       {dotClass && (
         <span
           aria-hidden
-          className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`}
+          className={`inline-block h-1 w-1 shrink-0 rounded-full ${dotClass}`}
         />
       )}
       <span className="truncate">{task.title}</span>
@@ -75,24 +67,25 @@ function CalendarTaskRow({
   );
 }
 
-export function CalendarDayCell({
+export function CalendarMonthCell({
   date,
   tasks,
   isToday = false,
   outOfMonth = false,
-  maxVisible = 4,
+  maxVisible = 3,
   onSelectDate,
   onEditTask,
-}: CalendarDayCellProps) {
+}: CalendarMonthCellProps) {
+  const dayNum = Number(date.slice(8, 10));
   const visible = tasks.slice(0, maxVisible);
   const overflow = Math.max(0, tasks.length - maxVisible);
   const handleSelect = onSelectDate ? () => onSelectDate(date) : undefined;
 
   return (
     <div
-      data-testid={`calendar-day-${date}`}
+      data-testid={`calendar-month-cell-${date}`}
       className={[
-        'flex min-h-[140px] flex-col gap-1.5 rounded-xl border border-slate-200/85 p-2',
+        'flex min-h-[96px] flex-col gap-1 rounded-lg border border-slate-200/85 p-1.5',
         isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white',
       ].join(' ')}
     >
@@ -100,30 +93,30 @@ export function CalendarDayCell({
         type="button"
         onClick={handleSelect}
         disabled={!handleSelect}
-        data-testid={`calendar-day-header-${date}`}
+        data-testid={`calendar-month-cell-header-${date}`}
         className={[
-          'block w-full text-left text-[11px] font-semibold',
+          'block text-left text-[12px] font-semibold leading-none',
           handleSelect ? 'cursor-pointer hover:underline' : 'cursor-default',
           outOfMonth
             ? 'text-slate-300'
             : isToday
               ? 'text-vn-accent'
-              : 'text-slate-600',
+              : 'text-slate-700',
         ].join(' ')}
       >
-        {formatDateLabel(date)}
+        {dayNum}
       </button>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         {visible.map((task) => (
-          <CalendarTaskRow key={task.id} task={task} onEdit={onEditTask} />
+          <MonthCompactTaskRow key={task.id} task={task} onEdit={onEditTask} />
         ))}
         {overflow > 0 && (
           <button
             type="button"
             onClick={handleSelect}
             disabled={!handleSelect}
-            data-testid={`calendar-day-overflow-${date}`}
-            className="self-start px-1.5 py-1 text-[11px] text-slate-500 hover:underline"
+            data-testid={`calendar-month-cell-overflow-${date}`}
+            className="self-start px-1 py-0.5 text-[10px] text-slate-500 hover:underline"
           >
             +{overflow} 件
           </button>

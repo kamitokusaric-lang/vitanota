@@ -1,7 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 import { CalendarMonthView } from '@/features/calendar/components/CalendarMonthView';
+import type { SharedFilters } from '@/features/tasks/components/TaskBoard';
+
+const DEFAULT_FILTERS: SharedFilters = {
+  filterOwner: 'self-user',
+  filterTagIds: [],
+  filterCategoryIds: [],
+  showDelegated: false,
+  period: { mode: 'default' },
+};
 
 vi.mock('next/router', () => ({
   useRouter: () => ({
@@ -38,13 +47,25 @@ describe('CalendarMonthView', () => {
     global.fetch = vi
       .fn()
       .mockImplementation(() => new Promise(() => undefined));
-    renderWithSwr(<CalendarMonthView onEditTask={vi.fn()} />);
+    renderWithSwr(
+      <CalendarMonthView
+        selfUserId="self-user"
+        filters={DEFAULT_FILTERS}
+        onEditTask={vi.fn()}
+      />,
+    );
     expect(screen.getByTestId('calendar-month-loading')).toBeInTheDocument();
   });
 
   it('取得成功で 35 or 42 個の日付セル (PC + mobile)', async () => {
     global.fetch = vi.fn().mockResolvedValue(mockJson({ tasks: [] }));
-    renderWithSwr(<CalendarMonthView onEditTask={vi.fn()} />);
+    renderWithSwr(
+      <CalendarMonthView
+        selfUserId="self-user"
+        filters={DEFAULT_FILTERS}
+        onEditTask={vi.fn()}
+      />,
+    );
     await waitFor(() => {
       expect(screen.queryByTestId('calendar-month-loading')).toBeNull();
     });
@@ -64,7 +85,13 @@ describe('CalendarMonthView', () => {
   it('「翌月」 ボタンで fetch が異なる URL で再呼び出しされる', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockJson({ tasks: [] }));
     global.fetch = fetchMock;
-    renderWithSwr(<CalendarMonthView onEditTask={vi.fn()} />);
+    renderWithSwr(
+      <CalendarMonthView
+        selfUserId="self-user"
+        filters={DEFAULT_FILTERS}
+        onEditTask={vi.fn()}
+      />,
+    );
     await waitFor(() => {
       expect(screen.queryByTestId('calendar-month-loading')).toBeNull();
     });
@@ -103,7 +130,13 @@ describe('CalendarMonthView', () => {
         ],
       }),
     );
-    renderWithSwr(<CalendarMonthView onEditTask={vi.fn()} />);
+    renderWithSwr(
+      <CalendarMonthView
+        selfUserId="self-user"
+        filters={DEFAULT_FILTERS}
+        onEditTask={vi.fn()}
+      />,
+    );
     await waitFor(() => {
       expect(screen.queryByTestId('calendar-month-loading')).toBeNull();
     });

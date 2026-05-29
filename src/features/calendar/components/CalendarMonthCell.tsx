@@ -10,6 +10,7 @@ interface CalendarMonthCellProps {
   tasks: TaskWithAssignees[];
   isToday?: boolean;
   outOfMonth?: boolean;
+  isCurrentWeek?: boolean;
   maxVisible?: number;
   onSelectDate?: (date: string) => void;
   onEditTask?: (task: TaskWithAssignees) => void;
@@ -89,6 +90,7 @@ export function CalendarMonthCell({
   tasks,
   isToday = false,
   outOfMonth = false,
+  isCurrentWeek = false,
   maxVisible = 3,
   onSelectDate,
   onEditTask,
@@ -128,7 +130,13 @@ export function CalendarMonthCell({
           ? 'border-vn-accent bg-indigo-50/50'
           : 'border-slate-200/85',
         !isDropOver &&
-          (isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white'),
+          (isToday
+            ? 'bg-indigo-100'
+            : outOfMonth
+              ? 'bg-slate-50/50'
+              : isCurrentWeek
+                ? 'bg-amber-50/70'
+                : 'bg-white'),
       ]
         .filter(Boolean)
         .join(' ')}

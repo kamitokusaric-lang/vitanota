@@ -10,6 +10,7 @@ interface CalendarMobileDaySectionProps {
   tasks: TaskWithAssignees[];
   isToday?: boolean;
   outOfMonth?: boolean;
+  isCurrentWeek?: boolean;
   maxVisible?: number;
   onSelectDate?: (date: string) => void;
   onEditTask?: (task: TaskWithAssignees) => void;
@@ -29,6 +30,7 @@ export function CalendarMobileDaySection({
   tasks,
   isToday = false,
   outOfMonth = false,
+  isCurrentWeek = false,
   maxVisible = 4,
   onSelectDate,
   onEditTask,
@@ -47,7 +49,13 @@ export function CalendarMobileDaySection({
       data-testid={`calendar-mobile-day-${date}`}
       className={[
         'rounded-xl border border-slate-200/85 p-3',
-        isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white',
+        isToday
+          ? 'bg-indigo-100'
+          : outOfMonth
+            ? 'bg-slate-50/50'
+            : isCurrentWeek
+              ? 'bg-amber-50/70'
+              : 'bg-white',
       ].join(' ')}
     >
       <div className="mb-2 flex items-center justify-between gap-2">

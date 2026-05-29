@@ -4,8 +4,6 @@
 // デフォルトは「自分」(= scope='mine'、assignee + requester 両方を含む)
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
-import { Save } from 'lucide-react';
-import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { Modal } from '@/shared/components/Modal';
@@ -13,11 +11,7 @@ import { useToast } from '@/shared/components/Toast';
 import { useTasks, type TaskWithAssignees } from '../hooks/useTasks';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
-import { useTaskFilterPreferences } from '../hooks/useTaskFilterPreferences';
-import { AssigneeFilter } from './AssigneeFilter';
-import { CategoryFilter } from './CategoryFilter';
-import { TagFilter } from './TagFilter';
-import { PeriodFilter, type PeriodValue } from './PeriodFilter';
+import { type PeriodValue } from './PeriodFilter';
 import { getToday } from '../lib/periodCalc';
 import { TaskMatrix, type MatrixGroup } from './TaskMatrix';
 import { useTaskTags } from '../hooks/useTaskTags';
@@ -27,55 +21,29 @@ import { TaskCommentSection } from './TaskCommentSection';
 // 新規作成 modal は廃止 (chimo 2026-05-13、Dashboard 上部 TaskCreateTabs に移管)
 // 編集モーダルは TaskEditModal に集約 (chimo 2026-05-30、 calendar 経由でも共有)。
 
-interface TaskBoardProps {
-  selfUserId: string;
+// Phase 7 (chimo 2026-05-30): フィルタ state は TasksTabWithCalendar に上げて
+// board / week / month で共有する。 TaskBoard はそれを props として受け取る。
+// PeriodFilter (期間) は board のみ参照、 calendar 側は週/月ナビで期間制御。
+export interface SharedFilters {
+  filterOwner: string | undefined;
+  filterTagIds: string[];
+  filterCategoryIds: string[];
+  showDelegated: boolean;
+  period: PeriodValue;
 }
 
-export function TaskBoard({ selfUserId }: TaskBoardProps) {
-  // フィルタの意味:
-  //   filterOwner === selfUserId → scope='mine' (assignee OR requester 両方)
-  //   filterOwner === <他ユーザーID> → ownerUserId 指定 (その人が assignee のもののみ)
-  //   filterOwner === undefined → 全員
-  const [filterOwner, setFilterOwner] = useState<string | undefined>(selfUserId);
-  // タグフィルタ (multi-select、空配列 = 全タグ、OR 条件)
-  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
-  // カテゴリフィルタ (multi-select、空配列 = 全カテゴリ、OR 条件)
-  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([]);
-  // 「自分」フィルタ時、自分が依頼した (createdBy=self, owner!=self) タスクを表示するか
-  const [showDelegated, setShowDelegated] = useState(false);
-  // 期間フィルタ (default = 今週 + null + 期限切れ未完了 / range = 純粋 due_date 範囲)
-  const [period, setPeriod] = useState<PeriodValue>({ mode: 'default' });
+interface TaskBoardProps {
+  selfUserId: string;
+  filters: SharedFilters;
+}
+
+export function TaskBoard({ selfUserId, filters }: TaskBoardProps) {
+  // Phase 7: フィルタ state は親 (TasksTabWithCalendar) で管理、 props で受け取る。
+  // filterOwner === selfUserId → scope='mine' / undefined → 全員 / 他 → ownerUserId 指定
+  const { filterOwner, filterTagIds, filterCategoryIds, showDelegated, period } =
+    filters;
   const [editTask, setEditTask] = useState<TaskWithAssignees | null>(null);
   const { showToast } = useToast();
-
-  // 教員ごとの保存済みフィルタ設定 (1 フィルタ上書き、画面開いた瞬間に自動適用)
-  const { preference, save: savePreference } = useTaskFilterPreferences();
-  const preferenceAppliedRef = useRef(false);
-  useEffect(() => {
-    if (preferenceAppliedRef.current) return;
-    if (preference === null) return;
-    setFilterOwner(preference.filterOwner ?? undefined);
-    setFilterTagIds(preference.filterTagIds);
-    setFilterCategoryIds(preference.filterCategoryIds);
-    setShowDelegated(preference.showDelegated);
-    setPeriod(preference.period);
-    preferenceAppliedRef.current = true;
-  }, [preference]);
-
-  const handleSaveFilter = async () => {
-    try {
-      await savePreference({
-        filterOwner: filterOwner ?? null,
-        filterTagIds,
-        filterCategoryIds,
-        showDelegated,
-        period,
-      });
-      showToast('フィルタを保存しました', 'success');
-    } catch (_e) {
-      showToast('保存に失敗しました', 'error');
-    }
-  };
 
   // useTasks に渡す dateFilter: default mode は「今日以降 + 期限なし + 期限切れ未完了」
   // 内部的には range の上限を遠未来に倒すことで API 側 default ロジックを流用している
@@ -188,41 +156,7 @@ export function TaskBoard({ selfUserId }: TaskBoardProps) {
     <div data-testid="task-board">
       {/* Linear 風 filter row: chip 4 つを左寄せ + 右端に新規ボタン
           chimo 2026-05-20: 高さ 34px / 14px / pill、 wrap 下余白 28px */}
-      <div className="mb-7 flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <AssigneeFilter
-            value={filterOwner}
-            onChange={setFilterOwner}
-            assignees={assignees ?? []}
-            selfUserId={selfUserId}
-            showDelegated={showDelegated}
-            onShowDelegatedChange={setShowDelegated}
-          />
-          <CategoryFilter
-            value={filterCategoryIds}
-            onChange={setFilterCategoryIds}
-            categories={categories}
-          />
-          <TagFilter
-            value={filterTagIds}
-            onChange={setFilterTagIds}
-            tags={taskTags ?? []}
-          />
-          <PeriodFilter value={period} onChange={setPeriod} />
-          <button
-            type="button"
-            onClick={handleSaveFilter}
-            className="inline-flex h-[30px] items-center gap-1 rounded-full border border-vn-border-strong bg-white px-[11px] text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
-            data-testid="task-board-save-filter-button"
-            title="現在のフィルタを次回以降のデフォルトとして保存"
-          >
-            <Save size={14} aria-hidden />
-            フィルタを保存
-          </button>
-        </div>
-        {/* 新規タスクボタンはダッシュボード上部の TaskCreateTabs (AI 整理 / 手動追加) に移管 (chimo 2026-05-13) */}
-      </div>
-
+      {/* Phase 7: filter UI は親 (TasksTabWithCalendar) に上げて board / week / month で共有 */}
       <TaskMatrix
         tasks={filteredTasks}
         rows={rows}

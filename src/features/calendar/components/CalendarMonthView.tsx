@@ -4,7 +4,7 @@
 // - 月ナビ (CalendarMonthNav) で月移動
 // - 日付ヘッダ / 「+N 件」 クリックで詳細モーダル (CalendarDayDetailModal)
 // - タスク行クリックで編集モーダル (onEditTask、 親 TasksTabWithCalendar が制御)
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useCalendarTasks } from '../hooks/useCalendarTasks';
 import {
   getMonthGrid,
@@ -18,8 +18,12 @@ import { CalendarMobileDaySection } from './CalendarMobileDaySection';
 import { CalendarMonthNav } from './CalendarMonthNav';
 import { CalendarDayDetailModal } from './CalendarDayDetailModal';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
+import type { SharedFilters } from '@/features/tasks/components/TaskBoard';
+import { applyClientSideFilters } from '../lib/applyClientSideFilters';
 
 interface CalendarMonthViewProps {
+  selfUserId: string;
+  filters: SharedFilters;
   onEditTask: (task: TaskWithAssignees) => void;
   onMoveTask?: (taskId: string, newDate: string) => void;
   onAddTask?: (date: string) => void;
@@ -48,6 +52,8 @@ function groupByDate(
 }
 
 export function CalendarMonthView({
+  selfUserId,
+  filters,
   onEditTask,
   onMoveTask,
   onAddTask,
@@ -56,10 +62,20 @@ export function CalendarMonthView({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const today = todayYmd();
 
-  const { tasks, isLoading, error } = useCalendarTasks({
+  const { tasks: rawTasks, isLoading, error } = useCalendarTasks({
     from: monthGrid.gridFrom,
     to: monthGrid.gridTo,
+    selfUserId,
+    filterOwner: filters.filterOwner,
   });
+
+  const tasks = useMemo(
+    () =>
+      rawTasks
+        ? applyClientSideFilters(rawTasks, filters, selfUserId)
+        : undefined,
+    [rawTasks, filters, selfUserId],
+  );
 
   const grouped = tasks
     ? groupByDate(tasks)
@@ -113,36 +129,45 @@ export function CalendarMonthView({
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1.5">
-              {monthGrid.weeks.flat().map((date) => (
-                <CalendarMonthCell
+              {monthGrid.weeks.map((week) => {
+                const isCurrentWeek = week.includes(today);
+                return week.map((date) => (
+                  <CalendarMonthCell
+                    key={date}
+                    date={date}
+                    tasks={grouped.get(date) ?? []}
+                    isToday={date === today}
+                    outOfMonth={isOutOfMonth(date, monthGrid.monthStart)}
+                    isCurrentWeek={isCurrentWeek}
+                    maxVisible={3}
+                    onSelectDate={handleSelectDate}
+                    onEditTask={onEditTask}
+                    onMoveTask={onMoveTask}
+                    onAddTask={onAddTask}
+                  />
+                ));
+              })}
+            </div>
+          </div>
+          {/* mobile (xl 未満): 月全体 の縦リスト、 今週 section は薄背景 */}
+          <div className="flex flex-col gap-2 xl:hidden">
+            {monthGrid.weeks.map((week) => {
+              const isCurrentWeek = week.includes(today);
+              return week.map((date) => (
+                <CalendarMobileDaySection
                   key={date}
                   date={date}
                   tasks={grouped.get(date) ?? []}
                   isToday={date === today}
                   outOfMonth={isOutOfMonth(date, monthGrid.monthStart)}
+                  isCurrentWeek={isCurrentWeek}
                   maxVisible={3}
                   onSelectDate={handleSelectDate}
                   onEditTask={onEditTask}
-                  onMoveTask={onMoveTask}
                   onAddTask={onAddTask}
                 />
-              ))}
-            </div>
-          </div>
-          {/* mobile (xl 未満): 月全体 の縦リスト (週 view と同じ section component を流用) */}
-          <div className="flex flex-col gap-2 xl:hidden">
-            {monthGrid.weeks.flat().map((date) => (
-              <CalendarMobileDaySection
-                key={date}
-                date={date}
-                tasks={grouped.get(date) ?? []}
-                isToday={date === today}
-                outOfMonth={isOutOfMonth(date, monthGrid.monthStart)}
-                maxVisible={3}
-                onSelectDate={handleSelectDate}
-                onEditTask={onEditTask}
-              />
-            ))}
+              ));
+            })}
           </div>
         </>
       )}

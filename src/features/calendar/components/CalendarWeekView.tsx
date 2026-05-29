@@ -19,6 +19,7 @@ import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 interface CalendarWeekViewProps {
   onEditTask: (task: TaskWithAssignees) => void;
   onMoveTask?: (taskId: string, newDate: string) => void;
+  onAddTask?: (date: string) => void;
 }
 
 function dueDateToYmd(value: string | Date | null): string | null {
@@ -41,7 +42,11 @@ function groupByDate(
   return map;
 }
 
-export function CalendarWeekView({ onEditTask, onMoveTask }: CalendarWeekViewProps) {
+export function CalendarWeekView({
+  onEditTask,
+  onMoveTask,
+  onAddTask,
+}: CalendarWeekViewProps) {
   const [range, setRange] = useState<WeekRange>(() => getWeekRange());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const today = todayYmd();
@@ -100,6 +105,7 @@ export function CalendarWeekView({ onEditTask, onMoveTask }: CalendarWeekViewPro
                 onSelectDate={handleSelectDate}
                 onEditTask={onEditTask}
                 onMoveTask={onMoveTask}
+                onAddTask={onAddTask}
               />
             ))}
           </div>
@@ -114,6 +120,7 @@ export function CalendarWeekView({ onEditTask, onMoveTask }: CalendarWeekViewPro
                 maxVisible={Infinity}
                 onSelectDate={handleSelectDate}
                 onEditTask={onEditTask}
+                onAddTask={onAddTask}
               />
             ))}
           </div>

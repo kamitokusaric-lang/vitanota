@@ -2,6 +2,7 @@
 // タスク行クリックで親に onEditTask、 日付ヘッダ / 「+N 件」 で onSelectDate。
 // PC では compact 行を draggable、 セルを drop target に → 日付セルへ drop で onMoveTask。
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 
 interface CalendarDayCellProps {
@@ -13,6 +14,7 @@ interface CalendarDayCellProps {
   onSelectDate?: (date: string) => void;
   onEditTask?: (task: TaskWithAssignees) => void;
   onMoveTask?: (taskId: string, newDate: string) => void;
+  onAddTask?: (date: string) => void;
 }
 
 const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
@@ -99,6 +101,7 @@ export function CalendarDayCell({
   onSelectDate,
   onEditTask,
   onMoveTask,
+  onAddTask,
 }: CalendarDayCellProps) {
   const visible = tasks.slice(0, maxVisible);
   const overflow = Math.max(0, tasks.length - maxVisible);
@@ -134,23 +137,39 @@ export function CalendarDayCell({
         !isDropOver && (isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white'),
       ].filter(Boolean).join(' ')}
     >
-      <button
-        type="button"
-        onClick={handleSelect}
-        disabled={!handleSelect}
-        data-testid={`calendar-day-header-${date}`}
-        className={[
-          'block w-full text-left text-[11px] font-semibold',
-          handleSelect ? 'cursor-pointer hover:underline' : 'cursor-default',
-          outOfMonth
-            ? 'text-slate-300'
-            : isToday
-              ? 'text-vn-accent'
-              : 'text-slate-600',
-        ].join(' ')}
-      >
-        {formatDateLabel(date)}
-      </button>
+      <div className="flex items-center justify-between gap-1">
+        <button
+          type="button"
+          onClick={handleSelect}
+          disabled={!handleSelect}
+          data-testid={`calendar-day-header-${date}`}
+          className={[
+            'block flex-1 text-left text-[11px] font-semibold',
+            handleSelect ? 'cursor-pointer hover:underline' : 'cursor-default',
+            outOfMonth
+              ? 'text-slate-300'
+              : isToday
+                ? 'text-vn-accent'
+                : 'text-slate-600',
+          ].join(' ')}
+        >
+          {formatDateLabel(date)}
+        </button>
+        {onAddTask && !outOfMonth && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddTask(date);
+            }}
+            data-testid={`calendar-add-task-${date}`}
+            aria-label="タスクを追加"
+            className="rounded p-0.5 text-slate-300 transition hover:bg-slate-100 hover:text-slate-600"
+          >
+            <Plus size={14} strokeWidth={2} aria-hidden />
+          </button>
+        )}
+      </div>
       <div className="flex flex-col gap-1">
         {visible.map((task) => (
           <CalendarTaskRow

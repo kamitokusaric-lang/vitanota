@@ -1,5 +1,7 @@
 # User Stories Assessment — 2026-05-11 AI 連携第一弾
 
+> **🟢 実装完了**: EPIC-T-07 は 2026-05-13 に Phase 1 として本番リリース済 (memory `project_ai_chat_feature_flag`)。本ドキュメントは実行判定アセスメント記録として保持。
+
 ## Request Analysis
 - **Original Request**: vitanota AI 連携第一弾 (チャット → タスク + 日誌ネタ抽出) のユーザーストーリー化
 - **User Impact**: Direct (教員が直接使う新機能、タスク/日誌入力フローが追加される)

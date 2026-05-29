@@ -1,5 +1,7 @@
 # 2026-05-11 AI 連携第一弾 — 実装プラン (Unit-05: AI 連携)
 
+> **🟢 実装完了**: 2026-05-13 に Phase 1 として本番リリース (memory `project_ai_chat_feature_flag` / `project_ai_chat_prod_default_true_20260517`)。本ドキュメントは当時の意思決定記録として保持。最新の運用情報は memory + git log を参照。
+
 > **対応要件**: [`inception/requirements/2026-05-11-ai-chat-extraction.md`](../requirements/2026-05-11-ai-chat-extraction.md)
 > **対応ストーリー**: [`inception/user-stories/2026-05-11-ai-chat-extraction-stories.md`](../user-stories/2026-05-11-ai-chat-extraction-stories.md)
 > **想定工数**: 機能設計 + 実装 + テストで 2〜3 週間程度 (chimo の commit/push タイミング自主管理、memory)

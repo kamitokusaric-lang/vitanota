@@ -6,7 +6,7 @@
 
 **関連ドキュメント**:
 - [`construction/user-onboarding-flow.md`](user-onboarding-flow.md) — 招待フロー仕様
-- [`operations/session-handoff-20260420.md`](../operations/session-handoff-20260420.md) — Lambda Proxy 導入経緯
+- [`operations/history/session-handoff-20260420.md`](../operations/history/session-handoff-20260420.md) — Lambda Proxy 導入経緯
 
 **文言設計ポリシー**:
 - メッセージにはユーザーが取れる**具体的アクション**を含める (再試行 / 設定確認 / 管理者連絡)

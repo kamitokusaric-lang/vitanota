@@ -9,16 +9,6 @@
 
 ---
 
-## 未解決バグ
-
-### 🟢 低: 日誌 / つぶやき / ナレッジ作成モーダルの textarea を広げるとモーダルが閉じる
-- **発見日**: 2026-05-21 / chimo 報告
-- **現状**: 日誌・つぶやき・ナレッジの新規作成モーダル内の textarea (本文入力欄) の右下 resize handle をドラッグして広げると、モーダル本体が消えてしまう (書きかけ本文も失われる)
-- **影響**: 長文を書きたいときに入力欄を広げる動作がそのまま離脱事故になる。ただし「広げない」で回避可能、頻度は低と推定
-- **対策**: 未着手。再現確認 → 原因特定 (resize 中の pointer event がモーダル outside click 判定に拾われている可能性が一つの仮説、 要コード確認) → 修正
-
----
-
 ## 脆弱性対応 / 依存更新
 
 ### 🔴 高: Next.js 14 → 15 major upgrade + drizzle-orm 0.30 → 0.31+ upgrade
@@ -231,26 +221,6 @@
 
 ## CI / テスト
 
-### 🔴 高: CI workflow が main で常時 fail (5/14 以降、 setup-node の pnpm × Node 不一致)
-
-- **発見日**: 2026-05-15 (PAM retry / access-distribution 一連の作業中)
-- **背景**: setup-node action 経由で pnpm を install する際、 最新版 pnpm が Node v22.13+ を要求するが CI runner は Node v20 を使用。`Error [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:sqlite` で setup-node が失敗 → 依存ジョブも全部 fail
-- **影響ジョブ** (最新 run 25904201369 / sha 6d95a46、 main の **全** CI run が 5/14 以降 failure):
-  - Lockfile Integrity (setup-node 段階で失敗)
-  - Lint / Type Check / Test (同上)
-  - Integration Tests (PostgreSQL) (同上)
-  - E2E Tests (Playwright) (下記 既知項目 + setup-node 問題併発)
-  - Dependency Audit (OSV-Scanner) (Next.js 14→15 backlog の既知 CVE allowlist、 これは別系統)
-  - Secret Scan (gitleaks) のみ success
-- **影響**: 回帰検出能力ゼロ。 何を変更しても何も気づかない状態
-- **対策候補**:
-  1. CI workflow を Node v22 にアップグレード (`.github/workflows/ci.yml` の `node-version`)
-  2. pnpm version を Node v20 互換の特定バージョンに pin (setup-node の `version: latest` を `version: 9` 等に固定)
-  3. setup-node + corepack で pnpm 管理を一元化
-- **判断保留**: Node v22 upgrade は Next.js 14→15 と同時にやる方が干渉少ない可能性。 ただし「常時 fail で何を変更しても何も気づかない」状態は危険、 最低でも pnpm pin の hotfix を先行
-- **着手判断**: 至急 hotfix (pnpm pin) を 1-2 時間で投入、 Node v22 upgrade は Next.js 15 と同時
-- **関連**: Next.js 14→15 upgrade (脆弱性セクション)、 下記 E2E test 16 件
-
 ### 🟡 中: coverage threshold を元の水準 (lines/branches/statements 80, functions 70) に戻す
 - **発見日**: 2026-05-04 (functions のみ)、 **2026-05-18 拡大** (4 項目すべて低下)
 - **現状** (2026-05-18 PR #36): `vitest.config.ts` の coverage threshold を暫定的に下げた:
@@ -280,19 +250,6 @@
 - **検証手順**: `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` を workflow env に一時設定して dry run で互換性検証 → OK なら SHA bump
 - **緊急回避**: 万が一 Node.js 24 移行で死んだら `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true` で一時的に opt-out 可 (短期しのぎのみ、 2026-09-16 までに恒久対応)
 - **着手判断**: Next.js 15 upgrade と独立、 ci.yml fix の延長で同時にやるのが筋
-
-### 🟢 低: E2E test (Playwright) の継続的整備 (2026-05-18 ほぼ resolve)
-- **発見日**: 2026-05-04 (fix/ci-green 着手中、ローカル実走 16 failed / 10 passed を確認)
-- **2026-05-18 status**: dashboard 統合 ([[project_dashboard_structure_20260424]]) と migration 0016 (tags → emotion_tags) に追従して spec を全面 rewrite、 **25 passed + 1 skipped / 26 tests** でローカル / CI ともに green 化 (CI workflow の pnpm 11 死は PR #35 で並走解消)
-- **resolved した内訳**:
-  - **01-auth**: `/journal` → `/dashboard` URL 置換、 `journal-timeline-heading` testid → `dashboard-page` に追従
-  - **02-journal-crud**: `/journal/new` 廃止 → `quick-record-tweet` pill → Modal の EntryForm 操作経路に rewrite。 編集/削除動線も entry-card menu → menu-edit/menu-delete → Modal に追従
-  - **03-timeline**: `/journal` / `/journal/mine` → `/dashboard?tab=notes` + `timeline-subtab-personal` 子タブクリックに追従
-  - **04-tags**: seed helper の createTag を `category` required + `type` field 削除に修正、 spec も Modal 経由の `tag-filter` 操作に rewrite
-- **残された skip 1 件**: 04-tags の `感情タグと業務タグが視覚的に区別される` は migration 0016 で「業務タグ」概念が emotion_tags 側から廃止 (task_categories に移譲) されたため成立しない。 将来 task_categories 統合 tag-filter UI を作る場合に復活検討
-- **継続的整備**:
-  - 新規 UI 機能追加時に testid と spec の追従を運用ルール化
-  - CI required check 設定の検討 (現状は continue-on-error なし、 fail で merge ブロック)
 
 ---
 
@@ -334,44 +291,6 @@
 ---
 
 ## 機能拡張候補
-
-### 🟡 中: 日々ノートタブに新着マーク (未読バッジ)
-- **発見日**: 2026-05-04
-- **背景**: 共有タイムラインに新しい投稿があっても、現状は「日々ノート」タブを開きにいかないと気づけない。tab ラベルに小さなドット or 件数バッジを出して "新着あり" を示したい
-- **設計検討**:
-  - **判定基準**: 自分が最後に「日々ノート」タブを開いた時刻 (= last_read_at) より後に他人が投稿したかどうか。`localStorage` に last_read_at を保持するか、サーバー側で users.last_journal_read_at カラムを持たせるか
-  - **粒度**: 件数バッジ (例: `日々ノート (3)`) or ドットだけ (例: `日々ノート ●`)。ドットの方が控えめで踏み絵 (観測感) と整合
-  - **対象**: 共有タイムラインのみ (マイ記録は自分の投稿だから新着判定不要)
-- **裏テーマ踏み絵 (`feedback_observed_moment_broken`)**: 「他の先生が投稿してくれた」を軽く伝える程度に留める。「○○先生が新規投稿!」の明示通知や音は NG
-- **着手判断**: 5/7 説明会後
-
-### 🟡 中: タスクボードの期間絞り込み
-- **発見日**: 2026-05-04
-- **背景**: 現状 TaskBoard は全期間の未完タスク + 完了済タスクを混在表示。「今週」「今月」「期限切れ」等で絞り込めると、教員が頭を整理しやすい
-- **設計検討**:
-  - フィルター UI 案: 既存の AssigneeFilter / TagFilter の隣に PeriodFilter を追加。値: `今週 / 今月 / 期限切れ / 期限なし / すべて` 等
-  - 判定: `tasks.due_date` 基準でクライアント側 filter (件数少ないので server side filter は不要)。ただし期限切れの判定は今日との比較で日次変わる → useMemo で当日キャッシュ
-  - 「完了済」を別途隠す toggle と独立させるか議論
-- **着手判断**: 5/7 説明会後、現場で「タスクが多すぎて見づらい」フィードバックが出たら優先度上げ
-
-### 🟢 低: 「vitanotaとは」モーダルにスライド (複数ページ) を入れる
-- **発見日**: 2026-05-04
-- **現状**: `AboutVitanotaModal.tsx` は 1 枚の画像で世界観を伝えてる
-- **背景**: 説明会・新規導入校向けに複数ページのスライド (左右ナビで切替) で各機能・思想を順に見せたい
-- **設計検討**:
-  - 既存画像をスライド 1 枚目として残しつつ、新規スライドを追加する形
-  - ナビゲーション: 左右ボタン or インジケータ点
-  - 中身: 「vitanota の思想」「日々ノート」「タスクボード」「学校レポート」「フィードバック」など 4-6 枚
-- **着手判断**: 説明会導入校が増えるタイミング、または校長導入 (kamitokusari ニセコ) 後の運用フィードバック取り
-
-### 🟡 中: タスク複数アサイン本実装 (M:N スキーマ化)
-- **発見日**: 2026-05-02
-- **背景**: 2026-05-07 教員向け説明会では「タスク複製」機能で 1 担当者複製を回避策として採用。本来の M:N (1 タスクに複数担当者) への移行は別途実施
-- **影響**: 現状は 1 タスク 1 担当者 (`tasks.owner_user_id` 単数)、複製で同タスクを複数生成する運用 = 担当者間で「同じタスクを共有してる」感が薄い
-- **対策**: `task_assignees` テーブル新設 (M:N) + RLS / API / UI / 既存タスクの `owner_user_id` → `assignees` 1 件目への migration
-- **想定工数**: 4-6 日 (スキーマ変更 × RLS 再設計 × TaskBoard / TaskForm / AssigneeFilter / useAssignees の改修 + テスト網羅)
-- **裏テーマ踏み絵**: 複数アサイン自体は OK (分担は学校現場の自然)。ただし「誰がサボってる」が見えやすくなる UI は NG → 進捗は個人別ではなくタスク単位の完了/未完了で表示する設計を維持
-- **着手判断**: 5/7 説明会後、教員からのフィードバック (新設 feedback 機能経由) で「複製運用が辛い」「同じタスクを共同で管理したい」と確認できたら優先度上げ。フィードバック無いなら現状維持で塩漬け継続
 
 ### ⚪ 凍結 (2026-04-27 撤回): 先週のvitanotaレポート 機能
 - **撤回判断**: 2026-04-27、chimo 判断で AI 機能の使い所を再検討するフェーズに入ったため、Anthropic 接続を全面撤回。「AI ツールを使うこと自体に意味がある」前提で配置すると裏テーマ (観測されてると思われた瞬間に壊れる) を踏みかねないと判断。校長導入 (2026-05-04 週) 前のコード / CFN drift 解消も同時に達成。
@@ -517,60 +436,6 @@
 - **関連**: memory `feedback_cdk_app_stack_context_required` / `project_ai_chat_feature_flag`
 
 ---
-
-### 🟡 中: AI チャット機能の有効化フラグの管理画面化
-- **発見日**: 2026-05-13
-- **現状**: `ENABLE_AI_CHAT_EXTRACTION` + `AI_CHAT_ALLOWLIST_TENANT_IDS` の 2 段 env で制御 (AppRunner 環境変数)。テナント追加のたびに CSV 文字列を更新 + AppRunner 再起動 (~3 分)。緊急停止は `ENABLE_AI_CHAT_EXTRACTION=false` で全テナント即時 OFF
-- **影響**: テナント追加に deploy 権限と AppRunner 再起動が必要。校長動線で対応校が増えると運用負荷が線形に増える
-- **対策**: system_admin 専用画面 (例: `/admin/feature-flags`) で DB ベースのフラグ管理に移行。`feature_flags` テーブル + `feature_flag_tenants` 関連テーブル + RLS。即時反映、deploy 不要
-- **着手判断**: allowlist 対象テナントが 10 件超えた時点、または「申請から 3 営業日以内に AI 機能 ON」要求が校長動線で出た時点で優先度を上げる。それまで env 運用で十分
-- **裏テーマ踏み絵**: 「機能 ON/OFF」自体は運用情報 (踏み絵ではない)。ただし「AI 利用量」「ON 履歴」を school_admin 閲覧可能にしない (= 観測者原則の対象)。管理画面は system_admin 専用とし RLS 設計を踏襲
-- **関連 memory**: `project_ai_chat_feature_flag.md`
-
-### ✅ 実装済: フィードバック返信機能 (F3)
-
-- **発見日**: 2026-05-16 (`feature/2026-05-16-ai-capture-onboarding` ブランチでスコープ外として切り出し)
-- **実装日**: 2026-05-17 (`feature/2026-05-17-feedback-reply` ブランチ、migration 0042)
-- **実装スコープ** (MVP):
-  - 片方向スレッド (system_admin の複数返信 / 教員 read-only)
-  - 返信者表記は一律「運営より」固定 (個人名を出さない、`feedback_design_vocab`)
-  - 内部 status enum は **持たない** (本文に「今回は見送り」「別のかたちで検討中」等を書く運用)
-  - 教員側 FAB に未読 dot のみ (件数表示なし)、FAB モーダル accordion から read-only 表示
-  - school_admin 完全不可視 (admin 画面・admin API は system_admin のみ、`feedback_observed_moment_broken`)
-- **スコープ外** (将来検討): 返信の編集/削除、AI 返信下書き、通知 push/メール、教員からの返信
-- **言葉遣いの注意 (踏み絵)**: 内部 enum で `declined` を使う場合でも、教員に見える日本語文言は「却下」「拒否」を避け、「今回は見送り」「別のかたちで検討中」等にする (`feedback_design_vocab`)。
-- **裏テーマ踏み絵**: 運営→教員方向の返信は「届いてる感」で OK。ただし返信頻度・件数を school_admin 集計に出すと「教員ごとの不満度」可視化に滑るので避ける (`feedback_observed_moment_broken`)。school_admin 集計 endpoint は **意図的に作らない**。
-
-### 🟢 低: AI 整理コーチマーク再表示動線
-
-- **発見日**: 2026-05-16 (同上ブランチ実装中に派生)
-- **背景**: 初回コーチマークを「閉じる」とその後 dismiss 永続化されて二度と出ない設計 (押し付け感排除)。文言改訂時 / 別端末で初めて触ったとき / 一度閉じた後にやっぱり見たいとき の再表示動線がない
-- **検討案**:
-  - ヘルプメニューに「使い方ガイド」項目を追加し、押すと state を reset して再表示
-  - `aiCaptureOnboardingStateSchema.version` 不一致時に再表示する選択肢もあるが、現状の useOnboardingState は version を見ない実装
-- **着手判断**: 「再表示したい」要望が現場から出たら優先度上げ。いきなり機能追加すると「閉じても出る」感が再生するので慎重に
-- **凍結日**: 2026-05-15 (週次レポート機能撤回 2026-04-27 に伴い、 本項目も実質不要)
-- **凍結理由**: 週次サマリ機能が「先週のvitanotaレポート 機能 (凍結)」で全面撤回されたため、 cron 自動生成も不要。 ただし将来 AI 機能再開時に類似の batch 設計が必要になる可能性があるため、 設計参照用として残置
-- **元の内容** (2026-04-27 発見):
-  - MVP では「アクセス時自動生成」、 月曜 fresh は保証されない
-  - 対策: EventBridge Scheduler + Lambda で月曜 0:00 JST に batch 生成
-  - 設計書: `construction/weekly-summary-design.md` § 17 (Phase 2)
-- **再開時に必要**: 週次レポート機能を再設計するなら本項目も再評価
-
-### 🟡 中: 「マイノート」 大タブ廃止に伴う E2E test 回帰修正
-
-- **発見日**: 2026-05-21 (H3-B 朝カード v1 リリース後 CI で検出)
-- **背景**: 2026-05-20 commit `fe61ac5` で dashboard 大タブ「マイノート」 を削除し、 右レーン
-  (`PublicTimelineRail`) の「マイノート」 タブに統合した。 これに伴い以下の E2E spec
-  7 件が古い構造 (大タブ「マイノート」 経由) を前提にして失敗
-  - `__tests__/e2e/02-journal-crud.spec.ts`: 4 件 (US-T-010 新規投稿 / 非公開トグル、 US-T-011 編集、 US-T-012 削除)
-  - `__tests__/e2e/03-timeline.spec.ts`: 2 件 (US-T-014 別テナント不可視、 マイノート全エントリ表示)
-  - `__tests__/e2e/04-tags.spec.ts`: 1 件 (US-T-013 / US-T-021 タグ選択投稿)
-- **影響**: 本番アプリの動作には影響なし (= AppRunner image に test は含まれず deploy 自体は success)。
-  ただし journal 系の回帰検知が失われたまま
-- **対応**: 各 spec を右レーン「マイノート」 タブ + `[data-testid="public-timeline-rail-tab-mine"]`
-  クリック → エントリ確認の構造に書き換える
-- **着手判断**: 次に journal 系の機能変更を行う際に併せて修正
 
 ### 🟢 低: OSV-Scanner CVE filter 拡張 (next 14.2.35 新規 CVE 群 + brace-expansion + ws)
 

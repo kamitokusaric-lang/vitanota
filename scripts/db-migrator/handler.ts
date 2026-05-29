@@ -32,8 +32,8 @@ interface MigrationRow {
   applied_at: string;
 }
 
-const RDS_HOST = process.env.RDS_PROXY_ENDPOINT!;
-const RDS_PORT = Number(process.env.RDS_PROXY_PORT ?? '5432');
+const RDS_HOST = process.env.RDS_ENDPOINT!;
+const RDS_PORT = Number(process.env.RDS_PORT ?? '5432');
 const RDS_USER = process.env.DB_USER!;
 const RDS_DATABASE = process.env.DB_NAME!;
 const AWS_REGION = process.env.AWS_REGION_OVERRIDE ?? process.env.AWS_REGION ?? 'ap-northeast-1';

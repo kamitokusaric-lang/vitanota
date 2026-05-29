@@ -124,7 +124,7 @@ export class AppStack extends cdk.Stack {
             runtimeEnvironmentVariables: [
               { name: 'NODE_ENV', value: 'production' },
               { name: 'AWS_REGION', value: props.env?.region ?? 'ap-northeast-1' },
-              { name: 'RDS_PROXY_ENDPOINT', value: props.rdsEndpoint },
+              { name: 'RDS_ENDPOINT', value: props.rdsEndpoint },
               { name: 'DB_USER', value: 'vitanota_app' },
               { name: 'DB_NAME', value: props.dbName },
               { name: 'E2E_TEST_MODE', value: 'false' },
@@ -260,8 +260,8 @@ export class AppStack extends cdk.Stack {
         },
       },
       environment: {
-        RDS_PROXY_ENDPOINT: props.rdsEndpoint,
-        RDS_PROXY_PORT: props.rdsPort,
+        RDS_ENDPOINT: props.rdsEndpoint,
+        RDS_PORT: props.rdsPort,
         DB_USER: 'vitanota',
         DB_NAME: props.dbName,
         DB_PASSWORD_SECRET_ARN: props.rdsSecret.secretArn,

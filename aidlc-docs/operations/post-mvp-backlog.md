@@ -103,9 +103,7 @@
 - **項目**:
   1. **pool sweep (Phase 2)**: 同一 generation で N 秒以内に M 回失敗 → idle clients destroy。最初の retry 実装では未着手 (reconnect storm 防止)。本番ログで retry_success が出続けても旧 generation の尾が長く残る場合に追加
   2. **`db.connect.retry.same_generation` assertion の unit test**: production code 改変 (UUID 注入可能化 or 専用 wrapper) なしには `vi.doMock('node:crypto')` が効かず unit test 困難 ([[feedback_vi_domock_node_builtin]])。production の assertion 行は CloudWatch で監視中
-  3. **`RDS_PROXY_ENDPOINT` env 名 rename**: RDS Proxy 無いのに名前嘘 (`src/shared/lib/db.ts:90`、`src/shared/lib/db-auth.ts:33`)。`RDS_ENDPOINT` に rename。CDK 側との同期必要
-  4. **`src/shared/lib/db.ts` / `db-auth.ts` のコメント嘘修正**: 「RDS Proxy がプール管理」「IAM トークン 15 分」「12 分 TTL キャッシュ」等の古い記述を実態 (Proxy 無し、TTL 8 分) に合わせる
-  5. **AutoMinorVersionUpgrade 運用見直し**: 2026-05-15 当日に B+C ハイブリッド (AutoMinor: false + window 変更) を検討したが、PAM failed が AutoMinor 起因ではないと判明し見送り。再発が別パターンになったら再評価
+  3. **AutoMinorVersionUpgrade 運用見直し**: 2026-05-15 当日に B+C ハイブリッド (AutoMinor: false + window 変更) を検討したが、PAM failed が AutoMinor 起因ではないと判明し見送り。再発が別パターンになったら再評価
 
 ### 🟢 低: CDK ドリフト解消 (CloudWatch Logs export ON を CDK に反映)
 - **発見日**: 2026-05-15 (PAM 調査中の本番設定変更)

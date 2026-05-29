@@ -5,7 +5,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   vi.stubEnv('AWS_REGION', 'ap-northeast-1');
-  vi.stubEnv('RDS_PROXY_ENDPOINT', 'mock-host');
+  vi.stubEnv('RDS_ENDPOINT', 'mock-host');
   vi.stubEnv('DB_USER', 'mock-user');
 });
 

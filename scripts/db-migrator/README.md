@@ -22,8 +22,8 @@ DB マイグレーション専用 Lambda 関数の参考実装。
 
 | 変数 | 用途 |
 |---|---|
-| `RDS_PROXY_ENDPOINT` | RDS Proxy ホスト名 |
-| `RDS_PROXY_PORT` | デフォルト 5432 |
+| `RDS_ENDPOINT` | RDS インスタンスのホスト名 |
+| `RDS_PORT` | デフォルト 5432 |
 | `DB_USER` | DB ユーザー名（dev: vitanota_dev・prod: vitanota_app） |
 | `DB_NAME` | DB 名 |
 | `AWS_REGION` | デフォルト ap-northeast-1 |

@@ -211,7 +211,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/vitanota_test
       # アプリは非特権ロール vitanota_app で接続（0008 マイグレーションで作成）
-      RDS_PROXY_ENDPOINT: localhost
+      RDS_ENDPOINT: localhost
       DB_USER: vitanota_app
       DB_NAME: vitanota_test
       DB_PASSWORD: vitanota_app_local

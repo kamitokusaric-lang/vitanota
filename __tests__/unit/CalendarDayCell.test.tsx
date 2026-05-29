@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CalendarDayCell } from '@/features/calendar/components/CalendarDayCell';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
@@ -70,5 +70,45 @@ describe('CalendarDayCell', () => {
     const row = screen.getByTestId('calendar-task-row-t1');
     expect(row.className).toMatch(/line-through/);
     expect(row.className).toMatch(/opacity-60/);
+  });
+
+  it('onMoveTask 指定時 + 未完了タスク: タスク行が draggable=true', () => {
+    const tasks = [makeTask({ id: 't-todo', title: '未完了', status: 'todo' })];
+    render(
+      <CalendarDayCell
+        date="2026-05-29"
+        tasks={tasks}
+        onMoveTask={vi.fn()}
+      />,
+    );
+    const row = screen.getByTestId('calendar-task-row-t-todo');
+    expect(row.getAttribute('draggable')).toBe('true');
+  });
+
+  it('done タスクは draggable=false (移動禁止、 chimo 2026-05-29 指示)', () => {
+    const tasks = [makeTask({ id: 't-done', title: '完了済', status: 'done' })];
+    render(
+      <CalendarDayCell
+        date="2026-05-29"
+        tasks={tasks}
+        onMoveTask={vi.fn()}
+      />,
+    );
+    const row = screen.getByTestId('calendar-task-row-t-done');
+    expect(row.getAttribute('draggable')).toBe('false');
+  });
+
+  it('maxVisible=Infinity で全件表示 + 「+N 件」 出ない', () => {
+    const tasks = Array.from({ length: 10 }, (_, i) =>
+      makeTask({ id: `t${i}`, title: `タスク ${i}` }),
+    );
+    render(
+      <CalendarDayCell date="2026-05-29" tasks={tasks} maxVisible={Infinity} />,
+    );
+    expect(screen.getByText('タスク 0')).toBeInTheDocument();
+    expect(screen.getByText('タスク 9')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('calendar-day-overflow-2026-05-29'),
+    ).toBeNull();
   });
 });

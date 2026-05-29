@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import type React from 'react';
 import { CalendarMonthCell } from '@/features/calendar/components/CalendarMonthCell';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 
@@ -127,5 +128,56 @@ describe('CalendarMonthCell', () => {
     );
     const cell = screen.getByTestId('calendar-month-cell-2026-04-28');
     expect(cell.className).toMatch(/bg-slate-50/);
+  });
+
+  it('onMoveTask 指定時 + 未完了タスク: タスク行が draggable=true', () => {
+    const tasks = [makeTask({ id: 't-todo', title: '未完了', status: 'todo' })];
+    render(
+      <CalendarMonthCell
+        date="2026-05-29"
+        tasks={tasks}
+        onSelectDate={vi.fn()}
+        onEditTask={vi.fn()}
+        onMoveTask={vi.fn()}
+      />,
+    );
+    const row = screen.getByTestId('calendar-month-task-row-t-todo');
+    expect(row.getAttribute('draggable')).toBe('true');
+  });
+
+  it('done タスクは draggable=false (移動禁止、 chimo 2026-05-29 指示)', () => {
+    const tasks = [makeTask({ id: 't-done', title: '完了済', status: 'done' })];
+    render(
+      <CalendarMonthCell
+        date="2026-05-29"
+        tasks={tasks}
+        onSelectDate={vi.fn()}
+        onEditTask={vi.fn()}
+        onMoveTask={vi.fn()}
+      />,
+    );
+    const row = screen.getByTestId('calendar-month-task-row-t-done');
+    expect(row.getAttribute('draggable')).toBe('false');
+  });
+
+  it('セルへの drop で onMoveTask が発火される', () => {
+    const onMoveTask = vi.fn();
+    render(
+      <CalendarMonthCell
+        date="2026-05-29"
+        tasks={[]}
+        onSelectDate={vi.fn()}
+        onEditTask={vi.fn()}
+        onMoveTask={onMoveTask}
+      />,
+    );
+    const cell = screen.getByTestId('calendar-month-cell-2026-05-29');
+    const dataTransfer = {
+      getData: (key: string) => (key === 'text/task-id' ? 'dragged-task-id' : ''),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    fireEvent.drop(cell, { dataTransfer });
+    expect(onMoveTask).toHaveBeenCalledWith('dragged-task-id', '2026-05-29');
   });
 });

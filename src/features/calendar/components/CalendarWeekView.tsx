@@ -18,6 +18,7 @@ import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 
 interface CalendarWeekViewProps {
   onEditTask: (task: TaskWithAssignees) => void;
+  onMoveTask?: (taskId: string, newDate: string) => void;
 }
 
 function dueDateToYmd(value: string | Date | null): string | null {
@@ -40,7 +41,7 @@ function groupByDate(
   return map;
 }
 
-export function CalendarWeekView({ onEditTask }: CalendarWeekViewProps) {
+export function CalendarWeekView({ onEditTask, onMoveTask }: CalendarWeekViewProps) {
   const [range, setRange] = useState<WeekRange>(() => getWeekRange());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const today = todayYmd();
@@ -87,7 +88,7 @@ export function CalendarWeekView({ onEditTask }: CalendarWeekViewProps) {
 
       {!isLoading && !error && (
         <>
-          {/* PC (xl 以上): 7 列 grid */}
+          {/* PC (xl 以上): 7 列 grid。 週は全件表示 (chimo 2026-05-29 指示)。 */}
           <div className="hidden xl:grid xl:grid-cols-7 xl:gap-2">
             {range.days.map((date) => (
               <CalendarDayCell
@@ -95,13 +96,14 @@ export function CalendarWeekView({ onEditTask }: CalendarWeekViewProps) {
                 date={date}
                 tasks={grouped.get(date) ?? []}
                 isToday={date === today}
-                maxVisible={4}
+                maxVisible={Infinity}
                 onSelectDate={handleSelectDate}
                 onEditTask={onEditTask}
+                onMoveTask={onMoveTask}
               />
             ))}
           </div>
-          {/* mobile (xl 未満): 縦リスト */}
+          {/* mobile (xl 未満): 縦リスト。 週は全件表示。 */}
           <div className="flex flex-col gap-3 xl:hidden">
             {range.days.map((date) => (
               <CalendarMobileDaySection
@@ -109,7 +111,7 @@ export function CalendarWeekView({ onEditTask }: CalendarWeekViewProps) {
                 date={date}
                 tasks={grouped.get(date) ?? []}
                 isToday={date === today}
-                maxVisible={4}
+                maxVisible={Infinity}
                 onSelectDate={handleSelectDate}
                 onEditTask={onEditTask}
               />

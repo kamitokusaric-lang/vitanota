@@ -21,6 +21,7 @@ import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 
 interface CalendarMonthViewProps {
   onEditTask: (task: TaskWithAssignees) => void;
+  onMoveTask?: (taskId: string, newDate: string) => void;
 }
 
 const WEEKDAY_HEADERS = ['月', '火', '水', '木', '金', '土', '日'] as const;
@@ -45,7 +46,7 @@ function groupByDate(
   return map;
 }
 
-export function CalendarMonthView({ onEditTask }: CalendarMonthViewProps) {
+export function CalendarMonthView({ onEditTask, onMoveTask }: CalendarMonthViewProps) {
   const [monthGrid, setMonthGrid] = useState<MonthGrid>(() => getMonthGrid());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const today = todayYmd();
@@ -117,6 +118,7 @@ export function CalendarMonthView({ onEditTask }: CalendarMonthViewProps) {
                   maxVisible={3}
                   onSelectDate={handleSelectDate}
                   onEditTask={onEditTask}
+                  onMoveTask={onMoveTask}
                 />
               ))}
             </div>

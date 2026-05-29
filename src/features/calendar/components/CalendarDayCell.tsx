@@ -1,5 +1,7 @@
 // PC 7 列 grid の 1 日セル (週 view)。 タスクをコンパクトに最大 N 件 + 「+N 件」。
-// タスク行クリックで親に onEditTask 発火、 日付ヘッダ / 「+N 件」 で onSelectDate 発火。
+// タスク行クリックで親に onEditTask、 日付ヘッダ / 「+N 件」 で onSelectDate。
+// PC では compact 行を draggable、 セルを drop target に → 日付セルへ drop で onMoveTask。
+import { useState } from 'react';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 
 interface CalendarDayCellProps {
@@ -10,6 +12,7 @@ interface CalendarDayCellProps {
   maxVisible?: number;
   onSelectDate?: (date: string) => void;
   onEditTask?: (task: TaskWithAssignees) => void;
+  onMoveTask?: (taskId: string, newDate: string) => void;
 }
 
 const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
@@ -34,9 +37,11 @@ function todayYmd(): string {
 function CalendarTaskRow({
   task,
   onEdit,
+  draggable,
 }: {
   task: TaskWithAssignees;
   onEdit?: (task: TaskWithAssignees) => void;
+  draggable?: boolean;
 }) {
   const dueYmd = dueDateToYmd(task.dueDate);
   const today = todayYmd();
@@ -53,10 +58,20 @@ function CalendarTaskRow({
       type="button"
       onClick={onEdit ? () => onEdit(task) : undefined}
       disabled={!onEdit}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/task-id', task.id);
+            }
+          : undefined
+      }
       data-testid={`calendar-task-row-${task.id}`}
       className={[
         'flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[12px] leading-snug transition',
         onEdit ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default',
+        draggable ? 'active:cursor-grabbing' : '',
         isDone
           ? 'text-slate-400 line-through opacity-60'
           : overdueActive
@@ -83,18 +98,41 @@ export function CalendarDayCell({
   maxVisible = 4,
   onSelectDate,
   onEditTask,
+  onMoveTask,
 }: CalendarDayCellProps) {
   const visible = tasks.slice(0, maxVisible);
   const overflow = Math.max(0, tasks.length - maxVisible);
   const handleSelect = onSelectDate ? () => onSelectDate(date) : undefined;
+  const [isDropOver, setIsDropOver] = useState(false);
+
+  const dropHandlers = onMoveTask
+    ? {
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setIsDropOver(true);
+        },
+        onDragLeave: () => setIsDropOver(false),
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          setIsDropOver(false);
+          const taskId = e.dataTransfer.getData('text/task-id');
+          if (taskId) onMoveTask(taskId, date);
+        },
+      }
+    : {};
 
   return (
     <div
+      {...dropHandlers}
       data-testid={`calendar-day-${date}`}
       className={[
-        'flex min-h-[140px] flex-col gap-1.5 rounded-xl border border-slate-200/85 p-2',
-        isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white',
-      ].join(' ')}
+        'flex min-h-[140px] flex-col gap-1.5 rounded-xl border p-2 transition',
+        isDropOver
+          ? 'border-vn-accent bg-indigo-50/50'
+          : 'border-slate-200/85',
+        !isDropOver && (isToday ? 'bg-indigo-50/30' : outOfMonth ? 'bg-slate-50/50' : 'bg-white'),
+      ].filter(Boolean).join(' ')}
     >
       <button
         type="button"
@@ -115,7 +153,12 @@ export function CalendarDayCell({
       </button>
       <div className="flex flex-col gap-1">
         {visible.map((task) => (
-          <CalendarTaskRow key={task.id} task={task} onEdit={onEditTask} />
+          <CalendarTaskRow
+            key={task.id}
+            task={task}
+            onEdit={onEditTask}
+            draggable={!!onMoveTask && task.status !== 'done'}
+          />
         ))}
         {overflow > 0 && (
           <button

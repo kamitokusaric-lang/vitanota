@@ -113,3 +113,11 @@ export function shiftMonth(monthStart: string, deltaMonths: number): MonthGrid {
 export function isOutOfMonth(date: string, monthStart: string): boolean {
   return date.slice(0, 7) !== monthStart.slice(0, 7);
 }
+
+// 「来週に渡す」 用: 指定日付の翌週月曜 (YYYY-MM-DD) を返す。
+// task.dueDate=null のタスクは呼び出し側で今日基準 (new Date()) を渡す想定。
+export function getNextMondayFromDate(date: Date | string): string {
+  const base = typeof date === 'string' ? parseYmd(date) : date;
+  const { weekStart } = getWeekRange(base);
+  return shiftWeek(weekStart, 1).weekStart;
+}

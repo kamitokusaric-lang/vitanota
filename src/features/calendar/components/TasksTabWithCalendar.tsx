@@ -9,6 +9,7 @@
 // - cache は global mutate で /api/tasks を invalidate (TaskBoard 側 cache も同期)
 import { useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { ArrowRight } from 'lucide-react';
 import { Modal } from '@/shared/components/Modal';
 import { useToast } from '@/shared/components/Toast';
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
@@ -24,6 +25,23 @@ import { useTaskTags, type TaskTag } from '@/features/tasks/hooks/useTaskTags';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 import { CalendarWeekView } from './CalendarWeekView';
 import { CalendarMonthView } from './CalendarMonthView';
+import { getNextMondayFromDate } from '../lib/calendarDateRange';
+
+const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
+
+function formatMoveLabel(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return `${m}/${d} (${WEEK_LABELS[date.getDay()]})`;
+}
+
+function dueDateToBase(value: string | Date | null): Date | string {
+  if (!value) return new Date();
+  // API response の dueDate は ISO string ("YYYY-MM-DDTHH:MM:SS.sssZ") で来ることがある。
+  // calendarDateRange.parseYmd は "YYYY-MM-DD" を期待するので先頭 10 文字に切り詰める。
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value;
+}
 
 interface TasksTabWithCalendarProps {
   selfUserId: string;
@@ -92,6 +110,48 @@ export function TasksTabWithCalendar({
     }
   };
 
+  const handleMoveTask = async (taskId: string, newDate: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: newDate }),
+      });
+      if (!res.ok) {
+        showToast('日付の変更に失敗しました', 'error');
+        return;
+      }
+      await globalMutate(
+        (key) => typeof key === 'string' && key.startsWith('/api/tasks'),
+      );
+      showToast(`${formatMoveLabel(newDate)} に移動しました`, 'success');
+    } catch {
+      showToast('日付の変更に失敗しました', 'error');
+    }
+  };
+
+  const handlePushToNextWeek = async (task: TaskWithAssignees) => {
+    const nextMonday = getNextMondayFromDate(dueDateToBase(task.dueDate));
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: nextMonday }),
+      });
+      if (!res.ok) {
+        showToast('来週への移動に失敗しました', 'error');
+        return;
+      }
+      await globalMutate(
+        (key) => typeof key === 'string' && key.startsWith('/api/tasks'),
+      );
+      handleClose();
+      showToast('来週に渡しました', 'success');
+    } catch {
+      showToast('来週への移動に失敗しました', 'error');
+    }
+  };
+
   const handleCreateTag = async (name: string): Promise<TaskTag | null> => {
     const res = await fetch('/api/task-tags', {
       method: 'POST',
@@ -116,12 +176,22 @@ export function TasksTabWithCalendar({
     {
       id: 'week',
       label: '週',
-      content: <CalendarWeekView onEditTask={handleEditTask} />,
+      content: (
+        <CalendarWeekView
+          onEditTask={handleEditTask}
+          onMoveTask={handleMoveTask}
+        />
+      ),
     },
     {
       id: 'month',
       label: '月',
-      content: <CalendarMonthView onEditTask={handleEditTask} />,
+      content: (
+        <CalendarMonthView
+          onEditTask={handleEditTask}
+          onMoveTask={handleMoveTask}
+        />
+      ),
     },
   ];
 
@@ -135,20 +205,36 @@ export function TasksTabWithCalendar({
         maxWidth="max-w-xl"
       >
         {editing && (
-          <TaskForm
-            mode="edit"
-            initial={toFormInitial(editing)}
-            categories={categories ?? []}
-            assignees={assignees ?? []}
-            canAssignToOthers
-            selfUserId={selfUserId}
-            submitting={submitting}
-            error={formError}
-            taskTags={taskTags ?? []}
-            onCreateTag={handleCreateTag}
-            onSubmit={(values) => handleUpdate(editing.id, values)}
-            onCancel={handleClose}
-          />
+          <>
+            {editing.status !== 'done' && (
+              <div className="mb-3 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => handlePushToNextWeek(editing)}
+                  disabled={submitting}
+                  data-testid="calendar-push-to-next-week"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-full bg-vn-accent px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ArrowRight size={16} strokeWidth={2} aria-hidden />
+                  来週に渡す
+                </button>
+              </div>
+            )}
+            <TaskForm
+              mode="edit"
+              initial={toFormInitial(editing)}
+              categories={categories ?? []}
+              assignees={assignees ?? []}
+              canAssignToOthers
+              selfUserId={selfUserId}
+              submitting={submitting}
+              error={formError}
+              taskTags={taskTags ?? []}
+              onCreateTag={handleCreateTag}
+              onSubmit={(values) => handleUpdate(editing.id, values)}
+              onCancel={handleClose}
+            />
+          </>
         )}
       </Modal>
     </>

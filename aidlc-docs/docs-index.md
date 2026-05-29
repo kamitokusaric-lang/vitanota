@@ -92,6 +92,7 @@
 | Unit-03 | 教員ダッシュボード・タグ | [`construction/unit-03/`](construction/unit-03/) |
 | Unit-04 | 管理者ダッシュボード・アラート | [`construction/unit-04/`](construction/unit-04/) |
 | **Unit-05** | **AI 連携 (チャット抽出第一弾)** | [`construction/unit-05/`](construction/unit-05/) — 2026-05-11 新設、まず functional-design 4 ファイル |
+| **Unit-06** | **カレンダー表示機能** | [`construction/unit-06-calendar.md`](construction/unit-06-calendar.md) — 2026-05-29 新設、 軽量 1 ファイル (新 H3 仮説、 schema 変更ゼロ、 既存 tasks の別 view) |
 
 **Unit-02 に関しては特筆すべきファイル**:
 - [`unit-02/code/api-contracts.md`](construction/unit-02/code/api-contracts.md) — API 契約

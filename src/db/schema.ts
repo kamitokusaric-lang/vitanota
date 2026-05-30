@@ -65,12 +65,13 @@ export const aiSessionStatusEnum = pgEnum('ai_session_status', [
   'discarded',
 ]);
 
-// H3-B 朝カード (project_h3_morning_arrival_value) のクライアント発火イベント種別 (migration 0045)
-export const morningCardEventTypeEnum = pgEnum('morning_card_event_type', [
-  'shown',
-  'dismissed',
-  'candidate_clicked',
-  'candidate_status_changed',
+// カレンダー機能 (Unit-06) のクライアント発火イベント種別 (migration 0047)
+export const calendarEventTypeEnum = pgEnum('calendar_event_type', [
+  'view_switched',
+  'task_moved',
+  'task_pushed_to_next_week',
+  'task_created_from_plus',
+  'day_detail_opened',
 ]);
 
 // H9 検証 (2026-05-27): 投稿カードの reaction 種別 (migration 0046)
@@ -850,11 +851,11 @@ export const aiSessions = pgTable(
   }),
 );
 
-// ── morning_card_events (migration 0045) ────────────────────
-// H3-B 朝カード (project_h3_morning_arrival_value) の教員行動ログ。
+// ── calendar_events (migration 0047) ─────────────────────────
+// カレンダー機能 (Unit-06) の教員行動ログ。
 // RLS: 本人 + system_admin (school_admin 不可視、 ai_sessions と同水準の踏み絵)。
-export const morningCardEvents = pgTable(
-  'morning_card_events',
+export const calendarEvents = pgTable(
+  'calendar_events',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
     tenantId: uuid('tenant_id')
@@ -863,7 +864,7 @@ export const morningCardEvents = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    eventType: morningCardEventTypeEnum('event_type').notNull(),
+    eventType: calendarEventTypeEnum('event_type').notNull(),
     version: varchar('version', { length: 32 }).notNull(),
     payload: jsonb('payload').notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -871,15 +872,15 @@ export const morningCardEvents = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    tenantCreatedIdx: index('morning_card_events_tenant_created_idx').on(
+    tenantCreatedIdx: index('calendar_events_tenant_created_idx').on(
       table.tenantId,
       table.createdAt,
     ),
-    typeCreatedIdx: index('morning_card_events_type_created_idx').on(
+    typeCreatedIdx: index('calendar_events_type_created_idx').on(
       table.eventType,
       table.createdAt,
     ),
-    userIdx: index('morning_card_events_user_idx').on(
+    userIdx: index('calendar_events_user_idx').on(
       table.userId,
       table.createdAt,
     ),

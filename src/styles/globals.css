@@ -8,3 +8,27 @@
     color: #1a1a1a;
   }
 }
+
+/* New バッジのキラキラ (カレンダータブ等)。 transform 衝突を避けるため
+   位置決めは外側 span、 twinkle (scale/opacity) は内側でこのクラスが担う。 */
+@keyframes vn-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12) rotate(-2deg);
+  }
+}
+
+.vn-new-badge {
+  animation: vn-twinkle 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vn-new-badge {
+    animation: none;
+  }
+}

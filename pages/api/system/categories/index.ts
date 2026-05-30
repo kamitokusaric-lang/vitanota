@@ -4,7 +4,7 @@
 // POST: 新規作成、(tenant_id, name) UNIQUE 違反は 409 NAME_ALREADY_EXISTS
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { withSystemAdmin } from '@/shared/lib/db';
 import { taskCategories, tasks } from '@/db/schema';
@@ -55,6 +55,8 @@ async function handleList(
           isSystemDefault: taskCategories.isSystemDefault,
           sortOrder: taskCategories.sortOrder,
           createdAt: taskCategories.createdAt,
+          // Done (完了) タスクは紐付き数に含めない (chimo 2026-05-30)。
+          // 条件は ON 句に置き、 LEFT JOIN で非 Done が 0 のカテゴリも 0 件として残す。
           taskCount: sql<number>`COUNT(${tasks.id})::int`,
         })
         .from(taskCategories)
@@ -63,6 +65,7 @@ async function handleList(
           and(
             eq(tasks.categoryId, taskCategories.id),
             eq(tasks.tenantId, taskCategories.tenantId),
+            ne(tasks.status, 'done'),
           ),
         )
         .where(eq(taskCategories.tenantId, tenantId))

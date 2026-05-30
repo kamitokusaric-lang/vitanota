@@ -26,7 +26,6 @@ import { TasksTabWithCalendar } from '@/features/calendar/components/TasksTabWit
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
 import { TaskCreateTabs } from '@/features/ai-chat/TaskCreateTabs';
-import { MorningGreetingCard } from '@/features/dashboard/components/MorningGreetingCard';
 import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimelineRail';
 import {
   getMoodIcon,
@@ -239,15 +238,12 @@ export default function DashboardPage({
                   職員室ノート / マイノート
                 </button>
               </div>
-              {/* chimo 2026-05-20: タスク追加カード → 朝カードの順 (= 入口を先頭に出す) */}
+              {/* タスク追加カードを入口として先頭に出す (chimo 2026-05-20)。
+                  朝カード (H3-B) は 2026-05-30 に撤去 (役割を calendar に統合)。 */}
               <TaskCreateTabs
                 selfUserId={session.user.userId}
                 aiChatEnabled={aiChatEnabled}
               />
-              {/* H3-B 朝カード (project_h3_morning_arrival_value):
-                  朝 4-11 時 JST に表示、 開いた瞬間に「来てよかった」 を作る装置。
-                  AI 不使用、 ルールベース + 日付シードランダム文言で温かみを出す。 */}
-              <MorningGreetingCard selfUserId={session.user.userId} />
               <Tabs tabs={mainTabs} defaultTabId="tasks" queryParam="tab" />
             </div>
             <div className="hidden xl:block">

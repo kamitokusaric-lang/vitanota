@@ -20,12 +20,14 @@ import { CalendarDayDetailModal } from './CalendarDayDetailModal';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 import type { SharedFilters } from '@/features/tasks/components/TaskBoard';
 import { applyClientSideFilters } from '../lib/applyClientSideFilters';
+import { fireCalendarEvent } from '../lib/calendarAnalytics';
 
 interface CalendarMonthViewProps {
   selfUserId: string;
   filters: SharedFilters;
   onEditTask: (task: TaskWithAssignees) => void;
-  onMoveTask?: (taskId: string, newDate: string) => void;
+  // fromDate は drop 元の dueDate (null = 未設定タスク)、 toDate は drop 先セル。
+  onMoveTask?: (taskId: string, fromDate: string | null, toDate: string) => void;
   onAddTask?: (date: string) => void;
 }
 
@@ -85,8 +87,23 @@ export function CalendarMonthView({
   const handlePrev = () => setMonthGrid(shiftMonth(monthGrid.monthStart, -1));
   const handleNext = () => setMonthGrid(shiftMonth(monthGrid.monthStart, 1));
   const handleToday = () => setMonthGrid(getMonthGrid());
-  const handleSelectDate = (date: string) => setSelectedDate(date);
+  const handleSelectDate = (date: string) => {
+    fireCalendarEvent({ event: 'calendar_day_detail_opened', date });
+    setSelectedDate(date);
+  };
   const handleCloseModal = () => setSelectedDate(null);
+
+  // セル (drop 先 = toDate のみ知る) からの move を受け、 tasks から drop 元の
+  // dueDate を fromDate として解決して親に渡す。 同日 drop は no-op なので無視。
+  const handleCellMove = onMoveTask
+    ? (taskId: string, toDate: string) => {
+        const fromDate = tasks
+          ? dueDateToYmd(tasks.find((t) => t.id === taskId)?.dueDate ?? null)
+          : null;
+        if (fromDate === toDate) return;
+        onMoveTask(taskId, fromDate, toDate);
+      }
+    : undefined;
 
   return (
     <div data-testid="calendar-month-view">
@@ -142,7 +159,7 @@ export function CalendarMonthView({
                     maxVisible={3}
                     onSelectDate={handleSelectDate}
                     onEditTask={onEditTask}
-                    onMoveTask={onMoveTask}
+                    onMoveTask={handleCellMove}
                     onAddTask={onAddTask}
                   />
                 ));

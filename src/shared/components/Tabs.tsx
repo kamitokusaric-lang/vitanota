@@ -10,6 +10,7 @@ export interface TabDef {
   content: ReactNode;
   disabled?: boolean;
   icon?: ReactNode; // pill variant 時にラベル左に表示
+  badge?: ReactNode; // ラベル右に表示する任意のバッジ (例: New)
 }
 
 interface TabsProps {
@@ -19,6 +20,9 @@ interface TabsProps {
   variant?: 'underline' | 'pill';
   // tablist 右隣に並べる任意の slot (calendar の filter UI 等)
   rightSlot?: ReactNode;
+  // タブが実際に切り替わったとき (disabled / 同一タブ再選択を除く) に呼ぶ。
+  // 利用計測用 (calendar の view 切替計測など)。
+  onSelect?: (id: string) => void;
 }
 
 export function Tabs({
@@ -27,6 +31,7 @@ export function Tabs({
   queryParam = 'tab',
   variant = 'underline',
   rightSlot,
+  onSelect,
 }: TabsProps) {
   const router = useRouter();
   const queryValue = router.query[queryParam];
@@ -41,6 +46,7 @@ export function Tabs({
   const handleSelect = (id: string) => {
     const tab = tabs.find((t) => t.id === id);
     if (!tab || tab.disabled) return;
+    if (id === active) return; // 同一タブ再選択は切替ではない
     router.push(
       {
         pathname: router.pathname,
@@ -49,6 +55,7 @@ export function Tabs({
       undefined,
       { shallow: true },
     );
+    onSelect?.(id);
   };
 
   // underline variant: dashboard 大タブ等。 pill variant (chimo 2026-05-30): icon 付きの
@@ -71,7 +78,7 @@ export function Tabs({
           const buttonClass =
             variant === 'pill'
               ? [
-                  'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] transition-colors',
+                  'relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] transition-colors',
                   tab.disabled
                     ? 'cursor-not-allowed font-medium text-slate-300'
                     : isActive
@@ -100,6 +107,7 @@ export function Tabs({
             >
               {variant === 'pill' && tab.icon}
               {tab.label}
+              {tab.badge}
               {tab.disabled && (
                 <span className="ml-1 text-xs text-slate-400">(準備中)</span>
               )}

@@ -1,32 +1,44 @@
 // access-distribution dashboard の API response 型定義
 // system_admin 向け /admin/access-distribution で使用
 //
-// 集計対象 (2026-05-19 刷新、 2026-05-20 morning_plan 撤去):
-// - UU: sessions.created_at の date×hour matrix で user_id distinct
-// - AI 利用: ai_sessions.created_at の date×hour matrix を type='quick_capture' (H1 雑投げ整理) のみ集計
-// 旧 PV (AppRunner Requests metric) は HTTP リクエスト数で page view と対応しないため廃止
-// 旧 morning_plan 集計は project_h3_reframing_20260520 で撤去
+// 2026-05-30 (chimo): ヒートマップ + 折れ線を廃止し、 全メトリクスをバブルチャートで表現。
+//   各点 = (date, hour) の件数。 x=日付 / y=時間帯 / 大きさ=件数 / 色=系列。
+// 集計対象:
+// - UU: sessions.created_at の date×hour で user_id distinct
+// - AI 整理: ai_sessions の type='quick_capture' (H1 雑投げ整理) 件数
+// - 日々ノート: journal_entries 件数 (sub = 非公開件数)
+// - タスク: tasks.updated_at 件数 (sub = 完了件数)
+// - カレンダー: calendar_events を event 種別で色分け (Unit-06)
 
+// HeatmapTable component (汎用) が使う行型。 access-distribution の本ページでは
+// 非使用になったが、 component / test / aggregator が参照するため残す。
 export interface HeatmapRow {
   date: string; // YYYY-MM-DD (JST)
   hours: number[]; // length 24 (main value)
-  // optional: cell 内に括弧表示する 2 番目の数値 (例: journal の非公開件数)
-  subHours?: number[]; // length 24
+  subHours?: number[]; // length 24 (cell 内の 2 番目の数値)
 }
 
-export interface AccessDistributionSummary {
-  totalUu: number;
-  totalQuickCaptureSessions: number; // H1
-  totalJournalEntries: number; // journal 合算
-  totalJournalPrivateEntries: number; // journal 非公開のみ
-  totalTaskTouches: number; // task updated_at 件数
-  totalTaskCompletes: number; // task completed_at 件数
-  // H3-B 朝カード (morning_card_events、 chimo 2026-05-21 UU 化):
-  //   全指標は期間内ユニーク先生数。 反応率 = candidateStatusChangedUu / shownUu (UI で計算)
-  morningCardShownUu: number; // 朝カードを 1 回以上見た先生数 (反応率の分母)
-  morningCardDismissedUu: number; // 「閉じる」 を押した先生数
-  morningCardCandidateClickedUu: number; // 候補タイトルを押した先生数 (= 編集モーダルを開いた)
-  morningCardCandidateStatusChangedUu: number; // 「今日やる」 / 「完了」 に動かした先生数
+// バブルチャートの 1 点 (単一系列メトリクス用)。 sub は任意の内訳件数 (日々ノート=非公開 / タスク=完了)
+export interface MetricBubblePoint {
+  date: string; // YYYY-MM-DD (JST)
+  hour: number; // 0-23 (JST)
+  count: number;
+  sub?: number;
+}
+
+export type CalendarEventTypeKey =
+  | 'view_switched'
+  | 'task_moved'
+  | 'task_pushed_to_next_week'
+  | 'task_created_from_plus'
+  | 'day_detail_opened';
+
+// 日付 × 時間帯 × event 種別の 1 点 (カレンダーのバブル、 色=種別)
+export interface CalendarScatterPoint {
+  date: string; // YYYY-MM-DD (JST)
+  hour: number; // 0-23 (JST)
+  eventType: CalendarEventTypeKey;
+  count: number;
 }
 
 export interface AccessDistributionMeta {
@@ -36,28 +48,11 @@ export interface AccessDistributionMeta {
   generatedAt: string; // ISO
 }
 
-// 折れ線グラフ用の日次系列 (DailyCountLineChart の data prop に直接渡せる形)
-export interface DailySeriesPoint {
-  date: string; // YYYY-MM-DD (JST)
-  count: number;
-}
-
-// 5 指標の日次系列 (chimo 2026-05-21、 SummaryCards 撤去に伴い追加)
-export interface AccessDistributionDailySeries {
-  uu: DailySeriesPoint[]; // ログイン UU (COUNT DISTINCT user_id)
-  quickCapture: DailySeriesPoint[]; // H1 quick_capture 件数
-  journal: DailySeriesPoint[]; // 日々ノート合算件数
-  task: DailySeriesPoint[]; // タスク touch 件数 (updated_at)
-  morningCard: DailySeriesPoint[]; // 朝カード 候補ボタンクリック件数 (COUNT(*), candidate_clicked + candidate_status_changed)
-}
-
 export interface AccessDistributionResponse {
-  uuHeatmap: HeatmapRow[];
-  quickCaptureHeatmap: HeatmapRow[]; // H1
-  journalHeatmap: HeatmapRow[]; // 合算 (hours) + 非公開件数 (subHours)
-  taskHeatmap: HeatmapRow[]; // touch 合算 (hours) + 完了件数 (subHours)
-  morningCardHeatmap: HeatmapRow[]; // 朝カード 候補ボタンクリック件数 (COUNT(*), candidate_clicked + candidate_status_changed)、 H3-B
-  dailySeries: AccessDistributionDailySeries; // 5 指標の折れ線グラフ用日次系列
-  summary: AccessDistributionSummary;
+  uu: MetricBubblePoint[]; // count = distinct user 数 (date×hour)
+  quickCapture: MetricBubblePoint[]; // H1 quick_capture 件数
+  journal: MetricBubblePoint[]; // 日々ノート件数 (sub = 非公開)
+  task: MetricBubblePoint[]; // タスク touch 件数 (sub = 完了)
+  calendar: CalendarScatterPoint[]; // カレンダー操作 (event 種別で色分け)
   meta: AccessDistributionMeta;
 }

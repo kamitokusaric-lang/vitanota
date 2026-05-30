@@ -1,10 +1,10 @@
-// AI 改善 (H1 Phase B) 画面と API で共有する集計レスポンス型。
-// API: pages/api/system/ai-analytics.ts、画面: pages/admin/ai-analytics.tsx
+// AI 改善 (H1 Phase B) 指標の集計レスポンス型。
+// API: pages/api/system/ai-analytics.ts、表示: pages/admin/access-distribution.tsx 末尾
+// (2026-05-30 chimo: AI 改善ページをアクセス分布ページに統合、期間フィルタ対応)。
 //
 // 踏み絵 (project_ai_sessions_visibility / feedback_observed_moment_broken):
-//   - 出力は aggregate のみ。user_id / tenant_id は含めない
-//   - 自由コメント (freeComments) は教員が書いた文章。PII 混入の可能性ありで
-//     system_admin 限定表示。誰が書いたかは紐付けない (匿名集計)
+//   - 出力は aggregate のみ。user_id / tenant_id / 個別 session は返さない
+//   - 個別セッション詳細・自由コメントはこの API では返さない (エクスポートに分離)
 
 export interface AiAnalyticsResponse {
   summary: {
@@ -32,74 +32,4 @@ export interface AiAnalyticsResponse {
     privacyConcernDiscardCount: number;
     privacyConcernDiscardRate: number | null;
   };
-  promptVersions: Array<{
-    promptVersion: string;
-    total: number;
-    confirmed: number;
-    discarded: number;
-  }>;
-  categoryEdit: Array<{
-    parentName: string;
-    candidateCount: number;
-    categoryChanged: number;
-  }>;
-  discardReasons: Array<{ reason: string; count: number }>;
-  editReasons: Array<{ reason: string; count: number }>;
-  freeComments: {
-    discard: Array<{
-      reason: string | null;
-      text: string;
-      at: string | null;
-    }>;
-    edit: Array<{
-      reason: string | null;
-      text: string;
-      at: string | null;
-    }>;
-  };
-  sessions: SessionDetail[];
-  // chimo 2026-05-20: H3 morning_plan は撤去 (project_h3_reframing_20260520)。
-  // 旧 morningPlan: MorningPlanAnalytics / dailyCounts.h3 は削除。
-  dailyCounts: {
-    h1: Array<{ date: string; count: number }>;
-  };
-}
-
-// セッション詳細 (system_admin のみ閲覧、chimo 2026-05-14 指示で踏み絵から外す)
-export interface SessionDetail {
-  id: string;
-  type: string;
-  status: 'draft' | 'confirmed' | 'discarded';
-  createdAt: string;
-  inputText: string;
-  inputTextRedacted: string | null;
-  promptVersion: string | null;
-  extraction: {
-    tasks: Array<{
-      title: string;
-      categoryId: string | null;
-      dueDate: string | null;
-      memo: string;
-      confidence: string;
-    }>;
-    needsConfirmation: string[];
-  } | null;
-  userConfirmed: Array<{
-    title: string;
-    aiSuggestedTitle: string | null;
-    titleChanged: boolean;
-    aiSuggestedParentName: string | null;
-    userSelectedParentName: string;
-    categoryChanged: boolean;
-    dueDate: string | null;
-    aiSuggestedDueDate: string | null;
-    dueDateChanged: boolean;
-    taskCreated: boolean;
-  }> | null;
-  confirmedAt: string | null;
-  discardReason: string | null;
-  discardReasonText: string | null;
-  discardedAt: string | null;
-  editReason: string | null;
-  editReasonText: string | null;
 }

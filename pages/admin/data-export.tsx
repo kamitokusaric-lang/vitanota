@@ -82,6 +82,13 @@ export default function DataExportPage({ session }: DataExportPageProps) {
   const periodOrderOk = !dateValid || from <= to;
   const ready = Boolean(tenantId) && dateValid && periodOrderOk;
 
+  // AI セッション詳細は全テナント横断・匿名なので tenant 選択不要 (期間のみ)
+  const aiSessionParams = new URLSearchParams();
+  if (from) aiSessionParams.set('from', from);
+  if (to) aiSessionParams.set('to', to);
+  const aiSessionHref = `/api/system/ai-session-export?${aiSessionParams.toString()}`;
+  const aiSessionReady = dateValid && periodOrderOk;
+
   return (
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="system_admin">
@@ -205,6 +212,39 @@ export default function DataExportPage({ session }: DataExportPageProps) {
                     >
                       タスク CSV をダウンロード
                     </a>
+                  </div>
+
+                  {/* AI セッション詳細 (改善用): テナント非依存・期間のみ */}
+                  <div className="border-t border-gray-200 pt-5">
+                    <h2 className="text-sm font-semibold text-gray-700">
+                      AI セッション詳細 (prompt 改善用)
+                    </h2>
+                    <p
+                      className="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                      data-testid="data-export-ai-session-notice"
+                    >
+                      入力本文 → AI 提案 → 教員の確定/破棄の差分を含みます。
+                      <strong>全テナント横断・匿名</strong> (個人/学校は特定しない)。
+                      PII を含みうるため system_admin 専用。 期間のみで絞り込み (テナント選択は無視)。
+                    </p>
+                    <div className="mt-3">
+                      <a
+                        href={aiSessionReady ? aiSessionHref : undefined}
+                        data-testid="data-export-ai-session-download"
+                        aria-disabled={!aiSessionReady}
+                        className={
+                          'inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium transition-colors ' +
+                          (aiSessionReady
+                            ? 'border-gray-300 text-gray-800 hover:bg-gray-50'
+                            : 'cursor-not-allowed border-gray-200 text-gray-400')
+                        }
+                        onClick={(e) => {
+                          if (!aiSessionReady) e.preventDefault();
+                        }}
+                      >
+                        AI セッション詳細 CSV をダウンロード
+                      </a>
+                    </div>
                   </div>
 
                   <p className="text-[11px] text-gray-400">

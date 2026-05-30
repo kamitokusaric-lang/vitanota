@@ -73,7 +73,9 @@ export function ManualTaskCreateForm({
   // YYYY-MM-DD を渡して dueDate プリフィル。 dashboard 上部の TaskCreateTabs
   // 経由は渡さないので空文字列のまま (挙動不変)。
   initialDueDate?: string;
-  onSuccess?: () => void;
+  // 作成成功時に呼ぶ。 作成された task の id 配列を渡す (calendar 「+」 由来の
+  // 利用計測で taskId を拾うため)。 引数なし呼び出し (TaskCreateTabs) は不変。
+  onSuccess?: (createdTaskIds?: string[]) => void;
 }) {
   const [rows, setRows] = useState<ManualRow[]>(() => [
     { ...emptyRow(selfUserId), dueDate: initialDueDate ?? '' },
@@ -165,6 +167,7 @@ export function ManualTaskCreateForm({
     try {
       let createdCount = 0;
       let failedCount = 0;
+      const createdIds: string[] = [];
       for (const row of filledRows) {
         const categoryId = nameToId.get(
           normalizeCategoryName(row.userSelectedParentName),
@@ -190,6 +193,7 @@ export function ManualTaskCreateForm({
             continue;
           }
           const { task } = (await res.json()) as { task: { id: string } };
+          createdIds.push(task.id);
           if (row.tagIds.length > 0) {
             await fetch(`/api/tasks/${task.id}/tags`, {
               method: 'PUT',
@@ -211,7 +215,7 @@ export function ManualTaskCreateForm({
         setError(`${createdCount} 件作成、${failedCount} 件失敗しました。`);
       } else {
         setRows([emptyRow(selfUserId)]);
-        onSuccess?.();
+        onSuccess?.(createdIds);
       }
     } finally {
       setSubmitting(false);

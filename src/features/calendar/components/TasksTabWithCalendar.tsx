@@ -30,8 +30,16 @@ import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 import { ManualTaskCreateForm } from '@/features/ai-chat/ManualTaskCreateForm';
 import { CalendarMonthView } from './CalendarMonthView';
 import { getNextMondayFromDate } from '../lib/calendarDateRange';
+import { fireCalendarEvent } from '../lib/calendarAnalytics';
 
 const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
+
+// dueDate (string | Date | null) を YYYY-MM-DD | null に整形 (計測 payload 用)。
+function dueDateToYmd(value: string | Date | null): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
 
 function formatMoveLabel(ymd: string): string {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -97,7 +105,17 @@ export function TasksTabWithCalendar({
         typeof key === 'string' && key.startsWith('/api/tasks'),
     );
 
-  const handleMoveTask = async (taskId: string, newDate: string) => {
+  const handleMoveTask = async (
+    taskId: string,
+    fromDate: string | null,
+    newDate: string,
+  ) => {
+    fireCalendarEvent({
+      event: 'calendar_task_moved',
+      taskId,
+      fromDate,
+      toDate: newDate,
+    });
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
@@ -117,6 +135,12 @@ export function TasksTabWithCalendar({
 
   const handlePushToNextWeek = async (task: TaskWithAssignees) => {
     const nextMonday = getNextMondayFromDate(dueDateToBase(task.dueDate));
+    fireCalendarEvent({
+      event: 'calendar_task_pushed_to_next_week',
+      taskId: task.id,
+      fromDate: dueDateToYmd(task.dueDate),
+      toDate: nextMonday,
+    });
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
@@ -166,6 +190,11 @@ export function TasksTabWithCalendar({
       id: 'calendar',
       label: 'カレンダー',
       icon: <Calendar size={16} strokeWidth={1.75} aria-hidden />,
+      badge: (
+        <span className="vn-new-badge pointer-events-none inline-block whitespace-nowrap rounded-full bg-gradient-to-r from-pink-400 via-fuchsia-400 to-violet-400 px-2 py-0.5 text-[10px] font-bold leading-none text-white shadow-[0_2px_6px_rgba(217,70,239,0.45)]">
+          ✨ New
+        </span>
+      ),
       content: (
         <CalendarMonthView
           selfUserId={selfUserId}
@@ -234,6 +263,12 @@ export function TasksTabWithCalendar({
         queryParam="view"
         variant="pill"
         rightSlot={filterBar}
+        onSelect={(id) =>
+          fireCalendarEvent({
+            event: 'calendar_view_switched',
+            view: id as 'board' | 'calendar',
+          })
+        }
       />
       <TaskEditModal
         task={editing}
@@ -267,7 +302,16 @@ export function TasksTabWithCalendar({
           <ManualTaskCreateForm
             selfUserId={selfUserId}
             initialDueDate={createDate}
-            onSuccess={handleCloseCreate}
+            onSuccess={(ids) => {
+              ids?.forEach((taskId) =>
+                fireCalendarEvent({
+                  event: 'calendar_task_created_from_plus',
+                  date: createDate,
+                  taskId,
+                }),
+              );
+              handleCloseCreate();
+            }}
           />
         )}
       </Modal>

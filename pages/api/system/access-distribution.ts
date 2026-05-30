@@ -1,39 +1,29 @@
 // system_admin 向け /admin/access-distribution の集計 API
-// UU (sessions.created_at の date×hour distinct) + AI 利用 (ai_sessions の type 別件数) を時間帯別に集約
-// PV (旧 CloudWatch AppRunner Requests) は 2026-05-19 廃止 — HTTP リクエスト数は page view と対応しないため
+// 全メトリクス (UU / AI 整理 / 日々ノート / タスク / カレンダー) を date×hour の
+// バブルチャート用の点として返す (2026-05-30 chimo: ヒートマップ + 折れ線を廃止)。
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/features/auth/lib/auth-options';
-import {
-  initializeHeatmap,
-  fillHeatmap,
-  initializeHeatmapWithSub,
-  fillHeatmapWithSub,
-  initializeDailySeries,
-  fillDailySeries,
-} from '@/features/access-distribution/lib/aggregator';
-import {
-  getUuByHourDate,
-  getDailyUu,
-} from '@/features/access-distribution/lib/sessionUuRepository';
-import {
-  getAiSessionUsageByHourDate,
-  getDailyQuickCapture,
-} from '@/features/access-distribution/lib/aiSessionUsageRepository';
-import {
-  getJournalUsageByHourDate,
-  getDailyJournalEntries,
-} from '@/features/access-distribution/lib/journalUsageRepository';
-import {
-  getTaskUsageByHourDate,
-  getDailyTaskTouches,
-} from '@/features/access-distribution/lib/taskUsageRepository';
-import {
-  getMorningCardUsageByHourDate,
-  getDailyMorningCardClicks,
-} from '@/features/access-distribution/lib/morningCardUsageRepository';
-import type { AccessDistributionResponse } from '@/features/access-distribution/types';
+import { getUuByHourDate } from '@/features/access-distribution/lib/sessionUuRepository';
+import { getAiSessionUsageByHourDate } from '@/features/access-distribution/lib/aiSessionUsageRepository';
+import { getJournalUsageByHourDate } from '@/features/access-distribution/lib/journalUsageRepository';
+import { getTaskUsageByHourDate } from '@/features/access-distribution/lib/taskUsageRepository';
+import { getCalendarDateHourEventPoints } from '@/features/access-distribution/lib/calendarUsageRepository';
+import type {
+  AccessDistributionResponse,
+  CalendarEventTypeKey,
+  CalendarScatterPoint,
+  MetricBubblePoint,
+} from '@/features/access-distribution/types';
 import { logger } from '@/shared/lib/logger';
+
+const CALENDAR_EVENT_KEYS: CalendarEventTypeKey[] = [
+  'view_switched',
+  'task_moved',
+  'task_pushed_to_next_week',
+  'task_created_from_plus',
+  'day_detail_opened',
+];
 
 const MAX_PERIOD_DAYS = 90;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -92,116 +82,49 @@ export default async function handler(
   }
 
   try {
-    const [
-      uu,
-      ai,
-      journal,
-      task,
-      morningCard,
-      dailyUu,
-      dailyQuickCapture,
-      dailyJournal,
-      dailyTask,
-      dailyMorningCard,
-    ] = await Promise.all([
+    const [uu, ai, journal, task, calendarRows] = await Promise.all([
       getUuByHourDate(session.user.userId, startUtc, endUtcExclusive),
       getAiSessionUsageByHourDate(
         session.user.userId,
         startUtc,
         endUtcExclusive,
       ),
-      getJournalUsageByHourDate(
-        session.user.userId,
-        startUtc,
-        endUtcExclusive,
-      ),
-      getTaskUsageByHourDate(
-        session.user.userId,
-        startUtc,
-        endUtcExclusive,
-      ),
-      getMorningCardUsageByHourDate(
-        session.user.userId,
-        startUtc,
-        endUtcExclusive,
-      ),
-      getDailyUu(session.user.userId, startUtc, endUtcExclusive),
-      getDailyQuickCapture(session.user.userId, startUtc, endUtcExclusive),
-      getDailyJournalEntries(session.user.userId, startUtc, endUtcExclusive),
-      getDailyTaskTouches(session.user.userId, startUtc, endUtcExclusive),
-      getDailyMorningCardClicks(
+      getJournalUsageByHourDate(session.user.userId, startUtc, endUtcExclusive),
+      getTaskUsageByHourDate(session.user.userId, startUtc, endUtcExclusive),
+      getCalendarDateHourEventPoints(
         session.user.userId,
         startUtc,
         endUtcExclusive,
       ),
     ]);
 
-    const uuHeatmap = fillHeatmap(
-      initializeHeatmap(startUtc, endUtcExclusive),
-      uu.rows,
-    );
-    const quickCaptureHeatmap = fillHeatmap(
-      initializeHeatmap(startUtc, endUtcExclusive),
-      ai.quickCapture,
-    );
-    // chimo 2026-05-20: morning_plan は撤去 (project_h3_reframing_20260520)
-    const journalHeatmap = fillHeatmapWithSub(
-      initializeHeatmapWithSub(startUtc, endUtcExclusive),
-      journal.rows,
-    );
-    const taskHeatmap = fillHeatmapWithSub(
-      initializeHeatmapWithSub(startUtc, endUtcExclusive),
-      task.rows,
-    );
-    const morningCardHeatmap = fillHeatmap(
-      initializeHeatmap(startUtc, endUtcExclusive),
-      morningCard.clicks,
-    );
+    // 単一系列メトリクス: 集計行をそのままバブル点に (sub は WithSub 行のみ付与)
+    const toBubble = (
+      rows: Array<{ date: string; hour: number; count: number; subCount?: number }>,
+    ): MetricBubblePoint[] =>
+      rows.map((r) => ({
+        date: r.date,
+        hour: r.hour,
+        count: r.count,
+        ...(typeof r.subCount === 'number' ? { sub: r.subCount } : {}),
+      }));
 
-    // 折れ線グラフ用の日次系列 (期間内すべての JST 日付を 0 埋め)
-    const dailySeries = {
-      uu: fillDailySeries(
-        initializeDailySeries(startUtc, endUtcExclusive),
-        dailyUu,
-      ),
-      quickCapture: fillDailySeries(
-        initializeDailySeries(startUtc, endUtcExclusive),
-        dailyQuickCapture,
-      ),
-      journal: fillDailySeries(
-        initializeDailySeries(startUtc, endUtcExclusive),
-        dailyJournal,
-      ),
-      task: fillDailySeries(
-        initializeDailySeries(startUtc, endUtcExclusive),
-        dailyTask,
-      ),
-      morningCard: fillDailySeries(
-        initializeDailySeries(startUtc, endUtcExclusive),
-        dailyMorningCard,
-      ),
-    };
+    // カレンダー: 既知 event 種別のみ通す
+    const calendar: CalendarScatterPoint[] = calendarRows
+      .filter((row) => (CALENDAR_EVENT_KEYS as string[]).includes(row.event_type))
+      .map((row) => ({
+        date: row.date,
+        hour: row.hour,
+        eventType: row.event_type as CalendarEventTypeKey,
+        count: row.count,
+      }));
 
     const response: AccessDistributionResponse = {
-      uuHeatmap,
-      quickCaptureHeatmap,
-      journalHeatmap,
-      taskHeatmap,
-      morningCardHeatmap,
-      dailySeries,
-      summary: {
-        totalUu: uu.totalUu,
-        totalQuickCaptureSessions: ai.totalQuickCaptureSessions,
-        totalJournalEntries: journal.totalEntries,
-        totalJournalPrivateEntries: journal.totalPrivateEntries,
-        totalTaskTouches: task.totalTouches,
-        totalTaskCompletes: task.totalCompletes,
-        morningCardShownUu: morningCard.shownUu,
-        morningCardDismissedUu: morningCard.dismissedUu,
-        morningCardCandidateClickedUu: morningCard.candidateClickedUu,
-        morningCardCandidateStatusChangedUu:
-          morningCard.candidateStatusChangedUu,
-      },
+      uu: toBubble(uu.rows),
+      quickCapture: toBubble(ai.quickCapture),
+      journal: toBubble(journal.rows),
+      task: toBubble(task.rows),
+      calendar,
       meta: {
         start: startStr,
         end: endStr,

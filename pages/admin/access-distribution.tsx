@@ -1,7 +1,9 @@
 // system_admin: アクセス分布ダッシュボード
-// UU (sessions.created_at の date×hour distinct) + AI 利用 (H1 quick_capture) をヒートマップ可視化
+// 全メトリクス (UU / AI 整理 / 日々ノート / タスク / カレンダー) を date×hour の
+// バブルチャートで可視化 (x=日付 / y=時間帯 / 大きさ=件数 / 色=系列)。
 // 2026-05-15 朝の PAM failed 障害調査で「教員アクセス集中時に発火」が必要条件と判明、
-// incident と利用パターンの照合に使う運用基盤。 2026-05-19 PV (CloudWatch Requests) 廃止 + ヒートマップ刷新
+// incident と利用パターンの照合に使う運用基盤。
+// 2026-05-30 (chimo): ヒートマップ + 折れ線を廃止しバブルに統一。
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth';
@@ -9,12 +11,31 @@ import { getAuthOptions } from '@/features/auth/lib/auth-options';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { AdminLayout } from '@/shared/components/AdminLayout';
-import { DailyCountLineChart } from '@/shared/components/DailyCountLineChart';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
-import { HeatmapTable } from '@/features/access-distribution/components/HeatmapTable';
+import {
+  MetricBubbleChart,
+  type BubbleSeries,
+} from '@/features/access-distribution/components/MetricBubbleChart';
 import type { VitanotaSession } from '@/shared/types/auth';
-import type { AccessDistributionResponse } from '@/features/access-distribution/types';
+import type {
+  AccessDistributionResponse,
+  CalendarEventTypeKey,
+} from '@/features/access-distribution/types';
+import type { AiAnalyticsResponse } from '@/features/ai-chat/analyticsTypes';
+
+// カレンダーの event 種別ごとの色とラベル (バブルの色分け)
+const CALENDAR_SERIES: Array<{
+  key: CalendarEventTypeKey;
+  label: string;
+  color: string;
+}> = [
+  { key: 'view_switched', label: '表示切替', color: '#6366f1' },
+  { key: 'day_detail_opened', label: '日付詳細', color: '#22c55e' },
+  { key: 'task_created_from_plus', label: '＋作成', color: '#f59e0b' },
+  { key: 'task_moved', label: '日付変更(DnD)', color: '#06b6d4' },
+  { key: 'task_pushed_to_next_week', label: '来週に渡す', color: '#ec4899' },
+];
 
 interface PageProps {
   session: VitanotaSession;
@@ -22,6 +43,42 @@ interface PageProps {
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// ── AI 改善指標 (アクセス分布ページ末尾、 chimo 2026-05-30 統合) ──
+function formatPercent(numerator: number, denominator: number): string {
+  if (denominator === 0) return '—';
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+function formatScore(value: number | null): string {
+  if (value == null) return '—';
+  return value.toFixed(2);
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds == null) return '—';
+  if (seconds < 60) return `${Math.round(seconds)} 秒`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(1)} 分`;
+  return `${(seconds / 3600).toFixed(1)} 時間`;
+}
+
+function MetricCard({
+  label,
+  value,
+  caption,
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="mt-2 text-3xl font-semibold text-gray-900">{value}</div>
+      {caption && <div className="mt-1 text-[11px] text-gray-400">{caption}</div>}
+    </div>
+  );
 }
 
 // 説明会日 (= 教員導入開始日)。 これより前は MVP 内部テスト期間でノイズが多いため除外。
@@ -32,6 +89,7 @@ export default function AccessDistributionPage({ session }: PageProps) {
   const [start, setStart] = useState<string>(LAUNCH_DATE);
   const [end, setEnd] = useState<string>(todayIsoDate());
   const [data, setData] = useState<AccessDistributionResponse | null>(null);
+  const [aiData, setAiData] = useState<AiAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,17 +97,20 @@ export default function AccessDistributionPage({ session }: PageProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/system/access-distribution?start=${s}&end=${e}`,
-      );
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as {
+      // アクセス分布 (必須) と AI 改善指標 (同期間) を並列取得。
+      const [distRes, aiRes] = await Promise.all([
+        fetch(`/api/system/access-distribution?start=${s}&end=${e}`),
+        fetch(`/api/system/ai-analytics?start=${s}&end=${e}`),
+      ]);
+      if (!distRes.ok) {
+        const json = (await distRes.json().catch(() => ({}))) as {
           message?: string;
         };
-        throw new Error(json.message ?? `HTTP ${res.status}`);
+        throw new Error(json.message ?? `HTTP ${distRes.status}`);
       }
-      const json = (await res.json()) as AccessDistributionResponse;
-      setData(json);
+      setData((await distRes.json()) as AccessDistributionResponse);
+      // AI 指標は best-effort: 失敗してもアクセス分布の表示は止めない。
+      setAiData(aiRes.ok ? ((await aiRes.json()) as AiAnalyticsResponse) : null);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'データの取得に失敗しました',
@@ -79,10 +140,10 @@ export default function AccessDistributionPage({ session }: PageProps) {
               <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">アクセス分布</h1>
                 <p className="mt-2 text-sm text-gray-600">
-                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ)、 日々ノート登録、 タスク操作、 朝カード (H3-B) ボタンクリックを時間帯×日付ヒートマップで可視化。
+                  教員のログイン時刻 (UU) と AI 機能 (H1 雑投げ)、 日々ノート登録、 タスク操作、 カレンダー操作をバブルで可視化。 末尾に AI 整理 (H1) の改善指標 (確定率 / 修正率 / ガードレール) を掲載。 すべて上の期間で絞り込み。
                 </p>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数 / 日々ノートは journal_entries 件数 (括弧内は非公開) / タスクは tasks.updated_at 件数 (括弧内は完了) / 朝カードは morning_card_events 候補ボタンクリック件数 (candidate_clicked + candidate_status_changed)
+                  1 時間集計 / JST / UU は sessions.created_at distinct / AI 利用は ai_sessions 件数 / 日々ノートは journal_entries 件数 (括弧内は非公開) / タスクは tasks.updated_at 件数 (括弧内は完了) / カレンダーは calendar_events 全 interaction 件数 (COUNT(*), 全 event 種別)
                 </p>
               </div>
 
@@ -138,61 +199,207 @@ export default function AccessDistributionPage({ session }: PageProps) {
               {error && <ErrorMessage message={error} />}
 
               {!loading && !error && data && (
-                <div className="space-y-6">
-                  {/* 折れ線グラフ群 (chimo 2026-05-21、 SummaryCards 撤去に伴い追加) */}
-                  <div className="space-y-8">
-                    <DailyCountLineChart
-                      title="総 UU (日別)"
-                      data={data.dailySeries.uu}
-                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / sessions.created_at JST date 別 distinct user_id`}
-                    />
-                    <DailyCountLineChart
-                      title="AI 整理 (H1) 利用数 (日別)"
-                      data={data.dailySeries.quickCapture}
-                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / ai_sessions WHERE type='quick_capture' の件数`}
-                    />
-                    <DailyCountLineChart
-                      title="日々ノート登録数 (日別)"
-                      data={data.dailySeries.journal}
-                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / journal_entries 合算件数 (非公開内訳はヒートマップ参照)`}
-                    />
-                    <DailyCountLineChart
-                      title="タスク操作数 (日別)"
-                      data={data.dailySeries.task}
-                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / tasks.updated_at 件数 (完了内訳はヒートマップ参照)`}
-                    />
-                    <DailyCountLineChart
-                      title="朝カード (H3-B) ボタンクリック件数 (日別)"
-                      data={data.dailySeries.morningCard}
-                      caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / morning_card_events WHERE event_type IN ('candidate_clicked', 'candidate_status_changed') の COUNT(*)`}
-                    />
-                  </div>
-                  <HeatmapTable
-                    heatmap={data.uuHeatmap}
+                <div className="space-y-8">
+                  <MetricBubbleChart
                     title="UU (ログイン教員数)"
-                    caption="sessions.created_at の JST date×hour 別 distinct user_id"
+                    unit="人"
+                    series={[
+                      {
+                        key: 'uu',
+                        label: 'UU',
+                        color: '#6366f1',
+                        points: data.uu,
+                      },
+                    ]}
+                    caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / sessions.created_at の JST date×hour 別 distinct user_id`}
                   />
-                  <HeatmapTable
-                    heatmap={data.quickCaptureHeatmap}
-                    title="AI 整理 (H1) 利用数"
-                    caption="ai_sessions WHERE type='quick_capture' の件数"
-                  />
-                  {/* chimo 2026-05-20: 朝の見通し (H3) ヒートマップは撤去 (project_h3_reframing_20260520) */}
-                  <HeatmapTable
-                    heatmap={data.journalHeatmap}
+                  <MetricBubbleChart
                     title="日々ノート登録数"
-                    caption="journal_entries 合算 (うち非公開) の件数"
+                    subLabel="非公開"
+                    series={[
+                      {
+                        key: 'journal',
+                        label: '日々ノート',
+                        color: '#0ea5e9',
+                        points: data.journal,
+                      },
+                    ]}
+                    caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / journal_entries 件数 (ツールチップにうち非公開)`}
                   />
-                  <HeatmapTable
-                    heatmap={data.taskHeatmap}
+                  <MetricBubbleChart
                     title="タスク操作数"
-                    caption="tasks.updated_at 件数 (うち完了 = completed_at 件数)"
+                    subLabel="完了"
+                    series={[
+                      {
+                        key: 'task',
+                        label: 'タスク',
+                        color: '#10b981',
+                        points: data.task,
+                      },
+                    ]}
+                    caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / tasks.updated_at 件数 (ツールチップにうち完了)`}
                   />
-                  <HeatmapTable
-                    heatmap={data.morningCardHeatmap}
-                    title="朝カード (H3-B) ボタンクリック件数"
-                    caption="morning_card_events WHERE event_type IN ('candidate_clicked', 'candidate_status_changed') の COUNT(*) (時間帯別、 同一先生の複数回押下も積算)"
+                  <MetricBubbleChart
+                    title="カレンダー操作数"
+                    showLegend
+                    series={CALENDAR_SERIES.map<BubbleSeries>((s) => ({
+                      key: s.key,
+                      label: s.label,
+                      color: s.color,
+                      points: data.calendar
+                        .filter((p) => p.eventType === s.key)
+                        .map((p) => ({
+                          date: p.date,
+                          hour: p.hour,
+                          count: p.count,
+                        })),
+                    }))}
+                    caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / calendar_events を event 種別で色分け (x=日付 y=時間帯 大きさ=件数)`}
                   />
+
+                  <MetricBubbleChart
+                    title="AI 整理 (H1) 利用数"
+                    series={[
+                      {
+                        key: 'quickCapture',
+                        label: 'AI 整理',
+                        color: '#8b5cf6',
+                        points: data.quickCapture,
+                      },
+                    ]}
+                    caption={`期間: ${data.meta.start} 〜 ${data.meta.end} / ai_sessions WHERE type='quick_capture' の件数`}
+                  />
+
+                  {/* AI 整理 (H1) 改善指標 — 上の期間ピッカーで絞り込み (chimo 2026-05-30 統合) */}
+                  {aiData && (() => {
+                    const decisionTotal =
+                      aiData.summary.confirmedCount +
+                      aiData.summary.discardedCount;
+                    return (
+                      <>
+                        <div className="border-t border-gray-200 pt-6">
+                          <h2 className="text-lg font-bold text-gray-900">
+                            AI 整理 (H1) 改善指標
+                          </h2>
+                          <p className="mt-1 text-[11px] text-gray-400">
+                            期間: {data.meta.start} 〜 {data.meta.end} / ai_sessions
+                            の aggregate (個別セッションはデータエクスポートを参照)
+                          </p>
+                        </div>
+
+                        {/* 主指標 */}
+                        <section>
+                          <h3 className="mb-3 text-sm font-semibold text-gray-700">
+                            主指標 (H1 検証)
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <MetricCard
+                              label="タスク候補作成確定率"
+                              value={formatPercent(
+                                aiData.summary.confirmedCount,
+                                decisionTotal,
+                              )}
+                              caption={`確定 ${aiData.summary.confirmedCount} / 決定 ${decisionTotal}`}
+                            />
+                            <MetricCard
+                              label="破棄率"
+                              value={formatPercent(
+                                aiData.summary.discardedCount,
+                                decisionTotal,
+                              )}
+                              caption={`破棄 ${aiData.summary.discardedCount} / 決定 ${decisionTotal}`}
+                            />
+                          </div>
+                          <p className="mt-2 text-[11px] text-gray-400">
+                            総セッション数 {aiData.summary.totalSessions} (うち draft{' '}
+                            {aiData.summary.draftCount})
+                          </p>
+                        </section>
+
+                        {/* 副指標 */}
+                        <section>
+                          <h3 className="mb-3 text-sm font-semibold text-gray-700">
+                            副指標
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <MetricCard
+                              label="1 入力あたり候補生成数"
+                              value={formatScore(
+                                aiData.subMetrics.candidatesPerInputAvg,
+                              )}
+                              caption={`対象 ${aiData.subMetrics.candidatesPerInputCount} セッション`}
+                            />
+                            <MetricCard
+                              label="確定までの時間 (平均)"
+                              value={formatDuration(
+                                aiData.subMetrics.timeToConfirmSecondsAvg,
+                              )}
+                              caption={`対象 ${aiData.subMetrics.timeToConfirmCount} セッション`}
+                            />
+                            <MetricCard
+                              label="再利用率 (2 回以上)"
+                              value={formatPercent(
+                                aiData.subMetrics.reusedUsers,
+                                aiData.subMetrics.uniqueUsers,
+                              )}
+                              caption={`${aiData.subMetrics.reusedUsers} / ${aiData.subMetrics.uniqueUsers} ユーザー`}
+                            />
+                          </div>
+                        </section>
+
+                        {/* 修正率 */}
+                        <section>
+                          <h3 className="mb-3 text-sm font-semibold text-gray-700">
+                            AI 提案の修正率 (確定タスク候補 {aiData.editRate.candidateCount} 件)
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <MetricCard
+                              label="タイトル修正率"
+                              value={formatPercent(
+                                aiData.editRate.titleChanged,
+                                aiData.editRate.candidateCount,
+                              )}
+                              caption={`修正 ${aiData.editRate.titleChanged} 件`}
+                            />
+                            <MetricCard
+                              label="カテゴリ修正率"
+                              value={formatPercent(
+                                aiData.editRate.categoryChanged,
+                                aiData.editRate.candidateCount,
+                              )}
+                              caption={`修正 ${aiData.editRate.categoryChanged} 件`}
+                            />
+                            <MetricCard
+                              label="期限修正率"
+                              value={formatPercent(
+                                aiData.editRate.dueDateChanged,
+                                aiData.editRate.candidateCount,
+                              )}
+                              caption={`修正 ${aiData.editRate.dueDateChanged} 件`}
+                            />
+                          </div>
+                        </section>
+
+                        {/* ガードレール */}
+                        <section>
+                          <h3 className="mb-3 text-sm font-semibold text-gray-700">
+                            ガードレール
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <MetricCard
+                              label="生成後破棄率 (危険域: 70%以上)"
+                              value={formatPercent(
+                                aiData.summary.discardedCount,
+                                decisionTotal,
+                              )}
+                              caption={`破棄 ${aiData.summary.discardedCount} / 決定 ${decisionTotal}`}
+                            />
+                          </div>
+                        </section>
+                      </>
+                    );
+                  })()}
+
                   <p className="text-[11px] text-gray-400">
                     生成: {new Date(data.meta.generatedAt).toLocaleString('ja-JP')} / {data.meta.periodDays} 日間
                   </p>

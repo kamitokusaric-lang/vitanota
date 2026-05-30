@@ -57,12 +57,14 @@ export const LogEvents = {
   FeedbackUnreadHintShown: 'feedback_unread_hint_shown',
   FeedbackUnreadHintDismissed: 'feedback_unread_hint_dismissed',
 
-  // H3-B: 朝カード (project_h3_morning_arrival_value) の利用計測 (chimo 2026-05-20)。
-  // 全て info 出力、 「dismiss = 負シグナル」 として扱わない (踏み絵: 観測感を作らない)。
-  MorningCardShown: 'morning_card_shown',
-  MorningCardDismissed: 'morning_card_dismissed',
-  MorningCardCandidateClicked: 'morning_card_candidate_clicked',
-  MorningCardCandidateStatusChanged: 'morning_card_candidate_status_changed',
+  // カレンダー機能 (Unit-06) の利用計測 (chimo 2026-05-30)。
+  // 全て info 出力 (踏み絵: 観測感を作らない)。新 H3 仮説 (週/月の偏り把握 +
+  // calendar が朝の来訪価値を代替できるか) の検証データ。
+  CalendarViewSwitched: 'calendar_view_switched',
+  CalendarTaskMoved: 'calendar_task_moved',
+  CalendarTaskPushedToNextWeek: 'calendar_task_pushed_to_next_week',
+  CalendarTaskCreatedFromPlus: 'calendar_task_created_from_plus',
+  CalendarDayDetailOpened: 'calendar_day_detail_opened',
 } as const;
 
 export type LogEventName = (typeof LogEvents)[keyof typeof LogEvents];
@@ -188,43 +190,37 @@ interface FeedbackUnreadHintDismissedPayload extends BaseEventFields {
   version: string;
 }
 
-// H3-B 朝カード analytics (chimo 2026-05-20)
-// position は候補リスト上の 1-indexed の表示位置 (1 = 一番上)。
-// urgency は朝カード API の MorningCardCandidate.urgency と同値。
-type MorningCardUrgency =
-  | 'overdue'
-  | 'today'
-  | 'soon'
-  | 'in_progress'
-  | 'no_due_date'
-  | 'other';
-type MorningCardStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
-
-interface MorningCardShownPayload extends BaseEventFields {
+// カレンダー機能 (Unit-06) analytics (chimo 2026-05-30)
+// version は server 側で定数 'calendar-v1' を付与 (calendar に version 概念は無いが
+// morning_card_events と同型を保つため列を残す)。
+interface CalendarViewSwitchedPayload extends BaseEventFields {
   version: string;
-  candidateCount: number;
-  overdueCount: number;
-  todayDueCount: number;
-  noDueDateCount: number;
-  yesterdayDoneCount: number;
+  view: 'board' | 'calendar';
 }
 
-interface MorningCardDismissedPayload extends BaseEventFields {
+interface CalendarTaskMovedPayload extends BaseEventFields {
   version: string;
+  taskId: string;
+  fromDate: string | null;
+  toDate: string;
 }
 
-interface MorningCardCandidateClickedPayload extends BaseEventFields {
+interface CalendarTaskPushedToNextWeekPayload extends BaseEventFields {
   version: string;
-  position: number;
-  urgency: MorningCardUrgency;
+  taskId: string;
+  fromDate: string | null;
+  toDate: string;
 }
 
-interface MorningCardCandidateStatusChangedPayload extends BaseEventFields {
+interface CalendarTaskCreatedFromPlusPayload extends BaseEventFields {
   version: string;
-  position: number;
-  urgency: MorningCardUrgency;
-  from: MorningCardStatus;
-  to: MorningCardStatus;
+  date: string;
+  taskId: string;
+}
+
+interface CalendarDayDetailOpenedPayload extends BaseEventFields {
+  version: string;
+  date: string;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -252,10 +248,11 @@ export interface LogEventPayloads {
   [LogEvents.FeedbackThreadMarkedRead]: FeedbackThreadMarkedReadPayload;
   [LogEvents.FeedbackUnreadHintShown]: FeedbackUnreadHintShownPayload;
   [LogEvents.FeedbackUnreadHintDismissed]: FeedbackUnreadHintDismissedPayload;
-  [LogEvents.MorningCardShown]: MorningCardShownPayload;
-  [LogEvents.MorningCardDismissed]: MorningCardDismissedPayload;
-  [LogEvents.MorningCardCandidateClicked]: MorningCardCandidateClickedPayload;
-  [LogEvents.MorningCardCandidateStatusChanged]: MorningCardCandidateStatusChangedPayload;
+  [LogEvents.CalendarViewSwitched]: CalendarViewSwitchedPayload;
+  [LogEvents.CalendarTaskMoved]: CalendarTaskMovedPayload;
+  [LogEvents.CalendarTaskPushedToNextWeek]: CalendarTaskPushedToNextWeekPayload;
+  [LogEvents.CalendarTaskCreatedFromPlus]: CalendarTaskCreatedFromPlusPayload;
+  [LogEvents.CalendarDayDetailOpened]: CalendarDayDetailOpenedPayload;
 }
 
 // ─────────────────────────────────────────────────────────────

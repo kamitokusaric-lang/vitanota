@@ -67,12 +67,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb  # v6.0.0
-        with:
-          # Dockerfile の corepack pin (pnpm@10.33.0) と揃える。
-          # 浮動の `version: 10` だと最新 pnpm が Node 22.13+ を要求し、CI の Node 20 で破綻する。
-          version: 10.33.0
+      # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
+      # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
+      # 入れる regression があるため使わない (pnpm/action-setup#225 / #227)。
+      - name: Enable corepack & pin pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
@@ -98,12 +99,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb  # v6.0.0
-        with:
-          # Dockerfile の corepack pin (pnpm@10.33.0) と揃える。
-          # 浮動の `version: 10` だと最新 pnpm が Node 22.13+ を要求し、CI の Node 20 で破綻する。
-          version: 10.33.0
+      # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
+      # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
+      # 入れる regression があるため使わない (pnpm/action-setup#225 / #227)。
+      - name: Enable corepack & pin pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
@@ -158,12 +160,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb  # v6.0.0
-        with:
-          # Dockerfile の corepack pin (pnpm@10.33.0) と揃える。
-          # 浮動の `version: 10` だと最新 pnpm が Node 22.13+ を要求し、CI の Node 20 で破綻する。
-          version: 10.33.0
+      # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
+      # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
+      # 入れる regression があるため使わない (pnpm/action-setup#225 / #227)。
+      - name: Enable corepack & pin pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
@@ -231,12 +234,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb  # v6.0.0
-        with:
-          # Dockerfile の corepack pin (pnpm@10.33.0) と揃える。
-          # 浮動の `version: 10` だと最新 pnpm が Node 22.13+ を要求し、CI の Node 20 で破綻する。
-          version: 10.33.0
+      # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
+      # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
+      # 入れる regression があるため使わない (pnpm/action-setup#225 / #227)。
+      - name: Enable corepack & pin pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
@@ -291,7 +295,7 @@ jobs:
 # 現在固定中の SHA (2026-06-03 更新・要定期更新):
 # - actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd = v6.0.2
 # - actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 = v4.0.2
-# - pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb = v6.0.0
+# - pnpm: corepack で pnpm@10.33.0 を pin (Dockerfile と同一)。action-setup は v6 regression のため不使用
 # - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a = v7.0.1
 # - gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 = v2.3.7
 #

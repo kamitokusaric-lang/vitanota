@@ -11,7 +11,7 @@
 
 ## 脆弱性対応 / 依存更新
 
-### 🔴 高: Next.js 14 → 15 major upgrade + drizzle-orm 0.30 → 0.31+ upgrade
+### 🔴 高: Next.js 14 → 15 major upgrade + drizzle-orm 0.30 → 0.45 upgrade
 - **発見日**: 2026-04-22 (Phase C CI GREEN 化中に OSV-Scanner の CVE 一斉発覚)
 - **期限**: 2026-06-30 (MVP ローンチから約 2 ヶ月)
 - **背景**: Next.js 14.2 系の 5 CVE (High 2 + Medium 3) と drizzle-orm 0.30.10 の 1 High CVE が、それぞれ 14.2 最終 patch / 0.30 最終 patch で fix 対応していない。major upgrade (Next.js) / minor upgrade (drizzle-orm) が必要
@@ -41,12 +41,21 @@
   - SSRF は VPC Private Isolated で外部到達不能、Cache 系は CachingDisabled で影響ゼロ
   - drizzle SQL Injection は parameterized API のみ使用で実効リスク低
   - 詳細な CVE 別評価は `osv-scanner.toml` の各 reason 欄
-- **upgrade 手順 (推定工数 2-4 日)**:
-  1. Next.js 14 → 15 migration (React 19 含む、App Router / Middleware signature 変更追従)
-  2. drizzle-orm 0.30 → 0.31+ migration (schema API 変更確認)
-  3. 統合テスト + E2E regression 確認
-  4. 2026-05-18 検出分の 9 CVE + 2026-05-19 検出の brace-expansion CVE が解消されたことを osv-scanner で verify (ws CVE は vitest upgrade を別途実施)
-  5. 本番 deploy (CloudFront + App Runner)
+- **2026-06-03 update (足場固め調査確定)**: 着手前調査で 2 つの重要事実が判明し、ゴールと工数見積もりを確定した。
+  - **ゴールは Next 15 止めに確定** (16 ではない)。理由: **next-auth が Next 16 を peer サポートしていない** (2026-06 時点)。next-auth@4.24.x も v5.0.0 も peer が `next@'^12 || ^13 || ^14 || ^15'` 止まりで、Next 16 は範囲外 → `--legacy-peer-deps`/`--force` でしか install できず公式未サポート。認証はログインの生命線のため force 押し込みは不可。16 へは next-auth が追従してから別 PR で対応 ([nextauthjs/next-auth#13302](https://github.com/nextauthjs/next-auth/issues/13302))。CVE 一括解消という本来の目的は **Next 15 で達成できる**。
+  - **想定より軽い**: コードベース調査で vitanota は **Pages Router のみ** (`app/` 不在) と確定。よって「App Router 全面移行」という最大の懸念作業は **不要**。`getServerSideProps`×15 / `useRouter from next/router`×10 / `middleware.ts` はいずれも Next 15 で Pages Router フルサポート (低リスク)。`middleware.ts→proxy.ts` リネームは **16 から** なので 15 では不要。React 18 固有 API は `forwardRef` 1 箇所 (TagPicker) のみ。
+  - **最大リスクは 2 点に集約**: ① next-auth v4.24.7 が React 19 でコンパイル/起動するか (React 19 コンパイル失敗の報告あり、多くは @types 衝突解消で通る)、② drizzle-orm 0.30→0.45 の breaking (DrizzleAdapter の `as never` 型キャスト生存・複合 FK の DDL 生成・drizzle.config.ts 不在)。
+- **段階的 upgrade 手順 (推定工数 2-4 日・依存の底から上へ・各段に検証ゲート)**:
+  - **リバーシビリティ**: 着手前に `git tag pre-next15-upgrade` を main に打つ → `feature/yyyy-mm-dd-next15-react19` ブランチ → 段階を小コミットで積み各ゲートでロールバック可能に。
+  1. **準備**: Node version 確認 (Next 15 は Node 18.18+。Dockerfile / CI の `node-version: '20'` は OK だが点検)、git tag、ブランチ作成。
+  2. **React 19 + 型**: react/react-dom 19、@types/react・@types/react-dom 19。`npx types-react-codemod@latest preset-19 .` で型一括移行、`npx react-codemod@latest react-19/remove-forward-ref` で TagPicker 対応 → **ゲート①** `pnpm type-check` 通過。
+  3. **next-auth × React 19 検証** (最大リスク): `pnpm dev` でログイン全経路を手動確認。コンパイル失敗時は @types 衝突解消を先に。最悪 v5 検討は別判断。
+  4. **Next 15**: `npx @next/codemod@latest upgrade latest` (15 で止める)、eslint-config-next 15。next.config は experimental なしで影響軽微 → **ゲート②** `pnpm build` 通過 + getServerSideProps×15 + middleware 認証リダイレクト動作。
+  5. **drizzle-orm 0.30 → 0.45 + drizzle-kit 0.21 → 0.31.x**: schema.ts の pgTable / 複合 FK API 互換確認、`drizzle-kit generate` で DDL 差分ゼロ確認、DrizzleAdapter の `as never` キャスト生存確認 → **ゲート③** integration test (実 PostgreSQL) で RLS・複合 FK・マルチテナント隔離が生存。
+  6. **dev major (分離可・Next 15 と独立)**: typescript 6 / vitest 4 / eslint 10 / jsdom 29。別コミット or 別 PR に切り出し可。
+  7. **CVE verify**: osv-scanner で 2026-05-18 の 9 CVE + brace-expansion CVE 解消を確認 (ws CVE は vitest 4 upgrade で解消) → 全 CI green。
+  8. **本番 deploy**: schema 変更なしの想定。先生稼働時間帯を避ける ([[feedback_production_deploy_school_hours]])。
+- **先行投資候補**: ステップ 3 の確実化に、backlog 低項目「ログアウト E2E カバレッジ」を upgrade 前に厚くしておくとログイン経路の regression 検知が確実になる。
 - **運用監視**: 月次で OSV-Scanner 結果を review、新 CVE 発生 or severity 上方修正時は個別対応判断
 - **CI 表示の扱い**: Dependency Audit ジョブは `continue-on-error: true` で workflow conclusion は success だが、 ジョブバッジは Next.js 9 CVE + devDeps 系 2 CVE (brace-expansion / ws) で red 表示が継続。 Next.js 15 upgrade + vitest upgrade まで許容
 

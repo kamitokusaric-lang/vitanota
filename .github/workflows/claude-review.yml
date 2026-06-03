@@ -26,6 +26,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write   # claude-code-action v1 の GitHub 認証 (OIDC) に必要
 
 jobs:
   review:
@@ -64,6 +65,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # OIDC (Claude GitHub App) ではなく Actions の GITHUB_TOKEN で
+          # PR コメントを投稿する (App インストール不要・自己完結)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           # claude-code-action v1: mode は廃止 (prompt を渡すと automation mode)、
           # direct_prompt → prompt にリネーム。PR レビューは repo / PR 番号を prompt に渡す。
           prompt: |

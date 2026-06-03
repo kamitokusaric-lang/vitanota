@@ -68,6 +68,11 @@ jobs:
           # OIDC (Claude GitHub App) ではなく Actions の GITHUB_TOKEN で
           # PR コメントを投稿する (App インストール不要・自己完結)
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # clean PR でも「懸念なし」を 1 つの sticky コメントに出して可視化する
+          # (毎回更新されるので PR が乱雑にならない)
+          use_sticky_comment: true
+          # コスト抑制: Phase 1 の保守的レビューには Sonnet で十分 (default モデルより安価)
+          claude_args: --model claude-sonnet-4-6
           # claude-code-action v1: mode は廃止 (prompt を渡すと automation mode)、
           # direct_prompt → prompt にリネーム。PR レビューは repo / PR 番号を prompt に渡す。
           prompt: |

@@ -10,7 +10,11 @@ describe('getDbAuthToken (singleflight + cache + meta)', () => {
   it('cache hit のときは signer を呼ばずキャッシュ済み token を返す', async () => {
     const getAuthToken = vi.fn().mockResolvedValue('token-A');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken } = await import('@/shared/lib/db-auth');
@@ -30,7 +34,11 @@ describe('getDbAuthToken (singleflight + cache + meta)', () => {
     });
     const getAuthToken = vi.fn().mockReturnValue(signerPromise);
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken } = await import('@/shared/lib/db-auth');
@@ -51,7 +59,11 @@ describe('getDbAuthToken (singleflight + cache + meta)', () => {
   it('getCurrentTokenMeta は最新の generationId / createdAt を返す', async () => {
     const getAuthToken = vi.fn().mockResolvedValue('token-C');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken, getCurrentTokenMeta } = await import('@/shared/lib/db-auth');
@@ -75,7 +87,11 @@ describe('getDbAuthToken (singleflight + cache + meta)', () => {
       .mockResolvedValueOnce('token-D1')
       .mockResolvedValueOnce('token-D2');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken, getCurrentTokenMeta, __resetTokenCacheForTest } =
@@ -101,7 +117,11 @@ describe('invalidateTokenGeneration (compare-and-invalidate)', () => {
   it('現 cache.generationId と一致するときに cache を消し true を返す', async () => {
     const getAuthToken = vi.fn().mockResolvedValue('token-INV1');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken, getCurrentTokenMeta, invalidateTokenGeneration } =
@@ -119,7 +139,11 @@ describe('invalidateTokenGeneration (compare-and-invalidate)', () => {
   it('世代不一致のときは cache 不変で false を返す (stale failure protect)', async () => {
     const getAuthToken = vi.fn().mockResolvedValue('token-INV2');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken, getCurrentTokenMeta, invalidateTokenGeneration } =
@@ -139,7 +163,11 @@ describe('invalidateTokenGeneration (compare-and-invalidate)', () => {
   it('cache が空のときの invalidate は false を返す', async () => {
     const getAuthToken = vi.fn().mockResolvedValue('token-INV3');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { invalidateTokenGeneration, getCurrentTokenMeta } =
@@ -160,7 +188,11 @@ describe('getDbAuthToken { forceRefresh: true }', () => {
       .mockResolvedValueOnce('token-F1')
       .mockResolvedValueOnce('token-F2');
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken, getCurrentTokenMeta } = await import('@/shared/lib/db-auth');
@@ -184,7 +216,11 @@ describe('getDbAuthToken { forceRefresh: true }', () => {
     });
     const getAuthToken = vi.fn().mockReturnValue(signerPromise);
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+      // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+      // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+      Signer: vi.fn().mockImplementation(function () {
+        return { getAuthToken };
+      }),
     }));
 
     const { getDbAuthToken } = await import('@/shared/lib/db-auth');

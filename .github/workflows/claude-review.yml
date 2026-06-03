@@ -64,9 +64,13 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          mode: review
-          direct_prompt: |
-            vitanota プロジェクト(教員向け BtoB SaaS、Next.js + Drizzle + PostgreSQL)の PR を簡潔にレビューしてください。
+          # claude-code-action v1: mode は廃止 (prompt を渡すと automation mode)、
+          # direct_prompt → prompt にリネーム。PR レビューは repo / PR 番号を prompt に渡す。
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            vitanota プロジェクト(教員向け BtoB SaaS、Next.js + Drizzle + PostgreSQL)の上記 PR を簡潔にレビューしてください。
 
             **以下の重大リスクのみ指摘し、それ以外はスキップしてください**:
 

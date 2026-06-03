@@ -28,6 +28,10 @@
 - **2026-05-19 update**: 上記 Next.js 9 CVE と同タイミングで **devDependency 経路の 2 CVE** が追加検出。 いずれも production runtime に混入しない (build/test time only) ため、 Next.js 9 CVE と同様に **個別 osv-scanner.toml への ignore 追加はせず**、 上位パッケージの upgrade で自然解消する方針。 期限 (2026-06-30) は据え置き:
   - `GHSA-jxxr-4gwj-5jf2` (brace-expansion 5.0.5, CVSS 6.5) — 依存経路: `minimatch@10.2.5` → `@typescript-eslint/typescript-estree@8.58.2` → `eslint-config-next@14.2.35` (devDependencies)。 Next.js 15 upgrade で eslint-config-next も追従するため自然解消の可能性高
   - `GHSA-58qx-3vcg-4xpx` (ws 8.20.0, CVSS 4.4) — 依存経路: `jsdom@24.1.3` → `vitest@1.6.1` / `@vitest/coverage-v8@1.6.1` (devDependencies)。 vitest 系の minor upgrade で解消可能、 Next.js 15 upgrade と独立して任意のタイミングで対応可
+- **2026-06-03 update**: vitest 1.6.1 → 4.1.8 への major upgrade を実施 (別 PR `chore/2026-06-03-vitest-4-upgrade`)。 契機は新規 publish された `GHSA-5xrq-8626-4rwp` (CVE-2026-47429, CVSS 9.8, vitest UI/API server RCE)。 patch は 4.1.0 のみ (1.x 系に fix なし) のため major upgrade で根治。 vite 5→6 も同時 (vitest 4 peer 要件)。 dev-only / 本番 runtime 非混入のため blast radius はテスト基盤限定。
+  - 解消: `GHSA-5xrq-8626-4rwp` (vitest)。
+  - ws (`GHSA-58qx-3vcg-4xpx`) は vitest 4 でも ws 8.20.0 のまま残存 (依存経路が他にもあるため) → osv-scanner.toml の既存 ignore は維持。 上位 upgrade で継続監視。
+  - 副作用: v8 coverage が AST-aware remapping 化し閾値再校正が必要になった → 「CI / テスト」セクション参照。
 - **MVP β 期間の allowlist 根拠**:
   - vitanota は多層防御 (CloudFront secret 強制化 + WAF rate limit + 招待制 + RLS + session 8h) により実効リスクを中弱に抑制
   - SSRF は VPC Private Isolated で外部到達不能、Cache 系は CachingDisabled で影響ゼロ
@@ -235,6 +239,11 @@
   - **2026-05-15 既知**: cloudwatchClient.ts / sessionUuRepository.ts / API route / UI components (access-distribution Phase 2 行き)
 - **対策**: 各 feature の component / lib に unit test 追加 → 段階的に threshold を 80/70/80/80 (or それ以上) に戻す
 - **暫定下げの注意**: lines/statements 40 は CI 値ぴったり (margin 0.38)、 test が 1 件減る or 0% file が増えると即 fail。 新 PR で UI 追加するときは同時に最低限の render test を入れる運用が望ましい
+- **2026-06-03 update (vitest 4 upgrade による再校正)**: vitest 1.6.1 → 4.1.8 で v8 coverage が AST-aware remapping に変わり、 branch / function を厳密にカウントするようになった (分母: branches 543→1307 / functions 211→579)。 テスト内容は不変だが計測基準が変わり数値が下がったため閾値を実測フロア直下に置き直した:
+  - branches: 75 → **40** (v4 計測値 41.54、 旧 v1 計測 77.41)
+  - functions: 55 → **35** (v4 計測値 36.44、 旧 v1 計測 56.43)
+  - lines/statements: **40** 据え置き (v4 計測 43.14 / 41.32 で旧と概ね同水準)
+  - ⚠️ 元の目標 80/70/80/80 は **v1 計測基準**。 v4 では同じテスト網羅率でも数値が異なるため、 引き上げ目標は v4 基準で再設定が必要 (旧目標値をそのまま適用しない)。
 - **着手判断**: β ローンチ後の安定期、 coverage 厳守ポリシー復元
 
 ### 🟢 低: GitHub Actions の Node.js 20 actions を Node.js 24 対応版へ更新

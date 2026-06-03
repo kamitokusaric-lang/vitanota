@@ -11,12 +11,10 @@ export default defineConfig({
     globals: true,
     include: ['__tests__/integration/**/*.test.ts'],
     // テナント変数の漏えいを防ぐため直列実行 (CI でも同様)
+    // vitest 4: poolOptions.threads.singleThread は廃止。単一ワーカー直列は
+    // maxWorkers: 1 で担保 (isolate は default true のままでテスト間の漏えい防止)。
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
+    maxWorkers: 1,
     // testcontainers の起動には時間がかかる (15-30 秒)
     testTimeout: 60_000,
     hookTimeout: 120_000,

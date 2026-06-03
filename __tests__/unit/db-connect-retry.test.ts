@@ -27,7 +27,11 @@ function setupMocks(connectImpls: ConnectImpl[], signerTokens: string[] = ['toke
     getAuthToken.mockResolvedValueOnce(token);
   }
   vi.doMock('@aws-sdk/rds-signer', () => ({
-    Signer: vi.fn().mockImplementation(() => ({ getAuthToken })),
+    // vitest 4: new Signer() は実装関数を constructor として呼ぶため、
+    // arrow ではなく通常関数で object を返す (arrow は new 不可)。
+    Signer: vi.fn().mockImplementation(function () {
+      return { getAuthToken };
+    }),
   }));
   vi.doMock('drizzle-orm/node-postgres', () => ({
     drizzle: vi.fn(),

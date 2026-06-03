@@ -38,8 +38,19 @@ updates:
       prefix: 'deps'
       include: scope
     # 本番依存と dev 依存をグルーピング
+    # minor / patch のみグループ化する。major は意図的に除外し個別 PR に分離する。
+    # 理由: grouped PR に update-types を絞らないと、放置された際に major migration
+    # (next / react / drizzle / typescript / vitest 等) が無害な patch と混載され、
+    # マージ不能な巨大 PR に育つ (2026-06-03 に #58 / #24 で実害。close 済み)。
+    # major を個別 PR に弾き出すことで、土台の major upgrade は独立して目立つ形で扱う。
     groups:
-      production-dependencies:
+      production-minor-patch:
         dependency-type: production
-      development-dependencies:
+        update-types:
+          - minor
+          - patch
+      development-minor-patch:
         dependency-type: development
+        update-types:
+          - minor
+          - patch

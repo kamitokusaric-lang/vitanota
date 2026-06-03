@@ -72,7 +72,9 @@ jobs:
           # (毎回更新されるので PR が乱雑にならない)
           use_sticky_comment: true
           # コスト抑制: Phase 1 の保守的レビューには Sonnet で十分 (default モデルより安価)
-          claude_args: --model claude-sonnet-4-6
+          # agent mode の default tool は厳しく gh pr comment が denied される。
+          # 結果コメント投稿のため gh pr comment を許可 (Bash 全体は開けない)
+          claude_args: '--model claude-sonnet-4-6 --allowedTools "Bash(gh pr comment:*)"'
           # claude-code-action v1: mode は廃止 (prompt を渡すと automation mode)、
           # direct_prompt → prompt にリネーム。PR レビューは repo / PR 番号を prompt に渡す。
           prompt: |

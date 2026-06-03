@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           fetch-depth: 0  # 履歴全体を gitleaks がスキャンするため
 
@@ -45,7 +45,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       - name: Install OSV-Scanner
         run: |
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
       # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
@@ -97,7 +97,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
       # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
@@ -158,7 +158,7 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
       # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
@@ -232,7 +232,7 @@ jobs:
       SKIP_SECRETS_MANAGER: 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       # Dockerfile (corepack prepare pnpm@10.33.0) と同一方式で pnpm を用意する。
       # pnpm/action-setup は v6 で version 指定を無視し最新 (Node 22.13+ 要求) を
@@ -293,7 +293,7 @@ jobs:
 # 更新は Dependabot or 手動で行い、PR レビューで SHA とバージョンを照合する
 #
 # 現在固定中の SHA (2026-06-03 更新・要定期更新):
-# - actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd = v6.0.2
+# - actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 = v6.0.2
 # - actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 = v4.0.2
 # - pnpm: corepack で pnpm@10.33.0 を pin (Dockerfile と同一)。action-setup は v6 regression のため不使用
 # - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a = v7.0.1

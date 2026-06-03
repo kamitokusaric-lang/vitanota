@@ -19,13 +19,19 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       thresholds: {
         // 2026-05-18: 暫定的に下げた。直近の機能ナビ / AI chat / morning-plan /
-        // onboarding 系 component (PR #29 ほか) が test 未整備で
-        // coverage が落ちた (lines 40.38 / branches 77.41 / functions 56.43 / statements 40.38)。
-        // post-mvp-backlog に「coverage threshold 戻し」を登録、 unit test 整備後に
-        // 80 / 70 / 80 / 80 (or それ以上) に戻す。
+        // onboarding 系 component (PR #29 ほか) が test 未整備で coverage が落ちた。
+        // post-mvp-backlog に「coverage threshold 戻し」を登録、 unit test 整備後に戻す。
+        //
+        // 2026-06-03: vitest 4 へ upgrade。v8 coverage が AST-aware remapping に変わり
+        // branch / function を厳密にカウントするようになった (分母が branches 543→1307 /
+        // functions 211→579 に増加)。テスト内容は不変だが計測方式が変わったため数値が再校正:
+        //   旧 (v1): lines 40.38 / branches 77.41 / functions 56.43 / statements 40.38
+        //   新 (v4): lines 43.14 / branches 41.54 / functions 36.44 / statements 41.32
+        // 閾値は新計測の実測フロア直下に置き直した (品質劣化ではなく計測基準の変更)。
+        // unit test 整備で引き上げる目標は backlog で v4 基準として再設定する。
         lines: 40,
-        functions: 55,
-        branches: 75,
+        functions: 35,
+        branches: 40,
         statements: 40,
       },
       include: ['src/**/*.ts', 'src/**/*.tsx'],

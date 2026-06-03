@@ -2506,6 +2506,25 @@ chimo は **ハイブリッド開発スタイル** を採用。
 
 ---
 
+## Next.js 14 → 15 + React 18 → 19 upgrade (framework のみ)
+**タイムスタンプ**: 2026-06-03T06:05:00Z
+**ユーザー入力**: "Next15へのupgradeも今日やるはず"
+**AI応答**: backlog「Next.js 14→15 + drizzle 0.45」の Next.js 部分を実施。スコープは chimo 判断で **Next15 + React19 のみ** (drizzle 0.45 は DrizzleAdapter/RLS/複合FK のリスクで別 PR)。着手前調査で framework はほぼリスク不在と確定 (Pages Router のみ / next-auth peer が next^15・react^19 対応 / React18 固有 deprecated API 0 件) してから実装。
+
+**リバーシビリティ**: main に `git tag pre-next15-upgrade` → `feature/2026-06-03-next15-react19` を main から作成。
+
+**変更内容** (package.json / pnpm-lock.yaml のみ、**ソースコード変更ゼロ**):
+- next ^14.2.0→^15.0.0 (解決 15.5.19)、react/react-dom ^18.3.0→^19.0.0 (19.2.7)、@types/react・@types/react-dom →^19.0.0、eslint-config-next ^14.2.0→^15.0.0 (15.5.19)、@testing-library/react ^15.0.6→^16.0.0 (16.3.2、React19 peer)。
+- codemod (types-react preset-19 / remove-forward-ref) は **不要だった** (defaultProps/string ref 等 0 件、forwardRef は 19 でも有効で TagPicker 維持)。next.config.js / middleware.ts も変更不要 (experimental なし、geo/ip・@next/font 未使用を grep 確認)。
+
+**検証 (ローカル、各ゲート)**:
+- ゲート① `pnpm type-check`: エラー 0 (一発)
+- ゲート② `pnpm build` (Next 15 standalone) 成功 + `pnpm lint` 警告のみ (既存の img/exhaustive-deps、新規エラーなし)
+- `pnpm test` 391/391 pass / `pnpm test:coverage` exit 0 (React19 + RTL16 下、閾値クリア)。act 警告は RTL16 の noise で assertion は通過、production 挙動の regression なし。
+- dev smoke: `pnpm dev` で Next 15.5.19 起動 (Ready 1.7s) → `/auth/signin` が HTTP 200 で SSR レンダリング (next-auth × React19 が runtime で起動、最大リスク① クリア)。
+- integration (docker) と osv-scanner (バイナリ DL 不可) は CI に委譲。Next 14.2 系 9 CVE + brace-expansion CVE の解消は CI osv-scanner で verify 後、osv-scanner.toml の該当 ignore を撤去予定。
+
+**コンテキスト**: 本番 runtime に影響する framework upgrade だが schema 変更なし (drizzle 据え置き) のため migration 不要。commit はハルヒ実行、push/merge/deploy timing は chimo。deploy は #62/#60/#61/本 PR を 1 本ずつ直列・授業時間帯回避 ([[feedback_consecutive_merge_apprunner_collision]] [[feedback_production_deploy_school_hours]])。残: drizzle 0.30→0.45 別 PR (期限 2026-06-30)。
 ## vitest 1.6.1 → 4 major upgrade (vitest 9.8 CVE 根治)
 **タイムスタンプ**: 2026-06-03T05:10:00Z
 **ユーザー入力**: "いま、vitestをupgradeする"

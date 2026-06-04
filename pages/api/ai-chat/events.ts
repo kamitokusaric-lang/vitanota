@@ -45,20 +45,20 @@ const RequestSchema = z.discriminatedUnion('event', [
   }),
   z.object({
     event: z.literal('calendar_task_moved'),
-    taskId: z.string().uuid(),
+    taskId: z.string().guid(),
     fromDate: z.string().regex(CALENDAR_DATE_RE).nullable(),
     toDate: z.string().regex(CALENDAR_DATE_RE),
   }),
   z.object({
     event: z.literal('calendar_task_pushed_to_next_week'),
-    taskId: z.string().uuid(),
+    taskId: z.string().guid(),
     fromDate: z.string().regex(CALENDAR_DATE_RE).nullable(),
     toDate: z.string().regex(CALENDAR_DATE_RE),
   }),
   z.object({
     event: z.literal('calendar_task_created_from_plus'),
     date: z.string().regex(CALENDAR_DATE_RE),
-    taskId: z.string().uuid(),
+    taskId: z.string().guid(),
   }),
   z.object({
     event: z.literal('calendar_day_detail_opened'),
@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '入力が不正です',
+      message: parsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

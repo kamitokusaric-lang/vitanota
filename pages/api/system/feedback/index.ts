@@ -11,8 +11,8 @@ import { feedbackSubmissions, feedbackTopics, users, tenants } from '@/db/schema
 import { logger } from '@/shared/lib/logger';
 
 const listQuerySchema = z.object({
-  tenantId: z.string().uuid().optional(),
-  topicId: z.string().uuid().optional(),
+  tenantId: z.string().guid().optional(),
+  topicId: z.string().guid().optional(),
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '入力が不正です',
+      message: parsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

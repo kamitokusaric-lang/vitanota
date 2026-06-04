@@ -22,7 +22,7 @@ export default async function handler(
     if (!parsed.success) {
       return res.status(400).json({
         error: 'VALIDATION_ERROR',
-        message: parsed.error.errors[0]?.message ?? '不正なクエリ',
+        message: parsed.error.issues[0]?.message ?? '不正なクエリ',
       });
     }
     // schema → service 用 filters 形式に整形 (dateFilter を mode 別の判別共用体にまとめる)
@@ -46,7 +46,7 @@ export default async function handler(
     if (!parsed.success) {
       return res.status(400).json({
         error: 'VALIDATION_ERROR',
-        message: parsed.error.errors[0]?.message ?? '入力が不正です',
+        message: parsed.error.issues[0]?.message ?? '入力が不正です',
       });
     }
     try {

@@ -35,19 +35,31 @@ components:
       name: next-auth.session-token
       description: Auth.js セッション Cookie（database 戦略）
   schemas:
+    TimelineResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicJournalEntry"
+        page:
+          type: integer
+        perPage:
+          type: integer
+      required:
+        - entries
+        - page
+        - perPage
     PublicJournalEntry:
       type: object
       properties:
         id:
           type: string
-          format: uuid
           example: 550e8400-e29b-41d4-a716-446655440000
         tenantId:
           type: string
-          format: uuid
         userId:
           type: string
-          format: uuid
         content:
           type: string
           example: 今日の授業の振り返り
@@ -61,6 +73,7 @@ components:
             - neutral
             - negative
             - very_negative
+            - null
           example: positive
         createdAt:
           type: string
@@ -78,21 +91,6 @@ components:
         - mood
         - createdAt
         - updatedAt
-    TimelineResponse:
-      type: object
-      properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/PublicJournalEntry"
-        page:
-          type: integer
-        perPage:
-          type: integer
-      required:
-        - entries
-        - page
-        - perPage
     ErrorResponse:
       type: object
       properties:
@@ -105,6 +103,13 @@ components:
       required:
         - error
         - message
+    EntryResponse:
+      type: object
+      properties:
+        entry:
+          $ref: "#/components/schemas/JournalEntry"
+      required:
+        - entry
     JournalEntry:
       allOf:
         - $ref: "#/components/schemas/PublicJournalEntry"
@@ -115,19 +120,12 @@ components:
               example: true
           required:
             - isPublic
-    EntryResponse:
-      type: object
-      properties:
-        entry:
-          $ref: "#/components/schemas/JournalEntry"
-      required:
-        - entry
     CreateEntryInput:
       type: object
       properties:
         kind:
           type: string
-          enum: &a1
+          enum:
             - diary
             - knowledge
             - tweet
@@ -140,8 +138,7 @@ components:
           type: array
           items:
             type: string
-            format: uuid
-          example: &a2 []
+          example: &a1 []
         isPublic:
           type: boolean
           example: true
@@ -149,12 +146,13 @@ components:
           type:
             - string
             - "null"
-          enum: &a3
+          enum:
             - very_positive
             - positive
             - neutral
             - negative
             - very_negative
+            - null
           example: neutral
       required:
         - kind
@@ -166,7 +164,10 @@ components:
       properties:
         kind:
           type: string
-          enum: *a1
+          enum:
+            - diary
+            - knowledge
+            - tweet
           example: tweet
         content:
           type: string
@@ -176,8 +177,7 @@ components:
           type: array
           items:
             type: string
-            format: uuid
-          example: *a2
+          example: *a1
         isPublic:
           type: boolean
           example: true
@@ -185,7 +185,13 @@ components:
           type:
             - string
             - "null"
-          enum: *a3
+          enum:
+            - very_positive
+            - positive
+            - neutral
+            - negative
+            - very_negative
+            - null
           example: neutral
     MyJournalResponse:
       type: object
@@ -202,15 +208,22 @@ components:
         - entries
         - page
         - perPage
+    TagListResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+      required:
+        - tags
     Tag:
       type: object
       properties:
         id:
           type: string
-          format: uuid
         tenantId:
           type: string
-          format: uuid
         name:
           type: string
           example: うれしい
@@ -228,6 +241,7 @@ components:
             - positive
             - negative
             - neutral
+            - null
           example: positive
         isSystemDefault:
           type: boolean
@@ -237,7 +251,6 @@ components:
           type:
             - string
             - "null"
-          format: uuid
         createdAt:
           type: string
           format: date-time
@@ -251,15 +264,6 @@ components:
         - sortOrder
         - createdBy
         - createdAt
-    TagListResponse:
-      type: object
-      properties:
-        tags:
-          type: array
-          items:
-            $ref: "#/components/schemas/Tag"
-      required:
-        - tags
     TagResponse:
       type: object
       properties:
@@ -303,7 +307,7 @@ paths:
       tags:
         - Journal (Public)
       security:
-        - &a4
+        - &a2
           cookieAuth: []
       parameters:
         - schema:
@@ -373,7 +377,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a4
+        - *a2
       requestBody:
         content:
           application/json:
@@ -428,11 +432,10 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a4
+        - *a2
       parameters:
         - schema:
             type: string
-            format: uuid
           required: true
           name: id
           in: path
@@ -485,11 +488,10 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a4
+        - *a2
       parameters:
         - schema:
             type: string
-            format: uuid
           required: true
           name: id
           in: path
@@ -546,11 +548,10 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a4
+        - *a2
       parameters:
         - schema:
             type: string
-            format: uuid
           required: true
           name: id
           in: path
@@ -600,7 +601,7 @@ paths:
       tags:
         - Journal (Private)
       security:
-        - *a4
+        - *a2
       parameters:
         - schema:
             type: integer
@@ -668,7 +669,7 @@ paths:
       tags:
         - Tag
       security:
-        - *a4
+        - *a2
       responses:
         "200":
           description: タグ一覧
@@ -717,7 +718,7 @@ paths:
       tags:
         - Tag
       security:
-        - *a4
+        - *a2
       requestBody:
         content:
           application/json:
@@ -772,11 +773,10 @@ paths:
       tags:
         - Tag
       security:
-        - *a4
+        - *a2
       parameters:
         - schema:
             type: string
-            format: uuid
             example: 550e8400-e29b-41d4-a716-446655440000
           required: true
           name: id

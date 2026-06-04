@@ -12,7 +12,7 @@ import { feedbackReplyCreateSchema } from '@/features/feedback/lib/feedbackSchem
 import { logger } from '@/shared/lib/logger';
 import { LogEvents, logEvent } from '@/shared/lib/log-events';
 
-const idParamSchema = z.object({ id: z.string().uuid() });
+const idParamSchema = z.object({ id: z.string().guid() });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authOptions = await getAuthOptions();
@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!bodyParsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: bodyParsed.error.errors[0]?.message ?? '入力が不正です',
+      message: bodyParsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
   const { body } = bodyParsed.data;

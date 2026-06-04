@@ -37,7 +37,7 @@ export function calculateInvitationStatus(
 
 // 一括招待リクエストの Zod スキーマ
 export const bulkInvitationSchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().guid(),
   emails: z
     .array(z.string())
     .min(1, 'メールアドレスを 1 件以上指定してください')

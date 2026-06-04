@@ -33,7 +33,7 @@ export default async function handler(
   if (!bodyParsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: bodyParsed.error.errors[0]?.message ?? '入力が不正です',
+      message: bodyParsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

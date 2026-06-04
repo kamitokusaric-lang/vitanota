@@ -9,7 +9,7 @@ import { sessions, users, userTenantRoles, tenants } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 const loginSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().guid(),
 });
 
 export default async function handler(

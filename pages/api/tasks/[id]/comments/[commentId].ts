@@ -7,8 +7,8 @@ import { TaskNotFoundError } from '@/features/tasks/lib/errors';
 import { logger } from '@/shared/lib/logger';
 
 const paramSchema = z.object({
-  id: z.string().uuid(),
-  commentId: z.string().uuid(),
+  id: z.string().guid(),
+  commentId: z.string().guid(),
 });
 
 export default async function handler(

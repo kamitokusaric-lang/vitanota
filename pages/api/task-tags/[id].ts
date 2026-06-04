@@ -9,7 +9,7 @@ import { withTenantUser } from '@/shared/lib/db';
 import { taskTags, taskTagAssignments } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
 
-const idParamSchema = z.object({ id: z.string().uuid() });
+const idParamSchema = z.object({ id: z.string().guid() });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const ctx = await requireAuth(req, res);

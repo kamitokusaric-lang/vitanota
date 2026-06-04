@@ -25,7 +25,7 @@ export type CreateTagInput = z.infer<typeof createTagSchema>;
 // タグ削除（パスパラメータで id を受ける想定なのでスキーマは id のみ検証）
 export const tagIdParamSchema = z
   .object({
-    id: z.string().uuid('不正なタグIDです').openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    id: z.string().guid('不正なタグIDです').openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
   })
   .openapi('TagIdParam');
 

@@ -38,7 +38,7 @@ const createEntryBaseSchema = z.object({
     .max(1000, '1000文字以内で入力してください')
     .openapi({ example: '今日の授業の振り返り' }),
   tagIds: z
-    .array(z.string().uuid('不正なタグIDです'))
+    .array(z.string().guid('不正なタグIDです'))
     .openapi({ example: [] }),
   isPublic: z.boolean().openapi({ example: true }),
   mood: moodLevelSchema.nullable().optional(),

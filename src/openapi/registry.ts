@@ -127,7 +127,7 @@ export function buildOpenApiDocument() {
     tags: ['Journal (Private)'],
     security: [sessionCookie],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
     },
     responses: {
       200: {
@@ -146,7 +146,7 @@ export function buildOpenApiDocument() {
     tags: ['Journal (Private)'],
     security: [sessionCookie],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: {
         content: { 'application/json': { schema: updateEntrySchema } },
       },
@@ -167,7 +167,7 @@ export function buildOpenApiDocument() {
     tags: ['Journal (Private)'],
     security: [sessionCookie],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
     },
     responses: {
       204: { description: '削除成功' },

@@ -16,7 +16,7 @@ import {
 } from '@/db/schema';
 import { logger } from '@/shared/lib/logger';
 
-const idParamSchema = z.object({ id: z.string().uuid() });
+const idParamSchema = z.object({ id: z.string().guid() });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authOptions = await getAuthOptions();

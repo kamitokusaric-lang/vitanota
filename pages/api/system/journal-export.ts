@@ -18,7 +18,7 @@ import {
 } from '@/features/system/lib/journalExportQuery';
 
 const querySchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().guid(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });

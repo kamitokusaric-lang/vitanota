@@ -14,7 +14,7 @@ export type CreateTaskCommentInput = z.infer<typeof createTaskCommentSchema>;
 
 export const taskCommentParamSchema = z
   .object({
-    id: z.string().uuid(),
-    commentId: z.string().uuid().optional(),
+    id: z.string().guid(),
+    commentId: z.string().guid().optional(),
   })
   .openapi('TaskCommentParam');

@@ -52,8 +52,8 @@ const ConfirmTaskInputSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
   memo: z.string().max(500).default(''),
-  tagIds: z.array(z.string().uuid()).max(20).default([]),
-  assigneeUserIds: z.array(z.string().uuid()).min(1).max(10),
+  tagIds: z.array(z.string().guid()).max(20).default([]),
+  assigneeUserIds: z.array(z.string().guid()).min(1).max(10),
 });
 
 // カテゴリ名の全角/半角差を吸収する (DB に「１学年」全角、UI 側「1学年」半角の運用差を許容)。
@@ -77,13 +77,13 @@ const DISCARD_REASONS = [
 const RequestSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('confirm'),
-    sessionId: z.string().uuid(),
+    sessionId: z.string().guid(),
     selectedTasks: z.array(ConfirmTaskInputSchema).min(0).max(20),
     inputSnippet: z.string().max(2000).default(''),
   }),
   z.object({
     action: z.literal('discard'),
-    sessionId: z.string().uuid(),
+    sessionId: z.string().guid(),
     discardReason: z.enum(DISCARD_REASONS).optional(),
     discardReasonText: z.string().max(500).optional(),
   }),
@@ -106,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '入力が不正です',
+      message: parsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

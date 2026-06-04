@@ -13,7 +13,7 @@ export type TaskTagCreateInput = z.infer<typeof taskTagCreateSchema>;
 
 // system_admin 用: POST /api/system/task-tags (tenantId 明示)
 export const taskTagSystemCreateSchema = z.object({
-  tenantId: z.string().uuid('不正な tenantId です'),
+  tenantId: z.string().guid('不正な tenantId です'),
   name: z
     .string()
     .trim()
@@ -36,7 +36,7 @@ export type TaskTagUpdateInput = z.infer<typeof taskTagUpdateSchema>;
 
 // system_admin 用: DELETE /api/system/task-tags/{id} (moveTo 指定で移管 + 削除)
 export const taskTagDeleteSchema = z.object({
-  moveTo: z.string().uuid().nullable().optional(),
+  moveTo: z.string().guid().nullable().optional(),
 });
 
 export type TaskTagDeleteInput = z.infer<typeof taskTagDeleteSchema>;

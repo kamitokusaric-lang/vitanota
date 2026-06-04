@@ -30,29 +30,29 @@ const actionSchema = z.discriminatedUnion('action', [
   }),
   z.object({
     action: z.literal('user'),
-    tenantId: z.string().uuid(),
+    tenantId: z.string().guid(),
     role: z.enum(['teacher', 'school_admin', 'system_admin']),
     email: z.string().email(),
     name: z.string(),
   }),
   z.object({
     action: z.literal('entry'),
-    tenantId: z.string().uuid(),
-    userId: z.string().uuid(),
+    tenantId: z.string().guid(),
+    userId: z.string().guid(),
     content: z.string(),
     isPublic: z.boolean(),
   }),
   z.object({
     action: z.literal('tag'),
-    tenantId: z.string().uuid(),
-    userId: z.string().uuid(),
+    tenantId: z.string().guid(),
+    userId: z.string().guid(),
     name: z.string(),
     category: z.enum(['positive', 'negative', 'neutral']),
   }),
   z.object({
     action: z.literal('createSession'),
-    userId: z.string().uuid(),
-    tenantId: z.string().uuid().nullable().optional(),
+    userId: z.string().guid(),
+    tenantId: z.string().guid().nullable().optional(),
     expiresInSec: z.number().int().positive().default(28800),
   }),
 ]);
@@ -75,7 +75,7 @@ export default async function handler(
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '不正な入力',
+      message: parsed.error.issues[0]?.message ?? '不正な入力',
     });
   }
 

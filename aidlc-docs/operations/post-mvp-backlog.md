@@ -11,7 +11,7 @@
 
 ## 脆弱性対応 / 依存更新
 
-### 🔴 高: Next.js 14 → 15 major upgrade + drizzle-orm 0.30 → 0.45 upgrade
+### ✅ 完了 (2026-06-04): Next.js 15 + drizzle 0.45 + 依存一括更新 — 残: osv-scanner.toml ignore 撤去 / ws 監視
 - **発見日**: 2026-04-22 (Phase C CI GREEN 化中に OSV-Scanner の CVE 一斉発覚)
 - **期限**: 2026-06-30 (MVP ローンチから約 2 ヶ月)
 - **背景**: Next.js 14.2 系の 5 CVE (High 2 + Medium 3) と drizzle-orm 0.30.10 の 1 High CVE が、それぞれ 14.2 最終 patch / 0.30 最終 patch で fix 対応していない。major upgrade (Next.js) / minor upgrade (drizzle-orm) が必要
@@ -34,8 +34,14 @@
   - 副作用: v8 coverage が AST-aware remapping 化し閾値再校正が必要になった → 「CI / テスト」セクション参照。
 - **2026-06-03 update (Next.js 15 + React 19 を実施)**: framework 部分を別 PR `feature/2026-06-03-next15-react19` (#63) で実施。next 15.5.19 / react 19.2.7 / react-dom 19.2.7 / @types/react 19 / eslint-config-next 15.5.19 / @testing-library/react 16。**Pages Router のみ**のため App Router 系 breaking (async request API / fetch caching 等) は無関係、ソース変更ゼロ (codemod 不要、production code 不変) で type-check / build / lint / test 391 pass / dev 起動+signin SSR を確認。
   - 解消見込み: 2026-05-18 の Next.js 9 CVE 全件 + 2026-05-19 の `GHSA-jxxr-4gwj-5jf2` (eslint-config-next 追従) → CI osv-scanner で verify 後に osv-scanner.toml の該当 ignore を撤去予定。
-  - **残**: drizzle-orm 0.30 → 0.45 (DrizzleAdapter `as never` / RLS / 複合 FK のリスクで別 PR・別日)。`GHSA-gpj5-g38j-94v9` (drizzle) と `GHSA-58qx` (ws、vitest 4 でも残存) はこの drizzle PR / 継続監視で対応。
-  - dev majors (ts6 / eslint10) は対象外、vitest 4 は #62 で別途完了済。
+  - dev majors (ts6 / eslint10) は当初対象外、vitest 4 は #62 で別途完了済。
+- **2026-06-04 update (依存一括更新を本番デプロイ完了)**: 残依存を統合 PR **#87** (`chore/2026-06-04-deps-batch`) で 1 deploy 本番反映 (deploy success・本番ヘルス 200 確認)。元 11 PR は GitHub 自動 merged 判定。
+  - **drizzle-orm 0.45.2 + drizzle-kit 0.31.10** (#84): `GHSA-gpj5-g38j-94v9` 解消。コード変更ゼロ (index `.on()` / `as never` adapter / 複合 PK/FK / `$inferSelect` / `inet` は全て v4 互換)。integration (実 PostgreSQL) で RLS・複合 FK・テナント隔離 生存確認。
+  - **typescript 6.0.3** (#85): `globals.d.ts` に `declare module '*.css'` 1枚で TS2882 解消。typescript-eslint 8.58 は TS6.0 を peer 範囲内サポート。
+  - **zod 4.4.3 + zod-to-openapi 8.5** (#86): `.error.errors`→`.issues` ~38箇所、`z.string().uuid()`→`.guid()` 63箇所 (v4 strict uuid がダミー UUID を弾くため v3 同等の lenient guid で挙動温存)、openapi.yaml 再生成。
+  - dependabot 8本: Actions pin (#64-66) / production-minor #67 (aws-sdk 3.1060・next-auth 4.24.14・pg 8.21・react-hook-form 7.77 等) / development-minor #68 (playwright 1.60・postcss 8.5.15・tsx・yaml) / jsdom29 #69 / plugin-react5 #73 / @types/node25 #74。
+  - **統合手法**: 11本とも package.json/pnpm-lock 競合のため serial (11 deploy + collision) を回避し、git merge union → lockfile 再生成 → 1 PR・1 CI・1 deploy。
+  - **残作業**: ① osv-scanner.toml の Next14.2/devDeps 系 ignore を実解消反映して撤去 (harmless 残置中) ② ws `GHSA-58qx` の継続監視 (上位 upgrade で解消待ち)。
 - **MVP β 期間の allowlist 根拠**:
   - vitanota は多層防御 (CloudFront secret 強制化 + WAF rate limit + 招待制 + RLS + session 8h) により実効リスクを中弱に抑制
   - SSRF は VPC Private Isolated で外部到達不能、Cache 系は CachingDisabled で影響ゼロ
@@ -58,6 +64,18 @@
 - **先行投資候補**: ステップ 3 の確実化に、backlog 低項目「ログアウト E2E カバレッジ」を upgrade 前に厚くしておくとログイン経路の regression 検知が確実になる。
 - **運用監視**: 月次で OSV-Scanner 結果を review、新 CVE 発生 or severity 上方修正時は個別対応判断
 - **CI 表示の扱い**: Dependency Audit ジョブは `continue-on-error: true` で workflow conclusion は success だが、 ジョブバッジは Next.js 9 CVE + devDeps 系 2 CVE (brace-expansion / ws) で red 表示が継続。 Next.js 15 upgrade + vitest upgrade まで許容
+
+### 🟢 低: Tailwind CSS 3 → 4 移行 (dependabot #72・open のまま)
+- **発見日**: 2026-06-04 / 依存一括更新セッションで切り分け
+- **ブロッカー無し (ecosystem 待ちではない)**。ただしバージョン上げだけでは `next build` が落ちる (ローカル実証済): `Error: trying to use tailwindcss directly as a PostCSS plugin. The PostCSS plugin has moved to @tailwindcss/postcss`。v4 は PostCSS plugin を別パッケージに分離した。
+- **作業**: ① `@tailwindcss/postcss` install + `postcss.config.js` 差し替え (autoprefixer は v4 同梱で削除可) ② `src/styles/globals.css` の `@tailwind base/components/utilities` → `@import "tailwindcss"` ③ `tailwind.config.ts` の `vn-*` カラー/borderRadius/keyframes/fontFamily を v4 へ移植 (JS config 維持なら `@config`、CSS-first なら `@theme`)。
+- **本当の壁 = 検証手段**: v4 はデフォルトの ring/border 色・パレット色味が微変。色クラスを 273+ 箇所使用 & **視覚回帰テスト無し** → build が通っても見た目崩れを自動検知できない。
+- **進め方**: (A) ハルヒが移行 + 主要画面 (dashboard/EntryForm/Modal/timeline) の before/after スクショ → chimo 目視、(B) 先に Playwright 視覚スナップショットを足して安全網。**トリガー = chimo の目視時間確保時**。緊急度低 (tailwind3 に CVE 無し)。
+
+### 🟢 低: Next.js 15 → 16 (dependabot #76・open のまま・ecosystem 待ち)
+- **発見日**: 2026-06-04
+- **ハード詰み**: next-auth が next16 を peer サポートしない (`^12〜^15` 止まり)。`--force` 押し込みは認証の生命線ゆえ不可。
+- **やること = 待つ + 監視**: next-auth が next16 対応をリリースしたら drizzle/TS6 と同様クリーンな bump 一発で完了見込み。監視先 [nextauthjs/next-auth#13302](https://github.com/nextauthjs/next-auth/issues/13302)。別解の Auth.js v5 移行は認証基盤の作り替えで risk 高、next16 のためだけには非推奨。**トリガー = next-auth の next16 peer 対応リリース**。緊急度低 (next15 で CVE 解消済)。
 
 ---
 

@@ -23,9 +23,9 @@ export const errorResponseSchema = z
 // 公開タイムライン用（is_public 列を含まない、SP-U02-04 Layer 4 VIEW 由来）
 export const publicJournalEntrySchema = z
   .object({
-    id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
-    tenantId: z.string().uuid(),
-    userId: z.string().uuid(),
+    id: z.string().guid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    tenantId: z.string().guid(),
+    userId: z.string().guid(),
     content: z.string().openapi({ example: '今日の授業の振り返り' }),
     mood: z
       .enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative'])
@@ -75,14 +75,14 @@ export const entryResponseSchema = z
 
 export const tagSchema = z
   .object({
-    id: z.string().uuid(),
-    tenantId: z.string().uuid(),
+    id: z.string().guid(),
+    tenantId: z.string().guid(),
     name: z.string().openapi({ example: 'うれしい' }),
     type: z.enum(['emotion', 'context']).openapi({ example: 'emotion' }),
     category: z.enum(['positive', 'negative', 'neutral']).nullable().openapi({ example: 'positive' }),
     isSystemDefault: z.boolean(),
     sortOrder: z.number().int(),
-    createdBy: z.string().uuid().nullable(),
+    createdBy: z.string().guid().nullable(),
     createdAt: z.string().datetime(),
   })
   .openapi('Tag');

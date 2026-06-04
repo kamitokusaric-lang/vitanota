@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 export const feedbackSubmissionSchema = z.object({
-  topicId: z.string().uuid('トピックを選択してください'),
+  topicId: z.string().guid('トピックを選択してください'),
   content: z
     .string()
     .min(1, '本文を入力してください')

@@ -8,11 +8,11 @@ import { taskService } from '@/features/tasks/lib/taskService';
 import { TaskNotFoundError, InvalidTagReferenceError } from '@/features/tasks/lib/errors';
 import { logger } from '@/shared/lib/logger';
 
-const idParamSchema = z.object({ id: z.string().uuid() });
+const idParamSchema = z.object({ id: z.string().guid() });
 
 const setTagsSchema = z.object({
   tagIds: z
-    .array(z.string().uuid())
+    .array(z.string().guid())
     .max(20, 'タグは 1 タスクあたり 20 件までです'),
 });
 
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!bodyParsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: bodyParsed.error.errors[0]?.message ?? '入力が不正です',
+      message: bodyParsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

@@ -8,7 +8,7 @@ import { TaskNotFoundError } from '@/features/tasks/lib/errors';
 import { createTaskCommentSchema } from '@/features/tasks/schemas/taskComment';
 import { logger } from '@/shared/lib/logger';
 
-const idParamSchema = z.object({ id: z.string().uuid() });
+const idParamSchema = z.object({ id: z.string().guid() });
 
 export default async function handler(
   req: NextApiRequest,
@@ -41,7 +41,7 @@ export default async function handler(
     if (!parsed.success) {
       return res.status(400).json({
         error: 'VALIDATION_ERROR',
-        message: parsed.error.errors[0]?.message ?? '入力が不正です',
+        message: parsed.error.issues[0]?.message ?? '入力が不正です',
       });
     }
     try {

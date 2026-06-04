@@ -8,7 +8,7 @@ import { updateEntrySchema } from '@/features/journal/schemas/journal';
 import { requireAuth, mapErrorToResponse } from '@/features/journal/lib/apiHelpers';
 
 const idParamSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 
 export default async function handler(
@@ -37,7 +37,7 @@ export default async function handler(
       if (!parsed.success) {
         return res.status(400).json({
           error: 'VALIDATION_ERROR',
-          message: parsed.error.errors[0]?.message ?? '入力が不正です',
+          message: parsed.error.issues[0]?.message ?? '入力が不正です',
         });
       }
       const entry = await journalEntryService.updateEntry(id, parsed.data, ctx);

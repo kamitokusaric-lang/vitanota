@@ -24,7 +24,7 @@ const EDIT_REASONS = [
 ] as const;
 
 const RequestSchema = z.object({
-  sessionId: z.string().uuid(),
+  sessionId: z.string().guid(),
   organizeScore: z.number().int().min(1).max(5).optional(),
   inputBurdenScore: z.number().int().min(1).max(5).optional(),
   editReason: z.enum(EDIT_REASONS).optional(),
@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '入力が不正です',
+      message: parsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

@@ -13,7 +13,7 @@ import { feedbackTopics, feedbackSubmissions } from '@/db/schema';
 import { feedbackTopicUpdateSchema } from '@/features/feedback/lib/feedbackSchemas';
 import { logger } from '@/shared/lib/logger';
 
-const idParamSchema = z.object({ id: z.string().uuid() });
+const idParamSchema = z.object({ id: z.string().guid() });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const authOptions = await getAuthOptions();
@@ -49,7 +49,7 @@ async function handleUpdate(
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '入力が不正です',
+      message: parsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

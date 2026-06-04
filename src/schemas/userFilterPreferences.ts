@@ -15,9 +15,9 @@ export const periodValueSchema = z.discriminatedUnion('mode', [
 ]);
 
 export const taskFilterSettingsSchema = z.object({
-  filterOwner: z.string().uuid().nullable(),
-  filterTagIds: z.array(z.string().uuid()),
-  filterCategoryIds: z.array(z.string().uuid()),
+  filterOwner: z.string().guid().nullable(),
+  filterTagIds: z.array(z.string().guid()),
+  filterCategoryIds: z.array(z.string().guid()),
   showDelegated: z.boolean(),
   period: periodValueSchema,
 });

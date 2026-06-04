@@ -10,7 +10,7 @@ import { logger } from '@/shared/lib/logger';
 const createInvitationSchema = z.object({
   email: z.string().email('有効なメールアドレスを入力してください'),
   role: z.enum(['teacher', 'school_admin']),
-  tenantId: z.string().uuid(),
+  tenantId: z.string().guid(),
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!parsed.success) {
     return res.status(400).json({
       error: 'VALIDATION_ERROR',
-      message: parsed.error.errors[0]?.message ?? '入力が不正です',
+      message: parsed.error.issues[0]?.message ?? '入力が不正です',
     });
   }
 

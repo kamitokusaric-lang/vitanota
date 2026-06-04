@@ -7,7 +7,7 @@
 import { z } from 'zod';
 
 export const taskCategoryCreateSchema = z.object({
-  tenantId: z.string().uuid('不正な tenantId です'),
+  tenantId: z.string().guid('不正な tenantId です'),
   name: z
     .string()
     .trim()
@@ -34,7 +34,7 @@ export type TaskCategoryUpdateInput = z.infer<typeof taskCategoryUpdateSchema>;
 // 削除時のオプション: moveTo を指定するとタスクをそのカテゴリに移動してから削除
 // null / 未指定なら移動なし (タスクがあれば FK RESTRICT で 409)
 export const taskCategoryDeleteSchema = z.object({
-  moveTo: z.string().uuid().nullable().optional(),
+  moveTo: z.string().guid().nullable().optional(),
 });
 
 export type TaskCategoryDeleteInput = z.infer<typeof taskCategoryDeleteSchema>;

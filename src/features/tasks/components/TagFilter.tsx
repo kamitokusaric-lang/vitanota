@@ -1,12 +1,6 @@
 // タスクのタグ絞込 (chip + popover、multi-select)
 // 空配列 = 全タグ (フィルタなし) / OR 条件で複数選択可
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { usePopover } from '../hooks/usePopover';
 import type { TaskTag } from '../hooks/useTaskTags';
 
 interface TagFilterProps {
@@ -16,11 +10,8 @@ interface TagFilterProps {
 }
 
 export function TagFilter({ value, onChange, tags }: TagFilterProps) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties | null>(null);
+  const { open, setOpen, wrapRef, triggerRef, popoverRef, popoverStyle } =
+    usePopover();
 
   const selectedSet = new Set(value);
   const selected = tags.filter((t) => selectedSet.has(t.id));
@@ -29,42 +20,6 @@ export function TagFilter({ value, onChange, tags }: TagFilterProps) {
     if (selected.length === 1) return `#${selected[0]!.name}`;
     return `#${selected[0]!.name} +${selected.length - 1}`;
   })();
-
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setPopoverStyle(null);
-      return;
-    }
-    const r = triggerRef.current.getBoundingClientRect();
-    const margin = 16;
-    const maxHeight = Math.max(160, window.innerHeight - r.bottom - margin);
-    setPopoverStyle({
-      position: 'fixed',
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: Math.max(r.width, 200),
-      maxHeight,
-      zIndex: 60,
-    });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (wrapRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
 
   const toggle = (id: string) => {
     if (selectedSet.has(id)) {

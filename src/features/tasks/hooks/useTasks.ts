@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import type { Task } from '@/db/schema';
 
 export interface TaskTagSummary {
@@ -22,11 +23,6 @@ interface TasksResponse {
   tasks: TaskWithAssignees[];
 }
 
-const fetcher = async (url: string): Promise<TasksResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
 
 // 期間フィルタ:
 //   default: 今やるべきもの 3 点セット (今週 + null + 期限切れ未完了)
@@ -59,7 +55,7 @@ export function useTasks(filters?: UseTasksFilters) {
   const qs = params.toString() ? `?${params.toString()}` : '';
   const { data, error, isLoading, mutate } = useSWR(
     `/api/tasks${qs}`,
-    fetcher,
+    jsonFetcher<TasksResponse>,
   );
   return { tasks: data?.tasks, error, isLoading, mutate };
 }

@@ -262,7 +262,7 @@ export function TaskEditModal({
   const { showToast } = useToast();
   const { categories } = useTaskCategories();
   const { assignees } = useAssignees();
-  const { tags: taskTags, mutate: mutateTags } = useTaskTags();
+  const { tags: taskTags, createTag } = useTaskTags();
   const [duplicateSource, setDuplicateSource] =
     useState<TaskWithAssignees | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -387,23 +387,6 @@ export function TaskEditModal({
     }
   };
 
-  const handleCreateTag = async (name: string) => {
-    const res = await fetch('/api/task-tags', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(body.message ?? 'タグ作成に失敗しました');
-    }
-    const { tag } = (await res.json()) as {
-      tag: import('../hooks/useTaskTags').TaskTag;
-    };
-    await mutateTags();
-    return tag;
-  };
-
   const isSelfAssignee = !!task && task.assignees.some((a) => a.userId === selfUserId);
 
   return (
@@ -440,7 +423,7 @@ export function TaskEditModal({
               error={formError}
               readonly={!isSelfAssignee}
               taskTags={taskTags ?? []}
-              onCreateTag={handleCreateTag}
+              onCreateTag={createTag}
               onSubmit={(values) => handleUpdate(task.id, values)}
               onCancel={close}
             />
@@ -479,7 +462,7 @@ export function TaskEditModal({
               submitting={submitting}
               error={formError}
               taskTags={taskTags ?? []}
-              onCreateTag={handleCreateTag}
+              onCreateTag={createTag}
               onSubmit={(values) => handleDuplicate(duplicateSource.id, values)}
               onCancel={close}
             />

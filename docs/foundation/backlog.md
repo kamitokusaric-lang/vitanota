@@ -339,7 +339,7 @@
   - Secret: `vitanota/anthropic-api-key` 完全削除 (CFN destroy 時に同時削除確認)
 - **残置したもの (将来 AI 再開時の流用余地)**:
   - DB: `journal_entries.content_masked` カラム + `journal_weekly_summaries` テーブル (本番に残、データなし、害なし)
-  - 設計書: [`construction/weekly-summary-design.md`](../construction/weekly-summary-design.md) ([LEGACY] マーク、参照用)
+  - 設計書: [`weekly-summary-design.md`](../../aidlc-docs/_archive/construction/weekly-summary-design.md) ([LEGACY] 凍結、参照用)
   - ローカル `.env.local` の `ANTHROPIC_API_KEY` (chimo 指示)
 - **再開時に必要な作業**:
   1. AI 機能の使い所 (どこで・なぜ・誰のために) を再設計
@@ -353,7 +353,7 @@
 - **元の内容** (2026-04-27 発見):
   - 週次レポート MVP で on-the-fly mask 採用、 新規投稿は API で content_masked 常時埋め
   - 既存投稿は backfill 必要 (TS script で全 entries に maskContent 適用)
-  - 設計書: `construction/weekly-summary-design.md` § 9.3
+  - 設計書: `aidlc-docs/_archive/construction/weekly-summary-design.md` § 9.3
 - **再開時に必要**: 週次レポート機能を再設計するなら本項目も再評価
 
 ### 🟡 中: H3 リフレーミング (H3-A 見通し仮説 + H3-B 来訪価値仮説)

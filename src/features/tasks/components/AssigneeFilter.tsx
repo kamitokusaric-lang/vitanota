@@ -1,13 +1,7 @@
 // タスクの担当者絞込 (chip + popover、Linear 風)
 // 全員 / 自分 / 他教員 1 名 を single-select
 // 「自分」選択時のみ popover 末尾に「依頼中も表示」checkbox を統合
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { usePopover } from '../hooks/usePopover';
 import type { Assignee } from '../hooks/useAssignees';
 
 interface AssigneeFilterProps {
@@ -27,11 +21,8 @@ export function AssigneeFilter({
   showDelegated,
   onShowDelegatedChange,
 }: AssigneeFilterProps) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties | null>(null);
+  const { open, setOpen, wrapRef, triggerRef, popoverRef, popoverStyle } =
+    usePopover();
 
   const others = assignees.filter((a) => a.userId !== selfUserId);
   const selectedOther = others.find((o) => o.userId === value);
@@ -42,41 +33,6 @@ export function AssigneeFilter({
     return selectedOther?.name ?? selectedOther?.email ?? '不明';
   })();
 
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setPopoverStyle(null);
-      return;
-    }
-    const r = triggerRef.current.getBoundingClientRect();
-    const margin = 16;
-    const maxHeight = Math.max(160, window.innerHeight - r.bottom - margin);
-    setPopoverStyle({
-      position: 'fixed',
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: Math.max(r.width, 200),
-      maxHeight,
-      zIndex: 60,
-    });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (wrapRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
 
   const handleSelect = (next: string | undefined) => {
     onChange(next);

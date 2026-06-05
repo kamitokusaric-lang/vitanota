@@ -2,6 +2,7 @@
 // 絵文字 5 段階の日別積み上げ棒 + 先週比 + 合計
 import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
+import { noStoreJsonFetcher } from '@/shared/lib/fetcher';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { TrendArrow } from './TrendArrow';
@@ -17,12 +18,6 @@ import {
   aggregateMoodByWeek,
   PERIOD_COMPARISON_LABEL,
 } from '@/features/dashboard/lib/schoolDashboardService';
-
-const fetcher = async (url: string): Promise<SchoolMoodAnalysisData> => {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
 
 // mood 色 (chimo 指針 2026-05-04): 低彩度・薄め・同明度で統一。
 // 凡例 (chip) は薄め、グラフバー (bar) は少しだけ濃く差をつける。
@@ -196,7 +191,7 @@ export function SchoolMoodAnalysisTab({
 }: SchoolMoodAnalysisTabProps = {}) {
   const { data, error, isLoading } = useSWR<SchoolMoodAnalysisData>(
     `/api/school/mood-analysis?period=${period}`,
-    fetcher,
+    noStoreJsonFetcher,
   );
 
   if (isLoading) {

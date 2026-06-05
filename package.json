@@ -29,7 +29,8 @@
     "db:local:seed": "./scripts/local/seed.sh",
     "db:local:seed:system-admin": "./scripts/local/seed-system-admin.sh",
     "gen:openapi": "tsx scripts/gen-openapi.ts",
-    "openapi:check": "pnpm gen:openapi && git diff --exit-code openapi.yaml"
+    "openapi:check": "pnpm gen:openapi && git diff --exit-code openapi.yaml",
+    "openapi:coverage": "tsx scripts/check-openapi-coverage.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

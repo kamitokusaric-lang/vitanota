@@ -2,14 +2,8 @@
 // trigger は現在のフィルタを表す chip。クリックで popover が開き、preset とカスタム範囲を選べる
 // default mode = 「今日以降 + 期限なし + 期限切れ未完了」(初期表示)
 // 「今週」「先週」「来週」「今月」「先月」は range mode の preset として並ぶ
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { useMemo } from 'react';
+import { usePopover } from '../hooks/usePopover';
 import {
   getCurrentMonth,
   getCurrentWeek,
@@ -41,11 +35,8 @@ function formatYmdShort(ymd: string): string {
 }
 
 export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties | null>(null);
+  const { open, setOpen, wrapRef, triggerRef, popoverRef, popoverStyle } =
+    usePopover({ minWidth: 240, maxHeight: false });
 
   const presets = useMemo(() => {
     const now = new Date();
@@ -81,45 +72,6 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
     return `${formatYmdShort(value.from)}〜${formatYmdShort(value.to)}`;
   })();
 
-  // popover 位置計算
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setPopoverStyle(null);
-      return;
-    }
-    const r = triggerRef.current.getBoundingClientRect();
-    setPopoverStyle({
-      position: 'fixed',
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: Math.max(r.width, 240),
-      zIndex: 60,
-    });
-  }, [open]);
-
-  // 外クリック / ESC で閉じる
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        wrapRef.current?.contains(target) ||
-        popoverRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
 
   const applyPreset = (preset: Preset) => {
     const range = presets[preset];

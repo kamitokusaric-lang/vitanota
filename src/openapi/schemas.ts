@@ -2,6 +2,7 @@
 // リクエスト型は src/features/*/schemas/ に既存
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { aiCaptureOnboardingStateSchema } from '@/schemas/userOnboardingStates';
 
 extendZodWithOpenApi(z);
 
@@ -104,3 +105,101 @@ export const tagDeleteResponseSchema = z
     affectedEntries: z.number().int().openapi({ example: 0 }),
   })
   .openapi('TagDeleteResponse');
+
+// ─────────────────────────────────────────────────────────────
+// Knowledge Tag レスポンス型（taskTag と同パターン: 利用件数付き）
+// ─────────────────────────────────────────────────────────────
+export const knowledgeTagSchema = z
+  .object({
+    id: z.string().guid(),
+    name: z.string().openapi({ example: '校内研修' }),
+    createdBy: z.string().guid().nullable(),
+    createdAt: z.string().datetime(),
+    assignmentCount: z.number().int().openapi({ example: 0 }),
+  })
+  .openapi('KnowledgeTag');
+
+export const knowledgeTagListResponseSchema = z
+  .object({ tags: z.array(knowledgeTagSchema) })
+  .openapi('KnowledgeTagListResponse');
+
+export const knowledgeTagResponseSchema = z
+  .object({ tag: knowledgeTagSchema })
+  .openapi('KnowledgeTagResponse');
+
+// ─────────────────────────────────────────────────────────────
+// Profile レスポンス型
+// ─────────────────────────────────────────────────────────────
+export const profileResponseSchema = z
+  .object({
+    profile: z.object({
+      nickname: z.string().nullable().openapi({ example: 'たなか' }),
+    }),
+  })
+  .openapi('ProfileResponse');
+
+// ─────────────────────────────────────────────────────────────
+// Onboarding State レスポンス型（未保存なら state=null）
+// ─────────────────────────────────────────────────────────────
+export const onboardingStateResponseSchema = z
+  .object({
+    state: aiCaptureOnboardingStateSchema.nullable(),
+  })
+  .openapi('OnboardingStateResponse');
+
+// ─────────────────────────────────────────────────────────────
+// Announcement レスポンス型（運営からのお知らせ）
+// ─────────────────────────────────────────────────────────────
+export const announcementSchema = z
+  .object({
+    id: z.string().guid(),
+    publishDate: z.string().openapi({ example: '2026-06-01' }),
+    title: z.string().openapi({ example: 'メンテナンスのお知らせ' }),
+    body: z.array(z.string()),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  })
+  .openapi('Announcement');
+
+export const announcementsResponseSchema = z
+  .object({ announcements: z.array(announcementSchema) })
+  .openapi('AnnouncementsResponse');
+
+// ─────────────────────────────────────────────────────────────
+// Invitation レスポンス型
+// ─────────────────────────────────────────────────────────────
+// 招待作成 (POST /api/invitations) のリクエスト body
+export const createInvitationSchema = z
+  .object({
+    email: z.string().email().openapi({ example: 'teacher@example.com' }),
+    role: z.enum(['teacher', 'school_admin']),
+    tenantId: z.string().guid(),
+  })
+  .openapi('CreateInvitationInput');
+
+// 招待作成レスポンス
+export const invitationCreatedResponseSchema = z
+  .object({
+    invitation: z.object({
+      id: z.string().guid(),
+      expiresAt: z.string().datetime(),
+      inviteUrl: z.string().openapi({ example: 'https://vitanota.io/auth/invite?token=...' }),
+    }),
+  })
+  .openapi('InvitationCreatedResponse');
+
+// 招待トークン検証 (GET /api/invitations/{token}) レスポンス
+export const invitationInfoResponseSchema = z
+  .object({
+    invitation: z.object({
+      email: z.string(),
+      role: z.enum(['teacher', 'school_admin']),
+      expiresAt: z.string().datetime(),
+    }),
+  })
+  .openapi('InvitationInfoResponse');
+
+// 招待受諾 (POST /api/invitations/{token}) レスポンス
+export const successResponseSchema = z
+  .object({ success: z.literal(true) })
+  .openapi('SuccessResponse');

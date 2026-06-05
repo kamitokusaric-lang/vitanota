@@ -297,6 +297,443 @@ components:
           example: 0
       required:
         - affectedEntries
+    TasksListResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+      required:
+        - tasks
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        categoryId:
+          type: string
+        createdBy:
+          type: string
+        title:
+          type: string
+          example: 保護者対応メモ
+        description:
+          type:
+            - string
+            - "null"
+        dueDate:
+          type:
+            - string
+            - "null"
+          example: 2026-06-30
+        status:
+          type: string
+          enum:
+            - backlog
+            - todo
+            - in_progress
+            - review
+            - done
+        completedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        sourceChatSnippet:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskAssigneeSummary"
+        commentCount:
+          type: integer
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskTagSummary"
+      required:
+        - id
+        - tenantId
+        - categoryId
+        - createdBy
+        - title
+        - description
+        - dueDate
+        - status
+        - completedAt
+        - sourceChatSnippet
+        - createdAt
+        - updatedAt
+        - assignees
+        - commentCount
+        - tags
+    TaskAssigneeSummary:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type:
+            - string
+            - "null"
+        nickname:
+          type:
+            - string
+            - "null"
+      required:
+        - userId
+        - name
+        - nickname
+    TaskTagSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: 校務
+      required:
+        - id
+        - name
+    TaskResponse:
+      type: object
+      properties:
+        task:
+          $ref: "#/components/schemas/Task"
+      required:
+        - task
+    CreateTaskInput:
+      type: object
+      properties:
+        categoryId:
+          type: string
+        assigneeUserIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 10
+        title:
+          type: string
+          minLength: 1
+          maxLength: 15
+        description:
+          type: string
+          maxLength: 2000
+        dueDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+      required:
+        - categoryId
+        - assigneeUserIds
+        - title
+    UpdateTaskInput:
+      type: object
+      properties:
+        categoryId:
+          type: string
+        title:
+          type: string
+          minLength: 1
+          maxLength: 15
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 2000
+        dueDate:
+          type:
+            - string
+            - "null"
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        status:
+          type: string
+          enum:
+            - backlog
+            - todo
+            - in_progress
+            - review
+            - done
+        assigneeUserIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 10
+    TaskCommentsResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskComment"
+      required:
+        - comments
+    TaskComment:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        taskId:
+          type: string
+        userId:
+          type:
+            - string
+            - "null"
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        userName:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - tenantId
+        - taskId
+        - userId
+        - body
+        - createdAt
+        - updatedAt
+        - userName
+    TaskCommentResponse:
+      type: object
+      properties:
+        comment:
+          $ref: "#/components/schemas/TaskComment"
+      required:
+        - comment
+    CreateTaskCommentInput:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - body
+    DuplicateTaskInput:
+      type: object
+      properties:
+        assigneeUserIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 10
+        categoryId:
+          type: string
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 2000
+        dueDate:
+          type:
+            - string
+            - "null"
+          pattern: ^\d{4}-\d{2}-\d{2}$
+      required:
+        - assigneeUserIds
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum:
+            - true
+      required:
+        - ok
+    SetTaskTagsInput:
+      type: object
+      properties:
+        tagIds:
+          type: array
+          items:
+            type: string
+      required:
+        - tagIds
+    AssigneesResponse:
+      type: object
+      properties:
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assignee"
+      required:
+        - assignees
+    Assignee:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type:
+            - string
+            - "null"
+        email:
+          type: string
+          example: teacher@example.com
+      required:
+        - userId
+        - name
+        - email
+    TaskCategoriesResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskCategory"
+      required:
+        - categories
+    TaskCategory:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        name:
+          type: string
+          example: 校務
+        isSystemDefault:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdBy:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - tenantId
+        - name
+        - isSystemDefault
+        - sortOrder
+        - createdBy
+        - createdAt
+    TaskTagsListResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskTag"
+      required:
+        - tags
+    TaskTag:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: 研究授業
+        createdBy:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        assignmentCount:
+          type: integer
+          example: 0
+      required:
+        - id
+        - name
+        - createdBy
+        - createdAt
+        - assignmentCount
+    TaskTagResponse:
+      type: object
+      properties:
+        tag:
+          $ref: "#/components/schemas/TaskTag"
+      required:
+        - tag
+    TaskFilterPreferenceResponse:
+      type: object
+      properties:
+        preference:
+          type:
+            - object
+            - "null"
+          properties:
+            filterOwner:
+              type:
+                - string
+                - "null"
+            filterTagIds:
+              type: array
+              items:
+                type: string
+            filterCategoryIds:
+              type: array
+              items:
+                type: string
+            showDelegated:
+              type: boolean
+            period:
+              oneOf:
+                - type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum:
+                        - default
+                  required:
+                    - mode
+                - type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum:
+                        - range
+                    from:
+                      type: string
+                      pattern: ^\d{4}-\d{2}-\d{2}$
+                    to:
+                      type: string
+                      pattern: ^\d{4}-\d{2}-\d{2}$
+                  required:
+                    - mode
+                    - from
+                    - to
+          required:
+            - filterOwner
+            - filterTagIds
+            - filterCategoryIds
+            - showDelegated
+            - period
+      required:
+        - preference
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -788,6 +1225,1048 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TagDeleteResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks:
+    get:
+      summary: タスク一覧取得（フィルタ・期間指定可）
+      description: scope=mine は自分が担当 or 作成したタスク。mode=default は「今週 + 期限なし + 期限切れ未完了」の3点セット、mode=range は due_date の範囲指定。
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: false
+          name: ownerUserId
+          in: query
+        - schema:
+            type: string
+            enum:
+              - mine
+          required: false
+          name: scope
+          in: query
+        - schema:
+            type: string
+            enum:
+              - default
+              - range
+          required: false
+          name: mode
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: false
+          name: weekStart
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: false
+          name: weekEnd
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: false
+          name: from
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: false
+          name: to
+          in: query
+      responses:
+        "200":
+          description: タスク一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TasksListResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: タスク作成
+      tags:
+        - Task
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskInput"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{id}:
+    get:
+      summary: タスク単体取得
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      summary: タスク更新（status / 担当者 / 期限 等）
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskInput"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: タスク削除
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: 削除成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{id}/comments:
+    get:
+      summary: タスクのコメント一覧取得
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: コメント一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentsResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: タスクにコメント追加
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskCommentInput"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{id}/comments/{commentId}:
+    delete:
+      summary: タスクコメント削除（投稿者本人）
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+          required: true
+          name: commentId
+          in: path
+      responses:
+        "204":
+          description: 削除成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{id}/duplicate:
+    post:
+      summary: タスク複製（担当者を指定して複製）
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateTaskInput"
+      responses:
+        "201":
+          description: 複製成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{id}/tags:
+    put:
+      summary: タスクに紐づくタグ集合を置換
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetTaskTagsInput"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/assignees:
+    get:
+      summary: 担当者として選択可能な教員一覧
+      tags:
+        - Task
+      security:
+        - *a2
+      responses:
+        "200":
+          description: 担当者候補一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssigneesResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/task-categories:
+    get:
+      summary: テナント内タスクカテゴリ一覧
+      tags:
+        - Task
+      security:
+        - *a2
+      responses:
+        "200":
+          description: カテゴリ一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCategoriesResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/task-tags:
+    get:
+      summary: テナント内タスクタグ一覧（利用件数付き）
+      tags:
+        - Task
+      security:
+        - *a2
+      responses:
+        "200":
+          description: タスクタグ一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTagsListResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: タスクタグ作成（teacher 以上）
+      tags:
+        - Task
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+              required:
+                - name
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTagResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 同名タグが既に存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/task-tags/{id}:
+    delete:
+      summary: タスクタグ削除
+      tags:
+        - Task
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: タグが使用中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/me/filter-preferences/tasks:
+    get:
+      summary: タスクボードのフィルタ設定取得（未保存なら null）
+      tags:
+        - Task
+      security:
+        - *a2
+      responses:
+        "200":
+          description: フィルタ設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskFilterPreferenceResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: タスクボードのフィルタ設定を保存（UPSERT）
+      tags:
+        - Task
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filterOwner:
+                  type:
+                    - string
+                    - "null"
+                filterTagIds:
+                  type: array
+                  items:
+                    type: string
+                filterCategoryIds:
+                  type: array
+                  items:
+                    type: string
+                showDelegated:
+                  type: boolean
+                period:
+                  oneOf:
+                    - type: object
+                      properties:
+                        mode:
+                          type: string
+                          enum:
+                            - default
+                      required:
+                        - mode
+                    - type: object
+                      properties:
+                        mode:
+                          type: string
+                          enum:
+                            - range
+                        from:
+                          type: string
+                          pattern: ^\d{4}-\d{2}-\d{2}$
+                        to:
+                          type: string
+                          pattern: ^\d{4}-\d{2}-\d{2}$
+                      required:
+                        - mode
+                        - from
+                        - to
+              required:
+                - filterOwner
+                - filterTagIds
+                - filterCategoryIds
+                - showDelegated
+                - period
+      responses:
+        "200":
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
         "400":
           description: バリデーションエラー
           content:

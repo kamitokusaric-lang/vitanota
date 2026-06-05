@@ -12,6 +12,18 @@ import {
   timelineQuerySchema,
 } from '@/features/journal/schemas/journal';
 import { createTagSchema, tagIdParamSchema } from '@/features/journal/schemas/tag';
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  taskIdParamSchema,
+  duplicateTaskSchema,
+  listTasksQuerySchema,
+} from '@/features/tasks/schemas/task';
+import {
+  createTaskCommentSchema,
+} from '@/features/tasks/schemas/taskComment';
+import { taskTagCreateSchema } from '@/features/tasks/schemas/taskTag';
+import { taskFilterSettingsSchema } from '@/schemas/userFilterPreferences';
 
 import {
   errorResponseSchema,
@@ -22,6 +34,19 @@ import {
   tagResponseSchema,
   tagDeleteResponseSchema,
 } from './schemas';
+import {
+  tasksListResponseSchema,
+  taskResponseSchema,
+  taskCommentsResponseSchema,
+  taskCommentResponseSchema,
+  assigneesResponseSchema,
+  taskCategoriesResponseSchema,
+  taskTagsListResponseSchema,
+  taskTagResponseSchema,
+  okResponseSchema,
+  setTaskTagsSchema,
+  taskFilterPreferenceResponseSchema,
+} from './taskSchemas';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -246,6 +271,323 @@ export function buildOpenApiDocument() {
       200: {
         description: '削除成功（影響を受けたエントリ数を返却）',
         content: { 'application/json': { schema: tagDeleteResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ═════════════════════════════════════════════════════════════
+  // Tasks (タスク管理)
+  // ═════════════════════════════════════════════════════════════
+  const taskIdParam = z.object({ id: z.string().guid() });
+
+  // /api/tasks - 一覧・作成
+  registry.registerPath({
+    method: 'get',
+    path: '/api/tasks',
+    summary: 'タスク一覧取得（フィルタ・期間指定可）',
+    description:
+      'scope=mine は自分が担当 or 作成したタスク。mode=default は「今週 + 期限なし + 期限切れ未完了」の3点セット、mode=range は due_date の範囲指定。',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: { query: listTasksQuerySchema },
+    responses: {
+      200: {
+        description: 'タスク一覧',
+        content: { 'application/json': { schema: tasksListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/tasks',
+    summary: 'タスク作成',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createTaskSchema } } },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: taskResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // /api/tasks/{id} - 取得・更新・削除
+  registry.registerPath({
+    method: 'get',
+    path: '/api/tasks/{id}',
+    summary: 'タスク単体取得',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: { params: taskIdParamSchema },
+    responses: {
+      200: {
+        description: '取得成功',
+        content: { 'application/json': { schema: taskResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/tasks/{id}',
+    summary: 'タスク更新（status / 担当者 / 期限 等）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      params: taskIdParamSchema,
+      body: { content: { 'application/json': { schema: updateTaskSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: taskResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/tasks/{id}',
+    summary: 'タスク削除',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: { params: taskIdParamSchema },
+    responses: {
+      204: { description: '削除成功' },
+      ...errorResponses,
+    },
+  });
+
+  // /api/tasks/{id}/comments - コメント一覧・作成
+  registry.registerPath({
+    method: 'get',
+    path: '/api/tasks/{id}/comments',
+    summary: 'タスクのコメント一覧取得',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: { params: taskIdParamSchema },
+    responses: {
+      200: {
+        description: 'コメント一覧',
+        content: { 'application/json': { schema: taskCommentsResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/tasks/{id}/comments',
+    summary: 'タスクにコメント追加',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      params: taskIdParamSchema,
+      body: {
+        content: { 'application/json': { schema: createTaskCommentSchema } },
+      },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: taskCommentResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/tasks/{id}/comments/{commentId}',
+    summary: 'タスクコメント削除（投稿者本人）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      params: z.object({
+        id: z.string().guid(),
+        commentId: z.string().guid(),
+      }),
+    },
+    responses: {
+      204: { description: '削除成功' },
+      ...errorResponses,
+    },
+  });
+
+  // /api/tasks/{id}/duplicate - 複製
+  registry.registerPath({
+    method: 'post',
+    path: '/api/tasks/{id}/duplicate',
+    summary: 'タスク複製（担当者を指定して複製）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      params: taskIdParamSchema,
+      body: { content: { 'application/json': { schema: duplicateTaskSchema } } },
+    },
+    responses: {
+      201: {
+        description: '複製成功',
+        content: { 'application/json': { schema: taskResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // /api/tasks/{id}/tags - タスクのタグ集合を置換
+  registry.registerPath({
+    method: 'put',
+    path: '/api/tasks/{id}/tags',
+    summary: 'タスクに紐づくタグ集合を置換',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      params: taskIdParam,
+      body: { content: { 'application/json': { schema: setTaskTagsSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: okResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // /api/tasks/assignees - 担当者候補一覧
+  registry.registerPath({
+    method: 'get',
+    path: '/api/tasks/assignees',
+    summary: '担当者として選択可能な教員一覧',
+    tags: ['Task'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: '担当者候補一覧',
+        content: { 'application/json': { schema: assigneesResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // /api/task-categories - カテゴリ一覧
+  registry.registerPath({
+    method: 'get',
+    path: '/api/task-categories',
+    summary: 'テナント内タスクカテゴリ一覧',
+    tags: ['Task'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'カテゴリ一覧',
+        content: {
+          'application/json': { schema: taskCategoriesResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // /api/task-tags - タスクタグ一覧・作成
+  registry.registerPath({
+    method: 'get',
+    path: '/api/task-tags',
+    summary: 'テナント内タスクタグ一覧（利用件数付き）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'タスクタグ一覧',
+        content: { 'application/json': { schema: taskTagsListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/task-tags',
+    summary: 'タスクタグ作成（teacher 以上）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: taskTagCreateSchema } } },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: taskTagResponseSchema } },
+      },
+      409: {
+        description: '同名タグが既に存在',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/task-tags/{id}',
+    summary: 'タスクタグ削除',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: { params: taskIdParam },
+    responses: {
+      200: {
+        description: '削除成功',
+        content: { 'application/json': { schema: okResponseSchema } },
+      },
+      409: {
+        description: 'タグが使用中',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // /api/users/me/filter-preferences/tasks - タスクボードのフィルタ設定
+  registry.registerPath({
+    method: 'get',
+    path: '/api/users/me/filter-preferences/tasks',
+    summary: 'タスクボードのフィルタ設定取得（未保存なら null）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'フィルタ設定',
+        content: {
+          'application/json': { schema: taskFilterPreferenceResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/users/me/filter-preferences/tasks',
+    summary: 'タスクボードのフィルタ設定を保存（UPSERT）',
+    tags: ['Task'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: taskFilterSettingsSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '保存成功',
+        content: { 'application/json': { schema: okResponseSchema } },
       },
       ...errorResponses,
     },

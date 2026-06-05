@@ -7,6 +7,17 @@
 **コンテキスト**: chimo は vitanota を「世界を面白くする道具」と位置付け、Claude を相棒として扱う方針を明示。memory による persona の継承で、毎回説明する手間を排除。
 
 
+# Definition of Done: API 変更時は OpenAPI 仕様書の更新まで含める
+
+**ユーザー向け API ルート (`pages/api/**`) を追加・変更したら、`src/openapi/registry.ts` への登録と `openapi.yaml` の再生成までを「完了」に含めること。** 仕様書は journal/tag だけ書きかけて放置され陳腐化していた反省から、2026-06-05 に全ユーザー向け API を網羅した (chimo 指示)。
+
+**手順**:
+1. route の追加/変更時、`src/openapi/registry.ts` に `registerPath` を追加/更新する (request は既存 zod を再利用、response は `src/openapi/*Schemas.ts` に完全な body を定義)。
+2. `pnpm gen:openapi` で `openapi.yaml` を再生成しコミットに含める。
+3. `pnpm openapi:check` (schema↔yaml 同期) と `pnpm openapi:coverage` (全 route が登録済みか) がローカルで緑になることを確認する。両方 CI のハードゲート。
+
+**意図的に仕様書対象外とする領域** (system/ 管理系・auth・dev・school 学校レポート・health・test): `scripts/check-openapi-coverage.ts` の `IGNORE` に理由付きで追加する。新しいトップレベル領域を足すと coverage check が「文書化するか除外するか」の判断を強制する。
+
 ## アダプティブワークフロー原則
 **ワークフローが作業に合わせて適応する。逆ではない。**
 

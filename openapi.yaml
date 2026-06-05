@@ -734,6 +734,219 @@ components:
             - period
       required:
         - preference
+    ReactionTypeQuery:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - knowledge
+            - appreciation
+            - endorsement
+          example: knowledge
+      required:
+        - type
+    KnowledgeTagListResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/KnowledgeTag"
+      required:
+        - tags
+    KnowledgeTag:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: 校内研修
+        createdBy:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        assignmentCount:
+          type: integer
+          example: 0
+      required:
+        - id
+        - name
+        - createdBy
+        - createdAt
+        - assignmentCount
+    KnowledgeTagResponse:
+      type: object
+      properties:
+        tag:
+          $ref: "#/components/schemas/KnowledgeTag"
+      required:
+        - tag
+    ProfileResponse:
+      type: object
+      properties:
+        profile:
+          type: object
+          properties:
+            nickname:
+              type:
+                - string
+                - "null"
+              example: たなか
+          required:
+            - nickname
+      required:
+        - profile
+    UpdateProfileInput:
+      type: object
+      properties:
+        nickname:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 50
+      required:
+        - nickname
+    OnboardingStateResponse:
+      type: object
+      properties:
+        state:
+          type:
+            - object
+            - "null"
+          properties:
+            dismissedAt:
+              type: string
+              format: date-time
+            completedStep:
+              anyOf:
+                - type: number
+                  enum:
+                    - 1
+                - type: number
+                  enum:
+                    - 2
+                - type: number
+                  enum:
+                    - 3
+            version:
+              type: string
+              minLength: 1
+          required:
+            - version
+      required:
+        - state
+    AnnouncementsResponse:
+      type: object
+      properties:
+        announcements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Announcement"
+      required:
+        - announcements
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: string
+        publishDate:
+          type: string
+          example: 2026-06-01
+        title:
+          type: string
+          example: メンテナンスのお知らせ
+        body:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - publishDate
+        - title
+        - body
+        - createdAt
+        - updatedAt
+    InvitationCreatedResponse:
+      type: object
+      properties:
+        invitation:
+          type: object
+          properties:
+            id:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+            inviteUrl:
+              type: string
+              example: https://vitanota.io/auth/invite?token=...
+          required:
+            - id
+            - expiresAt
+            - inviteUrl
+      required:
+        - invitation
+    CreateInvitationInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: teacher@example.com
+        role:
+          type: string
+          enum:
+            - teacher
+            - school_admin
+        tenantId:
+          type: string
+      required:
+        - email
+        - role
+        - tenantId
+    InvitationInfoResponse:
+      type: object
+      properties:
+        invitation:
+          type: object
+          properties:
+            email:
+              type: string
+            role:
+              type: string
+              enum:
+                - teacher
+                - school_admin
+            expiresAt:
+              type: string
+              format: date-time
+          required:
+            - email
+            - role
+            - expiresAt
+      required:
+        - invitation
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum:
+            - true
+      required:
+        - success
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -2287,6 +2500,720 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/private/journal/entries/{id}/reactions:
+    post:
+      summary: エントリにリアクションを付ける（knowledge / appreciation / endorsement）
+      tags:
+        - Journal (Private)
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactionTypeQuery"
+      responses:
+        "201":
+          description: リアクション付与成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: リアクションを外す
+      tags:
+        - Journal (Private)
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            enum:
+              - knowledge
+              - appreciation
+              - endorsement
+            example: knowledge
+          required: true
+          name: type
+          in: query
+      responses:
+        "204":
+          description: 削除成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/private/journal/knowledge-tags:
+    get:
+      summary: ナレッジタグ一覧取得（利用件数付き）
+      tags:
+        - Tag
+      security:
+        - *a2
+      responses:
+        "200":
+          description: ナレッジタグ一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeTagListResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: ナレッジタグ作成（teacher 以上）
+      tags:
+        - Tag
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+              required:
+                - name
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeTagResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 同名タグが既に存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/me/profile:
+    get:
+      summary: 自分のプロフィール取得（テナント内ニックネーム）
+      tags:
+        - Account
+      security:
+        - *a2
+      responses:
+        "200":
+          description: プロフィール
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      summary: ニックネーム更新
+      tags:
+        - Account
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileInput"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: ニックネーム重複
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/me/onboarding-states/{context}:
+    get:
+      summary: オンボーディング/ヒントの表示状態取得（未保存なら null）
+      tags:
+        - Account
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - ai_capture
+              - feedback_unread_hint
+          required: true
+          name: context
+          in: path
+      responses:
+        "200":
+          description: 表示状態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingStateResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: オンボーディング/ヒントの表示状態を保存（UPSERT）
+      tags:
+        - Account
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - ai_capture
+              - feedback_unread_hint
+          required: true
+          name: context
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dismissedAt:
+                  type: string
+                  format: date-time
+                completedStep:
+                  anyOf:
+                    - type: number
+                      enum:
+                        - 1
+                    - type: number
+                      enum:
+                        - 2
+                    - type: number
+                      enum:
+                        - 3
+                version:
+                  type: string
+                  minLength: 1
+              required:
+                - version
+      responses:
+        "200":
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/announcements:
+    get:
+      summary: 運営からのお知らせ一覧（公開日降順）
+      tags:
+        - Account
+      security:
+        - *a2
+      responses:
+        "200":
+          description: お知らせ一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementsResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/invitations:
+    post:
+      summary: 教員/管理者を招待（school_admin 以上）
+      tags:
+        - Account
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvitationInput"
+      responses:
+        "201":
+          description: 招待リンク発行
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationCreatedResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/invitations/{token}:
+    get:
+      summary: 招待トークン検証（招待先メール・ロールを返す）
+      description: 認証不要。サインアップ画面で招待内容を表示するために使う。
+      tags:
+        - Account
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: token
+          in: path
+      responses:
+        "200":
+          description: 招待情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationInfoResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: 招待リンクが期限切れ・使用済み
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: 招待を受諾してテナントに参加
+      tags:
+        - Account
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: token
+          in: path
+      responses:
+        "200":
+          description: 参加成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: 招待リンクが期限切れ・使用済み
           content:
             application/json:
               schema:

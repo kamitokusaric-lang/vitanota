@@ -12,6 +12,13 @@ import {
   timelineQuerySchema,
 } from '@/features/journal/schemas/journal';
 import { createTagSchema, tagIdParamSchema } from '@/features/journal/schemas/tag';
+import { reactionTypeQuerySchema } from '@/features/journal/schemas/journal';
+import { knowledgeTagCreateSchema } from '@/features/journal/schemas/knowledgeTag';
+import { updateProfileSchema } from '@/features/profile/schemas/profile';
+import {
+  aiCaptureOnboardingStateSchema,
+  onboardingContextSchema,
+} from '@/schemas/userOnboardingStates';
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -33,6 +40,15 @@ import {
   tagListResponseSchema,
   tagResponseSchema,
   tagDeleteResponseSchema,
+  knowledgeTagListResponseSchema,
+  knowledgeTagResponseSchema,
+  profileResponseSchema,
+  onboardingStateResponseSchema,
+  announcementsResponseSchema,
+  createInvitationSchema,
+  invitationCreatedResponseSchema,
+  invitationInfoResponseSchema,
+  successResponseSchema,
 } from './schemas';
 import {
   tasksListResponseSchema,
@@ -588,6 +604,244 @@ export function buildOpenApiDocument() {
       200: {
         description: '保存成功',
         content: { 'application/json': { schema: okResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ═════════════════════════════════════════════════════════════
+  // Journal (リアクション・ナレッジタグ)
+  // ═════════════════════════════════════════════════════════════
+  registry.registerPath({
+    method: 'post',
+    path: '/api/private/journal/entries/{id}/reactions',
+    summary: 'エントリにリアクションを付ける（knowledge / appreciation / endorsement）',
+    tags: ['Journal (Private)'],
+    security: [sessionCookie],
+    request: {
+      params: z.object({ id: z.string().guid() }),
+      body: { content: { 'application/json': { schema: reactionTypeQuerySchema } } },
+    },
+    responses: {
+      201: { description: 'リアクション付与成功' },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/private/journal/entries/{id}/reactions',
+    summary: 'リアクションを外す',
+    tags: ['Journal (Private)'],
+    security: [sessionCookie],
+    request: {
+      params: z.object({ id: z.string().guid() }),
+      query: reactionTypeQuerySchema,
+    },
+    responses: {
+      204: { description: '削除成功' },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/private/journal/knowledge-tags',
+    summary: 'ナレッジタグ一覧取得（利用件数付き）',
+    tags: ['Tag'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'ナレッジタグ一覧',
+        content: {
+          'application/json': { schema: knowledgeTagListResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/private/journal/knowledge-tags',
+    summary: 'ナレッジタグ作成（teacher 以上）',
+    tags: ['Tag'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: knowledgeTagCreateSchema } },
+      },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: {
+          'application/json': { schema: knowledgeTagResponseSchema },
+        },
+      },
+      409: {
+        description: '同名タグが既に存在',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ═════════════════════════════════════════════════════════════
+  // Account / Org (プロフィール・オンボーディング・お知らせ・招待)
+  // ═════════════════════════════════════════════════════════════
+  registry.registerPath({
+    method: 'get',
+    path: '/api/me/profile',
+    summary: '自分のプロフィール取得（テナント内ニックネーム）',
+    tags: ['Account'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'プロフィール',
+        content: { 'application/json': { schema: profileResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/me/profile',
+    summary: 'ニックネーム更新',
+    tags: ['Account'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: updateProfileSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: profileResponseSchema } },
+      },
+      409: {
+        description: 'ニックネーム重複',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/users/me/onboarding-states/{context}',
+    summary: 'オンボーディング/ヒントの表示状態取得（未保存なら null）',
+    tags: ['Account'],
+    security: [sessionCookie],
+    request: { params: z.object({ context: onboardingContextSchema }) },
+    responses: {
+      200: {
+        description: '表示状態',
+        content: {
+          'application/json': { schema: onboardingStateResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/users/me/onboarding-states/{context}',
+    summary: 'オンボーディング/ヒントの表示状態を保存（UPSERT）',
+    tags: ['Account'],
+    security: [sessionCookie],
+    request: {
+      params: z.object({ context: onboardingContextSchema }),
+      body: {
+        content: {
+          'application/json': { schema: aiCaptureOnboardingStateSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: '保存成功',
+        content: { 'application/json': { schema: okResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/announcements',
+    summary: '運営からのお知らせ一覧（公開日降順）',
+    tags: ['Account'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'お知らせ一覧',
+        content: {
+          'application/json': { schema: announcementsResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/invitations',
+    summary: '教員/管理者を招待（school_admin 以上）',
+    tags: ['Account'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createInvitationSchema } } },
+    },
+    responses: {
+      201: {
+        description: '招待リンク発行',
+        content: {
+          'application/json': { schema: invitationCreatedResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/invitations/{token}',
+    summary: '招待トークン検証（招待先メール・ロールを返す）',
+    description: '認証不要。サインアップ画面で招待内容を表示するために使う。',
+    tags: ['Account'],
+    request: { params: z.object({ token: z.string() }) },
+    responses: {
+      200: {
+        description: '招待情報',
+        content: {
+          'application/json': { schema: invitationInfoResponseSchema },
+        },
+      },
+      410: {
+        description: '招待リンクが期限切れ・使用済み',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/invitations/{token}',
+    summary: '招待を受諾してテナントに参加',
+    tags: ['Account'],
+    security: [sessionCookie],
+    request: { params: z.object({ token: z.string() }) },
+    responses: {
+      200: {
+        description: '参加成功',
+        content: { 'application/json': { schema: successResponseSchema } },
+      },
+      410: {
+        description: '招待リンクが期限切れ・使用済み',
+        content: { 'application/json': { schema: errorResponseSchema } },
       },
       ...errorResponses,
     },

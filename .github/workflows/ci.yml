@@ -136,6 +136,11 @@ jobs:
       - name: OpenAPI schema sync check
         run: pnpm openapi:check
 
+      # DoD: 機能追加・変更時は OpenAPI 登録まで完了に含める
+      # pages/api/** の全 route が openapi.yaml に登録されているか検証 (未登録で失敗)
+      - name: OpenAPI coverage check
+        run: pnpm openapi:coverage
+
   # ── Step 16a: 統合テスト (実 PostgreSQL) ───────────────────────
   # GitHub Actions の services container で PostgreSQL 16 を起動
   # マルチテナント隔離・RLS・SP-U02-04 8 層防御の生存確認

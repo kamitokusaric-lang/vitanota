@@ -1,12 +1,6 @@
 // 複数担当者の選択 UI: input 風 box (選択中 chip 並び + ▼) と popover チェック一覧
 // table 内などで使ったときに親の overflow に切られないよう、popover は position:fixed で配置
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { usePopover } from '../hooks/usePopover';
 
 export interface AssigneeCandidate {
   userId: string;
@@ -34,54 +28,9 @@ export function AssigneePopoverInput({
   testIdPrefix = 'assignee-popover',
   maxSelected,
 }: AssigneePopoverInputProps) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties | null>(null);
-
-  // 開くたびに input box の bounding rect を取って popover 位置を計算 (fixed)
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setPopoverStyle(null);
-      return;
-    }
-    const r = triggerRef.current.getBoundingClientRect();
-    const margin = 16;
-    const maxHeight = Math.max(160, window.innerHeight - r.bottom - margin);
-    setPopoverStyle({
-      position: 'fixed',
-      top: r.bottom + 4,
-      left: r.left,
-      minWidth: Math.max(r.width, 200),
-      maxHeight,
-      zIndex: 60,
-    });
-  }, [open]);
-
-  // 外クリック / ESC で閉じる
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        wrapRef.current?.contains(target) ||
-        popoverRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
+  // trigger は input 風の div box (table 内 overflow に切られないよう fixed 配置)
+  const { open, setOpen, wrapRef, triggerRef, popoverRef, popoverStyle } =
+    usePopover<HTMLDivElement>();
 
   const labelById = new Map(candidates.map((c) => [c.userId, c.label]));
   const selectedSet = new Set(selectedUserIds);

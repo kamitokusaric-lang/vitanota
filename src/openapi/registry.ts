@@ -19,6 +19,7 @@ import {
   aiCaptureOnboardingStateSchema,
   onboardingContextSchema,
 } from '@/schemas/userOnboardingStates';
+import { feedbackSubmissionSchema } from '@/features/feedback/lib/feedbackSchemas';
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -63,6 +64,18 @@ import {
   setTaskTagsSchema,
   taskFilterPreferenceResponseSchema,
 } from './taskSchemas';
+import {
+  feedbackTopicsResponseSchema,
+  feedbackSubmissionCreatedResponseSchema,
+  myThreadsResponseSchema,
+  myThreadsQuerySchema,
+  aiChatExtractRequestSchema,
+  aiChatExtractResponseSchema,
+  aiChatConfirmRequestSchema,
+  aiChatConfirmResponseSchema,
+  aiChatEventRequestSchema,
+  aiChatFeedbackRequestSchema,
+} from './aiChatFeedbackSchemas';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -842,6 +855,185 @@ export function buildOpenApiDocument() {
       410: {
         description: '招待リンクが期限切れ・使用済み',
         content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ═════════════════════════════════════════════════════════════
+  // Feedback (運営フィードバック)
+  // ═════════════════════════════════════════════════════════════
+  registry.registerPath({
+    method: 'get',
+    path: '/api/feedback/topics',
+    summary: 'フィードバックのトピック一覧（有効なもの）',
+    tags: ['Feedback'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'トピック一覧',
+        content: {
+          'application/json': { schema: feedbackTopicsResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/feedback/submissions',
+    summary: '運営へフィードバックを送信',
+    tags: ['Feedback'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: feedbackSubmissionSchema } },
+      },
+    },
+    responses: {
+      201: {
+        description: '送信成功',
+        content: {
+          'application/json': {
+            schema: feedbackSubmissionCreatedResponseSchema,
+          },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/feedback/my-threads',
+    summary: '自分のフィードバックと運営返信スレッド',
+    description:
+      'summary=1 のときは未読サマリ ({ unreadAny, latestUnreadReply }) を、それ以外はスレッド一覧 ({ threads }) を返す。',
+    tags: ['Feedback'],
+    security: [sessionCookie],
+    request: { query: myThreadsQuerySchema },
+    responses: {
+      200: {
+        description: 'スレッド一覧 または 未読サマリ',
+        content: { 'application/json': { schema: myThreadsResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/feedback/mark-read',
+    summary: '運営返信を既読にする',
+    tags: ['Feedback'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: '既読化成功',
+        content: { 'application/json': { schema: okResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ═════════════════════════════════════════════════════════════
+  // AI Chat (雑に書く → AI がタスク候補を整理)
+  // ═════════════════════════════════════════════════════════════
+  registry.registerPath({
+    method: 'post',
+    path: '/api/ai-chat/extract',
+    summary: '入力文から AI がタスク候補を抽出',
+    description:
+      '1 日あたりの利用回数制限あり（超過で 429）。AI 基盤が一時的に使えない場合は 503。',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: aiChatExtractRequestSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '抽出されたタスク候補',
+        content: {
+          'application/json': { schema: aiChatExtractResponseSchema },
+        },
+      },
+      429: {
+        description: '1 日の利用上限に到達',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      503: {
+        description: 'AI 基盤が一時的に利用不可',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/ai-chat/confirm',
+    summary: 'タスク候補を確定（作成）または破棄',
+    description:
+      'action=confirm で選択したタスクを作成、action=discard でセッションを破棄（任意で理由を記録）。',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: aiChatConfirmRequestSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '破棄成功（createdCount=0）',
+        content: {
+          'application/json': { schema: aiChatConfirmResponseSchema },
+        },
+      },
+      201: {
+        description: '作成成功',
+        content: {
+          'application/json': { schema: aiChatConfirmResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/ai-chat/events',
+    summary: '利用計測イベントを記録（AI チャット / カレンダー）',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: aiChatEventRequestSchema } },
+      },
+    },
+    responses: {
+      204: { description: '記録成功' },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/ai-chat/feedback',
+    summary: 'AI 整理体験のスコア/理由を記録',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: aiChatFeedbackRequestSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '記録成功',
+        content: { 'application/json': { schema: okResponseSchema } },
       },
       ...errorResponses,
     },

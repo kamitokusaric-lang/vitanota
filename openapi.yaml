@@ -947,6 +947,462 @@ components:
             - true
       required:
         - success
+    FeedbackTopicsResponse:
+      type: object
+      properties:
+        topics:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackTopic"
+      required:
+        - topics
+    FeedbackTopic:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+          example: 使い勝手について
+        description:
+          type:
+            - string
+            - "null"
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - title
+        - description
+        - sortOrder
+    FeedbackSubmissionCreatedResponse:
+      type: object
+      properties:
+        submission:
+          type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+      required:
+        - submission
+    MyThreadsResponse:
+      anyOf:
+        - $ref: "#/components/schemas/FeedbackThreadsResponse"
+        - $ref: "#/components/schemas/FeedbackSummaryResponse"
+    FeedbackThreadsResponse:
+      type: object
+      properties:
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackThread"
+      required:
+        - threads
+    FeedbackThread:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        topicTitle:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        replyCount:
+          type: integer
+        latestReplyAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        hasUnread:
+          type: boolean
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackReply"
+      required:
+        - submissionId
+        - topicTitle
+        - content
+        - createdAt
+        - replyCount
+        - latestReplyAt
+        - hasUnread
+        - replies
+    FeedbackReply:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - body
+        - createdAt
+    FeedbackSummaryResponse:
+      type: object
+      properties:
+        unreadAny:
+          type: boolean
+        latestUnreadReply:
+          type:
+            - object
+            - "null"
+          properties:
+            body:
+              type: string
+            topicTitle:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+          required:
+            - body
+            - topicTitle
+            - createdAt
+      required:
+        - unreadAny
+        - latestUnreadReply
+    AiChatExtractResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskCandidate"
+        needsConfirmation:
+          type: array
+          items:
+            type: string
+      required:
+        - sessionId
+        - tasks
+        - needsConfirmation
+    TaskCandidate:
+      type: object
+      properties:
+        title:
+          type: string
+        category_id:
+          type:
+            - string
+            - "null"
+        due_date:
+          type:
+            - string
+            - "null"
+        memo:
+          type: string
+        confidence:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+      required:
+        - title
+        - category_id
+        - due_date
+        - memo
+        - confidence
+    AiChatExtractInput:
+      type: object
+      properties:
+        inputText:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - inputText
+    AiChatConfirmResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum:
+            - true
+        createdCount:
+          type: integer
+        skippedCount:
+          type: integer
+        hasEdits:
+          type: boolean
+      required:
+        - ok
+        - createdCount
+    AiChatConfirmInput:
+      oneOf:
+        - type: object
+          properties:
+            action:
+              type: string
+              enum:
+                - confirm
+            sessionId:
+              type: string
+            selectedTasks:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  aiSuggestedTitle:
+                    type:
+                      - string
+                      - "null"
+                    maxLength: 200
+                  aiSuggestedCategoryId:
+                    type:
+                      - string
+                      - "null"
+                  aiSuggestedDueDate:
+                    type:
+                      - string
+                      - "null"
+                    pattern: ^\d{4}-\d{2}-\d{2}$
+                  userSelectedParentName:
+                    type: string
+                    enum:
+                      - 学び
+                      - 育み
+                      - 安心
+                      - 1学年
+                      - 2学年
+                      - 3学年
+                      - 特別支援学級
+                      - 校務
+                  dueDate:
+                    type:
+                      - string
+                      - "null"
+                    pattern: ^\d{4}-\d{2}-\d{2}$
+                  memo:
+                    type: string
+                    maxLength: 500
+                  tagIds:
+                    type: array
+                    items:
+                      type: string
+                    maxItems: 20
+                  assigneeUserIds:
+                    type: array
+                    items:
+                      type: string
+                    minItems: 1
+                    maxItems: 10
+                required:
+                  - title
+                  - aiSuggestedTitle
+                  - aiSuggestedCategoryId
+                  - aiSuggestedDueDate
+                  - userSelectedParentName
+                  - dueDate
+                  - memo
+                  - tagIds
+                  - assigneeUserIds
+              maxItems: 20
+            inputSnippet:
+              type: string
+              maxLength: 2000
+          required:
+            - action
+            - sessionId
+            - selectedTasks
+            - inputSnippet
+        - type: object
+          properties:
+            action:
+              type: string
+              enum:
+                - discard
+            sessionId:
+              type: string
+            discardReason:
+              type: string
+              enum:
+                - wrong_candidate
+                - too_detailed
+                - too_rough
+                - not_a_task
+                - inconvenient
+                - privacy_concern
+                - other
+            discardReasonText:
+              type: string
+              maxLength: 500
+          required:
+            - action
+            - sessionId
+    AiChatEventInput:
+      oneOf:
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - ai_capture_input_started
+            source:
+              type: string
+              enum:
+                - rough_capture
+          required:
+            - event
+            - source
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - feedback_unread_hint_shown
+            version:
+              type: string
+              minLength: 1
+          required:
+            - event
+            - version
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - feedback_unread_hint_dismissed
+            reason:
+              type: string
+              enum:
+                - close_button
+                - cta_click
+            version:
+              type: string
+              minLength: 1
+          required:
+            - event
+            - reason
+            - version
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - calendar_view_switched
+            view:
+              type: string
+              enum:
+                - board
+                - calendar
+          required:
+            - event
+            - view
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - calendar_task_moved
+            taskId:
+              type: string
+            fromDate:
+              type:
+                - string
+                - "null"
+              pattern: ^\d{4}-\d{2}-\d{2}$
+            toDate:
+              type: string
+              pattern: ^\d{4}-\d{2}-\d{2}$
+          required:
+            - event
+            - taskId
+            - fromDate
+            - toDate
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - calendar_task_pushed_to_next_week
+            taskId:
+              type: string
+            fromDate:
+              type:
+                - string
+                - "null"
+              pattern: ^\d{4}-\d{2}-\d{2}$
+            toDate:
+              type: string
+              pattern: ^\d{4}-\d{2}-\d{2}$
+          required:
+            - event
+            - taskId
+            - fromDate
+            - toDate
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - calendar_task_created_from_plus
+            date:
+              type: string
+              pattern: ^\d{4}-\d{2}-\d{2}$
+            taskId:
+              type: string
+          required:
+            - event
+            - date
+            - taskId
+        - type: object
+          properties:
+            event:
+              type: string
+              enum:
+                - calendar_day_detail_opened
+            date:
+              type: string
+              pattern: ^\d{4}-\d{2}-\d{2}$
+          required:
+            - event
+            - date
+    AiChatFeedbackInput:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        organizeScore:
+          type: integer
+          minimum: 1
+          maximum: 5
+        inputBurdenScore:
+          type: integer
+          minimum: 1
+          maximum: 5
+        editReason:
+          type: string
+          enum:
+            - wrong_candidate
+            - too_detailed
+            - too_rough
+            - not_a_task
+            - inconvenient
+            - privacy_concern
+            - other
+        editReasonText:
+          type: string
+          maxLength: 500
+      required:
+        - sessionId
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -3214,6 +3670,465 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "410":
           description: 招待リンクが期限切れ・使用済み
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/feedback/topics:
+    get:
+      summary: フィードバックのトピック一覧（有効なもの）
+      tags:
+        - Feedback
+      security:
+        - *a2
+      responses:
+        "200":
+          description: トピック一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackTopicsResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/feedback/submissions:
+    post:
+      summary: 運営へフィードバックを送信
+      tags:
+        - Feedback
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                topicId:
+                  type: string
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+              required:
+                - topicId
+                - content
+      responses:
+        "201":
+          description: 送信成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackSubmissionCreatedResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/feedback/my-threads:
+    get:
+      summary: 自分のフィードバックと運営返信スレッド
+      description: summary=1 のときは未読サマリ ({ unreadAny, latestUnreadReply }) を、それ以外はスレッド一覧 ({ threads }) を返す。
+      tags:
+        - Feedback
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+            example: "1"
+          required: false
+          name: summary
+          in: query
+      responses:
+        "200":
+          description: スレッド一覧 または 未読サマリ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyThreadsResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/feedback/mark-read:
+    post:
+      summary: 運営返信を既読にする
+      tags:
+        - Feedback
+      security:
+        - *a2
+      responses:
+        "200":
+          description: 既読化成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/ai-chat/extract:
+    post:
+      summary: 入力文から AI がタスク候補を抽出
+      description: 1 日あたりの利用回数制限あり（超過で 429）。AI 基盤が一時的に使えない場合は 503。
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatExtractInput"
+      responses:
+        "200":
+          description: 抽出されたタスク候補
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatExtractResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: 1 日の利用上限に到達
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: AI 基盤が一時的に利用不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/ai-chat/confirm:
+    post:
+      summary: タスク候補を確定（作成）または破棄
+      description: action=confirm で選択したタスクを作成、action=discard でセッションを破棄（任意で理由を記録）。
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatConfirmInput"
+      responses:
+        "200":
+          description: 破棄成功（createdCount=0）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatConfirmResponse"
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatConfirmResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/ai-chat/events:
+    post:
+      summary: 利用計測イベントを記録（AI チャット / カレンダー）
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatEventInput"
+      responses:
+        "204":
+          description: 記録成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/ai-chat/feedback:
+    post:
+      summary: AI 整理体験のスコア/理由を記録
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatFeedbackInput"
+      responses:
+        "200":
+          description: 記録成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
           content:
             application/json:
               schema:

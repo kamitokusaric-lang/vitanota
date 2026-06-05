@@ -90,13 +90,3 @@ export function getMoodIcon(
 export function getMoodLabel(mood: MoodLevel | null | undefined): string | null {
   return getMoodOption(mood)?.label ?? null;
 }
-
-// 選んだ mood に紐づく問いかけ文 (mood ごとに 4 つ用意済) からランダムに 1 件
-// 例: positive → "いい感じだったこと、ちょっと教えて" / "今日、どんなことがスムーズだった?" 等
-export function pickRandomPromptFor(
-  mood: MoodLevel | null | undefined,
-): string {
-  const opt = getMoodOption(mood);
-  if (!opt || opt.prompts.length === 0) return '';
-  return opt.prompts[Math.floor(Math.random() * opt.prompts.length)];
-}

@@ -21,7 +21,6 @@ import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
 import { Modal } from '@/shared/components/Modal';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
-import { PhilosophyGreeting } from '@/features/dashboard/components/PhilosophyGreeting';
 import { TasksTabWithCalendar } from '@/features/calendar/components/TasksTabWithCalendar';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
 import { EntryForm } from '@/features/journal/components/EntryForm';
@@ -30,7 +29,6 @@ import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimeli
 import {
   getMoodIcon,
   getMoodLabel,
-  pickRandomPromptFor,
 } from '@/features/journal/lib/mood-options';
 import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
 import type { MoodLevel } from '@/features/journal/schemas/journal';

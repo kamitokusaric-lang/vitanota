@@ -1,4 +1,4 @@
-// mood (5 段階感情) のラベル / アイコン / プロンプト集約
+// mood (5 段階感情) のラベル / アイコン集約
 // EntryForm の選択 UI と EntryCard の表示で同一のアイコンを使うため共通化
 // emoji は通知メールなど text コンテキスト用に保持、UI 表示は Icon component を使う
 import { Frown, Meh, Smile, type LucideIcon } from 'lucide-react';
@@ -9,8 +9,6 @@ export interface MoodOption {
   emoji: string;
   Icon: LucideIcon;
   label: string;
-  caption: string;
-  prompts: string[];
 }
 
 // 2026-05-27 chimo 指示: mood UI を 5 → 3 種化「良い / ふつう / 大変」。
@@ -21,38 +19,18 @@ export const MOOD_OPTIONS: MoodOption[] = [
     emoji: '🙂',
     Icon: Smile,
     label: 'いい感じ',
-    caption: 'いい感じでした',
-    prompts: [
-      'いい感じだったこと、ちょっと教えて',
-      '何が嬉しかった?',
-      '誰かに感謝したいこと、ある?',
-    ],
   },
   {
     value: 'neutral',
     emoji: '😐',
     Icon: Meh,
     label: 'いつも通り',
-    caption: 'いつも通りでした',
-    prompts: [
-      '今日はどんな一日だった?',
-      'なんとなく印象に残ってることある?',
-      '今日、気になったこと書いておく?',
-      'ふと思い出すと、どんな一日?',
-    ],
   },
   {
     value: 'negative',
     emoji: '😣',
     Icon: Frown,
     label: 'ちょっと大変',
-    caption: 'ちょっと大変でした',
-    prompts: [
-      '少し疲れた場面、どこだった?',
-      'うまくいかなかったこと、書いてみる?',
-      '誰かに聞いてほしいこと、ある?',
-      '無理してない?',
-    ],
   },
 ];
 

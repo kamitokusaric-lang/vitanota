@@ -16,11 +16,11 @@ import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
 import { useToast } from '@/shared/components/Toast';
 import { FeedbackThreadList } from './FeedbackThreadList';
-import { useOnboardingState } from '@/features/onboarding/hooks/useOnboardingState';
+import { useOnboardingState } from '../hooks/useOnboardingState';
 import {
   FeedbackUnreadHint,
   FEEDBACK_UNREAD_HINT_VERSION,
-} from '@/features/onboarding/FeedbackUnreadHint';
+} from './FeedbackUnreadHint';
 
 interface Topic {
   id: string;

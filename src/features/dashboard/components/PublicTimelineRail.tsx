@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import { Sparkles } from 'lucide-react';
 import type {
   JournalEntryKind,
@@ -77,12 +78,6 @@ interface PublicTimelineRailProps {
   mode?: 'side' | 'modal';
 }
 
-const fetcher = async (url: string): Promise<RailResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as RailResponse;
-};
-
 type RailTab = 'staffroom' | 'mine';
 
 // 編集/削除モーダル状態 (chimo 2026-05-21: 旧 TimelineTab から移管。
@@ -98,12 +93,6 @@ interface EntryDetailResponse {
     knowledgeTags?: Array<{ id: string }>;
   };
 }
-
-const detailFetcher = async (url: string): Promise<EntryDetailResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
 
 export function PublicTimelineRail({
   selfUserId,
@@ -123,7 +112,7 @@ export function PublicTimelineRail({
   // 即時反映、 他教員の更新はページ遷移時 / tab 切替時の再 mount で同期。
   const { data, error, isLoading, mutate } = useSWR<RailResponse>(
     fetchUrl,
-    fetcher,
+    jsonFetcher,
     {
       refreshInterval: 0,
       revalidateOnFocus: false,
@@ -721,7 +710,7 @@ function EditEntryModalBody({
 }) {
   const { data, error, isLoading } = useSWR(
     `/api/private/journal/entries/${entryId}`,
-    detailFetcher,
+    jsonFetcher<EntryDetailResponse>,
   );
 
   if (isLoading) {

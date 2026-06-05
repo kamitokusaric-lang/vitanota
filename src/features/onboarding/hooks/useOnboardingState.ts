@@ -12,6 +12,7 @@
 // 投げるのではなく、AiCaptureCoachmark 側で fetch する (本 hook は永続化のみ責務)。
 import useSWR from 'swr';
 import { useCallback } from 'react';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import type {
   AiCaptureOnboardingState,
   OnboardingContext,
@@ -20,12 +21,6 @@ import type {
 interface ApiResponse {
   state: AiCaptureOnboardingState | null;
 }
-
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as ApiResponse;
-};
 
 /**
  * コーチマークを表示すべきかを判定する純関数。
@@ -47,7 +42,7 @@ export function computeShouldShow(args: {
 
 export function useOnboardingState(context: OnboardingContext, version: string) {
   const endpoint = `/api/users/me/onboarding-states/${context}`;
-  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(endpoint, fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(endpoint, jsonFetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });

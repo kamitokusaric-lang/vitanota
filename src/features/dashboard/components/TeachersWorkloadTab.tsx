@@ -3,6 +3,7 @@
 // 名前付きで推移を出すことも情報公開の増加にはならない (踏み絵通過)
 import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
+import { noStoreJsonFetcher } from '@/shared/lib/fetcher';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { TrendArrow } from './TrendArrow';
@@ -32,12 +33,6 @@ function aggregateWorkloadByWeek(days: WorkloadDay[]): WorkloadDay[] {
 interface WorkloadResponse {
   teachers: TeacherWorkloadCard[];
 }
-
-const fetcher = async (url: string): Promise<WorkloadResponse> => {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
 
 function formatDay(iso: string): string {
   const [, m, d] = iso.split('-');
@@ -120,7 +115,7 @@ export function TeachersWorkloadTab({
 }: TeachersWorkloadTabProps = {}) {
   const { data, error, isLoading } = useSWR<WorkloadResponse>(
     `/api/school/teachers-workload?period=${period}`,
-    fetcher,
+    noStoreJsonFetcher,
   );
 
   if (isLoading) {

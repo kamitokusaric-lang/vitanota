@@ -2,6 +2,7 @@
 // ニックネーム表示 + 編集 + 保存
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
@@ -11,12 +12,6 @@ interface ProfileResponse {
   profile: { nickname: string | null };
 }
 
-const fetcher = async (url: string): Promise<ProfileResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
 interface MyProfileModalProps {
   open: boolean;
   onClose: () => void;
@@ -25,7 +20,7 @@ interface MyProfileModalProps {
 export function MyProfileModal({ open, onClose }: MyProfileModalProps) {
   const { data, error, isLoading, mutate } = useSWR(
     open ? '/api/me/profile' : null,
-    fetcher,
+    jsonFetcher<ProfileResponse>,
   );
   const [nickname, setNickname] = useState('');
   const [submitting, setSubmitting] = useState(false);

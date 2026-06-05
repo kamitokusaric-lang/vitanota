@@ -7,6 +7,7 @@
 //   - save(settings): UPSERT、成功時にローカルキャッシュも更新
 import useSWR from 'swr';
 import { useCallback } from 'react';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import type { TaskFilterSettings } from '@/schemas/userFilterPreferences';
 
 const ENDPOINT = '/api/users/me/filter-preferences/tasks';
@@ -15,16 +16,10 @@ interface ApiResponse {
   preference: TaskFilterSettings | null;
 }
 
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as ApiResponse;
-};
-
 export function useTaskFilterPreferences() {
   const { data, error, isLoading, mutate } = useSWR<ApiResponse>(
     ENDPOINT,
-    fetcher,
+    jsonFetcher,
     {
       // 初回ロード以外は再フェッチしない (画面遷移ごとに毎回叩かない)
       revalidateOnFocus: false,

@@ -1,5 +1,6 @@
 // [全体] > 全体エンゲージ: 学校全体の元気度 (個人特定なし)
 import useSWR from 'swr';
+import { noStoreJsonFetcher } from '@/shared/lib/fetcher';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { SchoolWellnessChart } from './SchoolWellnessChart';
@@ -22,12 +23,6 @@ interface WellnessResponse {
   activeTeachersThisWeek: number;
 }
 
-const fetcher = async (url: string): Promise<WellnessResponse> => {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
 function deltaLabel(dir: TrendDirection): string {
   if (dir === 'up') return 'ポジ寄り';
   if (dir === 'down') return 'ネガ寄り';
@@ -43,7 +38,7 @@ export function SchoolWellnessTab({
 }: SchoolWellnessTabProps = {}) {
   const { data, error, isLoading } = useSWR<WellnessResponse>(
     `/api/school/wellness?period=${period}`,
-    fetcher,
+    noStoreJsonFetcher,
   );
 
   if (isLoading) {

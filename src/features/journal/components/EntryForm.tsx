@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import useSWR from 'swr';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import {
   createEntrySchema,
   type CreateEntryInput,
@@ -53,12 +54,6 @@ function pickPromptFor(mood: MoodLevel): string {
   return opt.prompts[Math.floor(Math.random() * opt.prompts.length)];
 }
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<{ tags: EmotionTag[] }>;
-};
-
 // 選択時の mood ごと淡い背景色 (chimo アドバイス 2026-05-27)。
 // 「危険・警告・評価」 に見えないよう赤系は控えめ、 学校現場向けに彩度低め。
 // 2026-05-27 chimo 指示: 5 → 3 種化、 旧 very_positive/very_negative は UI から除外。
@@ -99,7 +94,7 @@ export function EntryForm({
 }: EntryFormProps) {
   const { data: tagsData, error: tagsError } = useSWR(
     '/api/private/journal/tags',
-    fetcher
+    jsonFetcher<{ tags: EmotionTag[] }>,
   );
   const {
     register,

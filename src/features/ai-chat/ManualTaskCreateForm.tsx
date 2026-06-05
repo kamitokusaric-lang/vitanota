@@ -85,7 +85,7 @@ export function ManualTaskCreateForm({
 
   const { categories } = useTaskCategories();
   const { assignees } = useAssignees();
-  const { tags: availableTags, mutate: mutateTags } = useTaskTags();
+  const { tags: availableTags, createTag } = useTaskTags();
   const { mutate: globalMutate } = useSWRConfig();
 
   const assigneeCandidates: AssigneeCandidate[] = useMemo(
@@ -119,21 +119,6 @@ export function ManualTaskCreateForm({
         return { ...r, assigneeUserIds: [...r.assigneeUserIds, userId] };
       }),
     );
-  };
-
-  const handleCreateTag = async (name: string): Promise<TaskTag | null> => {
-    const res = await fetch('/api/task-tags', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(body.message ?? 'タグ作成に失敗しました');
-    }
-    const { tag } = (await res.json()) as { tag: TaskTag };
-    await mutateTags();
-    return tag;
   };
 
   const handleSubmit = async () => {
@@ -293,7 +278,7 @@ export function ManualTaskCreateForm({
                     tagIds={r.tagIds}
                     availableTags={availableTags ?? []}
                     onChange={(tagIds) => updateRow(i, { tagIds })}
-                    onCreateTag={handleCreateTag}
+                    onCreateTag={createTag}
                   />
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">

@@ -8,21 +8,16 @@
 // 想定用途: TodayPlanView / PlanResultModal でタスクタイトルクリック →
 //   taskId をセット → 取得完了で TaskEditModal を表示
 import useSWR from 'swr';
+import { jsonFetcher } from '@/shared/lib/fetcher';
 import type { TaskWithAssignees } from './useTasks';
 
 interface ApiResponse {
   task: TaskWithAssignees;
 }
 
-const fetcher = async (url: string): Promise<ApiResponse> => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as ApiResponse;
-};
-
 export function useTask(taskId: string | null | undefined) {
   const key = taskId ? `/api/tasks/${taskId}` : null;
-  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(key, fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(key, jsonFetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });

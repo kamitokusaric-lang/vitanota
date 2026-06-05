@@ -17,7 +17,7 @@ import { useToast } from '@/shared/components/Toast';
 import { useTask } from '../hooks/useTask';
 import { useTaskCategories } from '../hooks/useTaskCategories';
 import { useAssignees } from '../hooks/useAssignees';
-import { useTaskTags, type TaskTag } from '../hooks/useTaskTags';
+import { useTaskTags } from '../hooks/useTaskTags';
 import { TaskForm, toFormInitial, type TaskFormValues } from './TaskForm';
 import { TaskCommentSection } from './TaskCommentSection';
 
@@ -39,7 +39,7 @@ export function TaskEditModal({
   const { task, isLoading, error } = useTask(taskId);
   const { categories } = useTaskCategories();
   const { assignees } = useAssignees();
-  const { tags: taskTags, mutate: mutateTags } = useTaskTags();
+  const { tags: taskTags, createTag } = useTaskTags();
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { showToast } = useToast();
@@ -102,21 +102,6 @@ export function TaskEditModal({
     }
   };
 
-  const handleCreateTag = async (name: string): Promise<TaskTag | null> => {
-    const res = await fetch('/api/task-tags', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(body.message ?? 'タグ作成に失敗しました');
-    }
-    const { tag } = (await res.json()) as { tag: TaskTag };
-    await mutateTags();
-    return tag;
-  };
-
   return (
     <Modal
       open={taskId !== null}
@@ -150,7 +135,7 @@ export function TaskEditModal({
             error={formError}
             readonly={readonly}
             taskTags={taskTags ?? []}
-            onCreateTag={handleCreateTag}
+            onCreateTag={createTag}
             onSubmit={handleUpdate}
             onCancel={onClose}
           />

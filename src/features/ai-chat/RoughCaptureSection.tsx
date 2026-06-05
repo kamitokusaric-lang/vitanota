@@ -189,7 +189,7 @@ export function RoughCaptureSection({
   const [view, setView] = useState<View>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const inputStartedFiredRef = useRef(false);
-  const { tags: availableTags, mutate: mutateTags } = useTaskTags();
+  const { tags: availableTags, createTag } = useTaskTags();
   const { assignees } = useAssignees();
   const { mutate: globalMutate } = useSWRConfig();
 
@@ -228,20 +228,6 @@ export function RoughCaptureSection({
   // 最後に discard した session id を覚えておき、次のアンケート画面で reason を併設提示。
   const [pendingDiscardSessionId, setPendingDiscardSessionId] = useState<string | null>(null);
 
-  const handleCreateTag = async (name: string): Promise<TaskTag | null> => {
-    const res = await fetch('/api/task-tags', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(body.message ?? 'タグ作成に失敗しました');
-    }
-    const { tag } = (await res.json()) as { tag: TaskTag };
-    await mutateTags();
-    return tag;
-  };
 
 
   const inputTrimmed = input.trim();
@@ -489,7 +475,7 @@ export function RoughCaptureSection({
           onConfirm={handleConfirm}
           onDiscard={handleStartDiscard}
           availableTags={availableTags ?? []}
-          onCreateTag={handleCreateTag}
+          onCreateTag={createTag}
           assigneeCandidates={assigneeCandidates}
           onToggleAssignee={toggleRowAssignee}
           error={error}

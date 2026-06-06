@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朝の出欠から始まる、先生たちのバトンリレー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --ink:#1f2a2e; --ink-soft:#48565b; --ink-faint:#7c888c;
+    --paper:#f7f4ec; --card:#fffdf8; --line:#ddd6c6;
+    --teal:#1d7a63; --teal-soft:#e3f0ea; --teal-deep:#0f4d3d;
+    --amber:#b8791a; --amber-soft:#f6e9d2;
+    --coral:#c0492c; --coral-soft:#f6e0d8;
+    --blue:#2f6aa8; --blue-soft:#e1ecf6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:'Zen Kaku Gothic New',sans-serif;
+    color:var(--ink); background:var(--paper);
+    line-height:1.9; font-size:16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:0 24px 80px}
+  .mincho{font-family:'Shippori Mincho',serif}
+
+  header.hero{
+    padding:72px 0 48px; border-bottom:2px solid var(--ink);
+    margin-bottom:8px;
+  }
+  .eyebrow{
+    font-size:13px; letter-spacing:.18em; color:var(--teal);
+    font-weight:700; margin-bottom:20px;
+  }
+  h1{
+    font-family:'Shippori Mincho',serif; font-weight:600;
+    font-size:40px; line-height:1.4; color:var(--ink);
+    letter-spacing:.01em; margin-bottom:24px;
+  }
+  h1 .accent{
+    background:linear-gradient(transparent 62%, var(--teal-soft) 62%);
+    padding:0 2px;
+  }
+  .lede{font-size:17px; color:var(--ink-soft); max-width:680px}
+  .meta{
+    margin-top:32px; font-size:13px; color:var(--ink-faint);
+    display:flex; gap:24px; flex-wrap:wrap;
+  }
+
+  section{padding:56px 0; border-bottom:1px solid var(--line)}
+  .sec-num{
+    font-family:'Shippori Mincho',serif; font-size:14px;
+    color:var(--teal); font-weight:600; letter-spacing:.1em;
+    margin-bottom:12px;
+  }
+  h2{
+    font-family:'Shippori Mincho',serif; font-weight:600;
+    font-size:27px; line-height:1.5; margin-bottom:24px;
+    letter-spacing:.01em;
+  }
+  h3{font-size:18px; font-weight:700; margin:32px 0 12px; color:var(--teal-deep)}
+  p{margin-bottom:18px}
+  p:last-child{margin-bottom:0}
+  strong{font-weight:700; color:var(--ink)}
+  .em-teal{color:var(--teal); font-weight:700}
+  .em-coral{color:var(--coral); font-weight:700}
+
+  .callout{
+    background:var(--card); border:1px solid var(--line);
+    border-left:4px solid var(--teal); border-radius:0 10px 10px 0;
+    padding:24px 28px; margin:28px 0;
+  }
+  .callout.coral{border-left-color:var(--coral)}
+  .callout .label{
+    font-size:12px; letter-spacing:.12em; font-weight:700;
+    color:var(--teal); margin-bottom:8px;
+  }
+  .callout.coral .label{color:var(--coral)}
+  .callout .big{
+    font-family:'Shippori Mincho',serif; font-size:21px;
+    line-height:1.6; color:var(--ink); font-weight:500;
+  }
+
+  .compare{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:28px 0}
+  .compare .col{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:22px 24px;
+  }
+  .compare .col.med{border-top:3px solid var(--blue)}
+  .compare .col.sch{border-top:3px solid var(--teal)}
+  .compare .col h4{
+    font-size:15px; font-weight:700; margin-bottom:14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .compare .col.med h4{color:var(--blue)}
+  .compare .col.sch h4{color:var(--teal-deep)}
+  .compare ul{list-style:none; font-size:14.5px; color:var(--ink-soft)}
+  .compare li{padding:6px 0 6px 18px; position:relative; line-height:1.6}
+  .compare li::before{
+    content:''; position:absolute; left:0; top:14px;
+    width:6px; height:6px; border-radius:50%; background:var(--line);
+  }
+  .compare .col.med li::before{background:var(--blue)}
+  .compare .col.sch li::before{background:var(--teal)}
+
+  .relay{margin:32px 0}
+  .relay-track{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+    position:relative; margin-bottom:14px;
+  }
+  .relay-step{
+    background:var(--teal-soft); border:1px solid #c2ddd2;
+    border-radius:10px; padding:16px 12px; text-align:center;
+    position:relative;
+  }
+  .relay-step .t{font-size:12px; color:var(--teal); font-weight:700; letter-spacing:.08em}
+  .relay-step .n{font-family:'Shippori Mincho',serif; font-size:16px; font-weight:600; color:var(--teal-deep); margin:6px 0 4px}
+  .relay-step .d{font-size:12.5px; color:var(--ink-soft); line-height:1.5}
+  .relay-arrow{
+    text-align:center; color:var(--teal); font-size:20px;
+    margin:0 0 14px; font-weight:700;
+  }
+  .relay-sink{
+    background:var(--blue-soft); border:1px solid #c4dbef;
+    border-radius:12px; padding:20px 24px; text-align:center;
+  }
+  .relay-sink .n{font-family:'Shippori Mincho',serif; font-size:18px; font-weight:600; color:var(--blue); margin-bottom:4px}
+  .relay-sink .d{font-size:13.5px; color:var(--ink-soft)}
+
+  .layers{margin:28px 0}
+  .layer{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:20px 24px; margin-bottom:12px;
+  }
+  .layer .tag{
+    display:inline-block; font-size:11.5px; font-weight:700;
+    letter-spacing:.1em; padding:3px 10px; border-radius:20px;
+    margin-bottom:10px;
+  }
+  .layer.day .tag{background:var(--teal-soft); color:var(--teal-deep)}
+  .layer.week .tag{background:var(--amber-soft); color:var(--amber)}
+  .layer h4{font-size:16px; font-weight:700; margin-bottom:6px}
+  .layer p{font-size:14.5px; color:var(--ink-soft); margin:0}
+
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:28px 0}
+  .stat{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:20px; text-align:center;
+  }
+  .stat .num{font-family:'Shippori Mincho',serif; font-size:38px; font-weight:600; line-height:1; color:var(--teal)}
+  .stat .num.coral{color:var(--coral)}
+  .stat .num.blue{color:var(--blue)}
+  .stat .unit{font-size:14px; color:var(--ink-faint); margin-left:2px}
+  .stat .lab{font-size:13px; color:var(--ink-soft); margin-top:10px; line-height:1.5}
+
+  .chart-box{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:24px; margin:24px 0;
+  }
+  .chart-box .ttl{font-size:14px; font-weight:700; color:var(--ink); margin-bottom:4px}
+  .chart-box .sub{font-size:12.5px; color:var(--ink-faint); margin-bottom:18px}
+  .chart-wrap{position:relative; width:100%; height:240px}
+
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:12.5px; color:var(--ink-soft); margin-bottom:14px}
+  .legend span{display:flex; align-items:center; gap:6px}
+  .legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+  .effects{display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin:24px 0}
+  .effect{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:20px 22px; border-top:3px solid var(--teal);
+  }
+  .effect h4{font-size:16px; font-weight:700; color:var(--teal-deep); margin-bottom:6px}
+  .effect p{font-size:14px; color:var(--ink-soft); margin:0}
+
+  .close{
+    background:var(--ink); color:var(--paper);
+    border-radius:14px; padding:40px 44px; margin-top:48px;
+  }
+  .close .q{font-family:'Shippori Mincho',serif; font-size:15px; color:#a9c4ba; margin-bottom:14px; letter-spacing:.04em}
+  .close .a{font-family:'Shippori Mincho',serif; font-size:24px; line-height:1.6; font-weight:500}
+  .close .a .u{background:linear-gradient(transparent 60%, rgba(29,122,99,.55) 60%)}
+
+  footer{padding:32px 0 0; font-size:12.5px; color:var(--ink-faint); text-align:center}
+
+  @media (max-width:680px){
+    h1{font-size:30px} h2{font-size:23px}
+    .compare,.stats,.effects,.relay-track{grid-template-columns:1fr}
+    .relay-track{gap:8px}
+    .close{padding:30px 26px}
+    .close .a{font-size:20px}
+  }
+  @media print{
+    body{background:#fff}
+    section{break-inside:avoid}
+    .close{background:#1f2a2e !important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">職員室の情報共有に関する提案</div>
+    <h1>朝の出欠から始まる、<br><span class="accent">先生たちのバトンリレー</span></h1>
+    <p class="lede mincho">子どもを理解し、関わる判断を、担任ひとりで抱え込まない。医療が先に育ててきたこの仕組みを、学校の日課の中に、無理なく取り入れる提案です。</p>
+    <div class="meta">
+      <span>提案：vitanota 開発チーム</span>
+      <span>根拠：本校教職員アンケート（回答15名）</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-num">課題 ── 01</div>
+    <h2>子どもを理解する判断が、<br>担任ひとりに集まりやすい</h2>
+    <p>学校の仕事には、医療とよく似た性質があります。どちらも<strong>日々状態の変わる人を相手にし</strong>、マニュアルだけでは対応できず、<strong>小さな変化に気づく観察が仕事の中心</strong>にあります。ベテランほど見えるものが違い、経験知への依存が大きい点も同じです。</p>
+    <p>そして情報は分散しています。ひとりの子どもについて、担任・教科担当・養護教諭・顧問・保護者が、それぞれ<strong>一部分を見ています</strong>。その全体像を束ね、その子に関わる判断をするのは、多くの場合<span class="em-teal">担任の役割になりがちです</span>。</p>
+    <div class="callout coral">
+      <div class="label">この提案が向き合う構造</div>
+      <div class="big">全体像はみんなで分け持っているのに、<br>判断は一人に集まりやすい。</div>
+    </div>
+    <p>これは、先生方が日々ていねいに子どもと向き合っているからこそ生まれる、学校という仕事の構造的な難しさです。一人ひとりが真剣に担当の子を見るほど、その見立ては自然と個人の中に蓄えられていきます。だからこそ、その積み重ねを<strong>仕組みで支え合える</strong>ようにしたい。一人で抱えなくてよくなれば、互いの気づきを持ち寄れ、若手も先輩の見方にふれながら育っていけます。</p>
+  </section>
+
+  <section>
+    <div class="sec-num">先例 ── 02</div>
+    <h2>医療は、この難しさを<br>「仕組み」で支えてきた</h2>
+    <p>同じ構造を抱える医療現場は、患者を理解する判断を一人の医師だけに委ねないための仕組みを、長い時間をかけて育ててきました。学校にも、同じ土台を少しずつ持ち込めます。</p>
+    <div class="compare">
+      <div class="col med">
+        <h4>医療 ── 育ててきたこと</h4>
+        <ul>
+          <li>電子カルテで記録を共有した</li>
+          <li>チーム医療で複数の目を入れた</li>
+          <li>申し送り・SBARで短く正確に引き継ぐ</li>
+          <li>カンファレンスでみんなで見立てる</li>
+        </ul>
+      </div>
+      <div class="col sch">
+        <h4>学校 ── 同じ構造的な難しさ</h4>
+        <ul>
+          <li>ていねいに見るほど、見立てが個人に蓄えられる</li>
+          <li>その子の全体像は、複数の先生に分かれている</li>
+          <li>忙しい日々の中で、短く引き継ぐ手段がほしい</li>
+          <li>持ち寄って見立てる時間を、つくっていきたい</li>
+        </ul>
+      </div>
+    </div>
+    <p>医療が示したのは、<span class="em-teal">人を理解する営みは、個人の力だけでなく構造でも支えられる</span>ということです。ただし医療は、電子カルテで入力負担を増やしてしまった反省もあります。だからこの提案は、<strong>「先生の負担を増やさないこと」を最優先</strong>に設計します。</p>
+  </section>
+
+  <section>
+    <div class="sec-num">提案 ── 03</div>
+    <h2>新しい仕事ではなく<br>「日課の中のバトンリレー」</h2>
+    <p>提案の中心はシンプルです。<strong>朝の会の出欠確認を vitanota で行い、そのとき気になる子に一言、あるいは点をひとつ残す。</strong>次の授業の先生は、その記録を見てから子どもに接し、気づいたことをまた足す。これが放課後まで、先生から先生へ手渡されていきます。</p>
+
+    <div class="relay">
+      <div class="relay-track">
+        <div class="relay-step"><div class="t">朝の会</div><div class="n">出欠＋一言</div><div class="d">気になる子に点を打つ</div></div>
+        <div class="relay-step"><div class="t">1限</div><div class="n">見て・足す</div><div class="d">記録を見て接し、気づきを残す</div></div>
+        <div class="relay-step"><div class="t">2限</div><div class="n">見て・足す</div><div class="d">前の記録を踏まえて関わる</div></div>
+        <div class="relay-step"><div class="t">放課後まで</div><div class="n">続いていく</div><div class="d">一日を通して手渡される</div></div>
+      </div>
+      <div class="relay-arrow">↓ すべてが一人の子どもに集まる</div>
+      <div class="relay-sink">
+        <div class="n">ひとりの子どもに、一日分の視点が溜まる</div>
+        <div class="d">誰も「共有」と気負わない。出欠を取るだけで、複数の目が自然に集まる</div>
+      </div>
+    </div>
+
+    <p>ここが肝心です。記録の動機は「報告」ではなく<span class="em-teal">「次の先生への引き継ぎ」</span>。次の自分のために残すから、義務感なく続きます。新しい時間を作る必要もありません。<strong>記録が、毎日必ずやる出欠という動作に溶けている</strong>からです。</p>
+
+    <h3>そして週末、記録は「ふりかえり」になって返る</h3>
+    <p>医療に申し送り（日々の引き継ぎ）とカンファレンス（定例の見立て）の二層があるように、この仕組みも二層で働きます。そして、返ってきた記録を<strong>話し合う場とセットにする</strong>ことが要になります。</p>
+    <div class="layers">
+      <div class="layer day">
+        <span class="tag">日々の層 ── 申し送り</span>
+        <h4>朝の会 → 各時間 → 放課後のバトン</h4>
+        <p>その日のうちに、次の先生へ短く引き継ぐ。</p>
+      </div>
+      <div class="layer week">
+        <span class="tag">週次の層 ── カンファレンス</span>
+        <h4>一週間ぶんを、AIが「職員室のふりかえり」として返す</h4>
+        <p>溜まった記録をもとに、学年や学校の様子を俯瞰し、話してみたい問いを返す。個人を評価せず、状況を観察するトーンで。</p>
+      </div>
+      <div class="layer week" style="border-left:4px solid var(--amber)">
+        <span class="tag">話し合う場 ── 職員会議とセットで</span>
+        <h4>週次レポートは、職員会議で取り上げてこそ活きる</h4>
+        <p>レポートは読んで終わりにしない。職員会議や学年部会で定期的にひとつテーマを取り上げ、みんなで見立てを話し合う。返ってきた気づきが対話につながることで、書く意味が実感でき、リレーが続いていく。</p>
+      </div>
+    </div>
+    <p><strong>日々の申し送りが、そのまま週次のふりかえり資料になり、それを職員会議で話し合う。</strong>先生が書くのは日々の一言だけ。それが、引き継ぎ・見立て・対話の三つに効きます。記録と、返すレポートと、話し合う場。<span class="em-teal">この三つをセットで回すこと</span>が、この提案の核心です。</p>
+  </section>
+
+  <section>
+    <div class="sec-num">根拠 ── 04</div>
+    <h2>この提案は、本校の先生方の<br>声に裏づけられています</h2>
+    <p>本校の教職員15名へのアンケートから、はっきりした事実が3つ見えました。</p>
+    <div class="stats">
+      <div class="stat"><div class="num">15<span class="unit">/15</span></div><div class="lab">全員が、生徒の様子や学級の情報を「共有されると助かる」と回答</div></div>
+      <div class="stat"><div class="num blue">12<span class="unit">/15</span></div><div class="lab">他の先生の気づきを見ることが「働きやすさにつながる」</div></div>
+      <div class="stat"><div class="num coral">9<span class="unit">/15</span></div><div class="lab">一方で「時間がない・入力が負担」を共有の壁に挙げた</div></div>
+    </div>
+    <p>つまり、<span class="em-teal">情報はみんな欲しい。でも、書く時間も入力の余裕もない</span>。求める気持ちは全員にあるのに、出すきっかけがつくりにくい。この提案は、<strong>新しい仕事を増やさず、日課に溶かす</strong>ことで、その間を埋めようとするものです。</p>
+
+    <div class="chart-box">
+      <div class="ttl">共有のハードルの内訳（複数回答・n=15）</div>
+      <div class="sub">ハードルの中心は「時間」と「入力の負担」。だから設計は、書く量を極限まで減らすことを最優先にする。</div>
+      <div class="legend">
+        <span><i style="background:#c0492c"></i>時間・入力の負担</span>
+        <span><i style="background:#b8791a"></i>書き方の迷い</span>
+        <span><i style="background:#7c888c"></i>心理的な抵抗</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="wallChart" role="img" aria-label="共有のハードルの内訳。入力すること自体が負担6人、忙しくて使う時間がない6人、忙しくて共有する時間がない5人、何を書けばよいか分からない2人、管理されている感じがする2人、記録が残ることに抵抗1人。">入力負担6、使う時間6、共有時間5、書き方の迷い2、管理感2、記録抵抗1。</canvas>
+      </div>
+    </div>
+    <p>「書き方が分からない」「記録が残る抵抗」は少数です。ハードルのほとんどは<strong>時間と量</strong>。一言・一点で済む設計なら、その大半は越えられます。なお「管理されている感じ」への懸念には、ふりかえりで個人を評価しない設計で応えます。</p>
+  </section>
+
+  <section style="border-bottom:none">
+    <div class="sec-num">効果 ── 05</div>
+    <h2>ひとつの仕組みが、<br>四つの方向に効く</h2>
+    <p>判断を一人で抱え込まなくてよくなると、その効果は副産物ではなく、同じ構造から自然に生まれます。</p>
+    <div class="effects">
+      <div class="effect"><h4>子どもとの関係が増える</h4><p>判断に費やしていた一人の負荷が減り、子どもと向き合う余白が生まれる。</p></div>
+      <div class="effect"><h4>若手が育つ</h4><p>先輩の見立てや着眼点を日々参照でき、経験の差を職員室の知で補える。</p></div>
+      <div class="effect"><h4>同僚性が生まれる</h4><p>同じ子を複数の先生で見ることで、自然に協働とねぎらいが生まれる。</p></div>
+      <div class="effect"><h4>バーンアウトが減る</h4><p>「一人で抱え込まない」状態そのものが、先生の疲弊をやわらげる。</p></div>
+    </div>
+
+    <div class="close">
+      <div class="q mincho">vitanota が挑む問い</div>
+      <div class="a mincho">子どもを理解する判断を、<br><span class="u">先生ひとりで抱え込まなくて済む</span>状態を、<br>どうつくるか。</div>
+    </div>
+  </section>
+
+  <footer>
+    本資料は本校教職員アンケート（回答15名）の集計に基づいて作成しました。<br>数値は複数回答を含みます。
+  </footer>
+
+</div>
+
+<script>
+const ink='#48565b', faint='#7c888c', line='rgba(221,214,198,.6)';
+new Chart(document.getElementById('wallChart'),{
+  type:'bar',
+  data:{
+    labels:['入力すること自体が負担','忙しくて使う時間がない','忙しくて共有する時間がない','何を書けばよいか分からない','管理されている感じがする','記録が残ることに抵抗がある'],
+    datasets:[{
+      data:[6,6,5,2,2,1],
+      backgroundColor:['#c0492c','#c0492c','#c0492c','#b8791a','#7c888c','#7c888c'],
+      borderRadius:5, barThickness:20
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x+'名'}}},
+    scales:{
+      x:{beginAtZero:true,max:8,ticks:{stepSize:2,color:faint,callback:v=>v+'名'},grid:{color:line}},
+      y:{ticks:{color:ink,font:{size:12.5,family:"'Zen Kaku Gothic New',sans-serif"}},grid:{display:false}}
+    }
+  }
+});
+</script>
+</body>
+</html>

@@ -32,6 +32,27 @@ import {
 } from '@/features/tasks/schemas/taskComment';
 import { taskTagCreateSchema } from '@/features/tasks/schemas/taskTag';
 import { taskFilterSettingsSchema } from '@/schemas/userFilterPreferences';
+import {
+  createClassSchema,
+  updateClassSchema,
+  classIdParamSchema,
+  createStudentSchema,
+  listStudentsQuerySchema,
+  createNoteSchema,
+  updateNoteSchema,
+  noteIdParamSchema,
+  listNotesQuerySchema,
+  toggleReactionSchema,
+  listReactionsQuerySchema,
+  classResponseSchema,
+  classesListResponseSchema,
+  studentResponseSchema,
+  studentsListResponseSchema,
+  batonNoteResponseSchema,
+  notesListResponseSchema,
+  reactionsListResponseSchema,
+  toggleReactionResponseSchema,
+} from '@/features/baton-relay/schemas/batonRelay';
 
 import {
   errorResponseSchema,
@@ -1034,6 +1055,198 @@ export function buildOpenApiDocument() {
       200: {
         description: '記録成功',
         content: { 'application/json': { schema: okResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // /api/baton-relay/* - H7 朝のバトンリレー (学校知の循環の入口)
+  // teacher / school_admin が自テナントを読み書き (相互関心層)。書込は本人の行のみ。
+  // ─────────────────────────────────────────────────────────────
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/classes',
+    summary: 'クラス一覧取得',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'クラス一覧',
+        content: { 'application/json': { schema: classesListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/classes',
+    summary: 'クラス作成',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createClassSchema } } },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: z.object({ class: classResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/baton-relay/classes/{id}',
+    summary: 'クラス更新（クラス目標等）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      params: classIdParamSchema,
+      body: { content: { 'application/json': { schema: updateClassSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: z.object({ class: classResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/students',
+    summary: '生徒一覧取得（クラス指定）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { query: listStudentsQuerySchema },
+    responses: {
+      200: {
+        description: '生徒一覧',
+        content: { 'application/json': { schema: studentsListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/students',
+    summary: '生徒作成（手動ロスター投入）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createStudentSchema } } },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: z.object({ student: studentResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/notes',
+    summary: '生徒欄の一言取得（クラス + 日付で生徒横断）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { query: listNotesQuerySchema },
+    responses: {
+      200: {
+        description: 'ノート一覧',
+        content: { 'application/json': { schema: notesListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/notes',
+    summary: '生徒欄に一言を追加（append-only）',
+    description: '著者は自動的に現在のセッションユーザー。同じ生徒・同じ日に何度でも追加できる。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createNoteSchema } } },
+    },
+    responses: {
+      201: {
+        description: '追加成功',
+        content: { 'application/json': { schema: z.object({ note: batonNoteResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/baton-relay/notes/{id}',
+    summary: '自分の一言を編集',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      params: noteIdParamSchema,
+      body: { content: { 'application/json': { schema: updateNoteSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: z.object({ note: batonNoteResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/baton-relay/notes/{id}',
+    summary: '自分の一言を削除',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { params: noteIdParamSchema },
+    responses: {
+      204: { description: '削除成功' },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/reactions',
+    summary: '生徒への印（ポジティブ/気になる）一覧取得（クラス指定）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { query: listReactionsQuerySchema },
+    responses: {
+      200: {
+        description: 'リアクション一覧',
+        content: { 'application/json': { schema: reactionsListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/reactions',
+    summary: '生徒への印をトグル（付与/解除）',
+    description: 'positive(ポジティブ)/concern(気になる)。複数教員が各自トグル。数値化・ランキングはしない。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: toggleReactionSchema } } },
+    },
+    responses: {
+      200: {
+        description: 'トグル後の状態',
+        content: { 'application/json': { schema: toggleReactionResponseSchema } },
       },
       ...errorResponses,
     },

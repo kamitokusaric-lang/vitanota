@@ -52,6 +52,8 @@ import {
   notesListResponseSchema,
   reactionsListResponseSchema,
   toggleReactionResponseSchema,
+  importRequestSchema,
+  importResultResponseSchema,
 } from '@/features/baton-relay/schemas/batonRelay';
 
 import {
@@ -1247,6 +1249,26 @@ export function buildOpenApiDocument() {
       200: {
         description: 'トグル後の状態',
         content: { 'application/json': { schema: toggleReactionResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/import',
+    summary: 'ロスター CSV インポート（クラス・クラス目標・生徒を一括登録）',
+    description:
+      'クライアントで CSV をパースした行 (className/classGoal/studentName/grade) を送る。冪等: クラスは名前で統合・目標は最新値で更新・生徒は同名スキップ。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: importRequestSchema } } },
+    },
+    responses: {
+      200: {
+        description: '取り込み結果のサマリ',
+        content: { 'application/json': { schema: importResultResponseSchema } },
       },
       ...errorResponses,
     },

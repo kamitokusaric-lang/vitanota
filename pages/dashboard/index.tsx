@@ -9,8 +9,9 @@
 //     旧 3 種別 (日誌 / ナレッジ / つぶやき) は撤去、 新規投稿は kind='tweet' 固定。
 //     CTA クリックで Modal が開き、 EntryForm が default 'tweet' で起動する。
 import { useState } from 'react';
+import Link from 'next/link';
 import { useSWRConfig } from 'swr';
-import { PenLine } from 'lucide-react';
+import { PenLine, Sunrise } from 'lucide-react';
 import { eq } from 'drizzle-orm';
 import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { isAiChatEnabledForTenant } from '@/features/ai-chat/featureFlag';
@@ -220,6 +221,15 @@ export default function DashboardPage({
             data-testid="dashboard-page"
           >
             <div className="min-w-0">
+              {/* 朝のバトン (H7) への導線。グローバルナビ未整備のため dashboard から1本 (chimo 2026-06-08) */}
+              <Link
+                href="/baton-relay"
+                className="mb-4 flex items-center gap-2 rounded-vn border border-vn-border bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                data-testid="dashboard-baton-relay-link"
+              >
+                <Sunrise size={18} className="text-vn-accent" aria-hidden />
+                朝のバトン — 気になる子に印と一言を残す
+              </Link>
               {/* narrow (< xl) 専用: 記録入口 pill + 日々ノートモーダル呼出ボタン。
                   xl 以上では右レーン上部に集約 (chimo 2026-05-21) */}
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:hidden">

@@ -156,3 +156,30 @@ export const reactionsListResponseSchema = z
 export const toggleReactionResponseSchema = z
   .object({ active: z.boolean() })
   .openapi('ToggleStudentReactionResult');
+
+// ── ロスター CSV インポート ─────────────────────────────────────
+// CSV はクライアントでパースし、行 (className/classGoal/studentName/grade) を JSON で送る。
+export const importRowSchema = z.object({
+  className: z.string().trim().min(1).max(50),
+  classGoal: z.string().trim().max(200).optional(),
+  studentName: z.string().trim().min(1).max(50),
+  grade: z.string().trim().max(16).optional(),
+});
+export type ImportRow = z.infer<typeof importRowSchema>;
+
+export const importRequestSchema = z
+  .object({
+    rows: z.array(importRowSchema).min(1, '取り込む行がありません').max(2000),
+  })
+  .openapi('RosterImportInput');
+export type ImportRequest = z.infer<typeof importRequestSchema>;
+
+export const importResultResponseSchema = z
+  .object({
+    classesCreated: z.number().int(),
+    classesUpdated: z.number().int(),
+    studentsAdded: z.number().int(),
+    studentsSkipped: z.number().int(),
+  })
+  .openapi('RosterImportResult');
+export type ImportResult = z.infer<typeof importResultResponseSchema>;

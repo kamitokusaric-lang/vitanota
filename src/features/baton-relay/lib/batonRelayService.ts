@@ -14,7 +14,8 @@ import type {
   BatonNote,
   StudentReaction,
 } from '@/db/schema';
-import type { StudentReactionTypeInput } from '../schemas/batonRelay';
+import type { StudentReactionTypeInput, ImportRow, ImportResult } from '../schemas/batonRelay';
+import { planRosterImport } from './rosterImportPlan';
 
 // ── DTO (response 形に整える) ──────────────────────────────────
 export interface ClassDto {
@@ -211,6 +212,45 @@ export class BatonRelayService {
       }
       await studentReactionRepo.insert(tx, ctx, studentId, reactionType);
       return { active: true };
+    });
+  }
+
+  // ロスター CSV インポート (冪等)。1 トランザクションで既存を読み → 差分計算 → 適用。
+  async importRoster(ctx: AuthContext, rows: ImportRow[]): Promise<ImportResult> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      const existingClasses = await classRepo.findAll(tx, ctx);
+      const existingStudents = await studentRepo.findAllByTenant(tx, ctx);
+
+      const plan = planRosterImport(
+        rows,
+        existingClasses.map((c) => ({ id: c.id, name: c.name, goalText: c.goalText })),
+        existingStudents.map((s) => ({ classId: s.classId, displayName: s.displayName })),
+      );
+
+      // クラス名 → id (既存 + 新規作成)
+      const classIdByName = new Map<string, string>();
+      for (const c of existingClasses) classIdByName.set(c.name, c.id);
+      for (const c of plan.classesToCreate) {
+        const created = await classRepo.create(tx, ctx, {
+          name: c.name,
+          goalText: c.goalText ?? undefined,
+        });
+        classIdByName.set(created.name, created.id);
+      }
+      for (const g of plan.goalsToUpdate) {
+        await classRepo.update(tx, ctx, g.id, { goalText: g.goalText });
+      }
+      for (const s of plan.studentsToAdd) {
+        const classId = classIdByName.get(s.className);
+        if (!classId) continue; // 通常起こらない (上で作成済み)
+        await studentRepo.create(tx, ctx, {
+          classId,
+          displayName: s.displayName,
+          gradeLabel: s.gradeLabel ?? undefined,
+        });
+      }
+
+      return plan.summary;
     });
   }
 }

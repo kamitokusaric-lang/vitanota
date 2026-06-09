@@ -84,6 +84,14 @@ export class StudentRepository {
       .orderBy(desc(students.createdAt));
   }
 
+  // テナント内の全生徒 (ロスターインポートの重複判定用)
+  async findAllByTenant(tx: DrizzleDb, ctx: BatonContext): Promise<Student[]> {
+    return tx
+      .select()
+      .from(students)
+      .where(eq(students.tenantId, ctx.tenantId));
+  }
+
   async create(
     tx: DrizzleDb,
     ctx: BatonContext,

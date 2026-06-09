@@ -1649,6 +1649,51 @@ components:
       required:
         - studentId
         - reactionType
+    RosterImportResult:
+      type: object
+      properties:
+        classesCreated:
+          type: integer
+        classesUpdated:
+          type: integer
+        studentsAdded:
+          type: integer
+        studentsSkipped:
+          type: integer
+      required:
+        - classesCreated
+        - classesUpdated
+        - studentsAdded
+        - studentsSkipped
+    RosterImportInput:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              className:
+                type: string
+                minLength: 1
+                maxLength: 50
+              classGoal:
+                type: string
+                maxLength: 200
+              studentName:
+                type: string
+                minLength: 1
+                maxLength: 50
+              grade:
+                type: string
+                maxLength: 16
+            required:
+              - className
+              - studentName
+          minItems: 1
+          maxItems: 2000
+      required:
+        - rows
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -4995,6 +5040,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ToggleStudentReactionResult"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/import:
+    post:
+      summary: ロスター CSV インポート（クラス・クラス目標・生徒を一括登録）
+      description: "クライアントで CSV をパースした行 (className/classGoal/studentName/grade) を送る。冪等: クラスは名前で統合・目標は最新値で更新・生徒は同名スキップ。"
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RosterImportInput"
+      responses:
+        "200":
+          description: 取り込み結果のサマリ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RosterImportResult"
         "400":
           description: バリデーションエラー
           content:

@@ -13,6 +13,11 @@ import {
   ExtractionResultSchema,
   type ExtractionResult,
 } from './schemas';
+import {
+  kindSuggestResultSchema,
+  mockKindSuggest,
+  type KindSuggestResult,
+} from '../../src/features/ai-chat/kindSuggest';
 import type { ZodSchema } from 'zod';
 
 const REGION = process.env.AWS_REGION_OVERRIDE ?? process.env.AWS_REGION ?? 'ap-northeast-1';
@@ -83,6 +88,24 @@ export async function invokeExtraction(args: {
     systemPrompt: args.systemPrompt,
     userMessage: args.userMessage,
     schema: ExtractionResultSchema,
+  });
+  return { result, modelId: MODEL_ID };
+}
+
+// Slice 2b: 職員室ノートの種別そっと提案。出力は小さい ({suggestedKind, confidence}) ので max_tokens 控えめ。
+// MOCK_BEDROCK=true 時は keyword ベースの mockKindSuggest を返す (実 AI は本番のみ)。
+export async function invokeKindSuggest(args: {
+  systemPrompt: string;
+  userMessage: string;
+}): Promise<{ result: KindSuggestResult; modelId: string }> {
+  if (USE_MOCK) {
+    return { result: mockKindSuggest(args.userMessage), modelId: MODEL_ID };
+  }
+  const result = await invokeBedrock({
+    systemPrompt: args.systemPrompt,
+    userMessage: args.userMessage,
+    schema: kindSuggestResultSchema,
+    maxTokens: 150,
   });
   return { result, modelId: MODEL_ID };
 }

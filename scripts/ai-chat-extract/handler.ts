@@ -11,12 +11,14 @@
 //   - input_text の中身は構造化ログに流さない (個人情報混入前提)
 //   - 構造化ログには event 名 + 入力長 + 候補数 + type のみ
 
-import { invokeExtraction } from './bedrockInvoker';
+import { invokeExtraction, invokeKindSuggest } from './bedrockInvoker';
 import {
   AiChatEventSchema,
   ExtractEventSchema,
+  KindSuggestEventSchema,
   type ExtractionResult,
 } from './schemas';
+import type { KindSuggestResult } from '../../src/features/ai-chat/kindSuggest';
 import {
   AI_CATEGORY_DEFINITIONS,
   AI_CATEGORY_PROMPT_RULES,
@@ -82,11 +84,18 @@ function buildSystemPrompt(): string {
   ].join('\n');
 }
 
-interface SuccessResult {
+interface ExtractionSuccess {
   ok: true;
   type: 'task_extraction';
   modelId: string;
   result: ExtractionResult & { inputTextRedacted: string };
+}
+
+interface KindSuggestSuccess {
+  ok: true;
+  type: 'kind_suggestion';
+  modelId: string;
+  result: KindSuggestResult;
 }
 
 interface ErrorResult {
@@ -95,7 +104,9 @@ interface ErrorResult {
   message: string;
 }
 
-export async function handler(event: unknown): Promise<SuccessResult | ErrorResult> {
+type HandlerResult = ExtractionSuccess | KindSuggestSuccess | ErrorResult;
+
+export async function handler(event: unknown): Promise<HandlerResult> {
   // 1. Event 検証
   const parsed = AiChatEventSchema.safeParse(event);
   if (!parsed.success) {
@@ -108,13 +119,18 @@ export async function handler(event: unknown): Promise<SuccessResult | ErrorResu
     return { ok: false, error: 'invalid_event', message: 'invalid event shape' };
   }
 
+  if (parsed.data.type === 'kind_suggestion') {
+    const ev = KindSuggestEventSchema.parse(parsed.data);
+    return handleKindSuggestion(ev.inputText);
+  }
+
   const extractEvent = ExtractEventSchema.parse(parsed.data);
   return handleTaskExtraction(extractEvent.inputText);
 }
 
 async function handleTaskExtraction(
   inputText: string,
-): Promise<SuccessResult | ErrorResult> {
+): Promise<ExtractionSuccess | ErrorResult> {
   const inputTextRedacted = maskPii(inputText);
 
   console.info(
@@ -166,4 +182,77 @@ async function handleTaskExtraction(
     modelId,
     result: { ...extraction, inputTextRedacted },
   };
+}
+
+// ── kind_suggestion (Slice 2b) ──────────────────────────────
+// 踏み絵: AI は決めない・提案のみ (本人が確定)。「分類・評価・感情代弁」をしない。
+// 「どこへ渡す / どう残す」のルーティングとして種別を 1 つだけそっと薦める。確信が無ければ null。
+function buildKindSuggestSystemPrompt(): string {
+  return [
+    'あなたは中学校教員が職員室ノートに書いた一文を、しまう先の入口へそっと案内するアシスタントです。',
+    '',
+    '# 役割',
+    '- 文章を「分類」「評価」「採点」しない。教員を診断・励まさない。感情を代弁しない。',
+    '- やることは、その一文を「どの入口に渡すと自然か」を 1 つだけ控えめに薦めることだけ。',
+    '- 確定はしない (最終的に教員本人が選ぶ)。迷ったら無理に決めず null を返す。',
+    '',
+    '# 入口の種類 (suggestedKind)',
+    '- "knowledge": 役に立つ情報・やり方・工夫・手順・テンプレなど、他の先生の参考になる共有。',
+    '- "thanks": 誰かへの感謝・お礼・助かったという気持ちの共有。',
+    '- "help": 確認したいこと・相談したいこと・困っていて誰かの知恵を借りたいこと。',
+    '- null: 上のどれにも自然に当てはまらない、ただのつぶやき。判断に迷うときも null。',
+    '',
+    '# 確信度 (confidence)',
+    '- "high": 入口がはっきり読み取れる。"medium": おそらくそうだが断定しない。"low": 弱い手がかりのみ。',
+    '- null を返すときは "low"。',
+    '',
+    '# 出力形式 (この JSON のみ・前後の説明や markdown を一切付けない)',
+    '{ "suggestedKind": "knowledge" | "thanks" | "help" | null, "confidence": "high" | "medium" | "low" }',
+  ].join('\n');
+}
+
+async function handleKindSuggestion(
+  inputText: string,
+): Promise<KindSuggestSuccess | ErrorResult> {
+  // route 側で PII マスク済の本文が渡る。本文は構造化ログに出さない (観測者原則)。
+  console.info(
+    JSON.stringify({
+      event: 'ai_chat.invoke_start',
+      type: 'kind_suggestion',
+      input_length: inputText.length,
+    }),
+  );
+
+  let result: KindSuggestResult;
+  let modelId: string;
+  try {
+    const invoked = await invokeKindSuggest({
+      systemPrompt: buildKindSuggestSystemPrompt(),
+      userMessage: inputText,
+    });
+    result = invoked.result;
+    modelId = invoked.modelId;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: 'ai_chat.bedrock_error',
+        type: 'kind_suggestion',
+        error_name: err instanceof Error ? err.name : 'unknown',
+        error_message: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return { ok: false, error: 'bedrock_error', message: 'kind suggestion failed' };
+  }
+
+  console.info(
+    JSON.stringify({
+      event: 'ai_chat.invoke_success',
+      type: 'kind_suggestion',
+      input_length: inputText.length,
+      suggested_kind: result.suggestedKind ?? 'tweet',
+      confidence: result.confidence,
+    }),
+  );
+
+  return { ok: true, type: 'kind_suggestion', modelId, result };
 }

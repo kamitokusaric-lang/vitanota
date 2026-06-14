@@ -39,9 +39,25 @@ export const ExtractEventSchema = z
 
 export type ExtractEvent = z.infer<typeof ExtractEventSchema>;
 
+// ── kind_suggestion Lambda Event (Slice 2b・職員室ノートの種別そっと提案) ──
+// 出力 schema (kindSuggestResultSchema) は src/features/ai-chat/kindSuggest.ts に正本があり
+// API・Lambda・Frontend で共有する。
+export const KindSuggestEventSchema = z
+  .object({
+    type: z.literal('kind_suggestion'),
+    inputText: z.string().min(1).max(2000),
+  })
+  .strict();
+
+export type KindSuggestEvent = z.infer<typeof KindSuggestEventSchema>;
+
 // ── Lambda Event ────────────────────────────────────────────
 // chimo 2026-05-20: H3 morning_plan 機能を撤去 (project_h3_reframing_20260520)。
-// 旧 MorningPlanEventSchema / MorningPlanResultSchema / MorningPlanTaskInputSchema /
-// MorningPlanItemSchema は削除。 今は task_extraction のみ。
-export const AiChatEventSchema = ExtractEventSchema;
+// task_extraction (type 省略可) + kind_suggestion の union。
+// ExtractEventSchema は type optional のため discriminatedUnion 不可。両者 strict なので
+// union で相互排他に解決される (kind_suggestion は ExtractEventSchema.strict に弾かれる)。
+export const AiChatEventSchema = z.union([
+  ExtractEventSchema,
+  KindSuggestEventSchema,
+]);
 export type AiChatEvent = z.infer<typeof AiChatEventSchema>;

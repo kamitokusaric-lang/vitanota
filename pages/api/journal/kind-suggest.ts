@@ -21,7 +21,11 @@ import {
 
 const LOCAL_MOCK =
   (process.env.AI_CHAT_LOCAL_MOCK ?? 'false').toLowerCase() === 'true';
-const RATE_LIMIT_PER_DAY = Number(process.env.AI_CHAT_RATE_LIMIT_PER_DAY ?? '20');
+// 種別提案はタイピング中デバウンスで頻繁に呼ばれるため、タスク抽出 (20/日) とは別枠の高い上限。
+// さらに加算は「提案成功時のみ」(下記) — 失敗 (Bedrock 障害等) で枠を消費しない。
+const RATE_LIMIT_PER_DAY = Number(
+  process.env.AI_CHAT_KIND_SUGGEST_RATE_LIMIT_PER_DAY ?? '200',
+);
 const LAMBDA_ARN = process.env.AI_CHAT_LAMBDA_ARN ?? '';
 const AWS_REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
 
@@ -65,16 +69,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const role = pickDbRole(ctx);
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1. Rate Limit (UPSERT して count を進める) — extract と同テーブル・別 endpoint キー
+  // 1. Rate Limit 判定 (read のみ・加算は提案成功後)。失敗した呼び出しで枠を消費しないため。
   let currentCount = 0;
   try {
     currentCount = await withTenantUser(ctx.tenantId, ctx.userId, role, async (tx) => {
       const result = await tx.execute<{ count: number }>(sql`
-        INSERT INTO api_rate_limits (user_id, endpoint, date, count)
-        VALUES (${ctx.userId}::uuid, 'journal_kind_suggest', ${today}::date, 1)
-        ON CONFLICT (user_id, endpoint, date)
-        DO UPDATE SET count = api_rate_limits.count + 1, updated_at = NOW()
-        RETURNING count
+        SELECT count FROM api_rate_limits
+        WHERE user_id = ${ctx.userId}::uuid
+          AND endpoint = 'journal_kind_suggest'
+          AND date = ${today}::date
       `);
       return result.rows[0]?.count ?? 0;
     });
@@ -83,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 
-  if (currentCount > RATE_LIMIT_PER_DAY) {
+  if (currentCount >= RATE_LIMIT_PER_DAY) {
     return res.status(429).json({
       error: 'RATE_LIMIT',
       message: '本日の利用上限に達しました。明日また使えるようになります。',
@@ -128,6 +131,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       return res.status(503).json({ error: 'BEDROCK_ERROR' });
     }
+  }
+
+  // 3. 提案が得られたときだけ枠を加算 (失敗は上で return 済みなのでここに来ない)。
+  //    加算失敗は提案返却を妨げない (best-effort)。
+  try {
+    await withTenantUser(ctx.tenantId, ctx.userId, role, async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO api_rate_limits (user_id, endpoint, date, count)
+        VALUES (${ctx.userId}::uuid, 'journal_kind_suggest', ${today}::date, 1)
+        ON CONFLICT (user_id, endpoint, date)
+        DO UPDATE SET count = api_rate_limits.count + 1, updated_at = NOW()
+      `);
+    });
+  } catch (err) {
+    logger.warn({ event: 'journal_kind_suggest.rate_limit_increment_failed', err });
   }
 
   logger.info({

@@ -503,6 +503,16 @@
 
 ---
 
+## H7 / 記録入力一本化 の unit test 整備 → coverage exclude 戻し
+
+- **背景**: 2026-06-15 のリリースで baton-relay / staffroom の新規 UI・service/repository、
+  journal の TodayCaptureBox / DiaryNoteBox を `vitest.config.ts` の coverage exclude に追加した
+  (e2e / 統合テストではカバー済だが unit 未整備のため global threshold 割れを回避)。
+- **対応**: 主要コンポーネント・service の unit test を整備し、exclude エントリを順次外す。
+- **着手判断**: H7 出荷の安定後・次のテスト整備フェーズで。
+
+---
+
 ## 関連リファレンス
 
 - 招待フロー仕様: `aidlc-docs/construction/user-onboarding-flow.md`

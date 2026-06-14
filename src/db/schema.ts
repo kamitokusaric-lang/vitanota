@@ -31,11 +31,18 @@ export const moodLevelEnum = pgEnum('mood_level', [
   'very_negative',
 ]);
 
-// 投稿種別 (diary: 日々ノート / knowledge: ナレッジノート / tweet: つぶやき)
+// 投稿種別。
+//   diary/knowledge/tweet : 日々ノート / ナレッジノート / つぶやき
+//   keep/concern/thanks/help : 職員室ボード (H7-B staffroom / migration 0050)。
+//     続けたい / 気になる / ありがとう / たすけて。is_public は他 kind と同じく本人選択。
 export const journalEntryKindEnum = pgEnum('journal_entry_kind', [
   'diary',
   'knowledge',
   'tweet',
+  'keep',
+  'concern',
+  'thanks',
+  'help',
 ]);
 
 // Unit-05: タスク管理
@@ -85,7 +92,7 @@ export const journalReactionTypeEnum = pgEnum('journal_reaction_type', [
 ]);
 
 // ── H7 朝のバトンリレー (baton-relay) の enum ────────────────────
-// 生徒の在籍状態。active=在学中 (進級は grade_label 更新で一本), archived=在籍終了。
+// 生徒の在籍状態。active=在学中, archived=在籍終了。
 // 猶予 1 年後の終端処理 (匿名化/purge) は後続スライス。
 export const studentStatusEnum = pgEnum('student_status', ['active', 'archived']);
 
@@ -274,6 +281,12 @@ export const journalEntries = pgTable(
     // mood は kind='diary' のみ NOT NULL、emotion_tags は kind='tweet' のみ付与可
     // (制約は API/Zod レベルで担保、DB CHECK は付けない)。
     kind: journalEntryKindEnum('kind').notNull().default('diary'),
+    // ── H7-B 職員室ボードの A→B seam 受け口 (board kind のときのみ・migration 0051) ──
+    // 複合 FK ((student_id|class_id, tenant_id) → students|classes) は migration で定義。
+    // drizzle 側は列宣言のみ (journal_entries は students/classes より前方に宣言されるため、
+    // テーブル定義 callback から後方の const を参照すると初期化順序エラーになる)。
+    studentId: uuid('student_id'),
+    classId: uuid('class_id'),
     // マスキング済み本文 (AI 入力用、新規投稿は API 側で生成、既存データは backfill で埋める)
     contentMasked: text('content_masked'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1000,7 +1013,6 @@ export const students = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     classId: uuid('class_id').notNull(),
     displayName: text('display_name').notNull(),
-    gradeLabel: text('grade_label'),
     status: studentStatusEnum('status').notNull().default('active'),
     enrolledAt: date('enrolled_at'),
     leftAt: date('left_at'),
@@ -1094,6 +1106,12 @@ export const studentReactions = pgTable(
     ),
   }),
 );
+
+// ─────────────────────────────────────────────────────────────
+// H7-B 職員室ボード (staffroom) — 学校知の循環の出口 (migration 0051)
+// 循環の正本: docs/proposal/h7-circulation.md / build spec: docs/staffroom/design.md
+// 板の投稿は journal_entries(kind='board') として持つ (専用テーブルにしない)。
+// ─────────────────────────────────────────────────────────────
 
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;

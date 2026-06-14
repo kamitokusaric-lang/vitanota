@@ -14,11 +14,14 @@ import type { StudentReactionType, StudentReactionDto } from '../types';
 import { ClassGoalHeader } from './ClassGoalHeader';
 import { StudentRow } from './StudentRow';
 import { RosterAdd } from './RosterAdd';
-import { RosterImport } from './RosterImport';
+import { RosterStudentBulkAdd } from './RosterStudentBulkAdd';
 
 interface BatonRelayBoardProps {
   currentUserId: string;
   todayDate: string; // YYYY-MM-DD (SSR で確定・hydration mismatch 回避)
+  // 親 (生徒ノートのクラスタブ等) がクラスを制御する場合に渡す。
+  // 指定時は内部のクラス選択 <select> を出さない (chimo 2026-06-14)。
+  classId?: string;
 }
 
 async function postJson(url: string, body: unknown): Promise<Response> {
@@ -29,9 +32,11 @@ async function postJson(url: string, body: unknown): Promise<Response> {
   });
 }
 
-export function BatonRelayBoard({ currentUserId, todayDate }: BatonRelayBoardProps) {
+export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRelayBoardProps) {
   const { showToast } = useToast();
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  // classId 指定時は親が制御 (controlled)。未指定時は内部 state で選択 (/baton-relay ページ)。
+  const [internalClassId, setInternalClassId] = useState<string | null>(null);
+  const selectedClassId = classId ?? internalClassId;
   const [date, setDate] = useState(todayDate);
 
   const { classes, isLoading: classesLoading, error: classesError, mutate: mutateClasses } =
@@ -41,12 +46,12 @@ export function BatonRelayBoard({ currentUserId, todayDate }: BatonRelayBoardPro
   const { reactions, mutate: mutateReactions } = useReactions(selectedClassId);
   const nameById = useTeacherNames();
 
-  // クラスが読めたら先頭を選択 (未選択時のみ)
+  // クラスが読めたら先頭を選択 (uncontrolled・未選択時のみ)
   useEffect(() => {
-    if (!selectedClassId && classes.length > 0) {
-      setSelectedClassId(classes[0].id);
+    if (!classId && !internalClassId && classes.length > 0) {
+      setInternalClassId(classes[0].id);
     }
-  }, [classes, selectedClassId]);
+  }, [classId, internalClassId, classes]);
 
   const selectedClass = classes.find((c) => c.id === selectedClassId) ?? null;
 
@@ -83,26 +88,22 @@ export function BatonRelayBoard({ currentUserId, todayDate }: BatonRelayBoardPro
     }
     const { class: created } = (await res.json()) as { class: { id: string } };
     await mutateClasses();
-    setSelectedClassId(created.id);
+    if (!classId) setInternalClassId(created.id);
     showToast('クラスを作りました', 'success');
   };
 
-  const handleAddStudent = async (
-    classId: string,
-    displayName: string,
-    gradeLabel: string,
-  ) => {
-    const res = await postJson('/api/baton-relay/students', {
-      classId,
-      displayName,
-      gradeLabel: gradeLabel || undefined,
+  const handleMoveStudent = async (studentId: string, newClassId: string) => {
+    const res = await fetch(`/api/baton-relay/students/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ classId: newClassId }),
     });
     if (!res.ok) {
-      showToast('生徒の追加に失敗しました', 'error');
+      showToast('クラスの変更に失敗しました', 'error');
       return;
     }
-    await mutateStudents();
-    showToast('生徒を追加しました', 'success');
+    await mutateStudents(); // 移動元の一覧から消える
+    showToast('クラスを変更しました', 'success');
   };
 
   const handleSaveGoal = async (goalText: string) => {
@@ -195,24 +196,28 @@ export function BatonRelayBoard({ currentUserId, todayDate }: BatonRelayBoardPro
 
   return (
     <div className="space-y-4">
-      {/* クラス切替 + 日付 */}
+      {/* クラス切替 (uncontrolled のみ) + 日付 */}
       {classes.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="sr-only" htmlFor="baton-class">
-            クラス
-          </label>
-          <select
-            id="baton-class"
-            value={selectedClassId ?? ''}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-base focus:border-vn-accent focus:outline-none"
-          >
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {!classId && (
+            <>
+              <label className="sr-only" htmlFor="baton-class">
+                クラス
+              </label>
+              <select
+                id="baton-class"
+                value={selectedClassId ?? ''}
+                onChange={(e) => setInternalClassId(e.target.value)}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-base focus:border-vn-accent focus:outline-none"
+              >
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <label className="sr-only" htmlFor="baton-date">
             日付
           </label>
@@ -243,7 +248,9 @@ export function BatonRelayBoard({ currentUserId, todayDate }: BatonRelayBoardPro
                 reactions={reactionsByStudent.get(s.id) ?? []}
                 currentUserId={currentUserId}
                 nameById={nameById}
+                classes={classes}
                 onToggleReaction={handleToggleReaction}
+                onMoveStudent={handleMoveStudent}
                 onAddNote={handleAddNote}
                 onEditNote={handleEditNote}
                 onDeleteNote={handleDeleteNote}
@@ -264,19 +271,15 @@ export function BatonRelayBoard({ currentUserId, todayDate }: BatonRelayBoardPro
         </p>
       )}
 
-      {/* ロスター取り込み (CSV 一括 + 手動追加) */}
+      {/* 生徒をまとめて追加 (選択クラスへ) + クラス追加 */}
       <div className="space-y-3 pt-2">
-        <RosterImport
-          onImported={async () => {
-            await Promise.all([mutateClasses(), mutateStudents()]);
+        <RosterStudentBulkAdd
+          selectedClass={selectedClass}
+          onAdded={async () => {
+            await mutateStudents();
           }}
         />
-        <RosterAdd
-          classes={classes}
-          selectedClassId={selectedClassId}
-          onCreateClass={handleCreateClass}
-          onAddStudent={handleAddStudent}
-        />
+        <RosterAdd classes={classes} onCreateClass={handleCreateClass} />
       </div>
     </div>
   );

@@ -41,6 +41,9 @@ const actionSchema = z.discriminatedUnion('action', [
     userId: z.string().guid(),
     content: z.string(),
     isPublic: z.boolean(),
+    kind: z
+      .enum(['diary', 'knowledge', 'tweet', 'keep', 'concern', 'thanks', 'help'])
+      .optional(),
   }),
   z.object({
     action: z.literal('tag'),
@@ -133,11 +136,12 @@ export default async function handler(
         return res.status(201).json({ user: u });
       }
       case 'entry': {
-        const { tenantId, userId, content, isPublic } = parsed.data;
+        const { tenantId, userId, content, isPublic, kind } = parsed.data;
         const e = await withSystemAdmin(SEED_ADMIN_ID, async (tx) => {
           const [created] = await tx
             .insert(journalEntries)
-            .values({ tenantId, userId, content, isPublic })
+            // kind 省略時は drizzle が undefined を外し DB 既定 (diary) を使う
+            .values({ tenantId, userId, content, isPublic, kind })
             .returning();
           return created;
         });

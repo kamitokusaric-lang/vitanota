@@ -98,7 +98,6 @@ export class StudentRepository {
     params: {
       classId: string;
       displayName: string;
-      gradeLabel?: string;
       enrolledAt?: string;
     },
   ): Promise<Student> {
@@ -108,9 +107,26 @@ export class StudentRepository {
         tenantId: ctx.tenantId,
         classId: params.classId,
         displayName: params.displayName,
-        gradeLabel: params.gradeLabel ?? null,
         enrolledAt: params.enrolledAt ?? null,
       })
+      .returning();
+    return row;
+  }
+
+  // クラス移動 / 氏名の修正 (chimo 2026-06-14)。複合 FK で別テナントの classId は物理防止。
+  async update(
+    tx: DrizzleDb,
+    ctx: BatonContext,
+    id: string,
+    params: { classId?: string; displayName?: string },
+  ): Promise<Student | undefined> {
+    const patch: Partial<typeof students.$inferInsert> = {};
+    if (params.classId !== undefined) patch.classId = params.classId;
+    if (params.displayName !== undefined) patch.displayName = params.displayName;
+    const [row] = await tx
+      .update(students)
+      .set(patch)
+      .where(and(eq(students.id, id), eq(students.tenantId, ctx.tenantId)))
       .returning();
     return row;
   }

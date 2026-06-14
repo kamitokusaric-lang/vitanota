@@ -65,6 +65,12 @@ export const LogEvents = {
   CalendarTaskPushedToNextWeek: 'calendar_task_pushed_to_next_week',
   CalendarTaskCreatedFromPlus: 'calendar_task_created_from_plus',
   CalendarDayDetailOpened: 'calendar_day_detail_opened',
+
+  // H7-B 職員室ボード (staffroom) 循環計測 (chimo 2026-06-10)。
+  // 循環の「書く・反応する」段階のログ点。全て info 出力 (踏み絵: 観測感を作らない /
+  // 数値化・ランキングしない)。閲覧率・役立ち率の計測は UI スライス S4 で追加。
+  StaffroomBoardPosted: 'staffroom_board_posted',
+  StaffroomBoardReacted: 'staffroom_board_reacted',
 } as const;
 
 export type LogEventName = (typeof LogEvents)[keyof typeof LogEvents];
@@ -223,6 +229,16 @@ interface CalendarDayDetailOpenedPayload extends BaseEventFields {
   date: string;
 }
 
+// H7-B 職員室ボード (staffroom) 循環計測。数値化・スコア化はしない (踏み絵ガード 2/3/7)。
+interface StaffroomBoardPostedPayload extends BaseEventFields {
+  boardEntryId: string;
+  boardKind: 'keep' | 'concern' | 'thanks' | 'help';
+}
+interface StaffroomBoardReactedPayload extends BaseEventFields {
+  boardEntryId: string;
+  reactionType: 'knowledge' | 'appreciation' | 'endorsement';
+}
+
 // ─────────────────────────────────────────────────────────────
 // イベント名 → ペイロード型のマッピング
 // ─────────────────────────────────────────────────────────────
@@ -253,6 +269,8 @@ export interface LogEventPayloads {
   [LogEvents.CalendarTaskPushedToNextWeek]: CalendarTaskPushedToNextWeekPayload;
   [LogEvents.CalendarTaskCreatedFromPlus]: CalendarTaskCreatedFromPlusPayload;
   [LogEvents.CalendarDayDetailOpened]: CalendarDayDetailOpenedPayload;
+  [LogEvents.StaffroomBoardPosted]: StaffroomBoardPostedPayload;
+  [LogEvents.StaffroomBoardReacted]: StaffroomBoardReactedPayload;
 }
 
 // ─────────────────────────────────────────────────────────────

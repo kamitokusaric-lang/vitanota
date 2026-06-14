@@ -14,6 +14,8 @@ interface ModalProps {
   title?: ReactNode;
   children: ReactNode;
   maxWidth?: string;
+  // パネル背景の差し替え (未指定は bg-white)。例: 'bg-sky-50'
+  panelClassName?: string;
 }
 
 export function Modal({
@@ -22,6 +24,7 @@ export function Modal({
   title,
   children,
   maxWidth = 'max-w-md',
+  panelClassName = 'bg-white',
 }: ModalProps) {
   // SSR 安全のため、 client mount を待ってから portal を返す
   const [mounted, setMounted] = useState(false);
@@ -54,7 +57,7 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative ${maxWidth} max-h-[90vh] w-full overflow-y-auto rounded-vn border border-vn-border bg-white p-6 shadow-lg`}
+        className={`relative ${maxWidth} max-h-[90vh] w-full overflow-y-auto rounded-vn border border-vn-border ${panelClassName} p-6 shadow-lg`}
         data-testid="modal-content"
       >
         <button

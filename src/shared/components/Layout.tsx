@@ -34,14 +34,16 @@ export function Layout({ children, session }: LayoutProps) {
               vita<span className="text-vn-accent">nota</span>
               <span className="text-vn-accent">.</span>
             </Link>
-            <button
+            {/* chimo 2026-06-15: 「vitanotaとは」は一旦非表示 (あとで使うのでコメントアウトのみ)。
+                state / モーダル / import は復活しやすいよう残置。 */}
+            {/* <button
               type="button"
               onClick={() => setAboutOpen(true)}
               className="text-[15px] text-slate-300 transition-colors hover:text-white"
               data-testid="nav-about"
             >
               vitanotaとは
-            </button>
+            </button> */}
           </div>
 
           {/* 右: 管理画面リンク (兼務時) + ユーザー名 (プロフィール) + ログアウト */}

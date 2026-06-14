@@ -1,8 +1,9 @@
 // Step 16b - Spec 03: 共有タイムライン (US-T-014)
 // stories.md 改訂版: 共有タイムラインはテナント内全教員の公開エントリを表示
-// 2026-05-21 update: dashboard リファクタで notes メインタブ廃止、 右レーン
-//   PublicTimelineRail に集約。 staffroom = 職員室ノート (default 表示) /
-//   mine = マイノート (自分の公開・非公開両方)。
+// 2026-06-14 update (記録入力一本化): 右レーン PublicTimelineRail = 職員室ノート単独
+//   (subtab 撤去)。職員室ノートは diary を除外して流す (tweet/knowledge 等)。
+//   そのため「タイムラインに出る」検証用の公開エントリは kind='tweet' で seed する。
+//   マイノートはトップタブ (?tab=my-notes) の MyNotesByKind (全 kind・公開非公開両方)。
 import { test, expect } from '@playwright/test';
 import { SeedClient } from './helpers/seed';
 import { loginAs } from './helpers/auth';
@@ -16,17 +17,18 @@ test.describe('共有タイムライン (US-T-014)', () => {
     const userA = await seed.createUser(tenant.id, 'teacher', { email: 'teacherA@test.example.com', name: '教員 A' });
     const userB = await seed.createUser(tenant.id, 'teacher', { email: 'teacherB@test.example.com', name: '教員 B' });
 
-    // 教員 B が公開エントリを作成
+    // 教員 B が公開エントリを作成 (職員室ノートに流すため非 diary)
     await seed.createEntry({
       tenantId: tenant.id,
       userId: userB.id,
       content: '教員 B の公開投稿',
       isPublic: true,
+      kind: 'tweet',
     });
 
-    // 教員 A としてログイン → 日々ノート (staffroom = default 子タブ)
+    // 教員 A としてログイン → ダッシュボード右レーン (職員室ノート)
     await loginAs(context, seed, userA, tenant.id);
-    await page.goto('/dashboard?tab=notes');
+    await page.goto('/dashboard');
 
     await expect(page.getByText('教員 B の公開投稿')).toBeVisible();
   });
@@ -45,16 +47,17 @@ test.describe('共有タイムライン (US-T-014)', () => {
       content: 'B の非公開記録',
       isPublic: false,
     });
-    // 公開エントリも 1 件
+    // 公開エントリも 1 件 (職員室ノートに流すため非 diary)
     await seed.createEntry({
       tenantId: tenant.id,
       userId: userB.id,
       content: 'B の公開記録',
       isPublic: true,
+      kind: 'tweet',
     });
 
     await loginAs(context, seed, userA, tenant.id);
-    await page.goto('/dashboard?tab=notes');
+    await page.goto('/dashboard');
 
     await expect(page.getByText('B の公開記録')).toBeVisible();
     await expect(page.getByText('B の非公開記録')).not.toBeVisible();
@@ -73,12 +76,13 @@ test.describe('共有タイムライン (US-T-014)', () => {
       userId: userB.id,
       content: 'テナント B の公開投稿',
       isPublic: true,
+      kind: 'tweet',
     });
 
     await loginAs(context, seed, userA, tenantA.id);
     await page.goto('/dashboard');
 
-    // 右レーン「職員室ノート」 (default) でテナント A の公開投稿は 0 件
+    // 職員室ノート (default) でテナント A の公開投稿は 0 件
     await expect(page.getByTestId('public-timeline-rail-empty')).toBeVisible();
     await expect(page.getByText('テナント B の公開投稿')).not.toBeVisible();
   });
@@ -103,9 +107,8 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, user, tenant.id);
-    // 右レーン「マイノート」 subtab で自分の公開・非公開両方を確認
-    await page.goto('/dashboard');
-    await page.getByTestId('public-timeline-rail-tab-mine').click();
+    // マイノートタブで自分の公開・非公開両方を確認
+    await page.goto('/dashboard?tab=my-notes');
 
     await expect(page.getByText('自分の公開')).toBeVisible();
     await expect(page.getByText('自分の非公開')).toBeVisible();

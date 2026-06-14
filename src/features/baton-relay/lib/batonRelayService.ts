@@ -30,7 +30,6 @@ export interface StudentDto {
   id: string;
   classId: string;
   displayName: string;
-  gradeLabel: string | null;
   status: 'active' | 'archived';
   enrolledAt: string | null;
   leftAt: string | null;
@@ -69,7 +68,6 @@ function toStudentDto(s: Student): StudentDto {
     id: s.id,
     classId: s.classId,
     displayName: s.displayName,
-    gradeLabel: s.gradeLabel,
     status: s.status,
     enrolledAt: s.enrolledAt,
     leftAt: s.leftAt,
@@ -140,12 +138,23 @@ export class BatonRelayService {
     params: {
       classId: string;
       displayName: string;
-      gradeLabel?: string;
       enrolledAt?: string;
     },
   ): Promise<StudentDto> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return toStudentDto(await studentRepo.create(tx, ctx, params));
+    });
+  }
+
+  // クラス移動 / 修正 (chimo 2026-06-14)。
+  async updateStudent(
+    ctx: AuthContext,
+    id: string,
+    params: { classId?: string; displayName?: string },
+  ): Promise<StudentDto | null> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      const row = await studentRepo.update(tx, ctx, id, params);
+      return row ? toStudentDto(row) : null;
     });
   }
 
@@ -246,7 +255,6 @@ export class BatonRelayService {
         await studentRepo.create(tx, ctx, {
           classId,
           displayName: s.displayName,
-          gradeLabel: s.gradeLabel ?? undefined,
         });
       }
 

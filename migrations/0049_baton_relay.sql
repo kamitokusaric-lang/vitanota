@@ -52,7 +52,6 @@ CREATE TABLE students (
   tenant_id    UUID            NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   class_id     UUID            NOT NULL,
   display_name TEXT            NOT NULL,
-  grade_label  TEXT,
   status       student_status  NOT NULL DEFAULT 'active',
   enrolled_at  DATE,
   left_at      DATE,

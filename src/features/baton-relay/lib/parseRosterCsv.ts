@@ -1,5 +1,5 @@
 // ロスター CSV をクライアントでパースして行 (ImportRow) に変換する純関数。
-// 形式: 先頭行ヘッダー、列 = クラス / クラス目標 / 生徒名 / 学年 (順不同・別名許容)。
+// 形式: 先頭行ヘッダー、列 = クラス / クラス目標 / 生徒名 (順不同・別名許容)。
 // 引用符 (" ") でくくられたフィールド内のカンマ・改行・"" エスケープに対応。
 import type { ImportRow } from '../schemas/batonRelay';
 
@@ -54,7 +54,6 @@ const HEADER_ALIASES: Record<keyof ImportRow, string[]> = {
   className: ['クラス', 'クラス名', 'class'],
   classGoal: ['クラス目標', '目標', 'goal'],
   studentName: ['生徒名', '氏名', '名前', '生徒', 'student'],
-  grade: ['学年', 'grade'],
 };
 
 function findIndex(header: string[], aliases: string[]): number {
@@ -73,7 +72,6 @@ export function parseRosterCsv(text: string): ParseResult {
     className: findIndex(header, HEADER_ALIASES.className),
     classGoal: findIndex(header, HEADER_ALIASES.classGoal),
     studentName: findIndex(header, HEADER_ALIASES.studentName),
-    grade: findIndex(header, HEADER_ALIASES.grade),
   };
 
   if (idx.className < 0 || idx.studentName < 0) {
@@ -89,7 +87,6 @@ export function parseRosterCsv(text: string): ParseResult {
     const className = (rec[idx.className] ?? '').trim();
     const studentName = (rec[idx.studentName] ?? '').trim();
     const classGoal = idx.classGoal >= 0 ? (rec[idx.classGoal] ?? '').trim() : '';
-    const grade = idx.grade >= 0 ? (rec[idx.grade] ?? '').trim() : '';
 
     if (!className || !studentName) {
       errors.push(`${i + 1} 行目: クラスまたは生徒名が空のため飛ばしました`);
@@ -99,7 +96,6 @@ export function parseRosterCsv(text: string): ParseResult {
       className,
       studentName,
       ...(classGoal ? { classGoal } : {}),
-      ...(grade ? { grade } : {}),
     });
   }
 

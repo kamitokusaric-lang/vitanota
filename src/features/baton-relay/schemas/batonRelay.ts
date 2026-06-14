@@ -56,11 +56,26 @@ export const createStudentSchema = z
   .object({
     classId: z.string().guid(),
     displayName: z.string().trim().min(1, '名前を入力してください').max(50),
-    gradeLabel: z.string().trim().max(16).optional(),
     enrolledAt: dateString.optional(),
   })
   .openapi('CreateStudentInput');
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
+
+// 生徒の更新 (クラス移動 / 氏名の修正)。少なくとも 1 項目必須。
+export const updateStudentSchema = z
+  .object({
+    classId: z.string().guid().optional(),
+    displayName: z.string().trim().min(1).max(50).optional(),
+  })
+  .refine((v) => v.classId || v.displayName, {
+    message: '更新する項目がありません',
+  })
+  .openapi('UpdateStudentInput');
+export type UpdateStudentInput = z.infer<typeof updateStudentSchema>;
+
+export const studentIdParamSchema = z
+  .object({ id: z.string().guid('不正な生徒IDです') })
+  .openapi('StudentIdParam');
 
 export const listStudentsQuerySchema = z.object({
   classId: z.string().guid(),
@@ -71,7 +86,6 @@ export const studentResponseSchema = z
     id: z.string().guid(),
     classId: z.string().guid(),
     displayName: z.string(),
-    gradeLabel: z.string().nullable(),
     status: studentStatusSchema,
     enrolledAt: z.string().nullable(),
     leftAt: z.string().nullable(),
@@ -158,12 +172,11 @@ export const toggleReactionResponseSchema = z
   .openapi('ToggleStudentReactionResult');
 
 // ── ロスター CSV インポート ─────────────────────────────────────
-// CSV はクライアントでパースし、行 (className/classGoal/studentName/grade) を JSON で送る。
+// CSV はクライアントでパースし、行 (className/classGoal/studentName) を JSON で送る。
 export const importRowSchema = z.object({
   className: z.string().trim().min(1).max(50),
   classGoal: z.string().trim().max(200).optional(),
   studentName: z.string().trim().min(1).max(50),
-  grade: z.string().trim().max(16).optional(),
 });
 export type ImportRow = z.infer<typeof importRowSchema>;
 

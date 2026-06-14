@@ -28,6 +28,7 @@ import { useTaskTags } from '@/features/tasks/hooks/useTaskTags';
 import { useTaskFilterPreferences } from '@/features/tasks/hooks/useTaskFilterPreferences';
 import type { TaskWithAssignees } from '@/features/tasks/hooks/useTasks';
 import { ManualTaskCreateForm } from '@/features/ai-chat/ManualTaskCreateForm';
+import { TaskCreateTabs } from '@/features/ai-chat/TaskCreateTabs';
 import { CalendarMonthView } from './CalendarMonthView';
 import { getNextMondayFromDate } from '../lib/calendarDateRange';
 import { fireCalendarEvent } from '../lib/calendarAnalytics';
@@ -55,10 +56,12 @@ function dueDateToBase(value: string | Date | null): Date | string {
 
 interface TasksTabWithCalendarProps {
   selfUserId: string;
+  aiChatEnabled: boolean;
 }
 
 export function TasksTabWithCalendar({
   selfUserId,
+  aiChatEnabled,
 }: TasksTabWithCalendarProps) {
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
@@ -190,11 +193,6 @@ export function TasksTabWithCalendar({
       id: 'calendar',
       label: 'カレンダー',
       icon: <Calendar size={16} strokeWidth={1.75} aria-hidden />,
-      badge: (
-        <span className="vn-new-badge pointer-events-none inline-block whitespace-nowrap rounded-full bg-gradient-to-r from-pink-400 via-fuchsia-400 to-violet-400 px-2 py-0.5 text-[10px] font-bold leading-none text-white shadow-[0_2px_6px_rgba(217,70,239,0.45)]">
-          ✨ New
-        </span>
-      ),
       content: (
         <CalendarMonthView
           selfUserId={selfUserId}
@@ -257,6 +255,9 @@ export function TasksTabWithCalendar({
 
   return (
     <>
+      {/* 雑に入力するフォーム (AI 整理 / 手動) はタスクボードの一番上に置く (chimo 2026-06-12)。
+          旧位置は dashboard の main Tabs より上だったが、 タスク文脈の入口なのでここへ移設。 */}
+      <TaskCreateTabs selfUserId={selfUserId} aiChatEnabled={aiChatEnabled} />
       <Tabs
         tabs={tabs}
         defaultTabId="board"

@@ -16,7 +16,6 @@ describe('parseRosterCsv', () => {
       className: '2-A',
       studentName: 'さくら',
       classGoal: 'あいさつ',
-      grade: '3年',
     });
   });
 
@@ -29,7 +28,7 @@ describe('parseRosterCsv', () => {
   it('列順が違ってもヘッダー名で対応づける', () => {
     const csv = '生徒名,学年,クラス\nさくら,3年,2-A';
     const { rows } = parseRosterCsv(csv);
-    expect(rows[0]).toEqual({ className: '2-A', studentName: 'さくら', grade: '3年' });
+    expect(rows[0]).toEqual({ className: '2-A', studentName: 'さくら' });
   });
 
   it('必須列が無ければエラー', () => {
@@ -49,9 +48,9 @@ describe('parseRosterCsv', () => {
 
 describe('planRosterImport', () => {
   const rows = [
-    { className: '2-A', classGoal: 'あいさつ', studentName: 'さくら', grade: '3年' },
-    { className: '2-A', classGoal: 'あいさつ', studentName: 'ひろき', grade: '3年' },
-    { className: '2-B', classGoal: 'めあて', studentName: 'みなと', grade: '3年' },
+    { className: '2-A', classGoal: 'あいさつ', studentName: 'さくら'},
+    { className: '2-A', classGoal: 'あいさつ', studentName: 'ひろき'},
+    { className: '2-B', classGoal: 'めあて', studentName: 'みなと'},
   ];
 
   it('全部新規: クラス2・生徒3を作成', () => {
@@ -106,7 +105,6 @@ describe('planRosterImport', () => {
     expect(plan.studentsToAdd[0]).toEqual({
       className: '3-C',
       displayName: 'たろう',
-      gradeLabel: null,
     });
   });
 });

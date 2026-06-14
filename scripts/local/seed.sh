@@ -18,7 +18,7 @@ docker exec -i vitanota-postgres psql -U vitanota -d vitanota_dev <<'SQL'
 TRUNCATE TABLE
   journal_entry_tags,
   journal_entries,
-  tags,
+  emotion_tags,
   sessions,
   verification_tokens,
   accounts,
@@ -49,21 +49,15 @@ VALUES
   ('00000000-0000-0000-0000-000000000100', '00000000-0000-0000-0000-000000000001', 'teacher'),
   ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000001', 'school_admin');
 
--- RLS セッション変数を設定して tags INSERT (NFR-U02-03 シード相当)
-BEGIN;
-SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000001', true);
-SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000101', true);
-
-INSERT INTO tags (tenant_id, name, is_emotion, is_system_default, sort_order, created_by) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'うれしい',  true,  true, 1, NULL),
-  ('00000000-0000-0000-0000-000000000001', 'つかれた',  true,  true, 2, NULL),
-  ('00000000-0000-0000-0000-000000000001', 'やってみた', true,  true, 3, NULL),
-  ('00000000-0000-0000-0000-000000000001', '行き詰まり', true,  true, 4, NULL),
-  ('00000000-0000-0000-0000-000000000001', '相談したい', true,  true, 5, NULL),
-  ('00000000-0000-0000-0000-000000000001', '授業準備',  false, true, 6, NULL),
-  ('00000000-0000-0000-0000-000000000001', '保護者対応', false, true, 7, NULL),
-  ('00000000-0000-0000-0000-000000000001', '行事準備',  false, true, 8, NULL);
-COMMIT;
+-- システムデフォルトの感情タグ (emotion_tags)。
+-- migration 0016 で tags → emotion_tags にリネーム済 (is_emotion 廃止・category 必須)。
+-- 業務文脈タグ (授業準備 等) は task_categories へ役割移譲したのでここには入れない。
+INSERT INTO emotion_tags (tenant_id, name, category, is_system_default, sort_order, created_by) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'うれしい',   'positive', true, 1, NULL),
+  ('00000000-0000-0000-0000-000000000001', 'つかれた',   'negative', true, 2, NULL),
+  ('00000000-0000-0000-0000-000000000001', 'やってみた', 'positive', true, 3, NULL),
+  ('00000000-0000-0000-0000-000000000001', '行き詰まり', 'negative', true, 4, NULL),
+  ('00000000-0000-0000-0000-000000000001', '相談したい', 'neutral',  true, 5, NULL);
 SQL
 
 echo ""
@@ -73,7 +67,7 @@ echo "作成されたデータ:"
 echo "  テナント: ローカル学校 (id: 00000000-0000-0000-0000-000000000001)"
 echo "  教員:     teacher@local.test (id: 00000000-0000-0000-0000-000000000100)"
 echo "  管理者:   admin@local.test   (id: 00000000-0000-0000-0000-000000000101)"
-echo "  タグ:     8 件 (システムデフォルト)"
+echo "  感情タグ: 5 件 (emotion_tags システムデフォルト)"
 echo ""
 echo "次のステップ:"
 echo "  1. pnpm dev で Next.js 起動"

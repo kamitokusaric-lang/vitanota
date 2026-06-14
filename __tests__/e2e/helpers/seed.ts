@@ -72,6 +72,9 @@ export class SeedClient {
     userId: string;
     content: string;
     isPublic: boolean;
+    // 省略時は DB 既定 (diary)。職員室ノート (公開タイムライン) は diary を除外する
+    // ため、 タイムライン表示を検証するエントリは非 diary (tweet 等) を指定する。
+    kind?: 'diary' | 'knowledge' | 'tweet' | 'keep' | 'concern' | 'thanks' | 'help';
   }): Promise<SeedEntry> {
     const res = await this.request.post('/api/test/_seed', {
       data: { action: 'entry', ...params },

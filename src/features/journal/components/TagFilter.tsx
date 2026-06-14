@@ -20,10 +20,11 @@ const CATEGORY_LABEL: Record<string, string> = {
 const CATEGORY_ORDER = ['positive', 'negative', 'neutral'] as const;
 
 function getTagStyle(isSelected: boolean): string {
+  // 選択色は mood / 種別チップ (bg-vn-accent) と統一 (chimo 2026-06-12)。
   const base =
     'rounded-full px-3 py-1 text-xs font-medium transition-colors';
   return isSelected
-    ? `${base} bg-blue-600 text-white`
+    ? `${base} bg-vn-accent text-white`
     : `${base} border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100`;
 }
 

@@ -32,6 +32,38 @@ import {
 } from '@/features/tasks/schemas/taskComment';
 import { taskTagCreateSchema } from '@/features/tasks/schemas/taskTag';
 import { taskFilterSettingsSchema } from '@/schemas/userFilterPreferences';
+import {
+  createClassSchema,
+  updateClassSchema,
+  classIdParamSchema,
+  createStudentSchema,
+  updateStudentSchema,
+  studentIdParamSchema,
+  listStudentsQuerySchema,
+  createNoteSchema,
+  updateNoteSchema,
+  noteIdParamSchema,
+  listNotesQuerySchema,
+  toggleReactionSchema,
+  listReactionsQuerySchema,
+  classResponseSchema,
+  classesListResponseSchema,
+  studentResponseSchema,
+  studentsListResponseSchema,
+  batonNoteResponseSchema,
+  notesListResponseSchema,
+  reactionsListResponseSchema,
+  toggleReactionResponseSchema,
+  importRequestSchema,
+  importResultResponseSchema,
+} from '@/features/baton-relay/schemas/batonRelay';
+import {
+  createBoardSchema,
+  listBoardQuerySchema,
+  boardResponseSchema,
+  boardListResponseSchema,
+  studentSupportResponseSchema,
+} from '@/features/staffroom/schemas/staffroom';
 
 import {
   errorResponseSchema,
@@ -974,6 +1006,49 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'post',
+    path: '/api/journal/kind-suggest',
+    summary: '本文から journal 種別を AI が提案（そっと提案・本人確定）',
+    description:
+      '提案のみで保存はしない。本人が確認ステップで種別を確定する。フラグ off は 404、利用上限超過は 429、AI 基盤不可は 503。',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: z.object({ content: z.string().min(1).max(2000) }),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'AI の種別提案（suggestedKind=null は tweet 据え置き）',
+        content: {
+          'application/json': {
+            schema: z.object({
+              suggestedKind: z
+                .enum(['knowledge', 'thanks', 'help'])
+                .nullable(),
+              confidence: z.enum(['high', 'medium', 'low']),
+            }),
+          },
+        },
+      },
+      429: {
+        description: '1 日の利用上限に到達',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      503: {
+        description: 'AI 基盤が一時的に利用不可',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
     path: '/api/ai-chat/confirm',
     summary: 'タスク候補を確定（作成）または破棄',
     description:
@@ -1034,6 +1109,295 @@ export function buildOpenApiDocument() {
       200: {
         description: '記録成功',
         content: { 'application/json': { schema: okResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // /api/baton-relay/* - H7 朝のバトンリレー (学校知の循環の入口)
+  // teacher / school_admin が自テナントを読み書き (相互関心層)。書込は本人の行のみ。
+  // ─────────────────────────────────────────────────────────────
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/classes',
+    summary: 'クラス一覧取得',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: 'クラス一覧',
+        content: { 'application/json': { schema: classesListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/classes',
+    summary: 'クラス作成',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createClassSchema } } },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: z.object({ class: classResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/baton-relay/classes/{id}',
+    summary: 'クラス更新（クラス目標等）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      params: classIdParamSchema,
+      body: { content: { 'application/json': { schema: updateClassSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: z.object({ class: classResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/students',
+    summary: '生徒一覧取得（クラス指定）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { query: listStudentsQuerySchema },
+    responses: {
+      200: {
+        description: '生徒一覧',
+        content: { 'application/json': { schema: studentsListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/students',
+    summary: '生徒作成（手動ロスター投入）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createStudentSchema } } },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: { 'application/json': { schema: z.object({ student: studentResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/baton-relay/students/{id}',
+    summary: '生徒の更新（クラス移動 / 氏名・学年の修正）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      params: studentIdParamSchema,
+      body: { content: { 'application/json': { schema: updateStudentSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: z.object({ student: studentResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/notes',
+    summary: '生徒欄の一言取得（クラス + 日付で生徒横断）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { query: listNotesQuerySchema },
+    responses: {
+      200: {
+        description: 'ノート一覧',
+        content: { 'application/json': { schema: notesListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/notes',
+    summary: '生徒欄に一言を追加（append-only）',
+    description: '著者は自動的に現在のセッションユーザー。同じ生徒・同じ日に何度でも追加できる。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createNoteSchema } } },
+    },
+    responses: {
+      201: {
+        description: '追加成功',
+        content: { 'application/json': { schema: z.object({ note: batonNoteResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/baton-relay/notes/{id}',
+    summary: '自分の一言を編集',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      params: noteIdParamSchema,
+      body: { content: { 'application/json': { schema: updateNoteSchema } } },
+    },
+    responses: {
+      200: {
+        description: '更新成功',
+        content: { 'application/json': { schema: z.object({ note: batonNoteResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/baton-relay/notes/{id}',
+    summary: '自分の一言を削除',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { params: noteIdParamSchema },
+    responses: {
+      204: { description: '削除成功' },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/baton-relay/reactions',
+    summary: '生徒への印（ポジティブ/気になる）一覧取得（クラス指定）',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { query: listReactionsQuerySchema },
+    responses: {
+      200: {
+        description: 'リアクション一覧',
+        content: { 'application/json': { schema: reactionsListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/reactions',
+    summary: '生徒への印をトグル（付与/解除）',
+    description: 'positive(ポジティブ)/concern(気になる)。複数教員が各自トグル。数値化・ランキングはしない。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: toggleReactionSchema } } },
+    },
+    responses: {
+      200: {
+        description: 'トグル後の状態',
+        content: { 'application/json': { schema: toggleReactionResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/import',
+    summary: 'ロスター CSV インポート（クラス・クラス目標・生徒を一括登録）',
+    description:
+      'クライアントで CSV をパースした行 (className/classGoal/studentName/grade) を送る。冪等: クラスは名前で統合・目標は最新値で更新・生徒は同名スキップ。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: importRequestSchema } } },
+    },
+    responses: {
+      200: {
+        description: '取り込み結果のサマリ',
+        content: { 'application/json': { schema: importResultResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // /api/staffroom/* - H7-B 職員室ボード (学校知の循環の出口)
+  // board 投稿は journal_entries(kind='board', is_public=false)。teacher / school_admin が
+  // 自テナントの board を読み (相互関心層)、書きは投稿者本人。コメントはツリー。
+  // リアクション (3 種) は既存 /api/private/journal/entries/{id}/reactions を再利用。
+  // ─────────────────────────────────────────────────────────────
+  registry.registerPath({
+    method: 'get',
+    path: '/api/staffroom/board',
+    summary: '職員室ボード投稿の一覧取得（種別・クラスで絞り込み可）',
+    tags: ['Staffroom'],
+    security: [sessionCookie],
+    request: { query: listBoardQuerySchema },
+    responses: {
+      200: {
+        description: 'ボード投稿一覧',
+        content: { 'application/json': { schema: boardListResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/staffroom/board',
+    summary: '職員室ボードに投稿（KPT+Thanks / Help / 共有）',
+    description:
+      'is_public=false 固定で個人タイムラインには載らない。boardType=kpt のとき kptLabel 必須。数値化・ランキングはしない。',
+    tags: ['Staffroom'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: createBoardSchema } } },
+    },
+    responses: {
+      201: {
+        description: '投稿成功',
+        content: { 'application/json': { schema: z.object({ board: boardResponseSchema }) } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/staffroom/student-support',
+    summary: '生徒サポート（朝バトンをクラス別に集約）',
+    description: 'A→B seam。印が付いた生徒をクラス(学年)別に 名前 + 印件数 + 今週の一言 で返す。数値化・ランキングはしない。',
+    tags: ['Staffroom'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: '生徒サポート',
+        content: { 'application/json': { schema: studentSupportResponseSchema } },
       },
       ...errorResponses,
     },

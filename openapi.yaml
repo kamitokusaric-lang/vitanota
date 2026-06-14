@@ -1403,6 +1403,455 @@ components:
           maxLength: 500
       required:
         - sessionId
+    ClassList:
+      type: object
+      properties:
+        classes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Class"
+      required:
+        - classes
+    Class:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        goalText:
+          type:
+            - string
+            - "null"
+        schoolYear:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - goalText
+        - schoolYear
+        - createdAt
+        - updatedAt
+    CreateClassInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        goalText:
+          type: string
+          maxLength: 200
+        schoolYear:
+          type: string
+          maxLength: 16
+      required:
+        - name
+    UpdateClassInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        goalText:
+          type:
+            - string
+            - "null"
+          maxLength: 200
+        schoolYear:
+          type:
+            - string
+            - "null"
+          maxLength: 16
+    StudentList:
+      type: object
+      properties:
+        students:
+          type: array
+          items:
+            $ref: "#/components/schemas/Student"
+      required:
+        - students
+    Student:
+      type: object
+      properties:
+        id:
+          type: string
+        classId:
+          type: string
+        displayName:
+          type: string
+        status:
+          type: string
+          enum:
+            - active
+            - archived
+        enrolledAt:
+          type:
+            - string
+            - "null"
+        leftAt:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - classId
+        - displayName
+        - status
+        - enrolledAt
+        - leftAt
+        - createdAt
+        - updatedAt
+    CreateStudentInput:
+      type: object
+      properties:
+        classId:
+          type: string
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        enrolledAt:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+      required:
+        - classId
+        - displayName
+    UpdateStudentInput:
+      type: object
+      properties:
+        classId:
+          type: string
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 50
+    BatonNoteList:
+      type: object
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatonNote"
+      required:
+        - notes
+    BatonNote:
+      type: object
+      properties:
+        id:
+          type: string
+        studentId:
+          type: string
+        authorUserId:
+          type:
+            - string
+            - "null"
+        noteDate:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - studentId
+        - authorUserId
+        - noteDate
+        - content
+        - createdAt
+        - updatedAt
+    CreateBatonNoteInput:
+      type: object
+      properties:
+        studentId:
+          type: string
+        noteDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required:
+        - studentId
+        - noteDate
+        - content
+    UpdateBatonNoteInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required:
+        - content
+    StudentReactionList:
+      type: object
+      properties:
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentReaction"
+      required:
+        - reactions
+    StudentReaction:
+      type: object
+      properties:
+        id:
+          type: string
+        studentId:
+          type: string
+        userId:
+          type: string
+        reactionType:
+          type: string
+          enum:
+            - positive
+            - concern
+        createdAt:
+          type: string
+      required:
+        - id
+        - studentId
+        - userId
+        - reactionType
+        - createdAt
+    ToggleStudentReactionResult:
+      type: object
+      properties:
+        active:
+          type: boolean
+      required:
+        - active
+    ToggleStudentReactionInput:
+      type: object
+      properties:
+        studentId:
+          type: string
+        reactionType:
+          type: string
+          enum:
+            - positive
+            - concern
+      required:
+        - studentId
+        - reactionType
+    RosterImportResult:
+      type: object
+      properties:
+        classesCreated:
+          type: integer
+        classesUpdated:
+          type: integer
+        studentsAdded:
+          type: integer
+        studentsSkipped:
+          type: integer
+      required:
+        - classesCreated
+        - classesUpdated
+        - studentsAdded
+        - studentsSkipped
+    RosterImportInput:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              className:
+                type: string
+                minLength: 1
+                maxLength: 50
+              classGoal:
+                type: string
+                maxLength: 200
+              studentName:
+                type: string
+                minLength: 1
+                maxLength: 50
+            required:
+              - className
+              - studentName
+          minItems: 1
+          maxItems: 2000
+      required:
+        - rows
+    StaffroomBoardList:
+      type: object
+      properties:
+        boards:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffroomBoard"
+      required:
+        - boards
+    StaffroomBoard:
+      type: object
+      properties:
+        id:
+          type: string
+        boardKind:
+          type: string
+          enum:
+            - keep
+            - concern
+            - thanks
+            - help
+            - knowledge
+            - tweet
+        content:
+          type: string
+        isPublic:
+          type: boolean
+        studentId:
+          type:
+            - string
+            - "null"
+        classId:
+          type:
+            - string
+            - "null"
+        authorUserId:
+          type:
+            - string
+            - "null"
+        reactions:
+          type: object
+          properties:
+            knowledge:
+              type: object
+              properties:
+                count:
+                  type: integer
+                mine:
+                  type: boolean
+              required:
+                - count
+                - mine
+            appreciation:
+              type: object
+              properties:
+                count:
+                  type: integer
+                mine:
+                  type: boolean
+              required:
+                - count
+                - mine
+            endorsement:
+              type: object
+              properties:
+                count:
+                  type: integer
+                mine:
+                  type: boolean
+              required:
+                - count
+                - mine
+          required:
+            - knowledge
+            - appreciation
+            - endorsement
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - boardKind
+        - content
+        - isPublic
+        - studentId
+        - classId
+        - authorUserId
+        - reactions
+        - createdAt
+        - updatedAt
+    CreateStaffroomBoardInput:
+      type: object
+      properties:
+        boardKind:
+          type: string
+          enum:
+            - keep
+            - concern
+            - thanks
+            - help
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        isPublic:
+          type: boolean
+        studentId:
+          type: string
+        classId:
+          type: string
+      required:
+        - boardKind
+        - content
+    StaffroomStudentSupport:
+      type: object
+      properties:
+        classes:
+          type: array
+          items:
+            type: object
+            properties:
+              classId:
+                type: string
+              className:
+                type: string
+              schoolYear:
+                type:
+                  - string
+                  - "null"
+              students:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    studentId:
+                      type: string
+                    displayName:
+                      type: string
+                    positiveCount:
+                      type: integer
+                    concernCount:
+                      type: integer
+                    notes:
+                      type: array
+                      items:
+                        type: string
+                  required:
+                    - studentId
+                    - displayName
+                    - positiveCount
+                    - concernCount
+                    - notes
+            required:
+              - classId
+              - className
+              - schoolYear
+              - students
+      required:
+        - classes
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -3977,6 +4426,100 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/journal/kind-suggest:
+    post:
+      summary: 本文から journal 種別を AI が提案（そっと提案・本人確定）
+      description: 提案のみで保存はしない。本人が確認ステップで種別を確定する。フラグ off は 404、利用上限超過は 429、AI 基盤不可は 503。
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+              required:
+                - content
+      responses:
+        "200":
+          description: AI の種別提案（suggestedKind=null は tweet 据え置き）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestedKind:
+                    type:
+                      - string
+                      - "null"
+                    enum:
+                      - knowledge
+                      - thanks
+                      - help
+                      - null
+                  confidence:
+                    type: string
+                    enum:
+                      - high
+                      - medium
+                      - low
+                required:
+                  - suggestedKind
+                  - confidence
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: 1 日の利用上限に到達
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: AI 基盤が一時的に利用不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/ai-chat/confirm:
     post:
       summary: タスク候補を確定（作成）または破棄
@@ -4109,6 +4652,974 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/classes:
+    get:
+      summary: クラス一覧取得
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      responses:
+        "200":
+          description: クラス一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassList"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: クラス作成
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClassInput"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class:
+                    $ref: "#/components/schemas/Class"
+                required:
+                  - class
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/classes/{id}:
+    patch:
+      summary: クラス更新（クラス目標等）
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClassInput"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  class:
+                    $ref: "#/components/schemas/Class"
+                required:
+                  - class
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/students:
+    get:
+      summary: 生徒一覧取得（クラス指定）
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: classId
+          in: query
+      responses:
+        "200":
+          description: 生徒一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentList"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: 生徒作成（手動ロスター投入）
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentInput"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  student:
+                    $ref: "#/components/schemas/Student"
+                required:
+                  - student
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/students/{id}:
+    patch:
+      summary: 生徒の更新（クラス移動 / 氏名・学年の修正）
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStudentInput"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  student:
+                    $ref: "#/components/schemas/Student"
+                required:
+                  - student
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/notes:
+    get:
+      summary: 生徒欄の一言取得（クラス + 日付で生徒横断）
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: classId
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: true
+          name: date
+          in: query
+      responses:
+        "200":
+          description: ノート一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatonNoteList"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: 生徒欄に一言を追加（append-only）
+      description: 著者は自動的に現在のセッションユーザー。同じ生徒・同じ日に何度でも追加できる。
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBatonNoteInput"
+      responses:
+        "201":
+          description: 追加成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: "#/components/schemas/BatonNote"
+                required:
+                  - note
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/notes/{id}:
+    patch:
+      summary: 自分の一言を編集
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBatonNoteInput"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: "#/components/schemas/BatonNote"
+                required:
+                  - note
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: 自分の一言を削除
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: 削除成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/reactions:
+    get:
+      summary: 生徒への印（ポジティブ/気になる）一覧取得（クラス指定）
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: classId
+          in: query
+      responses:
+        "200":
+          description: リアクション一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentReactionList"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: 生徒への印をトグル（付与/解除）
+      description: positive(ポジティブ)/concern(気になる)。複数教員が各自トグル。数値化・ランキングはしない。
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleStudentReactionInput"
+      responses:
+        "200":
+          description: トグル後の状態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToggleStudentReactionResult"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/import:
+    post:
+      summary: ロスター CSV インポート（クラス・クラス目標・生徒を一括登録）
+      description: "クライアントで CSV をパースした行 (className/classGoal/studentName/grade) を送る。冪等: クラスは名前で統合・目標は最新値で更新・生徒は同名スキップ。"
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RosterImportInput"
+      responses:
+        "200":
+          description: 取り込み結果のサマリ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RosterImportResult"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/staffroom/board:
+    get:
+      summary: 職員室ボード投稿の一覧取得（種別・クラスで絞り込み可）
+      tags:
+        - Staffroom
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - keep
+              - concern
+              - thanks
+              - help
+              - knowledge
+              - tweet
+          required: false
+          name: boardKind
+          in: query
+        - schema:
+            type: string
+          required: false
+          name: classId
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: false
+          name: from
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: false
+          name: to
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          required: false
+          name: limit
+          in: query
+        - schema:
+            type:
+              - integer
+              - "null"
+            minimum: 0
+          required: false
+          name: offset
+          in: query
+      responses:
+        "200":
+          description: ボード投稿一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffroomBoardList"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: 職員室ボードに投稿（KPT+Thanks / Help / 共有）
+      description: is_public=false 固定で個人タイムラインには載らない。boardType=kpt のとき kptLabel 必須。数値化・ランキングはしない。
+      tags:
+        - Staffroom
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffroomBoardInput"
+      responses:
+        "201":
+          description: 投稿成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  board:
+                    $ref: "#/components/schemas/StaffroomBoard"
+                required:
+                  - board
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/staffroom/student-support:
+    get:
+      summary: 生徒サポート（朝バトンをクラス別に集約）
+      description: A→B seam。印が付いた生徒をクラス(学年)別に 名前 + 印件数 + 今週の一言 で返す。数値化・ランキングはしない。
+      tags:
+        - Staffroom
+      security:
+        - *a2
+      responses:
+        "200":
+          description: 生徒サポート
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffroomStudentSupport"
         "400":
           description: バリデーションエラー
           content:

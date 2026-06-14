@@ -31,9 +31,10 @@ import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
 import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
 import { ErrorMessage } from '@/shared/components/ErrorMessage';
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
-import { EntryForm } from '@/features/journal/components/EntryForm';
-import type { JournalEntry } from '@/db/schema';
+import {
+  TodayCaptureBox,
+  type CaptureKind,
+} from '@/features/journal/components/TodayCaptureBox';
 
 function emptyReactions(): Reactions {
   return {
@@ -78,34 +79,22 @@ interface PublicTimelineRailProps {
   mode?: 'side' | 'modal';
 }
 
-type RailTab = 'staffroom' | 'mine';
-
 // 編集/削除モーダル状態 (chimo 2026-05-21: 旧 TimelineTab から移管。
 // 自分の投稿カード右上の 3 点リーダー → 編集 / 削除 を開く)
 type RailModalState =
   | { kind: 'closed' }
-  | { kind: 'edit'; entryId: string }
+  | { kind: 'edit'; entryId: string; content: string; entryKind: CaptureKind }
   | { kind: 'confirm-delete'; entryId: string };
-
-interface EntryDetailResponse {
-  entry: JournalEntry & {
-    tags?: Array<{ id: string }>;
-    knowledgeTags?: Array<{ id: string }>;
-  };
-}
 
 export function PublicTimelineRail({
   selfUserId,
   mode = 'side',
 }: PublicTimelineRailProps) {
-  const [tab, setTab] = useState<RailTab>('staffroom');
   const [modal, setModal] = useState<RailModalState>({ kind: 'closed' });
   const { mutate: globalMutate } = useSWRConfig();
-  // tab で fetch URL を切り替え (SWR は key 別に独立 cache、 切替時に再 fetch)
-  const fetchUrl =
-    tab === 'staffroom'
-      ? `/api/public/journal/entries?page=1&perPage=${RAIL_PAGE_SIZE}`
-      : `/api/private/journal/entries/mine?page=1&perPage=${RAIL_PAGE_SIZE}`;
+
+  // 右レーンは職員室ノート (公開タイムライン) 単独。マイノートタブは撤去 (chimo 2026-06-12)。
+  const fetchUrl = `/api/public/journal/entries?page=1&perPage=${RAIL_PAGE_SIZE}`;
   // chimo 2026-05-21: refreshInterval / revalidateOnFocus を無効化。
   // 自動再 fetch が in-flight 古い request の結果で楽観的更新を上書きする
   // race の原因になっていた。 自分の create / edit / delete は楽観的更新で
@@ -118,6 +107,12 @@ export function PublicTimelineRail({
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
     },
+  );
+
+  // 職員室ノート (タイムライン) は diary 以外の全種別を流す
+  // (tweet/knowledge + board 4 種。diary は個人面のみ・chimo 2026-06-12)。
+  const visibleEntries = (data?.entries ?? []).filter(
+    (e) => (e.kind ?? 'diary') !== 'diary',
   );
 
   // 楽観的更新パターン (TimelineList と同じ): mutate(更新後 cache, revalidate=false)
@@ -163,75 +158,22 @@ export function PublicTimelineRail({
     }
   };
 
-  const emptyMessage =
-    tab === 'staffroom'
-      ? 'まだ公開された投稿はありません'
-      : 'まだ投稿はありません';
+  const emptyMessage = 'まだ公開された投稿はありません';
 
-  // 編集 / 削除モーダル成功時の楽観的更新 (chimo 2026-05-21: server fetch を
-  // 待つと体感ラグが出るうえ、 race で楽観的更新が古い結果で上書きされる)。
-  // revalidate: false で勝手に refetch しない (in-flight 古い GET が optimistic を
-  // 上書きする race 防止)。 server 最新は 30s refreshInterval / focus で sync。
-  const handleModalSuccess = async (
-    result?: import('@/features/journal/components/EntryForm').EntrySaveResult,
-  ) => {
-    // モーダル切替前の操作内容を捕捉 (setModal 後は modal が closed になる)
-    const prevModal = modal;
+  // 削除成功時の楽観的更新: 該当エントリを職員室ノート cache から除去する
+  // (server fetch を待つと体感ラグ + race で楽観的更新が古い結果に上書きされるため)。
+  // 編集は TodayCaptureBox 内の refreshFeeds (mutate) に委ねる。
+  const handleDeleteSuccess = async (deletedId: string) => {
     setModal({ kind: 'closed' });
-
-    const MINE_KEY = `/api/private/journal/entries/mine?page=1&perPage=${RAIL_PAGE_SIZE}`;
     const STAFFROOM_KEY = `/api/public/journal/entries?page=1&perPage=${RAIL_PAGE_SIZE}`;
     type RailCache = RailResponse | undefined;
-
-    if (prevModal.kind === 'edit' && result?.entry) {
-      // 編集: 該当エントリを map で同フィールド差し替え
-      // (kind / isPublic が変わるケースは server 整形を待つ = 30s revalidate に委ねる)
-      const updated = result.entry;
-      const updateMatching = (current: RailCache): RailCache => {
-        if (!current) return current;
-        return {
-          ...current,
-          entries: current.entries.map((e) =>
-            e.id === updated.id
-              ? {
-                  ...e,
-                  content: updated.content,
-                  isPublic: updated.isPublic,
-                  mood: updated.mood,
-                  kind: updated.kind,
-                  tags: result.tags,
-                }
-              : e,
-          ),
-        };
-      };
-      void globalMutate(MINE_KEY, updateMatching, { revalidate: false });
-      void globalMutate(STAFFROOM_KEY, updateMatching, { revalidate: false });
-      return;
-    }
-
-    if (prevModal.kind === 'confirm-delete') {
-      const deletedId = prevModal.entryId;
-      const removeMatching = (current: RailCache): RailCache => {
-        if (!current) return current;
-        return {
-          ...current,
-          entries: current.entries.filter((e) => e.id !== deletedId),
-        };
-      };
-      void globalMutate(MINE_KEY, removeMatching, { revalidate: false });
-      void globalMutate(STAFFROOM_KEY, removeMatching, { revalidate: false });
-      return;
-    }
-
-    // フォールバック: 想定外の経路は通常 invalidate のみ
-    await globalMutate(
-      (key) =>
-        typeof key === 'string' &&
-        (key.startsWith('/api/private/journal/entries/mine') ||
-          key.startsWith('/api/public/journal/entries')),
-      undefined,
-      { revalidate: true },
+    void globalMutate(
+      STAFFROOM_KEY,
+      (current: RailCache): RailCache =>
+        current
+          ? { ...current, entries: current.entries.filter((e) => e.id !== deletedId) }
+          : current,
+      { revalidate: false },
     );
   };
 
@@ -244,26 +186,16 @@ export function PublicTimelineRail({
     <aside
       className={asideClass}
       data-testid="public-timeline-rail"
-      aria-label="日々ノート (職員室 / マイ 切替)"
+      aria-label="職員室ノート"
     >
-      {/* chimo 2026-05-20: 「職員室ノート」 単独 → 「職員室ノート / マイノート」 タブ切替に。
-          文字サイズは 16px のまま、 active は下線 indigo + slate-800 / 太字、 non-active は slate-400 */}
-      <header
-        className="flex items-stretch border-b border-vn-border px-5"
-        role="tablist"
-      >
-        <RailTabButton
-          active={tab === 'staffroom'}
-          onClick={() => setTab('staffroom')}
-          label="職員室ノート"
-          testId="public-timeline-rail-tab-staffroom"
-        />
-        <RailTabButton
-          active={tab === 'mine'}
-          onClick={() => setTab('mine')}
-          label="マイノート"
-          testId="public-timeline-rail-tab-mine"
-        />
+      {/* chimo 2026-06-12: マイノートタブを撤去し職員室ノート単独に。 */}
+      <header className="border-b border-vn-border px-5">
+        <h2
+          className="pb-3.5 pt-5 text-[16px] font-bold leading-[1.4] text-slate-800"
+          data-testid="public-timeline-rail-title"
+        >
+          職員室ノート
+        </h2>
       </header>
 
       <div className="flex-1 overflow-y-auto">
@@ -275,7 +207,7 @@ export function PublicTimelineRail({
             読み込みに失敗しました
           </p>
         )}
-        {data && data.entries.length === 0 && (
+        {data && visibleEntries.length === 0 && (
           <p
             className="px-5 py-6 text-[13px] leading-[1.6] text-slate-400"
             data-testid="public-timeline-rail-empty"
@@ -283,15 +215,22 @@ export function PublicTimelineRail({
             {emptyMessage}
           </p>
         )}
-        {data && data.entries.length > 0 && (
+        {data && visibleEntries.length > 0 && (
           <ul className="divide-y divide-slate-100">
-            {data.entries.map((e) => (
+            {visibleEntries.map((e) => (
               <RailItem
                 key={e.id}
                 entry={e}
                 isMine={e.userId === selfUserId}
                 onToggleReaction={toggleReaction}
-                onEdit={(id) => setModal({ kind: 'edit', entryId: id })}
+                onEdit={(en) =>
+                  setModal({
+                    kind: 'edit',
+                    entryId: en.id,
+                    content: en.content,
+                    entryKind: (en.kind ?? 'tweet') as CaptureKind,
+                  })
+                }
                 onDelete={(id) =>
                   setModal({ kind: 'confirm-delete', entryId: id })
                 }
@@ -304,14 +243,15 @@ export function PublicTimelineRail({
       <Modal
         open={modal.kind === 'edit'}
         onClose={() => setModal({ kind: 'closed' })}
-        title="今日の出来事を書く"
+        title="職員室ノートを編集"
         maxWidth="max-w-xl"
       >
         {modal.kind === 'edit' && (
-          <EditEntryModalBody
-            entryId={modal.entryId}
-            onSuccess={handleModalSuccess}
-            onCancel={() => setModal({ kind: 'closed' })}
+          <TodayCaptureBox
+            editId={modal.entryId}
+            initialContent={modal.content}
+            initialKind={modal.entryKind}
+            onSuccess={() => setModal({ kind: 'closed' })}
           />
         )}
       </Modal>
@@ -324,41 +264,12 @@ export function PublicTimelineRail({
         {modal.kind === 'confirm-delete' && (
           <ConfirmDeleteModalBody
             entryId={modal.entryId}
-            onSuccess={handleModalSuccess}
+            onSuccess={() => handleDeleteSuccess(modal.entryId)}
             onCancel={() => setModal({ kind: 'closed' })}
           />
         )}
       </Modal>
     </aside>
-  );
-}
-
-function RailTabButton({
-  active,
-  onClick,
-  label,
-  testId,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  testId: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      data-testid={testId}
-      className={`-mb-px flex-1 pb-3.5 pt-5 text-center text-[16px] leading-[1.4] transition-colors ${
-        active
-          ? 'border-b-2 border-vn-accent font-bold text-slate-800'
-          : 'border-b-2 border-transparent font-medium text-slate-400 hover:text-slate-600'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -377,7 +288,7 @@ function RailItem({
     next: boolean,
   ) => void | Promise<void>;
   // 編集/削除コールバック (isMine=true のときのみ kebab メニューから発火)
-  onEdit: (entryId: string) => void;
+  onEdit: (entry: RailEntry) => void;
   onDelete: (entryId: string) => void;
 }) {
   // chimo 2026-05-21: system_admin 兼任アカウントの投稿は AI 週次日誌 β カードとして
@@ -448,7 +359,7 @@ function RailItem({
             )}
             <RailItemMenu
               entryId={entry.id}
-              onEdit={() => onEdit(entry.id)}
+              onEdit={() => onEdit(entry)}
               onDelete={() => onDelete(entry.id)}
             />
           </div>
@@ -536,7 +447,7 @@ function AiPostRailItem({
     type: JournalReactionType,
     next: boolean,
   ) => void | Promise<void>;
-  onEdit: (entryId: string) => void;
+  onEdit: (entry: RailEntry) => void;
   onDelete: (entryId: string) => void;
 }) {
   const reactions = entry.reactions ?? emptyReactions();
@@ -567,7 +478,7 @@ function AiPostRailItem({
           <div className="flex shrink-0 items-center gap-1.5">
             <RailItemMenu
               entryId={entry.id}
-              onEdit={() => onEdit(entry.id)}
+              onEdit={() => onEdit(entry)}
               onDelete={() => onDelete(entry.id)}
             />
           </div>
@@ -694,58 +605,6 @@ function RailItemMenu({
         </div>
       )}
     </div>
-  );
-}
-
-// 編集モーダル中身 (chimo 2026-05-21: 旧 TimelineTab から移管)。
-// 既存 entry の詳細を fetch → EntryForm の mode='edit' に流す。
-function EditEntryModalBody({
-  entryId,
-  onSuccess,
-  onCancel,
-}: {
-  entryId: string;
-  onSuccess: () => Promise<void>;
-  onCancel: () => void;
-}) {
-  const { data, error, isLoading } = useSWR(
-    `/api/private/journal/entries/${entryId}`,
-    jsonFetcher<EntryDetailResponse>,
-  );
-
-  if (isLoading) {
-    return (
-      <div className="py-6 text-center">
-        <LoadingSpinner label="読み込み中" />
-      </div>
-    );
-  }
-  if (error || !data) {
-    return <ErrorMessage message="エントリの取得に失敗しました" />;
-  }
-
-  // edit 時の kind 別 tagIds 振り分け:
-  //   knowledge → knowledgeTags / それ以外 → tags (emotion_tags)
-  const tagIds =
-    data.entry.kind === 'knowledge'
-      ? data.entry.knowledgeTags?.map((t) => t.id) ?? []
-      : data.entry.tags?.map((t) => t.id) ?? [];
-
-  return (
-    <EntryForm
-      mode="edit"
-      kind={data.entry.kind}
-      initialData={{
-        id: data.entry.id,
-        kind: data.entry.kind,
-        content: data.entry.content,
-        tagIds,
-        isPublic: data.entry.isPublic,
-        mood: data.entry.mood,
-      }}
-      onSuccess={onSuccess}
-      onCancel={onCancel}
-    />
   );
 }
 

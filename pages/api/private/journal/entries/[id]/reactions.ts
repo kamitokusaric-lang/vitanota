@@ -16,6 +16,8 @@ import {
   type JournalReactionType,
 } from '@/features/journal/schemas/journal';
 import { logger } from '@/shared/lib/logger';
+import { logEvent, LogEvents } from '@/shared/lib/log-events';
+import { BOARD_KINDS } from '@/features/staffroom/lib/staffroomRepository';
 
 export default async function handler(
   req: NextApiRequest,
@@ -62,8 +64,9 @@ async function handleAdd(
       pickDbRole(ctx),
       async (tx) => {
         // entry の存在確認のみ (自分の投稿への reaction も許可)
+        // kind は staffroom board 投稿のリアクション計測 (循環の「反応する」段階) のため取得。
         const [entry] = await tx
-          .select({ id: journalEntries.id })
+          .select({ id: journalEntries.id, kind: journalEntries.kind })
           .from(journalEntries)
           .where(
             and(
@@ -83,12 +86,21 @@ async function handleAdd(
             reactionType: type,
           })
           .onConflictDoNothing();
-        return { status: 201 as const };
+        return { status: 201 as const, kind: entry.kind };
       },
     );
 
     if (result.status === 404) {
       return res.status(404).json({ error: 'ENTRY_NOT_FOUND' });
+    }
+    // H7-B: 職員室ボード投稿へのリアクションだけ循環計測ログを出す (info のみ)
+    if ((BOARD_KINDS as readonly string[]).includes(result.kind)) {
+      logEvent(LogEvents.StaffroomBoardReacted, {
+        userId: ctx.userId,
+        tenantId: ctx.tenantId,
+        boardEntryId: entryId,
+        reactionType: type,
+      });
     }
     return res.status(201).end();
   } catch (err) {

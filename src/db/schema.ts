@@ -31,11 +31,18 @@ export const moodLevelEnum = pgEnum('mood_level', [
   'very_negative',
 ]);
 
-// 投稿種別 (diary: 日々ノート / knowledge: ナレッジノート / tweet: つぶやき)
+// 投稿種別。
+//   diary/knowledge/tweet : 日々ノート / ナレッジノート / つぶやき
+//   keep/concern/thanks/help : 職員室ボード (H7-B staffroom / migration 0050)。
+//     続けたい / 気になる / ありがとう / たすけて。is_public は他 kind と同じく本人選択。
 export const journalEntryKindEnum = pgEnum('journal_entry_kind', [
   'diary',
   'knowledge',
   'tweet',
+  'keep',
+  'concern',
+  'thanks',
+  'help',
 ]);
 
 // Unit-05: タスク管理
@@ -82,6 +89,18 @@ export const journalReactionTypeEnum = pgEnum('journal_reaction_type', [
   'knowledge',
   'appreciation',
   'endorsement',
+]);
+
+// ── H7 朝のバトンリレー (baton-relay) の enum ────────────────────
+// 生徒の在籍状態。active=在学中, archived=在籍終了。
+// 猶予 1 年後の終端処理 (匿名化/purge) は後続スライス。
+export const studentStatusEnum = pgEnum('student_status', ['active', 'archived']);
+
+// 生徒への「印」リアクション。positive=ポジティブ / concern=気になる。
+// 数値化・スコア化・ランキングはしない (PHILOSOPHY 踏み絵ガード 2)。
+export const studentReactionTypeEnum = pgEnum('student_reaction_type', [
+  'positive',
+  'concern',
 ]);
 
 // ── tenants ────────────────────────────────────────────────────
@@ -262,6 +281,12 @@ export const journalEntries = pgTable(
     // mood は kind='diary' のみ NOT NULL、emotion_tags は kind='tweet' のみ付与可
     // (制約は API/Zod レベルで担保、DB CHECK は付けない)。
     kind: journalEntryKindEnum('kind').notNull().default('diary'),
+    // ── H7-B 職員室ボードの A→B seam 受け口 (board kind のときのみ・migration 0051) ──
+    // 複合 FK ((student_id|class_id, tenant_id) → students|classes) は migration で定義。
+    // drizzle 側は列宣言のみ (journal_entries は students/classes より前方に宣言されるため、
+    // テーブル定義 callback から後方の const を参照すると初期化順序エラーになる)。
+    studentId: uuid('student_id'),
+    classId: uuid('class_id'),
     // マスキング済み本文 (AI 入力用、新規投稿は API 側で生成、既存データは backfill で埋める)
     contentMasked: text('content_masked'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -950,6 +975,144 @@ export const apiRateLimits = pgTable(
   }),
 );
 
+// ─────────────────────────────────────────────────────────────
+// H7 朝のバトンリレー (baton-relay) — 学校知の循環の入口 (migration 0049)
+// 循環の正本: docs/proposal/h7-circulation.md / build spec: docs/baton-relay/design.md
+// ─────────────────────────────────────────────────────────────
+
+// ── classes (クラス・クラス目標の最小単位) ─────────────────────
+export const classes = pgTable(
+  'classes',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    goalText: text('goal_text'),
+    schoolYear: text('school_year'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // SP-U02-04 Layer 8: 複合 FK の参照先として必要な UNIQUE 制約
+    idTenantUnique: unique('classes_id_tenant_unique').on(table.id, table.tenantId),
+    tenantIdx: index('classes_tenant_idx').on(table.tenantId),
+  }),
+);
+
+// ── students (生徒・最小 PII) ──────────────────────────────────
+// users (教員) とは別系統の未成年。最小 PII に留め、恒久 dossier 化しない。
+// 保持期間 = 在学期間 + 卒業後 1 年の猶予 (baton-relay §7)。終端バッチは後続スライス。
+export const students = pgTable(
+  'students',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    classId: uuid('class_id').notNull(),
+    displayName: text('display_name').notNull(),
+    status: studentStatusEnum('status').notNull().default('active'),
+    enrolledAt: date('enrolled_at'),
+    leftAt: date('left_at'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    idTenantUnique: unique('students_id_tenant_unique').on(table.id, table.tenantId),
+    // 複合 FK: クロステナント参照の物理防止
+    classFk: foreignKey({
+      columns: [table.classId, table.tenantId],
+      foreignColumns: [classes.id, classes.tenantId],
+      name: 'students_class_fk',
+    }).onDelete('cascade'),
+    tenantIdx: index('students_tenant_idx').on(table.tenantId),
+    classIdx: index('students_class_idx').on(table.classId),
+  }),
+);
+
+// ── baton_notes (生徒欄の一言・append-only ログ) ───────────────
+// 同じ著者が同じ生徒・同じ日に何度でも行追加できる (一意制約を張らない)。
+// 「誰が書いた変更か」は author_user_id + 行追加で表現 (引き継ぎ用・採点ではない)。
+export const batonNotes = pgTable(
+  'baton_notes',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull(),
+    authorUserId: uuid('author_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    noteDate: date('note_date').notNull(),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    idTenantUnique: unique('baton_notes_id_tenant_unique').on(table.id, table.tenantId),
+    studentFk: foreignKey({
+      columns: [table.studentId, table.tenantId],
+      foreignColumns: [students.id, students.tenantId],
+      name: 'baton_notes_student_fk',
+    }).onDelete('cascade'),
+    tenantStudentDateIdx: index('baton_notes_tenant_student_date_idx').on(
+      table.tenantId,
+      table.studentId,
+      table.noteDate,
+    ),
+    studentCreatedIdx: index('baton_notes_student_created_idx').on(
+      table.studentId,
+      table.createdAt,
+    ),
+  }),
+);
+
+// ── student_reactions (印 = ポジティブ/気になる・journal リアクション同型) ─
+// 1 教員 × 1 生徒 × 1 reaction_type で 1 行 (トグル)。複数教員が各自 1 行。
+// 数値化・ランキングしない (踏み絵ガード 2/3)。
+export const studentReactions = pgTable(
+  'student_reactions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    reactionType: studentReactionTypeEnum('reaction_type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    studentFk: foreignKey({
+      columns: [table.studentId, table.tenantId],
+      foreignColumns: [students.id, students.tenantId],
+      name: 'student_reactions_student_fk',
+    }).onDelete('cascade'),
+    // 1 教員 1 生徒 1 種で 1 行 (トグル整合)
+    uniq: unique('student_reactions_uniq').on(
+      table.tenantId,
+      table.studentId,
+      table.userId,
+      table.reactionType,
+    ),
+    tenantStudentIdx: index('student_reactions_tenant_student_idx').on(
+      table.tenantId,
+      table.studentId,
+    ),
+  }),
+);
+
+// ─────────────────────────────────────────────────────────────
+// H7-B 職員室ボード (staffroom) — 学校知の循環の出口 (migration 0051)
+// 循環の正本: docs/proposal/h7-circulation.md / build spec: docs/staffroom/design.md
+// 板の投稿は journal_entries(kind='board') として持つ (専用テーブルにしない)。
+// ─────────────────────────────────────────────────────────────
+
 // ── 型エクスポート ─────────────────────────────────────────────
 export type JournalEntry = typeof journalEntries.$inferSelect;
 export type NewJournalEntry = typeof journalEntries.$inferInsert;
@@ -991,3 +1154,11 @@ export type TodayPlanItem = typeof todayPlanItems.$inferSelect;
 export type NewTodayPlanItem = typeof todayPlanItems.$inferInsert;
 export type ApiRateLimit = typeof apiRateLimits.$inferSelect;
 export type NewApiRateLimit = typeof apiRateLimits.$inferInsert;
+export type Class = typeof classes.$inferSelect;
+export type NewClass = typeof classes.$inferInsert;
+export type Student = typeof students.$inferSelect;
+export type NewStudent = typeof students.$inferInsert;
+export type BatonNote = typeof batonNotes.$inferSelect;
+export type NewBatonNote = typeof batonNotes.$inferInsert;
+export type StudentReaction = typeof studentReactions.$inferSelect;
+export type NewStudentReaction = typeof studentReactions.$inferInsert;

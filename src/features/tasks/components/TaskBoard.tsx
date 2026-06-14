@@ -154,8 +154,6 @@ export function TaskBoard({ selfUserId, filters }: TaskBoardProps) {
 
   return (
     <div data-testid="task-board">
-      {/* Linear 風 filter row: chip 4 つを左寄せ + 右端に新規ボタン
-          chimo 2026-05-20: 高さ 34px / 14px / pill、 wrap 下余白 28px */}
       {/* Phase 7: filter UI は親 (TasksTabWithCalendar) に上げて board / week / month で共有 */}
       <TaskMatrix
         tasks={filteredTasks}

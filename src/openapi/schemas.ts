@@ -148,24 +148,6 @@ export const onboardingStateResponseSchema = z
   .openapi('OnboardingStateResponse');
 
 // ─────────────────────────────────────────────────────────────
-// Announcement レスポンス型（運営からのお知らせ）
-// ─────────────────────────────────────────────────────────────
-export const announcementSchema = z
-  .object({
-    id: z.string().guid(),
-    publishDate: z.string().openapi({ example: '2026-06-01' }),
-    title: z.string().openapi({ example: 'メンテナンスのお知らせ' }),
-    body: z.array(z.string()),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  })
-  .openapi('Announcement');
-
-export const announcementsResponseSchema = z
-  .object({ announcements: z.array(announcementSchema) })
-  .openapi('AnnouncementsResponse');
-
-// ─────────────────────────────────────────────────────────────
 // Invitation レスポンス型
 // ─────────────────────────────────────────────────────────────
 // 招待作成 (POST /api/invitations) のリクエスト body

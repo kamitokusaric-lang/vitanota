@@ -751,31 +751,6 @@ export const feedbackReplies = pgTable(
   }),
 );
 
-// ── announcements (migration 0035) ─────────────────────────
-// 開発者からのお知らせ。system_admin が管理画面から CRUD、全テナント共通。
-// body は JSONB で string[] (行ごとの箱条書き)。
-export const announcements = pgTable(
-  'announcements',
-  {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    publishDate: date('publish_date').notNull(),
-    title: text('title').notNull(),
-    body: jsonb('body').notNull().default([]),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => ({
-    publishDateIdx: index('announcements_publish_date_idx').on(
-      table.publishDate,
-      table.createdAt,
-    ),
-  }),
-);
-
 // ── user_filter_preferences (migration 0034) ─────────────────
 // ユーザーごとフィルタ設定保存 (TaskBoard 等のカスタムフィルタを記憶)
 // context: 'tasks' / 'journal' (将来) 等で識別
@@ -1146,8 +1121,6 @@ export type UserFilterPreference = typeof userFilterPreferences.$inferSelect;
 export type NewUserFilterPreference = typeof userFilterPreferences.$inferInsert;
 export type UserOnboardingState = typeof userOnboardingStates.$inferSelect;
 export type NewUserOnboardingState = typeof userOnboardingStates.$inferInsert;
-export type Announcement = typeof announcements.$inferSelect;
-export type NewAnnouncement = typeof announcements.$inferInsert;
 export type AiSession = typeof aiSessions.$inferSelect;
 export type NewAiSession = typeof aiSessions.$inferInsert;
 export type TodayPlanItem = typeof todayPlanItems.$inferSelect;

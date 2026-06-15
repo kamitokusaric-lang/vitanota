@@ -5,11 +5,14 @@ import type { ClassDto } from '../types';
 interface RosterAddProps {
   classes: ClassDto[];
   onCreateClass: (name: string, goalText: string) => Promise<void>;
+  // 親 (生徒ノートの「＋」タブ等) が既に「クラス追加」を表現している場合は
+  // 内側のトグルを出さず入力欄を直接展開する (二重トグル回避)。
+  alwaysOpen?: boolean;
 }
 
 // クラス追加フォーム (生徒の追加は RosterStudentBulkAdd に一本化)。
-export function RosterAdd({ classes, onCreateClass }: RosterAddProps) {
-  const [open, setOpen] = useState(classes.length === 0);
+export function RosterAdd({ classes, onCreateClass, alwaysOpen = false }: RosterAddProps) {
+  const [open, setOpen] = useState(alwaysOpen || classes.length === 0);
   const [className, setClassName] = useState('');
   const [classGoal, setClassGoal] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,14 +31,16 @@ export function RosterAdd({ classes, onCreateClass }: RosterAddProps) {
 
   return (
     <div className="rounded-vn border border-dashed border-vn-border-strong bg-vn-muted-bg/40 p-3.5">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 text-sm font-medium text-gray-600"
-      >
-        <Plus size={16} aria-hidden />
-        クラスを追加
-      </button>
+      {!alwaysOpen && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-1.5 text-sm font-medium text-gray-600"
+        >
+          <Plus size={16} aria-hidden />
+          クラスを追加
+        </button>
+      )}
 
       {open && (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">

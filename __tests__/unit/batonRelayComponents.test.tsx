@@ -44,6 +44,14 @@ describe('RosterAdd', () => {
     render(<RosterAdd classes={[]} onCreateClass={vi.fn()} />);
     expect(screen.getByRole('button', { name: '作る' })).toBeDisabled();
   });
+
+  it('alwaysOpen ではトグルを出さず入力欄を直接展開する', () => {
+    render(<RosterAdd classes={[makeClass()]} onCreateClass={vi.fn()} alwaysOpen />);
+    // 内側の「クラスを追加」トグルは出ない (親の「＋」タブが既に表現している)
+    expect(screen.queryByRole('button', { name: 'クラスを追加' })).not.toBeInTheDocument();
+    // 入力欄は最初から見えている
+    expect(screen.getByPlaceholderText(/クラス名/)).toBeInTheDocument();
+  });
 });
 
 describe('ClassGoalHeader', () => {

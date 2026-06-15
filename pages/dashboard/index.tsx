@@ -10,7 +10,16 @@
 //     CTA クリックで Modal が開き、 EntryForm が default 'tweet' で起動する。
 import { useState } from 'react';
 import Link from 'next/link';
-import { PenLine, NotebookPen } from 'lucide-react';
+import {
+  PenLine,
+  NotebookPen,
+  Users,
+  ListChecks,
+  BookUser,
+  GraduationCap,
+  LayoutDashboard,
+  BarChart3,
+} from 'lucide-react';
 import { eq } from 'drizzle-orm';
 import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { isAiChatEnabledForTenant } from '@/features/ai-chat/featureFlag';
@@ -77,10 +86,14 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
 function RecordEntrances({
   onWrite,
   onDiary,
+  onOpenRail,
   testIdPrefix = 'quick-record',
 }: {
   onWrite: () => void;
   onDiary: () => void;
+  // narrow のみ: 渡すと「職員室ノート」を見るボタンを入口 2 つと同じ行に並べる
+  // (xl は右レーンが常時表示なので渡さない → 3 つ目は出ない)。
+  onOpenRail?: () => void;
   // narrow / xl の 2 箇所に同コンポーネントを置くため testId を出し分け
   // (Playwright strict mode の重複検出回避)。
   testIdPrefix?: string;
@@ -99,7 +112,7 @@ function RecordEntrances({
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[20px] border-2 border-amber-500 bg-amber-50 px-3 py-2.5 text-center text-[13px] font-medium leading-tight text-amber-700 shadow-sm transition-all hover:bg-amber-100 hover:shadow-md"
         >
           <PenLine size={14} strokeWidth={1.75} className="shrink-0" aria-hidden />
-          職員室ノートに投稿する
+          職員室に投稿する
         </button>
         <button
           type="button"
@@ -108,8 +121,20 @@ function RecordEntrances({
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[20px] border-2 border-sky-400 bg-sky-50 px-3 py-2.5 text-center text-[13px] font-medium leading-tight text-sky-700 shadow-sm transition-all hover:bg-sky-100 hover:shadow-md"
         >
           <NotebookPen size={14} strokeWidth={1.75} className="shrink-0" aria-hidden />
-          自分用の日々ノートを書く
+          日々ノートを書く
         </button>
+        {onOpenRail && (
+          <button
+            type="button"
+            onClick={onOpenRail}
+            data-testid="dashboard-open-note-rail-modal-button"
+            aria-label="職員室ノートを見る"
+            className="inline-flex shrink-0 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-[20px] border-2 border-vn-border-strong bg-white px-3 py-1.5 text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md"
+          >
+            <Users size={18} strokeWidth={1.75} className="shrink-0" aria-hidden />
+            <span className="text-[10px] font-medium leading-none">職員室ノート</span>
+          </button>
+        )}
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
         日々のつぶやき、生徒の様子、相談したいことなどを残せます。
@@ -143,6 +168,7 @@ export default function DashboardPage({
     {
       id: 'tasks',
       label: 'タスクボード',
+      icon: <ListChecks size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <TasksTabWithCalendar
           selfUserId={session.user.userId}
@@ -154,12 +180,14 @@ export default function DashboardPage({
       // chimo 2026-06-11 関係図: マイノートを kind 別に並べる (個人の作業場)。
       id: 'my-notes',
       label: 'マイノート',
+      icon: <BookUser size={18} strokeWidth={1.75} aria-hidden />,
       content: <MyNotesByKind />,
     },
     {
       // chimo 2026-06-11 関係図: 生徒ノート (朝バトンのクラスを学年別に)。
       id: 'student-notes',
       label: '生徒ノート',
+      icon: <GraduationCap size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <StudentNotesByClass
           selfUserId={session.user.userId}
@@ -171,6 +199,7 @@ export default function DashboardPage({
       // chimo 2026-06-14: 職員室ボード(循環の出口)は生徒ノートの後ろに。
       id: 'staffroom',
       label: '職員室ボード',
+      icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden />,
       content: <StaffroomBoard />,
     },
   ];
@@ -179,6 +208,7 @@ export default function DashboardPage({
     mainTabs.push({
       id: 'engagement',
       label: '学校レポート',
+      icon: <BarChart3 size={18} strokeWidth={1.75} aria-hidden />,
       content: <SchoolEngagementTab />,
     });
   }
@@ -194,22 +224,15 @@ export default function DashboardPage({
             data-testid="dashboard-page"
           >
             <div className="min-w-0">
-              {/* narrow (< xl) 専用: 記録入口 pill + 日々ノートモーダル呼出ボタン。
+              {/* narrow (< xl) 専用: 記録入口 2 つ + 職員室ノート閲覧を 1 行横並び。
                   xl 以上では右レーン上部に集約 (chimo 2026-05-21) */}
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:hidden">
+              <div className="mb-4 xl:hidden">
                 <RecordEntrances
                   onWrite={handleOpenCapture}
                   onDiary={handleOpenDiary}
+                  onOpenRail={() => setNoteRailModalOpen(true)}
                   testIdPrefix="narrow-quick-record"
                 />
-                <button
-                  type="button"
-                  onClick={() => setNoteRailModalOpen(true)}
-                  className="inline-flex h-9 shrink-0 items-center rounded-full border border-vn-border-strong bg-white px-4 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
-                  data-testid="dashboard-open-note-rail-modal-button"
-                >
-                  職員室ノート / マイノート
-                </button>
               </div>
               {/* タスク雑入力フォーム (TaskCreateTabs) は タスクボードタブの一番上へ移設
                   (chimo 2026-06-12)。 タスク文脈の入口を board の中に収める。 */}
@@ -232,7 +255,7 @@ export default function DashboardPage({
           <Modal
             open={noteRailModalOpen}
             onClose={() => setNoteRailModalOpen(false)}
-            title="職員室ノート / マイノート"
+            title="職員室ノート"
             maxWidth="max-w-2xl"
           >
             <PublicTimelineRail

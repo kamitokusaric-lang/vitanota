@@ -841,43 +841,6 @@ components:
             - version
       required:
         - state
-    AnnouncementsResponse:
-      type: object
-      properties:
-        announcements:
-          type: array
-          items:
-            $ref: "#/components/schemas/Announcement"
-      required:
-        - announcements
-    Announcement:
-      type: object
-      properties:
-        id:
-          type: string
-        publishDate:
-          type: string
-          example: 2026-06-01
-        title:
-          type: string
-          example: メンテナンスのお知らせ
-        body:
-          type: array
-          items:
-            type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-        - id
-        - publishDate
-        - title
-        - body
-        - createdAt
-        - updatedAt
     InvitationCreatedResponse:
       type: object
       properties:
@@ -3872,56 +3835,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OkResponse"
-        "400":
-          description: バリデーションエラー
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: 未認証
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: 権限不足
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: リソースが見つからない
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "423":
-          description: テナント停止中
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: サーバーエラー
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/announcements:
-    get:
-      summary: 運営からのお知らせ一覧（公開日降順）
-      tags:
-        - Account
-      security:
-        - *a2
-      responses:
-        "200":
-          description: お知らせ一覧
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AnnouncementsResponse"
         "400":
           description: バリデーションエラー
           content:

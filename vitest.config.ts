@@ -76,16 +76,12 @@ export default defineConfig({
         'src/features/profile/**',
         'src/features/invitations/**',
         'src/features/feedback/**',
-        // H7 (朝バトン / 職員室ボード) + 記録入力一本化 の新規 UI / DB 依存 lib。
-        // UI は e2e、service/repository は統合テストでカバー。unit test 整備は backlog。
-        // (rosterImportPlan.ts / parseRosterCsv.ts は unit test 済みなので除外しない)
-        'src/features/baton-relay/components/**',
+        // H7 (朝バトン / 職員室ボード) の DB 依存 service/repository は統合テストでカバー。
+        // 2026-06-15: 新規 UI コンポーネントは全て unit test を整備し coverage 除外を解消した
+        //   (baton-relay / staffroom components, TodayCaptureBox / DiaryNoteBox)。除外は DB 層のみ。
         'src/features/baton-relay/lib/batonRelayService.ts',
         'src/features/baton-relay/lib/batonRelayRepository.ts',
-        'src/features/staffroom/components/**',
         'src/features/staffroom/lib/**',
-        'src/features/journal/components/DiaryNoteBox.tsx',
-        'src/features/journal/components/TodayCaptureBox.tsx',
         // 共有 UI (Layout 系) は test 未整備、MVP 後追加予定
         'src/shared/components/AdminLayout.tsx',
         'src/shared/components/Tabs.tsx',

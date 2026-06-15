@@ -5,8 +5,8 @@
 >
 > この文書は**循環そのもの**（H7 仮説・循環図・踏み絵ゲート・**一体の計測設計**・ガードレール・進め方）の
 > **単一正本**である。各機能の build spec は分割し、ここを参照する:
-> - 入口（生徒情報を書く・溜める）→ [`../baton-relay/design.md`](../baton-relay/design.md)（H7-A）
-> - 出口（学校知として返す）→ [`../staffroom/design.md`](../staffroom/design.md)（H7-B）
+> - 入口（生徒情報を書く・溜める）→ [`../features/baton-relay/design.md`](../features/baton-relay/design.md)（H7-A）
+> - 出口（学校知として返す）→ [`../features/staffroom/design.md`](../features/staffroom/design.md)（H7-B）
 >
 > 循環・踏み絵・計測は**ここにだけ書き、feature 側に複写しない**（README の鉄則「単一正本・契約を複写
 > しない」）。実装が進んだら横断仕様は `foundation/` へ graduate する。
@@ -168,7 +168,7 @@ staffroom がボード・リアクションを持つ）。
 ## 関連
 
 - 起点提案: [`proposal_1.html`](./proposal_1.html)
-- 入口の build spec（H7-A）: [`../baton-relay/design.md`](../baton-relay/design.md)
-- 出口の build spec（H7-B）: [`../staffroom/design.md`](../staffroom/design.md)
+- 入口の build spec（H7-A）: [`../features/baton-relay/design.md`](../features/baton-relay/design.md)
+- 出口の build spec（H7-B）: [`../features/staffroom/design.md`](../features/staffroom/design.md)
 - 設計憲法（踏み絵）: [`../PHILOSOPHY.md`](../PHILOSOPHY.md)
 - AI ふりかえりの §7 退避先: [`../foundation/backlog.md`](../foundation/backlog.md)

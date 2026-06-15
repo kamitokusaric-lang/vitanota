@@ -1,6 +1,6 @@
 # H7 朝バトン 実装 進捗 & 次の手順（次セッション用・手順を間違えないための記録）
 
-> **更新**: 2026-06-09 / **正本リンク**: 循環 [`h7-circulation.md`](./h7-circulation.md)・入口 [`../baton-relay/design.md`](../baton-relay/design.md)・出口 [`../staffroom/design.md`](../staffroom/design.md)
+> **更新**: 2026-06-09 / **正本リンク**: 循環 [`h7-circulation.md`](./h7-circulation.md)・入口 [`../features/baton-relay/design.md`](../features/baton-relay/design.md)・出口 [`../features/staffroom/design.md`](../features/staffroom/design.md)
 >
 > **最重要方針（chimo 2026-06-09）**: **出口（職員室ボード H7-B）まで閉じてから本番に出す。**
 > S1（データ基盤）・S2（画面）を**単独で main にマージ／デプロイしない**。循環が一周する形（入口→出口→反応）になってから一括で出荷する。

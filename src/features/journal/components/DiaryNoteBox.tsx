@@ -97,7 +97,7 @@ export function DiaryNoteBox({
         data-testid="diary-note-banner"
       >
         <Lock size={15} strokeWidth={2} className="shrink-0" aria-hidden />
-        自分だけが見られる記録として保存されます
+        自分だけが見られる記録としてマイノートに保存されます
       </div>
 
       {/* 今の気持ち (mood)。本人選択・AI 不可触。職員室ノートと同じ独立した行の体裁。 */}

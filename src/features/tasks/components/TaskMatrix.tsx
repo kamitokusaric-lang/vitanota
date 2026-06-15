@@ -96,7 +96,7 @@ export function TaskMatrix({
       {/* status ヘッダ (sticky で常に見える、nav h-[72px] の下にピン)
           chimo 2026-05-20: カラム見出しは 16px / 800 / #1E293B、 下線 2px slate-800 */}
       <div
-        className="sticky top-[72px] z-10 mb-3 grid grid-cols-5 gap-5 bg-vn-bg/95 py-2 backdrop-blur"
+        className="sticky top-[72px] z-10 mb-3 hidden grid-cols-5 gap-5 bg-vn-bg/95 py-2 backdrop-blur lg:grid"
       >
         {STATUS_COLS.map((c) => (
           <div
@@ -123,7 +123,7 @@ export function TaskMatrix({
                 </span>
               </h3>
             )}
-            <div className="grid grid-cols-5 gap-5">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-5 lg:gap-5">
               {STATUS_COLS.map((c) => {
                 const cellTasks = grid.get(row.id)?.get(c.id) ?? [];
                 const isDropTarget =
@@ -135,12 +135,17 @@ export function TaskMatrix({
                   <div
                     key={c.id}
                     className={[
-                      // chimo 2026-05-20: カラム背景を薄白 (55%) で塗ってカードとの境界を出す
-                      'min-h-[260px] rounded-xl border p-3 transition-colors',
+                      // モバイルは縦積みのプレーンなセクション。 lg 以上で従来のカラム箱 (背景 55% 白)。
+                      'transition-colors lg:min-h-[260px] lg:rounded-xl lg:border lg:p-3',
+                      // 空セルはモバイルでは出さない (見出し + 空箱が縦に並ぶのを防ぐ)。
+                      // desktop は drag の drop 先として空でも残す (chimo 2026-06-15)。
+                      cellTasks.length === 0 ? 'hidden lg:block' : '',
                       isDropTarget
-                        ? 'border-vn-accent bg-vn-muted-bg'
-                        : 'border-vn-border bg-white/55',
-                    ].join(' ')}
+                        ? 'lg:border-vn-accent lg:bg-vn-muted-bg'
+                        : 'lg:border-vn-border lg:bg-white/55',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                     data-testid={`matrix-cell-${row.id}-${c.id}`}
                     onDragOver={
                       dndEnabled
@@ -180,6 +185,11 @@ export function TaskMatrix({
                         : undefined
                     }
                   >
+                    {/* モバイル専用: 縦積み時にどのステータスかを示す見出し
+                        (desktop は上部 sticky ヘッダが担うので lg:hidden)。 */}
+                    <div className="mb-2 border-b border-vn-border pb-1.5 text-[13px] font-bold leading-[1.4] text-slate-600 lg:hidden">
+                      {c.label}
+                    </div>
                     {cellTasks.length === 0 ? (
                       <div className="py-6"></div>
                     ) : (
@@ -208,6 +218,9 @@ export function TaskMatrix({
                                     }
                                   : undefined
                               }
+                              // モバイル (lg 未満) のドラッグ代替。 drop と同じハンドラを流用。
+                              onChangeStatus={onTaskDropStatus}
+                              statusOptions={STATUS_COLS}
                             />
                           );
                         })}

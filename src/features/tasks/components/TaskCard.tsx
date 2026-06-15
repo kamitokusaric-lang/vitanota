@@ -1,7 +1,9 @@
 // カンバン上の個別タスクカード
 // delegated: 自分が作成したが assignees に自分が含まれないタスク (色違い表示、「あの先生に振ったやつ」を識別)
-// ステータス変更は (1) 編集モーダル の status select、または (2) 横方向ドラッグ&ドロップ で行う。
+// ステータス変更は (1) 編集モーダル の status select、(2) 横方向ドラッグ&ドロップ (PC)、
+// または (3) モバイル (lg 未満) ではカード上の status select で行う (chimo 2026-06-15)。
 import type { TaskAssigneeSummary, TaskWithAssignees } from '../hooks/useTasks';
+import type { TaskStatus } from '../schemas/task';
 
 interface TaskCardProps {
   task: TaskWithAssignees;
@@ -13,6 +15,9 @@ interface TaskCardProps {
   categoryName?: string;
   onDragStart?: (taskId: string) => void;
   onDragEnd?: () => void;
+  // モバイル (lg 未満) 専用: ドラッグの代替。 渡されたときのみカード下に status select を出す。
+  onChangeStatus?: (taskId: string, status: TaskStatus) => void;
+  statusOptions?: { id: TaskStatus; label: string }[];
 }
 
 function formatDate(value: string | Date): string {
@@ -64,6 +69,8 @@ export function TaskCard({
   categoryName,
   onDragStart,
   onDragEnd,
+  onChangeStatus,
+  statusOptions,
 }: TaskCardProps) {
   const draggable = !!onDragStart;
   // 背景色の決定: delegated > mineHighlight > 通常 (delegated と mineHighlight は assignees の包含で排他)
@@ -225,6 +232,31 @@ export function TaskCard({
           </div>
         )}
       </button>
+
+      {/* モバイル (lg 未満) 専用: ドラッグの代替として status を直接変更する select。
+          button の外に置き、 タップ→編集モーダル (onEdit) と操作を分離する。 */}
+      {onChangeStatus && statusOptions && (
+        <div className="mt-2.5 lg:hidden">
+          <label className="sr-only" htmlFor={`task-status-${task.id}`}>
+            ステータスを変更
+          </label>
+          <select
+            id={`task-status-${task.id}`}
+            value={task.status}
+            onChange={(e) =>
+              onChangeStatus(task.id, e.target.value as TaskStatus)
+            }
+            data-testid={`task-card-status-select-${task.id}`}
+            className="w-full rounded-md border border-vn-border bg-white px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:border-slate-400 focus:border-vn-accent focus:outline-none"
+          >
+            {statusOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }

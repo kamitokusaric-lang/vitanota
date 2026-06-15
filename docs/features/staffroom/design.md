@@ -1,14 +1,17 @@
 # staffroom（職員室ダッシュボード / H7-B）設計書
 
-> **位置づけ**: 未実装・staging。`src/features/staffroom/` ⇄ `docs/staffroom/` の build spec。
+> **位置づけ**: 本番実装済（2026-06-15 出荷）。`src/features/staffroom/` の設計記録。
 > **循環そのもの**（H7 仮説・循環図・踏み絵ゲート・一体の計測・進め方）は単一正本
-> [`../proposal/h7-circulation.md`](../proposal/h7-circulation.md) にあり、ここには複写しない。
+> [`../../proposal/h7-circulation.md`](../../proposal/h7-circulation.md) にあり、ここには複写しない。
 > この機能は循環の**出口**（学校知として返し、反応を生む側）を担う。
 >
-> **graduate**: 実装着手時に `docs/features/staffroom/` へ昇格し `docs/README.md` の機能一覧表へ追加、
-> データモデルは `foundation/data-model.md` / RLS は `foundation/rls-and-tenancy.md` へ正本化する。
+> **as-built 差分**（本書は原設計 2026-06-06。実装で変わった主な点）:
+> 職員室ボード = `journal_entries` の kind `keep/concern/thanks/help` 直値（補助 enum 列なし）/
+> **読み取り専用**（起票は右レーン `TodayCaptureBox` に一本化・`BoardComposer` 撤去）/
+> **コメント機能は全撤去**（`staffroom_board_comments` 不採用）/ RLS は migration 直書き。
+> 現行 UI の概要は [overview.md](./overview.md)。下記 §2 / §4 のコメントツリー記述は撤去済。
 
-- **対象仮説**: H7-B（→ [循環の正本](../proposal/h7-circulation.md)）
+- **対象仮説**: H7-B（→ [循環の正本](../../proposal/h7-circulation.md)）
 - **作成**: 2026-06-06
 
 > **更新 (chimo 2026-06-12 / 入力一本化)**: 記録の**起票は右サイドの入口に一本化**した
@@ -27,10 +30,11 @@
 **対象仮説**: 投稿が「自分の思ったこと」中心になりやすく学校知として循環しづらい現状を、生徒の様子・
 気づきが自然に共有され、ふりかえりとして返ることで、投稿・閲覧・反応・再投稿の循環に変えられるか。
 
-> **§3 の境界（最重要）**: ここでの「学校として返す」の**“学校” は教員集団（相互関心層）**であり、
-> 管理職ではない。職員室ダッシュボードは既存 school_admin `/dashboard`（組織状態層）とは**別物のまま
-> 分ける**。個票が校長の俯瞰に流れ込んだ瞬間に PHILOSOPHY §3 が壊れ、投稿が嘘データ化する。§4 で
-> 物理担保する。
+> **§3 の境界（最重要・chimo 2026-06-10 で更新）**: school_admin は **teacher と同一権限で相互関心層に
+> 参加する**（個票も同僚として読める）。守るべきは「個票を school_admin から隠すこと」ではなく、
+> **個票を admin の組織状態レンズ（集計・温度カード・ランキング俯瞰）に流し込む経路を作らないこと**。
+> 職員室ボードは既存 school_admin `/dashboard`（組織状態層）とは別物として保ち、ボードを集計化する
+> admin ビューを作らない。これで PHILOSOPHY §3（行レベルの可視は監視ではない／集計俯瞰が監視）を守る。
 
 ---
 
@@ -64,7 +68,7 @@
 - **KPT+Thanks / Help / 共有ボード**は投稿の種別軸（例: 既存 `journal_entry_kind` の拡張、または board
   種別 enum）で表現する。実装時に「既存 kind 拡張」か「専用テーブル」かを確定する。
 - **ふりかえり**: v1 は人/ルールベースの「昨日のまとめ・今週のまとめ」。AI 生成は §7 ゲート
-  （→ [`../foundation/backlog.md`](../foundation/backlog.md)）。
+  （→ [`../../foundation/backlog.md`](../../foundation/backlog.md)）。
 
 ### 可視性・RLS（§3 を物理で守る）
 
@@ -73,13 +77,14 @@ RLS は `src/db/rls/policies.ts`（generated）に追加。`migrations/0049_*`�
 | ロール | 職員室ボード個票・コメント・リアクション |
 |---|---|
 | **teacher** | 自テナントを読み書き（全教員可視・相互関心層）。 |
-| **school_admin** | **個票を見ない（見えない）**。§3 唯一特権「組織状態の俯瞰」に該当する集計は v1 では作らない（admin への流入経路をそもそも作らない）。 |
+| **school_admin** | **teacher と同一権限でボード個票を読み書きできる**（相互関心層に管理職も参加）。踏み絵は「ボードを集計化する admin ビュー（組織状態の俯瞰）を作らないこと」で守る。 |
 | **system_admin** | 既存パターン（健全性監視）。 |
 
-- **二重の壁**: ① マイ / 職員室（個人 ⇄ 教員集団）を UI で分ける、② 職員室（teacher）/ 校長（admin）を
-  RLS で分ける。職員室ダッシュボードは ① の「教員集団」側に立ち、② の壁で admin から遮断される。
-- 共通の踏み絵ガード（admin に個票を流さない / リアクションは同僚への共感 / 循環実感スコアはアプリ内
-  スコア化しない 等）は循環の正本 §3 を参照。
+- **壁の置き場所（更新）**: ① マイ / 職員室（個人 ⇄ 教員集団）を UI で分ける。② school_admin は教員集団の
+  一員としてボードを読めるが、**ボードを集計化する admin ビュー（組織状態レンズ）は作らない**。
+  壁は「school_admin を RLS でボードから締め出す」ではなく「個票を集計俯瞰に流す経路を作らない」側に置く。
+- 共通の踏み絵ガード（集計・温度カード・ランキング俯瞰を作らない / リアクションは同僚への共感 /
+  循環実感スコアはアプリ内スコア化しない 等）は循環の正本 §3 を参照。
 
 ---
 
@@ -91,7 +96,7 @@ RLS は `src/db/rls/policies.ts`（generated）に追加。`migrations/0049_*`�
 - **v1**: 人/ルールベース（集計・列挙ベースの「昨日／今週のまとめ」）に留める。
 - **graduate（AI 生成）の条件**（明示的な §7 再決定）: 学校知を返す・教員無記名・fact+提案のみ
   （§4.3）・mood/生徒感情は要約しない・生徒個人を特定しない。
-- 退避先: [`../foundation/backlog.md`](../foundation/backlog.md) の「§7 ゲート: H7 学校知循環の AI 週次
+- 退避先: [`../../foundation/backlog.md`](../../foundation/backlog.md) の「§7 ゲート: H7 学校知循環の AI 週次
   ふりかえり」。
 
 ---
@@ -121,8 +126,8 @@ RLS は `src/db/rls/policies.ts`（generated）に追加。`migrations/0049_*`�
 
 ## 関連
 
-- 循環の正本（H7 仮説・踏み絵・計測）: [`../proposal/h7-circulation.md`](../proposal/h7-circulation.md)
+- 循環の正本（H7 仮説・踏み絵・計測）: [`../../proposal/h7-circulation.md`](../../proposal/h7-circulation.md)
 - 入口（H7-A）: [`../baton-relay/design.md`](../baton-relay/design.md)
-- 既存 journal（ボードの土台・リアクション 3 種）: [`../features/journal/overview.md`](../features/journal/overview.md)
-- 既存ダッシュボード（組織状態層・§3 の対岸）: [`../features/dashboard/overview.md`](../features/dashboard/overview.md)
-- 設計憲法: [`../PHILOSOPHY.md`](../PHILOSOPHY.md)
+- 既存 journal（ボードの土台・リアクション 3 種）: [`../journal/overview.md`](../journal/overview.md)
+- 既存ダッシュボード（組織状態層・§3 の対岸）: [`../dashboard/overview.md`](../dashboard/overview.md)
+- 設計憲法: [`../../PHILOSOPHY.md`](../../PHILOSOPHY.md)

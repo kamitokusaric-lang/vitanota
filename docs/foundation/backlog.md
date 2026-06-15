@@ -332,7 +332,7 @@
 
 ### ⚪ §7 ゲート: H7 学校知循環の AI 週次ふりかえり
 - **発見日**: 2026-06-06 (朝のバトンリレー × 職員室ダッシュボード 設計セッション)
-- **背景**: H7-B「職員室ダッシュボード（学校知の循環）」のエンジン候補。設計は循環の正本 [`docs/proposal/h7-circulation.md`](../proposal/h7-circulation.md) と出口の build spec [`docs/staffroom/design.md`](../staffroom/design.md)。循環「書く→溜まる→返る→反応→また書く」の "返る" 段階に AI 週次ふりかえりを置きたいが、これは下記「先週のvitanotaレポート 機能 (凍結)」と隣接領域 (PHILOSOPHY §7)
+- **背景**: H7-B「職員室ダッシュボード（学校知の循環）」のエンジン候補。設計は循環の正本 [`docs/proposal/h7-circulation.md`](../proposal/h7-circulation.md) と出口の build spec [`docs/staffroom/design.md`](../features/staffroom/design.md)。循環「書く→溜まる→返る→反応→また書く」の "返る" 段階に AI 週次ふりかえりを置きたいが、これは下記「先週のvitanotaレポート 機能 (凍結)」と隣接領域 (PHILOSOPHY §7)
 - **v1 の扱い**: **出さない**。v1 はふりかえりを**人/ルールベースの「昨日のまとめ・今週のまとめ」**に留め、循環の骨格 (投稿→閲覧→反応→再投稿) を先に検証する (設計書 §11)。これにより §7 凍結に黙って触れずに済む
 - **graduate (AI 生成へ) の条件**: 明示的な §7 再決定。かつ以下の制約を満たす再設計:
   - 「教員の週」ではなく**学校知**を返す (凍結機能との本質的な差分)

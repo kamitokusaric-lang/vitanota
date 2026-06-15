@@ -28,6 +28,8 @@
 | system (管理者エクスポート) | `src/features/system/` | overview | 対象外 (IGNORE: system) | [features/system/overview.md](./features/system/overview.md) |
 | calendar (カレンダー表示) | `src/features/calendar/` | overview | 専用なし (Task/Account 読取) | [features/calendar/overview.md](./features/calendar/overview.md) |
 | profile (プロフィール設定) | `src/features/profile/` | overview | Account | [features/profile/overview.md](./features/profile/overview.md) |
+| baton-relay (朝のバトンリレー / H7-A) | `src/features/baton-relay/` | overview+design | Baton Relay | [features/baton-relay/overview.md](./features/baton-relay/overview.md) |
+| staffroom (職員室ボード / H7-B) | `src/features/staffroom/` | overview+design | Staffroom | [features/staffroom/overview.md](./features/staffroom/overview.md) |
 
 **粒度の方針 (アダプティブ)**: 重い機能 (journal / tasks / auth) だけサブ分割し、薄い機能は `overview.md` 1 枚で済ませる。各 `overview.md` は**ハブに徹して薄く保つ** — 詳細はサブファイルか `foundation/` に逃がす。
 
@@ -64,6 +66,8 @@
 | タスク・複数アサイン・カテゴリ | [features/tasks/](./features/tasks/overview.md) |
 | 認証・招待・ロール | [features/auth/](./features/auth/overview.md) |
 | AI 整理・チャット抽出 | [features/ai-chat/](./features/ai-chat/overview.md) |
+| 朝のバトンリレー・生徒ノート (H7-A) | [features/baton-relay/](./features/baton-relay/overview.md) |
+| 職員室ボード・学校知の循環 (H7-B) | [features/staffroom/](./features/staffroom/overview.md) |
 | 何を作るか (要件 FR) | [foundation/requirements.md](./foundation/requirements.md) |
 | テーブル構造 | [foundation/data-model.md](./foundation/data-model.md) → `src/db/schema.ts` |
 | RLS ポリシー | [foundation/rls-and-tenancy.md](./foundation/rls-and-tenancy.md) → `migrations/0009_rls_role_separation.sql` |

@@ -1,14 +1,16 @@
 # baton-relay（朝のバトンリレー / H7-A）設計書
 
-> **位置づけ**: 未実装・staging。`src/features/baton-relay/` ⇄ `docs/baton-relay/` の build spec。
+> **位置づけ**: 本番実装済（2026-06-15 出荷）。`src/features/baton-relay/` の設計記録。
 > **循環そのもの**（H7 仮説・循環図・踏み絵ゲート・一体の計測・進め方）は単一正本
-> [`../proposal/h7-circulation.md`](../proposal/h7-circulation.md) にあり、ここには複写しない。
+> [`../../proposal/h7-circulation.md`](../../proposal/h7-circulation.md) にあり、ここには複写しない。
 > この機能は循環の**入口**（生徒情報を書く・溜める側）を担う。
 >
-> **graduate**: 実装着手時に `docs/features/baton-relay/` へ昇格し `docs/README.md` の機能一覧表へ追加、
-> データモデルは `foundation/data-model.md` / RLS は `foundation/rls-and-tenancy.md` へ正本化する。
+> **as-built 差分**（本書は原設計 2026-06-06。実装で変わった主な点）:
+> `students.grade_label` は廃止（学年で分断しない）/ RLS は `policies.ts` generator でなく **migration 直書き** /
+> 記録の起票は右レーン `TodayCaptureBox` に一本化 / 職員室ボードは読み取り専用化。
+> 現行 UI の概要は [overview.md](./overview.md)。
 
-- **対象仮説**: H7-A（→ [循環の正本](../proposal/h7-circulation.md)）
+- **対象仮説**: H7-A（→ [循環の正本](../../proposal/h7-circulation.md)）
 - **作成**: 2026-06-06
 
 ---
@@ -75,7 +77,7 @@ RLS は `src/db/rls/policies.ts`（generated）に追加。`migrations/0049_*`�
 | ロール | classes / students / baton_notes |
 |---|---|
 | **teacher** | 自テナントを読み書き（**全教員可視＝確定**・相互関心層）。 |
-| **school_admin** | **バトン個票を見ない（見えない）**。組織状態の俯瞰に該当する集計は v1 では作らない。 |
+| **school_admin** | **teacher と同一権限で個票を読み書きできる**（相互関心層に管理職も参加・chimo 2026-06-10）。踏み絵は「admin 向けの集計・温度カード・ランキング俯瞰を作らないこと」で守る（行レベルの可視は監視ではない）。 |
 | **system_admin** | 既存パターン（健全性監視）。 |
 
 - **透明性（PHILOSOPHY §5）**: 「あなたが書いたこれは誰に見えるか」を UI で常に明示する。
@@ -125,8 +127,8 @@ RLS は `src/db/rls/policies.ts`（generated）に追加。`migrations/0049_*`�
 
 ## 関連
 
-- 循環の正本（H7 仮説・踏み絵・計測）: [`../proposal/h7-circulation.md`](../proposal/h7-circulation.md)
+- 循環の正本（H7 仮説・踏み絵・計測）: [`../../proposal/h7-circulation.md`](../../proposal/h7-circulation.md)
 - 出口（H7-B）: [`../staffroom/design.md`](../staffroom/design.md)
-- 起点提案: [`../proposal/proposal_1.html`](../proposal/proposal_1.html)
-- 設計憲法: [`../PHILOSOPHY.md`](../PHILOSOPHY.md)
-- 既存 journal（ボードの土台）: [`../features/journal/overview.md`](../features/journal/overview.md)
+- 起点提案: [`../../proposal/proposal_1.html`](../../proposal/proposal_1.html)
+- 設計憲法: [`../../PHILOSOPHY.md`](../../PHILOSOPHY.md)
+- 既存 journal（ボードの土台）: [`../journal/overview.md`](../journal/overview.md)

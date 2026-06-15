@@ -9,7 +9,7 @@ export interface TabDef {
   label: string;
   content: ReactNode;
   disabled?: boolean;
-  icon?: ReactNode; // pill variant 時にラベル左に表示
+  icon?: ReactNode; // pill: ラベル左 / underline: sm 以上はラベル左・モバイルはラベル上に表示
   badge?: ReactNode; // ラベル右に表示する任意のバッジ (例: New)
 }
 
@@ -63,7 +63,7 @@ export function Tabs({
   const tablistClass =
     variant === 'pill'
       ? 'mb-5 inline-flex items-center gap-1 rounded-full bg-slate-50 p-1'
-      : 'mb-5 flex gap-8 border-b border-vn-border';
+      : 'mb-5 flex justify-between gap-2 border-b border-vn-border lg:justify-start lg:gap-8';
 
   const wrapClass = rightSlot
     ? 'mb-5 flex flex-wrap items-center justify-between gap-3'
@@ -86,7 +86,10 @@ export function Tabs({
                       : 'font-medium text-slate-500 hover:text-slate-700',
                 ].join(' ')
               : [
-                  'pb-3.5 text-[17px] transition-colors',
+                  // 中間幅まで: アイコン上 + 小さいラベル下の縦並び。 lg 以上: 横並び大きめ。
+                  // 横並びを lg に上げたのは、 中間幅で横並びにするとラベルが語中折り返しして
+                  // 窮屈になるため (chimo 2026-06-15)。 whitespace-nowrap で語中折り返しも禁止。
+                  'flex flex-col items-center gap-0.5 whitespace-nowrap pb-2.5 text-[11px] leading-tight transition-colors lg:flex-row lg:gap-1.5 lg:pb-3.5 lg:text-[17px]',
                   tab.disabled
                     ? 'cursor-not-allowed font-semibold text-slate-300'
                     : isActive
@@ -105,7 +108,7 @@ export function Tabs({
               data-testid={`tab-${tab.id}`}
               className={buttonClass}
             >
-              {variant === 'pill' && tab.icon}
+              {tab.icon}
               {tab.label}
               {tab.badge}
               {tab.disabled && (

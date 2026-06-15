@@ -39,6 +39,10 @@ export interface AppStackProps extends cdk.StackProps {
   aiChatAllowlistTenantIds: string;
   /** AI_CHAT_RATE_LIMIT_PER_DAY env (Bedrock コスト保護、default '20') */
   aiChatRateLimitPerDay: string;
+  /** JWKS リフレッシャ Lambda (kid 不一致時に AppRunner から on-demand invoke) */
+  jwksRefresherFunction: lambda.IFunction;
+  /** Google JWKS を保管した Secret (AppRunner が verifyGoogleIdToken で読む) */
+  googleJwksSecret: secretsmanager.ISecret;
 }
 
 export class AppStack extends cdk.Stack {
@@ -102,6 +106,11 @@ export class AppStack extends cdk.Stack {
     // AI チャット整理 Lambda の invoke 権限 (AppRunner から pages/api/ai-chat/extract.ts 経由で呼ぶ)
     props.aiChatExtractFunction.grantInvoke(instanceRole);
 
+    // JWKS: Secret 読み取り + リフレッシャ Lambda の on-demand invoke 権限
+    // (verifyGoogleIdToken が Secret から JWKS を読み、kid 不一致時に Lambda を即時起動する)
+    props.googleJwksSecret.grantRead(instanceRole);
+    props.jwksRefresherFunction.grantInvoke(instanceRole);
+
     // ── App Runner アクセスロール（ECR pull 用） ──
     const accessRole = new iam.Role(this, 'AppRunnerAccessRole', {
       roleName: `${prefix}-apprunner-access-role`,
@@ -154,6 +163,9 @@ export class AppStack extends cdk.Stack {
               { name: 'AI_CHAT_RATE_LIMIT_PER_DAY', value: props.aiChatRateLimitPerDay },
               // AppRunner から InvokeFunction で呼び出す Lambda の ARN
               { name: 'AI_CHAT_LAMBDA_ARN', value: props.aiChatExtractFunction.functionArn },
+              // JWKS: 検証時に読む Secret と、kid 不一致時に叩くリフレッシャ Lambda
+              { name: 'GOOGLE_JWKS_SECRET_ARN', value: props.googleJwksSecret.secretArn },
+              { name: 'JWKS_REFRESHER_LAMBDA_ARN', value: props.jwksRefresherFunction.functionArn },
             ],
             // CloudFront 迂回攻撃防御: middleware が X-CloudFront-Secret header を
             // CLOUDFRONT_SECRET env と照合し、不一致なら 403 返却。

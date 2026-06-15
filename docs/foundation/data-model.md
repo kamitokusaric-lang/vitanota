@@ -58,7 +58,7 @@
 | ai-chat | `ai_sessions` | 本人 + system_admin のみ可視・school_admin 不可視 (踏み絵)。→ [features/ai-chat](../features/ai-chat/overview.md) |
 | feedback | フィードバック submissions / topics / replies / 既読状態 | → [features/feedback](../features/feedback/overview.md) |
 | profile | `user_tenant_profiles` / `user_filter_preferences` / `user_onboarding_states` | → [features/profile](../features/profile/overview.md) |
-| その他 | announcements ほか | |
+| その他 | 上記以外の補助テーブル | 一覧は `src/db/schema.ts` |
 
 列定義の最新は `src/db/schema.ts`、ER 図は [er-diagram.md](./er-diagram.md)。
 

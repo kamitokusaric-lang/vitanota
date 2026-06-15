@@ -77,7 +77,6 @@ import {
   knowledgeTagResponseSchema,
   profileResponseSchema,
   onboardingStateResponseSchema,
-  announcementsResponseSchema,
   createInvitationSchema,
   invitationCreatedResponseSchema,
   invitationInfoResponseSchema,
@@ -808,23 +807,6 @@ export function buildOpenApiDocument() {
       200: {
         description: '保存成功',
         content: { 'application/json': { schema: okResponseSchema } },
-      },
-      ...errorResponses,
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/api/announcements',
-    summary: '運営からのお知らせ一覧（公開日降順）',
-    tags: ['Account'],
-    security: [sessionCookie],
-    responses: {
-      200: {
-        description: 'お知らせ一覧',
-        content: {
-          'application/json': { schema: announcementsResponseSchema },
-        },
       },
       ...errorResponses,
     },

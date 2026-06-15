@@ -29,7 +29,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'トピック管理',  href: '/admin/feedback/topics', matchPrefix: '/admin/feedback/topics' },
   { label: 'カテゴリ管理',  href: '/admin/categories',      matchPrefix: '/admin/categories' },
   { label: 'タグ管理',      href: '/admin/tags',             matchPrefix: '/admin/tags' },
-  { label: '機能追加ログ',  href: '/admin/announcements',    matchPrefix: '/admin/announcements' },
   { label: 'データエクスポート', href: '/admin/data-export',    matchPrefix: '/admin/data-export' },
   { label: 'アクセス分布',  href: '/admin/access-distribution', matchPrefix: '/admin/access-distribution' },
 ];

@@ -2,6 +2,7 @@
 // 各タブの中身に朝バトンの記入画面 (BatonRelayBoard) をそのまま埋め込む。
 // クラスが無いときは CSV 取り込み + クラス/生徒追加をそのまま出す。
 import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useToast } from '@/shared/components/Toast';
 import { useClasses } from '@/features/baton-relay/hooks/useBatonRelay';
 import { BatonRelayBoard } from '@/features/baton-relay/components/BatonRelayBoard';
@@ -24,6 +25,8 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
   const { classes, isLoading, mutate: mutateClasses } = useClasses();
   const { showToast } = useToast();
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  // 「＋」タブ選択中はクラス追加フォームをタブ内に出す (クラス選択とは排他)。
+  const [addingClass, setAddingClass] = useState(false);
 
   // タブは左→右にクラス名の昇順 (「10組」が「2組」の後に来るよう数値対応の collation)。
   const sortedClasses = useMemo(
@@ -49,7 +52,12 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
       showToast('クラスの作成に失敗しました', 'error');
       return;
     }
+    const { class: created } = (await res.json()) as { class: { id: string } };
     await mutateClasses();
+    // 追加したクラスのタブへ切替え、追加モードを閉じる
+    // (新規クラスの記入画面 = 最下部は生徒追加フォームだけになる)。
+    setSelectedClassId(created.id);
+    setAddingClass(false);
     showToast('クラスを作りました', 'success');
   };
 
@@ -74,14 +82,17 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
       {/* クラスごとのカード型タブ */}
       <div className="flex flex-wrap gap-1 border-b border-vn-border" role="tablist">
         {sortedClasses.map((c) => {
-          const active = c.id === selectedClassId;
+          const active = !addingClass && c.id === selectedClassId;
           return (
             <button
               key={c.id}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setSelectedClassId(c.id)}
+              onClick={() => {
+                setSelectedClassId(c.id);
+                setAddingClass(false);
+              }}
               className={`-mb-px rounded-t-lg border px-4 py-2.5 text-sm transition-colors ${
                 active
                   ? 'border-vn-border border-b-white bg-white font-bold text-slate-800'
@@ -93,17 +104,39 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
             </button>
           );
         })}
+        {/* クラス追加タブ (押すとタブ内にクラス追加フォームを出す) */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={addingClass}
+          aria-label="クラスを追加"
+          onClick={() => setAddingClass(true)}
+          className={`-mb-px flex items-center rounded-t-lg border px-3 py-2.5 text-sm transition-colors ${
+            addingClass
+              ? 'border-vn-border border-b-white bg-white font-bold text-slate-800'
+              : 'border-transparent bg-slate-100 font-medium text-slate-500 hover:bg-slate-200'
+          }`}
+          data-testid="student-notes-tab-add"
+        >
+          <Plus size={16} aria-hidden />
+        </button>
       </div>
 
-      {/* 選択中クラスの朝バトン記入画面をそのまま埋め込む (クラス選択はタブ側) */}
-      {selectedClassId && (
+      {/* 「＋」タブ選択中はクラス追加フォーム、それ以外は選択中クラスの記入画面 */}
+      {addingClass ? (
         <div className="pt-4">
-          <BatonRelayBoard
-            currentUserId={selfUserId}
-            todayDate={todayDate}
-            classId={selectedClassId}
-          />
+          <RosterAdd classes={classes} onCreateClass={handleCreateClass} alwaysOpen />
         </div>
+      ) : (
+        selectedClassId && (
+          <div className="pt-4">
+            <BatonRelayBoard
+              currentUserId={selfUserId}
+              todayDate={todayDate}
+              classId={selectedClassId}
+            />
+          </div>
+        )
       )}
     </div>
   );

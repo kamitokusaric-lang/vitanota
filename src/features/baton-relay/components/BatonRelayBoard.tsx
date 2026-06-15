@@ -271,7 +271,8 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
         </p>
       )}
 
-      {/* 生徒をまとめて追加 (選択クラスへ) + クラス追加 */}
+      {/* 生徒をまとめて追加 (選択クラスへ)。クラス追加は uncontrolled (/baton-relay) のみ最下部に出す。
+          controlled (生徒ノートのタブ) では親の「＋」タブが持つ。 */}
       <div className="space-y-3 pt-2">
         <RosterStudentBulkAdd
           selectedClass={selectedClass}
@@ -279,7 +280,7 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
             await mutateStudents();
           }}
         />
-        <RosterAdd classes={classes} onCreateClass={handleCreateClass} />
+        {!classId && <RosterAdd classes={classes} onCreateClass={handleCreateClass} />}
       </div>
     </div>
   );

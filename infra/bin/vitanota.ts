@@ -7,6 +7,7 @@ import { DataSharedStack } from '../lib/data-shared-stack';
 import { AppStack } from '../lib/app-stack';
 import { EdgeStack } from '../lib/edge-stack';
 import { AiChatStack } from '../lib/ai-chat-stack';
+import { JwksStack } from '../lib/jwks-stack';
 
 const app = new cdk.App();
 
@@ -57,6 +58,13 @@ const aiChatStack = new AiChatStack(app, `${prefix}-ai-chat`, {
   envName,
 });
 
+// JwksStack も AppStack より先に作る (AppStack が refresherFunction / jwksSecret を参照するため)
+const jwksStack = new JwksStack(app, `${prefix}-jwks`, {
+  env,
+  projectName,
+  envName,
+});
+
 // テナント単位 allowlist (例: chimo テナント先行 ON 用)
 // 空文字なら ALLOWLIST 未設定 = 全テナント ON (= ENABLE_AI_CHAT_EXTRACTION 単独評価)
 const aiChatAllowlistTenantIds =
@@ -97,6 +105,8 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   aiChatEnableExtraction,
   aiChatAllowlistTenantIds,
   aiChatRateLimitPerDay,
+  jwksRefresherFunction: jwksStack.refresherFunction,
+  googleJwksSecret: jwksStack.jwksSecret,
 });
 
 new EdgeStack(app, `${prefix}-edge`, {

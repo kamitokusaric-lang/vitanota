@@ -1,0 +1,14 @@
+{
+  "name": "vitanota-jwks-refresher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lambda: fetch Google JWKS, validate, store in Secrets Manager (bridge keys into PRIVATE_ISOLATED VPC)",
+  "main": "handler.ts",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.658.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "typescript": "^5.4.5"
+  }
+}

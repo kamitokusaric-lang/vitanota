@@ -4,22 +4,11 @@ import type { ClassDto } from '../types';
 
 interface ClassGoalHeaderProps {
   cls: ClassDto;
-  date: string;
   onSaveGoal: (goalText: string) => Promise<void>;
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-  }).format(d);
-}
-
-// クラス名・日付・クラス目標。目標はインライン編集 (PATCH /classes/{id})。
-export function ClassGoalHeader({ cls, date, onSaveGoal }: ClassGoalHeaderProps) {
+// クラス名・クラス目標。目標はクラスに 1 つ (日付非依存)・インライン編集 (PATCH /classes/{id})。
+export function ClassGoalHeader({ cls, onSaveGoal }: ClassGoalHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(cls.goalText ?? '');
   const [busy, setBusy] = useState(false);
@@ -35,17 +24,12 @@ export function ClassGoalHeader({ cls, date, onSaveGoal }: ClassGoalHeaderProps)
   };
 
   return (
-    <div className="rounded-vn border border-vn-border bg-white p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-800">{cls.name}</h2>
-        <time className="text-sm text-gray-500">{formatDate(date)}</time>
-      </div>
-
-      <div className="mt-3 rounded-md bg-vn-muted-bg p-3">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-          <Target size={13} aria-hidden />
+    <div className="px-1">
+      <div className="rounded-md bg-vn-muted-bg p-3">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <Target size={14} aria-hidden />
           クラス目標
-        </div>
+        </h2>
         {editing ? (
           <div className="mt-1.5 flex items-center gap-1.5">
             <input
@@ -54,7 +38,7 @@ export function ClassGoalHeader({ cls, date, onSaveGoal }: ClassGoalHeaderProps)
               onChange={(e) => setDraft(e.target.value)}
               maxLength={200}
               autoFocus
-              placeholder="今日の目標…"
+              placeholder="クラスの目標…"
               className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-base focus:border-vn-accent focus:outline-none"
             />
             <button

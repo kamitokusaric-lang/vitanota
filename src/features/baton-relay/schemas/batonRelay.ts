@@ -61,13 +61,15 @@ export const createStudentSchema = z
   .openapi('CreateStudentInput');
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
 
-// 生徒の更新 (クラス移動 / 氏名の修正)。少なくとも 1 項目必須。
+// 生徒の更新 (クラス移動 / 氏名の修正 / アーカイブ・復元)。少なくとも 1 項目必須。
+// status を 'archived' にするとアーカイブ、'active' で復元 (left_at はサーバが導出)。
 export const updateStudentSchema = z
   .object({
     classId: z.string().guid().optional(),
     displayName: z.string().trim().min(1).max(50).optional(),
+    status: studentStatusSchema.optional(),
   })
-  .refine((v) => v.classId || v.displayName, {
+  .refine((v) => v.classId || v.displayName || v.status, {
     message: '更新する項目がありません',
   })
   .openapi('UpdateStudentInput');
@@ -77,8 +79,10 @@ export const studentIdParamSchema = z
   .object({ id: z.string().guid('不正な生徒IDです') })
   .openapi('StudentIdParam');
 
+// status 省略時は active のみ、'archived' でアーカイブ済みのみを返す。
 export const listStudentsQuerySchema = z.object({
   classId: z.string().guid(),
+  status: studentStatusSchema.optional(),
 });
 
 export const studentResponseSchema = z

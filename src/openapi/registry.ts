@@ -1155,7 +1155,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/api/baton-relay/students',
-    summary: '生徒一覧取得（クラス指定）',
+    summary: '生徒一覧取得（クラス指定・status 省略時 active）',
     tags: ['Baton Relay'],
     security: [sessionCookie],
     request: { query: listStudentsQuerySchema },
@@ -1189,7 +1189,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'patch',
     path: '/api/baton-relay/students/{id}',
-    summary: '生徒の更新（クラス移動 / 氏名・学年の修正）',
+    summary: '生徒の更新（クラス移動 / 氏名修正 / アーカイブ・復元）',
     tags: ['Baton Relay'],
     security: [sessionCookie],
     request: {

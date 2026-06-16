@@ -126,9 +126,13 @@ export class BatonRelayService {
   }
 
   // ── students ──
-  async listStudents(ctx: AuthContext, classId: string): Promise<StudentDto[]> {
+  async listStudents(
+    ctx: AuthContext,
+    classId: string,
+    status: 'active' | 'archived' = 'active',
+  ): Promise<StudentDto[]> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      const rows = await studentRepo.findByClass(tx, ctx, classId);
+      const rows = await studentRepo.findByClass(tx, ctx, classId, status);
       return rows.map(toStudentDto);
     });
   }
@@ -146,14 +150,21 @@ export class BatonRelayService {
     });
   }
 
-  // クラス移動 / 修正 (chimo 2026-06-14)。
+  // クラス移動 / 氏名修正 / アーカイブ・復元 (chimo 2026-06-14)。
+  // status 指定時は left_at をサーバが導出 (archived=今日 / active=null)。
   async updateStudent(
     ctx: AuthContext,
     id: string,
-    params: { classId?: string; displayName?: string },
+    params: { classId?: string; displayName?: string; status?: 'active' | 'archived' },
   ): Promise<StudentDto | null> {
+    const leftAt =
+      params.status === undefined
+        ? undefined
+        : params.status === 'archived'
+          ? new Date().toISOString().slice(0, 10)
+          : null;
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      const row = await studentRepo.update(tx, ctx, id, params);
+      const row = await studentRepo.update(tx, ctx, id, { ...params, leftAt });
       return row ? toStudentDto(row) : null;
     });
   }

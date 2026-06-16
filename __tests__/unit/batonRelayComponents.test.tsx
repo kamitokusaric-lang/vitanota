@@ -55,16 +55,14 @@ describe('RosterAdd', () => {
 });
 
 describe('ClassGoalHeader', () => {
-  it('クラス名・目標を表示し、編集で onSaveGoal が呼ばれる', async () => {
+  it('目標を表示し、編集で onSaveGoal が呼ばれる', async () => {
     const onSaveGoal = vi.fn().mockResolvedValue(undefined);
     render(
       <ClassGoalHeader
         cls={makeClass({ name: '2-A', goalText: '今日の目標' })}
-        date="2026-06-15"
         onSaveGoal={onSaveGoal}
       />,
     );
-    expect(screen.getByText('2-A')).toBeInTheDocument();
     // 目標テキスト (ボタン) をクリック → 編集モード
     fireEvent.click(screen.getByText('今日の目標'));
     const input = screen.getByDisplayValue('今日の目標');
@@ -74,7 +72,7 @@ describe('ClassGoalHeader', () => {
   });
 
   it('目標未設定なら誘導文言を出す', () => {
-    render(<ClassGoalHeader cls={makeClass({ goalText: null })} date="2026-06-15" onSaveGoal={vi.fn()} />);
+    render(<ClassGoalHeader cls={makeClass({ goalText: null })} onSaveGoal={vi.fn()} />);
     expect(screen.getByText('タップして目標を書く')).toBeInTheDocument();
   });
 });

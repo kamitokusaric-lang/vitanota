@@ -72,15 +72,23 @@ export class ClassRepository {
 
 // ── students ───────────────────────────────────────────────────
 export class StudentRepository {
+  // status 省略時は active のみ (日々の記入リスト)。'archived' でアーカイブ済みのみ。
   async findByClass(
     tx: DrizzleDb,
     ctx: BatonContext,
     classId: string,
+    status: 'active' | 'archived' = 'active',
   ): Promise<Student[]> {
     return tx
       .select()
       .from(students)
-      .where(and(eq(students.tenantId, ctx.tenantId), eq(students.classId, classId)))
+      .where(
+        and(
+          eq(students.tenantId, ctx.tenantId),
+          eq(students.classId, classId),
+          eq(students.status, status),
+        ),
+      )
       .orderBy(desc(students.createdAt));
   }
 
@@ -113,16 +121,23 @@ export class StudentRepository {
     return row;
   }
 
-  // クラス移動 / 氏名の修正 (chimo 2026-06-14)。複合 FK で別テナントの classId は物理防止。
+  // クラス移動 / 氏名の修正 / アーカイブ・復元。複合 FK で別テナントの classId は物理防止。
   async update(
     tx: DrizzleDb,
     ctx: BatonContext,
     id: string,
-    params: { classId?: string; displayName?: string },
+    params: {
+      classId?: string;
+      displayName?: string;
+      status?: 'active' | 'archived';
+      leftAt?: string | null;
+    },
   ): Promise<Student | undefined> {
     const patch: Partial<typeof students.$inferInsert> = {};
     if (params.classId !== undefined) patch.classId = params.classId;
     if (params.displayName !== undefined) patch.displayName = params.displayName;
+    if (params.status !== undefined) patch.status = params.status;
+    if (params.leftAt !== undefined) patch.leftAt = params.leftAt;
     const [row] = await tx
       .update(students)
       .set(patch)

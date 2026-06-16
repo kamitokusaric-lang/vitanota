@@ -1501,6 +1501,11 @@ components:
           type: string
           minLength: 1
           maxLength: 50
+        status:
+          type: string
+          enum:
+            - active
+            - archived
     BatonNoteList:
       type: object
       properties:
@@ -4778,7 +4783,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/baton-relay/students:
     get:
-      summary: 生徒一覧取得（クラス指定）
+      summary: 生徒一覧取得（クラス指定・status 省略時 active）
       tags:
         - Baton Relay
       security:
@@ -4788,6 +4793,14 @@ paths:
             type: string
           required: true
           name: classId
+          in: query
+        - schema:
+            type: string
+            enum:
+              - active
+              - archived
+          required: false
+          name: status
           in: query
       responses:
         "200":
@@ -4893,7 +4906,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
   /api/baton-relay/students/{id}:
     patch:
-      summary: 生徒の更新（クラス移動 / 氏名・学年の修正）
+      summary: 生徒の更新（クラス移動 / 氏名修正 / アーカイブ・復元）
       tags:
         - Baton Relay
       security:

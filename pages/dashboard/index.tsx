@@ -204,7 +204,11 @@ export default function DashboardPage({
     },
   ];
 
-  if (isAdmin) {
+  // 学校レポート (学校エンゲージメント) タブは一旦非表示 (chimo 2026-06-16)。
+  // school_admin 専用の組織状態ビュー。ルート (/api/school/*) とコンポーネントは残置し、
+  // 再表示は showSchoolReport を true に戻すだけ。
+  const showSchoolReport: boolean = false;
+  if (isAdmin && showSchoolReport) {
     mainTabs.push({
       id: 'engagement',
       label: '学校レポート',

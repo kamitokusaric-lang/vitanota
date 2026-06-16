@@ -42,7 +42,7 @@ import {
   getMoodIcon,
   getMoodLabel,
 } from '@/features/journal/lib/mood-options';
-import { canUseAdminFeatures } from '@/features/auth/lib/role-helpers';
+import { canUseAdminFeatures, canUseSystemAdminFeatures } from '@/features/auth/lib/role-helpers';
 import type { MoodLevel } from '@/features/journal/schemas/journal';
 import type { VitanotaSession } from '@/shared/types/auth';
 
@@ -285,6 +285,7 @@ export default function DashboardPage({
               <TodayCaptureBox
                 aiChatEnabled={aiChatEnabled}
                 authorName={session.user.name}
+                isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
                 onSuccess={() => setCaptureModalOpen(false)}
               />
             )}

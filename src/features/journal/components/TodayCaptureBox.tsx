@@ -211,17 +211,22 @@ export function TodayCaptureBox({
         const res = await postStaffroomBoard({ boardKind: finalKind, content: text, isPublic: true });
         ok = res.ok;
         if (ok) {
-          const { board } = (await res.json()) as {
-            board: { id: string; authorUserId: string; content: string; createdAt: string; boardKind: string };
-          };
-          created = {
-            id: board.id,
-            userId: board.authorUserId,
-            content: board.content,
-            createdAt: board.createdAt,
-            kind: board.boardKind,
-            mood: null,
-          };
+          // body 解析に失敗しても保存自体は成功 (楽観挿入だけ諦め、次の再取得に委ねる)。
+          try {
+            const { board } = (await res.json()) as {
+              board: { id: string; authorUserId: string; content: string; createdAt: string; boardKind: string };
+            };
+            created = {
+              id: board.id,
+              userId: board.authorUserId,
+              content: board.content,
+              createdAt: board.createdAt,
+              kind: board.boardKind,
+              mood: null,
+            };
+          } catch {
+            /* 楽観挿入なし */
+          }
         }
       } else {
         const res = await fetch('/api/private/journal/entries', {
@@ -231,17 +236,22 @@ export function TodayCaptureBox({
         });
         ok = res.ok;
         if (ok) {
-          const { entry } = (await res.json()) as {
-            entry: { id: string; userId: string; content: string; createdAt: string; kind: string; mood: number | null };
-          };
-          created = {
-            id: entry.id,
-            userId: entry.userId,
-            content: entry.content,
-            createdAt: entry.createdAt,
-            kind: entry.kind,
-            mood: entry.mood ?? null,
-          };
+          // body 解析に失敗しても保存自体は成功 (楽観挿入だけ諦め、次の再取得に委ねる)。
+          try {
+            const { entry } = (await res.json()) as {
+              entry: { id: string; userId: string; content: string; createdAt: string; kind: string; mood: number | null };
+            };
+            created = {
+              id: entry.id,
+              userId: entry.userId,
+              content: entry.content,
+              createdAt: entry.createdAt,
+              kind: entry.kind,
+              mood: entry.mood ?? null,
+            };
+          } catch {
+            /* 楽観挿入なし */
+          }
         }
       }
       if (!ok) {

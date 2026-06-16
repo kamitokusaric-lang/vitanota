@@ -31,9 +31,13 @@ test.describe('日誌エントリ CRUD', () => {
     // Modal が閉じる (capture box が消える)
     await expect(page.getByTestId('capture-content-input')).not.toBeVisible();
 
-    // マイノートタブで自分の投稿を確認
+    // マイノートタブで自分の投稿を確認。
+    // 公開エントリは右レーン (公開タイムライン) にも出るためマイノートパネル内にスコープ
+    // (strict mode 違反回避・製品挙動は正しい)。
     await page.goto('/dashboard?tab=my-notes');
-    await expect(page.getByText('今日の授業の振り返り')).toBeVisible();
+    await expect(
+      page.getByTestId('tabpanel-my-notes').getByText('今日の授業の振り返り'),
+    ).toBeVisible();
   });
 
   test('US-T-010: 1000文字制限のクライアント側バリデーション', async ({ page }) => {

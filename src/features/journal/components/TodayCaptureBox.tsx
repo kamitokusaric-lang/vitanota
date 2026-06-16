@@ -40,6 +40,9 @@ const KIND_CHIPS: { kind: CaptureKind; label: string }[] = [
 interface TodayCaptureBoxProps {
   aiChatEnabled?: boolean;
   onSuccess?: () => void;
+  // 新規投稿を職員室ノート (右レーン) へ楽観挿入する際、自分の投稿カードに出す表示名。
+  // create-mode のみ使用 (編集では使わない)。未指定なら名前は次の再取得で埋まる。
+  authorName?: string;
   // 編集モード (chimo 2026-06-15): 既存の職員室ノート投稿 (tweet/knowledge + board 4 種) の本文を編集。
   // kind は変更不可 (journal 編集 API が kind を書き換えない) ため、種別チップは選択固定・非活性で
   // 本文だけ PUT する。投稿フォームと見た目を統一するためチップ自体は出す。
@@ -51,6 +54,7 @@ interface TodayCaptureBoxProps {
 export function TodayCaptureBox({
   aiChatEnabled = false,
   onSuccess,
+  authorName,
   editId,
   initialContent,
   initialKind,
@@ -70,14 +74,55 @@ export function TodayCaptureBox({
 
   const maxLength = kind && isBoardKind(kind) ? 2000 : 1000;
 
+  // no-store なフィード (マイノート /private・職員室ボード /staffroom) は revalidate で最新化。
+  // 公開タイムライン /public は Cache-Control(s-maxage / stale-while-revalidate)で
+  // ブラウザ/CDN が stale を返すため revalidate では新規投稿が即時反映されない。
+  // create 時は下記 insertIntoPublicTimeline で楽観挿入し、ここでは /public を revalidate しない
+  // (revalidate すると stale GET が楽観挿入を上書きするため。編集分岐と同じ理由)。
   const refreshFeeds = () =>
     globalMutate(
       (key: unknown) =>
         typeof key === 'string' &&
         (key.startsWith('/api/private/journal/entries') ||
-          key.startsWith('/api/public/journal/entries') ||
           key.startsWith('/api/staffroom/board')),
     );
+
+  // 作成したエントリを職員室ノート (右レーン /public) の SWR cache 先頭へ楽観挿入する
+  // (revalidate:false でキャッシュ層を bypass。編集/削除と同じパターン)。
+  const insertIntoPublicTimeline = (created: {
+    id: string;
+    userId: string;
+    content: string;
+    createdAt: string;
+    kind: string;
+    mood: number | null;
+  }) => {
+    const optimistic = {
+      id: created.id,
+      userId: created.userId,
+      content: created.content,
+      createdAt: created.createdAt,
+      isPublic: true,
+      mood: created.mood,
+      kind: created.kind,
+      authorName: authorName ?? null,
+      authorNickname: null,
+      tags: [] as Array<{ id: string; name: string }>,
+      reactions: {
+        knowledge: { count: 0, mine: false },
+        appreciation: { count: 0, mine: false },
+        endorsement: { count: 0, mine: false },
+      },
+    };
+    type PublicCache = { entries?: unknown[] } | undefined;
+    void globalMutate(
+      (key: unknown) =>
+        typeof key === 'string' && key.startsWith('/api/public/journal/entries'),
+      (cur: PublicCache): PublicCache =>
+        cur?.entries ? { ...cur, entries: [optimistic, ...cur.entries] } : cur,
+      { revalidate: false },
+    );
+  };
 
   // 入力が少し止まったら (デバウンス) AI 提案を取得して種別チップをそっと先選択する。
   // blur は「書く」押下と競合して間に合わないため、タイピング中に拾う (chimo 2026-06-13)。
@@ -158,9 +203,31 @@ export function TodayCaptureBox({
       }
       const finalKind: CaptureKind = kind ?? 'note'; // 未選択は note (つぶやき)
       let ok: boolean;
+      // 作成したエントリ (職員室ノートへ楽観挿入する材料)。
+      let created:
+        | { id: string; userId: string; content: string; createdAt: string; kind: string; mood: number | null }
+        | null = null;
       if (isBoardKind(finalKind)) {
         const res = await postStaffroomBoard({ boardKind: finalKind, content: text, isPublic: true });
         ok = res.ok;
+        if (ok) {
+          // body 解析に失敗しても保存自体は成功 (楽観挿入だけ諦め、次の再取得に委ねる)。
+          try {
+            const { board } = (await res.json()) as {
+              board: { id: string; authorUserId: string; content: string; createdAt: string; boardKind: string };
+            };
+            created = {
+              id: board.id,
+              userId: board.authorUserId,
+              content: board.content,
+              createdAt: board.createdAt,
+              kind: board.boardKind,
+              mood: null,
+            };
+          } catch {
+            /* 楽観挿入なし */
+          }
+        }
       } else {
         const res = await fetch('/api/private/journal/entries', {
           method: 'POST',
@@ -168,11 +235,32 @@ export function TodayCaptureBox({
           body: JSON.stringify({ kind: finalKind, content: text, tagIds: [], isPublic: true, mood: null }),
         });
         ok = res.ok;
+        if (ok) {
+          // body 解析に失敗しても保存自体は成功 (楽観挿入だけ諦め、次の再取得に委ねる)。
+          try {
+            const { entry } = (await res.json()) as {
+              entry: { id: string; userId: string; content: string; createdAt: string; kind: string; mood: number | null };
+            };
+            created = {
+              id: entry.id,
+              userId: entry.userId,
+              content: entry.content,
+              createdAt: entry.createdAt,
+              kind: entry.kind,
+              mood: entry.mood ?? null,
+            };
+          } catch {
+            /* 楽観挿入なし */
+          }
+        }
       }
       if (!ok) {
         showToast('保存に失敗しました', 'error');
         return;
       }
+      // 右レーン (公開タイムライン) はキャッシュ層を bypass する楽観挿入で即時反映。
+      if (created) insertIntoPublicTimeline(created);
+      // マイノート・職員室ボード (no-store) は revalidate で最新化。
       await refreshFeeds();
       setContent('');
       setKind(null);

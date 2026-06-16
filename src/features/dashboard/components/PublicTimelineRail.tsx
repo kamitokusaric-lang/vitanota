@@ -8,13 +8,16 @@
 // mood / タグも表示する (chimo 2026-05-20 指示)。 isPublic で本人が公開した投稿のみが
 // この経路に乗るので、 mood 露出は本人同意済みコンテンツ範囲内。
 //
-// API は /api/public/journal/entries?perPage=50 を SWR で 30s 間隔で更新
-// (timelineQuerySchema の max は 50)。 CloudFront 側のキャッシュも s-maxage=30 なので、
-// 体感は 30-60s 遅延で十分。 50 件超えるテナントが出たら useSWRInfinite で paginate に切替。
+// API は /api/public/journal/entries?perPage=50 を SWR で取得 (timelineQuerySchema の max は 50)。
+// fetcher は noStoreJsonFetcher = cache:'no-store' でブラウザ HTTP キャッシュを踏まない。
+//   /public は s-maxage/stale-while-revalidate 付きで、素の fetch だとマウント/フルリロード時に
+//   ブラウザがキャッシュの stale を返し、新規投稿が出ない (chimo 2026-06-16)。no-store でマウント時は
+//   常にサーバ最新を取り、投稿直後の即時反映は create 側の楽観挿入で担保する。
+//   50 件超えるテナントが出たら useSWRInfinite で paginate に切替。
 
 import { useEffect, useRef, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { jsonFetcher } from '@/shared/lib/fetcher';
+import { noStoreJsonFetcher } from '@/shared/lib/fetcher';
 import { Sparkles } from 'lucide-react';
 import type {
   JournalEntryKind,
@@ -101,7 +104,7 @@ export function PublicTimelineRail({
   // 即時反映、 他教員の更新はページ遷移時 / tab 切替時の再 mount で同期。
   const { data, error, isLoading, mutate } = useSWR<RailResponse>(
     fetchUrl,
-    jsonFetcher,
+    noStoreJsonFetcher,
     {
       refreshInterval: 0,
       revalidateOnFocus: false,

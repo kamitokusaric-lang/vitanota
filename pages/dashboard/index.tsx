@@ -280,6 +280,7 @@ export default function DashboardPage({
             {captureModalOpen && (
               <TodayCaptureBox
                 aiChatEnabled={aiChatEnabled}
+                authorName={session.user.name}
                 onSuccess={() => setCaptureModalOpen(false)}
               />
             )}

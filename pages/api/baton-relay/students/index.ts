@@ -16,7 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!parsed.success) {
       return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'classId が必要です' });
     }
-    const students = await batonRelayService.listStudents(ctx, parsed.data.classId);
+    const students = await batonRelayService.listStudents(
+      ctx,
+      parsed.data.classId,
+      parsed.data.status ?? 'active',
+    );
     return res.status(200).json({ students });
   }
 

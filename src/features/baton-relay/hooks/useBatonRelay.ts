@@ -25,6 +25,19 @@ export function useStudents(classId: string | null) {
   return { students: data?.students ?? [], error, isLoading, mutate };
 }
 
+// アーカイブ済み生徒。enabled=false の間は取得しない (トグル ON で初めて叩く)。
+export function useArchivedStudents(classId: string | null, enabled: boolean) {
+  const key =
+    enabled && classId
+      ? `/api/baton-relay/students?classId=${classId}&status=archived`
+      : null;
+  const { data, error, isLoading, mutate } = useSWR<{ students: StudentDto[] }>(
+    key,
+    jsonFetcher,
+  );
+  return { archived: data?.students ?? [], error, isLoading, mutate };
+}
+
 export function useNotes(classId: string | null, date: string) {
   const key = classId
     ? `/api/baton-relay/notes?classId=${classId}&date=${date}`

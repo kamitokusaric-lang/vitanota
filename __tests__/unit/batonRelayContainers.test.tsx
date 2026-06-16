@@ -8,6 +8,7 @@ vi.mock('@/shared/components/Toast', () => ({
 vi.mock('@/features/baton-relay/hooks/useBatonRelay', () => ({
   useClasses: vi.fn(),
   useStudents: vi.fn(),
+  useArchivedStudents: vi.fn(),
   useNotes: vi.fn(),
   useReactions: vi.fn(),
   useTeacherNames: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('@/features/baton-relay/hooks/useBatonRelay', () => ({
 import {
   useClasses,
   useStudents,
+  useArchivedStudents,
   useNotes,
   useReactions,
   useTeacherNames,
@@ -49,10 +51,34 @@ describe('StudentRow', () => {
     classes: [cls],
     onToggleReaction: vi.fn(),
     onMoveStudent: vi.fn(),
+    onRenameStudent: vi.fn(),
+    onArchiveStudent: vi.fn(),
     onAddNote: vi.fn(),
     onEditNote: vi.fn(),
     onDeleteNote: vi.fn(),
   };
+
+  it('メニューから「氏名を編集」でインライン入力し、保存で onRenameStudent が呼ばれる', async () => {
+    const onRenameStudent = vi.fn().mockResolvedValue(undefined);
+    render(<StudentRow {...baseProps} onRenameStudent={onRenameStudent} />);
+    fireEvent.click(screen.getByTestId('student-menu-s1'));
+    fireEvent.click(screen.getByTestId('student-rename-s1'));
+    const input = screen.getByTestId('student-name-input-s1');
+    fireEvent.change(input, { target: { value: 'さくら(改名)' } });
+    fireEvent.click(screen.getByTestId('student-name-save-s1'));
+    expect(onRenameStudent).toHaveBeenCalledWith('s1', 'さくら(改名)');
+  });
+
+  it('「アーカイブする」は 2 段確認の後に onArchiveStudent が呼ばれる', () => {
+    const onArchiveStudent = vi.fn().mockResolvedValue(undefined);
+    render(<StudentRow {...baseProps} onArchiveStudent={onArchiveStudent} />);
+    fireEvent.click(screen.getByTestId('student-menu-s1'));
+    fireEvent.click(screen.getByTestId('student-archive-s1'));
+    // 1 段目では呼ばれない
+    expect(onArchiveStudent).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('student-archive-confirm-s1'));
+    expect(onArchiveStudent).toHaveBeenCalledWith('s1');
+  });
 
   it('生徒名と 2 種の印ボタンを描画する', () => {
     render(<StudentRow {...baseProps} />);
@@ -96,6 +122,7 @@ describe('BatonRelayBoard (controlled・classId 指定)', () => {
   beforeEach(() => {
     vi.mocked(useClasses).mockReturnValue({ classes: [cls], isLoading: false, error: undefined, mutate: vi.fn() } as ReturnType<typeof useClasses>);
     vi.mocked(useStudents).mockReturnValue({ students: [student], mutate: vi.fn() } as unknown as ReturnType<typeof useStudents>);
+    vi.mocked(useArchivedStudents).mockReturnValue({ archived: [], mutate: vi.fn() } as unknown as ReturnType<typeof useArchivedStudents>);
     vi.mocked(useNotes).mockReturnValue({ notes: [], mutate: vi.fn() } as unknown as ReturnType<typeof useNotes>);
     vi.mocked(useReactions).mockReturnValue({ reactions: [], mutate: vi.fn() } as unknown as ReturnType<typeof useReactions>);
     vi.mocked(useTeacherNames).mockReturnValue(new Map());
@@ -103,7 +130,7 @@ describe('BatonRelayBoard (controlled・classId 指定)', () => {
 
   it('クラス目標ヘッダと生徒行を描画する', () => {
     render(<BatonRelayBoard currentUserId="u1" todayDate="2026-06-15" classId="c1" />);
-    expect(screen.getByText('2-A')).toBeInTheDocument(); // ClassGoalHeader
+    expect(screen.getByText('クラス目標')).toBeInTheDocument(); // ClassGoalHeader
     expect(screen.getByText('さくら')).toBeInTheDocument(); // StudentRow
     expect(screen.getByText(/まとめて追加/)).toBeInTheDocument(); // RosterStudentBulkAdd
   });

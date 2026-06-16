@@ -50,10 +50,10 @@ describe('mockKindSuggest (MOCK_BEDROCK 時の Lambda 応答)', () => {
   it('感謝ワード → thanks', () => {
     expect(mockKindSuggest('助かりました、ありがとうございます').suggestedKind).toBe('thanks');
   });
-  it('やり方共有 → knowledge', () => {
-    expect(mockKindSuggest('掲示物作成のコツをまとめました').suggestedKind).toBe('knowledge');
+  it('やり方共有 → null (note 据え置き・knowledge 種別は廃止)', () => {
+    expect(mockKindSuggest('掲示物作成のコツをまとめました').suggestedKind).toBeNull();
   });
-  it('特定できない → null (tweet 据え置き)', () => {
+  it('特定できない → null (note 据え置き)', () => {
     expect(mockKindSuggest('今日はいい天気だった').suggestedKind).toBeNull();
   });
 });

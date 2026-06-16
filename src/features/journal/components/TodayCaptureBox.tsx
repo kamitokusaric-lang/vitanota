@@ -19,7 +19,8 @@ import { postStaffroomBoard } from '@/features/staffroom/lib/postStaffroomBoard'
 import type { StaffroomBoardKind } from '@/features/staffroom/types';
 import type { SuggestKind } from '@/features/ai-chat/kindSuggest';
 
-export type CaptureKind = 'tweet' | 'knowledge' | StaffroomBoardKind;
+// note = 一般の公開メモ (旧 tweet/knowledge を集約)。board 4 種は意図つきの共有。
+export type CaptureKind = 'note' | StaffroomBoardKind;
 
 const BOARD_KINDS: readonly StaffroomBoardKind[] = ['keep', 'concern', 'thanks', 'help'];
 
@@ -27,13 +28,12 @@ function isBoardKind(kind: CaptureKind): kind is StaffroomBoardKind {
   return (BOARD_KINDS as readonly string[]).includes(kind);
 }
 
-// 種別チップ (chimo 2026-06-13 文言)。語彙は「渡す / 共有」に寄せ、評価語を使わない。
-// keep/concern は生徒ノート由来とするため職員室ノートの選択肢からは外す (chimo 2026-06-13)。
-// knowledge は手動投稿 + 「なるほど」自動集計の両方で役に立つ情報箱に集まる (chimo 2026-06-14)。
+// 種別チップ。語彙は「渡す / 共有」に寄せ、評価語を使わない。既定は note (つぶやき)。
+// keep/concern は生徒ノート由来とするため職員室ノートの選択肢からは外す。
+// 「役に立つ情報」は手動種別をやめ、「なるほど」集計で役に立つ情報箱に集まる (kind 再設計 2026-06-16)。
 const KIND_CHIPS: { kind: CaptureKind; label: string }[] = [
-  { kind: 'tweet', label: 'つぶやき' },
+  { kind: 'note', label: 'つぶやき' },
   { kind: 'help', label: '確認・相談したいこと' },
-  { kind: 'knowledge', label: '役に立つ情報' },
   { kind: 'thanks', label: '感謝を伝える' },
 ];
 
@@ -156,7 +156,7 @@ export function TodayCaptureBox({
         onSuccess?.();
         return;
       }
-      const finalKind: CaptureKind = kind ?? 'tweet'; // 未選択は ひとこと
+      const finalKind: CaptureKind = kind ?? 'note'; // 未選択は note (つぶやき)
       let ok: boolean;
       if (isBoardKind(finalKind)) {
         const res = await postStaffroomBoard({ boardKind: finalKind, content: text, isPublic: true });

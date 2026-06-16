@@ -109,11 +109,10 @@ export function PublicTimelineRail({
     },
   );
 
-  // 職員室ノート (タイムライン) は diary 以外の全種別を流す
-  // (tweet/knowledge + board 4 種。diary は個人面のみ・chimo 2026-06-12)。
-  const visibleEntries = (data?.entries ?? []).filter(
-    (e) => (e.kind ?? 'diary') !== 'diary',
-  );
+  // 職員室ノート (タイムライン) = 公開 (is_public=true) の全投稿。
+  // 公開/私的は is_public が持つ (kind 再設計 2026-06-16)。取得元の公開 view が既に
+  // is_public=true のみなので、ここで kind による除外はしない (私的 note はそもそも届かない)。
+  const visibleEntries = data?.entries ?? [];
 
   // 楽観的更新パターン (TimelineList と同じ): mutate(更新後 cache, revalidate=false)
   //   → API → 成功時は楽観的更新を信じて revalidate しない (ETag 304 cache 問題回避)
@@ -228,7 +227,7 @@ export function PublicTimelineRail({
                     kind: 'edit',
                     entryId: en.id,
                     content: en.content,
-                    entryKind: (en.kind ?? 'tweet') as CaptureKind,
+                    entryKind: (en.kind ?? 'note') as CaptureKind,
                   })
                 }
                 onDelete={(id) =>
@@ -308,16 +307,14 @@ function RailItem({
     );
   }
   const author = entry.authorNickname ?? entry.authorName ?? '';
-  const kind = entry.kind ?? 'diary';
-  // 2026-05-27 chimo 指示: kind バッジは timeline 表示で意味が伝わらないため非表示
-  //   (新仕様で投稿時に kind を選ばないため。 既存 knowledge レコードのタグ表示分岐は維持)。
+  // kind バッジは timeline では非表示 (踏み絵)。タグは emotion_tags を表示し、
+  // 既存 knowledge レコードの knowledge_tags も残っていれば併せて出す (legacy・新規 note では空)。
   const MoodIcon = getMoodIcon(entry.mood);
   const moodLabel = getMoodLabel(entry.mood);
-  // 表示タグ: knowledge は knowledgeTags、 それ以外は emotion_tags
-  const tagList: Array<{ id: string; name: string }> =
-    kind === 'knowledge'
-      ? entry.knowledgeTags ?? []
-      : entry.tags ?? [];
+  const tagList: Array<{ id: string; name: string }> = [
+    ...(entry.tags ?? []),
+    ...(entry.knowledgeTags ?? []),
+  ];
   const visibleTags = tagList.slice(0, MAX_TAGS_INLINE);
   const overflowCount = Math.max(0, tagList.length - visibleTags.length);
   const reactions = entry.reactions ?? emptyReactions();

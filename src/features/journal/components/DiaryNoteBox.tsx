@@ -62,10 +62,10 @@ export function DiaryNoteBox({
           method: isEdit ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            kind: 'diary',
+            kind: 'note',
             content: text,
             tagIds,
-            isPublic: false, // diary は常に自分用
+            isPublic: false, // 倉庫 (自分用) の note は常に非公開
             mood,
           }),
         },

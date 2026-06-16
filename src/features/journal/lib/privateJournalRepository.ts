@@ -31,15 +31,14 @@ export type MoodLevel =
   | 'negative'
   | 'very_negative';
 
-export type JournalEntryKind = 'diary' | 'knowledge' | 'tweet';
+// journal (倉庫/職員室ノート) 経路で作るのは note のみ (公開/私的は is_public)。
+export type JournalEntryKind = 'note';
 
 export interface CreateEntryParams {
-  // kind は次ステップで repository INSERT に組み込む。今は受け取るのみ (DB default 'diary')。
-  kind?: JournalEntryKind;
+  kind?: JournalEntryKind; // 未指定は DB default 'note'
   content: string;
   tagIds: string[];
   isPublic: boolean;
-  // mood は kind='diary' のみ必須 (Zod superRefine で担保)、それ以外で null/undefined
   mood?: MoodLevel | null;
 }
 
@@ -226,33 +225,19 @@ export class PrivateJournalRepository {
         content: params.content,
         isPublic: params.isPublic,
         mood: params.mood,
-        kind: params.kind ?? 'diary',
+        kind: params.kind ?? 'note',
       })
       .returning();
 
     if (params.tagIds.length > 0) {
-      // kind 別に振り分け:
-      //   tweet     → emotion_tags (既存 journal_entry_tags)
-      //   knowledge → knowledge_tags (journal_entry_knowledge_tags)
-      //   diary     → Zod superRefine でガード済 (この分岐に到達しない)
-      if (params.kind === 'knowledge') {
-        await tx.insert(journalEntryKnowledgeTags).values(
-          params.tagIds.map((tagId) => ({
-            tenantId: ctx.tenantId,
-            journalEntryId: entry.id,
-            knowledgeTagId: tagId,
-          })),
-        );
-      } else {
-        // kind=tweet または未指定 (default 'diary' だが Zod でタグ禁止)
-        await tx.insert(journalEntryTags).values(
-          params.tagIds.map((tagId) => ({
-            tenantId: ctx.tenantId,
-            entryId: entry.id,
-            tagId,
-          }))
-        );
-      }
+      // note は emotion_tags (journal_entry_tags) に一本化。
+      await tx.insert(journalEntryTags).values(
+        params.tagIds.map((tagId) => ({
+          tenantId: ctx.tenantId,
+          entryId: entry.id,
+          tagId,
+        }))
+      );
     }
 
     return entry;
@@ -292,40 +277,20 @@ export class PrivateJournalRepository {
 
     if (!entry) return null;
 
-    // タグ更新: kind 別に既存を全 DELETE → 新規を一括 INSERT
-    //   knowledge → journal_entry_knowledge_tags
-    //   tweet     → journal_entry_tags (emotion_tags)
-    //   diary     → tagIds 空 (Zod でガード済) なので分岐不要
+    // タグ更新: 既存を全 DELETE → 新規を一括 INSERT (note は emotion_tags 一本)。
     if (params.tagIds !== undefined) {
-      if (params.kind === 'knowledge') {
-        await tx
-          .delete(journalEntryKnowledgeTags)
-          .where(eq(journalEntryKnowledgeTags.journalEntryId, id));
+      await tx
+        .delete(journalEntryTags)
+        .where(eq(journalEntryTags.entryId, id));
 
-        if (params.tagIds.length > 0) {
-          await tx.insert(journalEntryKnowledgeTags).values(
-            params.tagIds.map((tagId) => ({
-              tenantId: ctx.tenantId,
-              journalEntryId: id,
-              knowledgeTagId: tagId,
-            })),
-          );
-        }
-      } else {
-        // tweet (or kind 未指定 = diary フォールバック)
-        await tx
-          .delete(journalEntryTags)
-          .where(eq(journalEntryTags.entryId, id));
-
-        if (params.tagIds.length > 0) {
-          await tx.insert(journalEntryTags).values(
-            params.tagIds.map((tagId) => ({
-              tenantId: ctx.tenantId,
-              entryId: id,
-              tagId,
-            }))
-          );
-        }
+      if (params.tagIds.length > 0) {
+        await tx.insert(journalEntryTags).values(
+          params.tagIds.map((tagId) => ({
+            tenantId: ctx.tenantId,
+            entryId: id,
+            tagId,
+          }))
+        );
       }
     }
 

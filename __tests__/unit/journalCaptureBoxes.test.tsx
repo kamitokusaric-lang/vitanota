@@ -39,12 +39,12 @@ describe('TodayCaptureBox', () => {
   it('種別チップ・本文・公開バナーを描画し、空のとき書くボタンは disabled', () => {
     wrap(<TodayCaptureBox />);
     expect(screen.getByTestId('capture-public-note')).toBeInTheDocument();
-    expect(screen.getByTestId('capture-kind-tweet')).toBeInTheDocument();
+    expect(screen.getByTestId('capture-kind-note')).toBeInTheDocument();
     expect(screen.getByTestId('capture-kind-help')).toBeInTheDocument();
     expect(screen.getByTestId('capture-submit')).toBeDisabled();
   });
 
-  it('種別未選択で投稿すると journal API に tweet/公開で POST する', async () => {
+  it('種別未選択で投稿すると journal API に note/公開で POST する', async () => {
     const onSuccess = vi.fn();
     wrap(<TodayCaptureBox onSuccess={onSuccess} />);
     fireEvent.change(screen.getByTestId('capture-content-input'), { target: { value: '今日の気づき' } });
@@ -54,7 +54,7 @@ describe('TodayCaptureBox', () => {
       String(c[0]).includes('/api/private/journal/entries'),
     );
     const body = JSON.parse((call![1] as RequestInit).body as string);
-    expect(body).toMatchObject({ kind: 'tweet', isPublic: true });
+    expect(body).toMatchObject({ kind: 'note', isPublic: true });
   });
 
   it('board 種別 (help) を選ぶと postStaffroomBoard へ流す', async () => {
@@ -69,7 +69,7 @@ describe('TodayCaptureBox', () => {
 
   it('編集モードは本文のみ PUT し、ボタンは「保存」', async () => {
     const onSuccess = vi.fn();
-    wrap(<TodayCaptureBox editId="e1" initialContent="編集前" initialKind="tweet" onSuccess={onSuccess} />);
+    wrap(<TodayCaptureBox editId="e1" initialContent="編集前" initialKind="note" onSuccess={onSuccess} />);
     expect(screen.getByTestId('capture-submit')).toHaveTextContent('保存');
     fireEvent.change(screen.getByTestId('capture-content-input'), { target: { value: '編集後' } });
     fireEvent.click(screen.getByTestId('capture-submit'));
@@ -90,7 +90,7 @@ describe('DiaryNoteBox', () => {
     expect(screen.getByTestId('diary-content-input')).toBeInTheDocument();
   });
 
-  it('投稿すると diary/非公開で POST する', async () => {
+  it('投稿すると note/非公開で POST する', async () => {
     const onSuccess = vi.fn();
     wrap(<DiaryNoteBox onSuccess={onSuccess} />);
     fireEvent.change(screen.getByTestId('diary-content-input'), { target: { value: 'ふりかえり' } });
@@ -100,7 +100,7 @@ describe('DiaryNoteBox', () => {
       String(c[0]).includes('/api/private/journal/entries') && (c[1] as RequestInit)?.method === 'POST',
     );
     const body = JSON.parse((call![1] as RequestInit).body as string);
-    expect(body).toMatchObject({ kind: 'diary', isPublic: false });
+    expect(body).toMatchObject({ kind: 'note', isPublic: false });
   });
 
   it('編集モードは PUT・ボタンは「保存」', async () => {

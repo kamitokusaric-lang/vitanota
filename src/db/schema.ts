@@ -32,17 +32,21 @@ export const moodLevelEnum = pgEnum('mood_level', [
 ]);
 
 // 投稿種別。
-//   diary/knowledge/tweet : 日々ノート / ナレッジノート / つぶやき
-//   keep/concern/thanks/help : 職員室ボード (H7-B staffroom / migration 0050)。
-//     続けたい / 気になる / ありがとう / たすけて。is_public は他 kind と同じく本人選択。
+//   note : ただのメモ (is_public=false なら倉庫 / true なら一般の職員室ノート)。
+//          公開/私的は kind ではなく is_public が持つ (chimo 2026-06-16・kind 再設計 / migration 0053-0054)。
+//   keep/concern/thanks/help : 意図 (職員室ボード H7-B / 生徒ノート由来)。
+//     続けたい / 気になる / ありがとう / たすけて。
+//   diary/knowledge/tweet : 旧値。'note' へ集約済 (参照停止・enum 物理削除はしない)。
 export const journalEntryKindEnum = pgEnum('journal_entry_kind', [
-  'diary',
-  'knowledge',
-  'tweet',
+  'note',
   'keep',
   'concern',
   'thanks',
   'help',
+  // ── 以下は旧値 (0054 で note へ移行済・新規では使わない) ──
+  'diary',
+  'knowledge',
+  'tweet',
 ]);
 
 // Unit-05: タスク管理
@@ -280,7 +284,7 @@ export const journalEntries = pgTable(
     // 投稿種別 (migration 0030)。既存データは default 'diary'。
     // mood は kind='diary' のみ NOT NULL、emotion_tags は kind='tweet' のみ付与可
     // (制約は API/Zod レベルで担保、DB CHECK は付けない)。
-    kind: journalEntryKindEnum('kind').notNull().default('diary'),
+    kind: journalEntryKindEnum('kind').notNull().default('note'),
     // ── H7-B 職員室ボードの A→B seam 受け口 (board kind のときのみ・migration 0051) ──
     // 複合 FK ((student_id|class_id, tenant_id) → students|classes) は migration で定義。
     // drizzle 側は列宣言のみ (journal_entries は students/classes より前方に宣言されるため、

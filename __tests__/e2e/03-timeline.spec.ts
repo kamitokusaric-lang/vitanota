@@ -107,10 +107,13 @@ test.describe('共有タイムライン (US-T-014)', () => {
     });
 
     await loginAs(context, seed, user, tenant.id);
-    // マイノートタブで自分の公開・非公開両方を確認
+    // マイノートタブで自分の公開・非公開両方を確認。
+    // 公開エントリは右レーン (公開タイムライン) にも出るため、マイノートパネル内にスコープして
+    // strict mode 違反 (同名 2 要素) を避ける。
     await page.goto('/dashboard?tab=my-notes');
 
-    await expect(page.getByText('自分の公開')).toBeVisible();
-    await expect(page.getByText('自分の非公開')).toBeVisible();
+    const myNotes = page.getByTestId('tabpanel-my-notes');
+    await expect(myNotes.getByText('自分の公開')).toBeVisible();
+    await expect(myNotes.getByText('自分の非公開')).toBeVisible();
   });
 });

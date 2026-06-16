@@ -10,18 +10,19 @@
 ## 何ができるか
 
 - 日誌エントリの作成・編集・削除 (本文 1〜1000 文字)
-- 3 つの種別 (`kind`): **diary** (日々ノート・mood+感情タグ任意) / **knowledge** (ナレッジノート・ナレッジタグ任意) / **tweet** (ひとこと・感情タグ任意)
+- 種別 (`kind`) = **`note`** (ただのメモ・mood/感情タグ任意)。公開/私的は kind ではなく **`is_public`** が持つ (kind 再設計 2026-06-16 / migration 0053-0054)。`note` は非公開なら倉庫 (マイノート)、公開なら一般の職員室ノート。
+  - 旧 `diary`/`knowledge`/`tweet` は `note` へ集約済 (enum には残すが新規では使わない)。意図つきの共有 `keep`/`concern`/`thanks`/`help` は別経路 (職員室ボード / 生徒ノート)。
 - 公開 (`is_public`) の切替: 公開すれば教員タイムラインに並ぶ (相互関心の層)、非公開なら自分だけ
 
 ### 記録の入口 (chimo 2026-06-12: 右サイドに一本化)
 
 記録を「書く」入口はダッシュボード右サイドの 2 つだけ。職員室ボードからは起票しない。
 
-- **今日の出来事を書く** (`TodayCaptureBox`): 雑に一文を書いて種別を選んで残す単一キャプチャ箱。既定は `tweet`。種別で確定先を振り分ける —— `tweet`/`knowledge` → 日々ノート (`POST /api/private/journal/entries`)、`keep`/`concern`/`thanks`/`help` → 職員室ボード (`POST /api/staffroom/board`)。
-  - 種別は「分類・評価」ではなく「どこへ渡す / どう残す」のルーティング。Slice 2 で AI が種別を**そっと提案**する (確定は必ず本人)。
-- **自分用の日誌** (`EntryForm` kind=`diary`): 自分用なので既定は非公開、感情タグ UI は出さない。
+- **今日の出来事を書く** (`TodayCaptureBox`): 雑に一文を書いて種別を選んで残す単一キャプチャ箱。既定は `note` (つぶやき)。種別で確定先を振り分ける —— `note` (公開) → 職員室ノート (`POST /api/private/journal/entries`・`is_public=true`)、`thanks`/`help` → 職員室ボード (`POST /api/staffroom/board`)。
+  - 種別は「分類・評価」ではなく「どこへ渡す / どう残す」のルーティング。AI が種別 (thanks/help) を**そっと提案**する (確定は必ず本人)。「役に立つ情報」の手動種別は廃止し「なるほど」集計に一本化。
+- **自分用の日誌** (`DiaryNoteBox` kind=`note`・`is_public=false`): 倉庫 (自分だけ)。mood + 感情タグ任意。
 - 共有タイムライン (テナント内の公開エントリ) と マイ記録 (自分の公開+非公開) の 2 ビュー
-- 感情タグ (emotion_tags) と ナレッジタグ (knowledge_tags) の付与
+- 感情タグ (emotion_tags) の付与 (note は emotion_tags に一本化。旧 knowledge_tags は新規書き込みなし)
 - リアクション 3 種 (参考になった / お疲れ様です / すてきです) — 自分の投稿にも付けられる
 
 ## 仕様の所在

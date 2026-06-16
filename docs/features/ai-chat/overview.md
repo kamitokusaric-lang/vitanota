@@ -10,9 +10,9 @@
 ## 何ができるか
 
 - テキスト入力から候補を抽出 (`extract`) — Bedrock 経由 Claude Haiku
-- 候補を行ごとに表示 → ワンタップ承認 / 編集 / 棄却。task と diary の 2 分類
+- 候補を行ごとに表示 → ワンタップ承認 / 編集 / 棄却。task と note (メモ) の 2 分類
 - 確定 (`confirm`) で `tasks` / `journal_entries` に INSERT (`source_chat_snippet` 付き)
-- diary のときだけ MoodPicker (5 段階)。**mood は教員が選ぶ。AI 提案なし**
+- note のときだけ MoodPicker (5 段階)。**mood は教員が選ぶ。AI 提案なし**
 - 確定/棄却の理由を記録 (`feedback`)、利用計測 (`events`)
 
 ## セッションのライフサイクル

@@ -9,26 +9,26 @@
 |---|---|---|
 | `content` | text | 本文。1〜1000 文字 (2026-05-27 に 200→1000 へ拡張) |
 | `is_public` | boolean | 公開フラグ。デフォルト `true` |
-| `mood` | enum (5段階) | very_positive / positive / neutral / negative / very_negative。diary/tweet で任意 |
-| `kind` | enum | diary / knowledge / tweet。デフォルト diary |
+| `mood` | enum (5段階) | very_positive / positive / neutral / negative / very_negative。note で任意 |
+| `kind` | enum | `note` (メモ) ほか `keep`/`concern`/`thanks`/`help` (共有意図)。デフォルト `note`。**公開/私的は kind ではなく `is_public`** (kind 再設計 2026-06-16) |
 | `content_masked` | text | AI 入力用マスキング済み本文 |
 | `user_id` | UUID (nullable) | 作成者。退会時は SET NULL で匿名化 (投稿本体は残す) |
 
-種別ごとの違い:
+journal (倉庫/職員室ノート) 経路で作るのは `note` のみ (旧 diary/knowledge/tweet は note へ集約済)。
 
-| kind | mood | 付けられるタグ | UI |
+| kind | mood | 付けられるタグ | 入口 |
 |---|---|---|---|
-| diary (日々ノート) | 任意 | emotion_tags + knowledge_tags | 標準フォーム |
-| knowledge (ナレッジ) | — | knowledge_tags | ナレッジ向け |
-| tweet (ひとこと) | 任意 | emotion_tags | 軽量入力 |
+| note (メモ) | 任意 | emotion_tags | 非公開=`DiaryNoteBox` (倉庫) / 公開=`TodayCaptureBox` (職員室ノート) |
+
+意図つきの共有 (`keep`/`concern`/`thanks`/`help`) は職員室ボード経路 ([staffroom](../staffroom/overview.md))。
 
 ## CRUD の挙動
 
 ### 作成 (`POST /api/private/journal/entries`)
-1. Zod 検証 (1〜1000 文字、tagIds は kind 別に emotion/knowledge を検証)
+1. Zod 検証 (1〜1000 文字、tagIds は emotion_tags を検証)
 2. tagIds が同一テナントに属するか確認 (違反は `InvalidTagReferenceError`)
-3. `journal_entries` に INSERT (user_id=セッションユーザー、is_public デフォルト true)
-4. kind に応じた中間テーブルへタグを一括 INSERT (tweet→entry_tags / knowledge→entry_knowledge_tags / diary→両方可)
+3. `journal_entries` に INSERT (user_id=セッションユーザー、kind=note、is_public は入口で決定)
+4. タグを `journal_entry_tags` (emotion_tags) に一括 INSERT (note は emotion_tags に一本化)
 5. 作成エントリ (タグ含む) を 201 で返す
 
 ### 更新 (`PUT /api/private/journal/entries/{id}`)
@@ -83,5 +83,5 @@
 
 - `lib/journalEntryService.ts` (CRUD・所有者検証・トランザクション)
 - `lib/privateJournalRepository.ts` / `lib/publicTimelineRepository.ts`
-- `components/EntryForm.tsx` (kind 別モード) / `components/EntryCard.tsx`
+- `components/DiaryNoteBox.tsx` (倉庫=非公開 note) / `components/TodayCaptureBox.tsx` (公開 note / 職員室ボード) / `components/EntryCard.tsx`
 - `pages/api/private/journal/entries*` / `pages/api/public/journal/entries.ts`

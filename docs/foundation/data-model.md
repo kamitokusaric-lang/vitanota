@@ -24,7 +24,7 @@
 
 | テーブル | 役割 |
 |---|---|
-| `journal_entries` | 日誌エントリ本体 (content / mood / kind / is_public) |
+| `journal_entries` | 日誌エントリ本体 (content / mood / kind / is_public)。`kind` は意図 (`note`=メモ / `keep`/`concern`/`thanks`/`help`=共有意図)・**公開/私的は `is_public`** (kind 再設計 2026-06-16・旧 diary/tweet/knowledge は note へ集約済) |
 | `emotion_tags` | 感情タグ (system_admin 管理・category: positive/negative/neutral) |
 | `knowledge_tags` | ナレッジタグ (teacher 作成可) |
 | `journal_entry_tags` | エントリ × emotion_tag (M:N) |

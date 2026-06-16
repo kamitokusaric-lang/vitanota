@@ -49,17 +49,51 @@ describe('StaffroomPeriodFilter', () => {
     expect(p.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('preset に一致しないカスタム範囲は M/D〜M/D で表示する', () => {
-    // 2020 の範囲は現在日基準の preset に一致しないのでカスタム表示になる
+  it('表示中の週を「M月D日 〜 M月D日」で出す', () => {
     render(
-      <StaffroomPeriodFilter value={{ from: '2020-01-01', to: '2020-01-02' }} onChange={vi.fn()} />,
+      <StaffroomPeriodFilter value={{ from: '2026-06-15', to: '2026-06-21' }} onChange={vi.fn()} />,
     );
-    expect(screen.getByText('1/1〜1/2')).toBeInTheDocument();
+    const label = screen.getByTestId('board-period-label');
+    expect(label.textContent).toContain('6月15日');
+    expect(label.textContent).toContain('6月21日');
   });
 
-  it('トリガーで popover を開閉できる', () => {
-    render(<StaffroomPeriodFilter value={{ from: '2020-01-01', to: '2020-01-02' }} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByTestId('board-period-filter-trigger'));
-    expect(screen.getByTestId('board-period-filter-popover')).toBeInTheDocument();
+  it('先週に戻る / 次の週に進む で 1 週ずつめくる', () => {
+    const onChange = vi.fn();
+    // 過去週 (今週でない) なら次の週ボタンも有効
+    render(
+      <StaffroomPeriodFilter value={{ from: '2026-06-08', to: '2026-06-14' }} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByTestId('board-period-prev'));
+    expect(onChange).toHaveBeenCalledWith({ from: '2026-06-01', to: '2026-06-07' });
+    fireEvent.click(screen.getByTestId('board-period-next'));
+    expect(onChange).toHaveBeenCalledWith({ from: '2026-06-15', to: '2026-06-21' });
+  });
+
+  it('今週のときは「今週」と「次の週に進む」が無効 (未来は見せない)', () => {
+    const thisWeek = getDefaultBoardPeriod();
+    render(<StaffroomPeriodFilter value={thisWeek} onChange={vi.fn()} />);
+    expect(screen.getByTestId('board-period-next')).toBeDisabled();
+    expect(screen.getByTestId('board-period-this')).toBeDisabled();
+  });
+
+  it('月毎表示に切り替えると当月へ移り、月ラベル・先月/次月で 1 か月ずつめくる', () => {
+    const onChange = vi.fn();
+    // value=2026-05 (当月でない月) で開始
+    render(
+      <StaffroomPeriodFilter value={{ from: '2026-05-01', to: '2026-05-31' }} onChange={onChange} />,
+    );
+    // 月毎に切替 → 当月 (1日始まり) を onChange
+    fireEvent.click(screen.getByTestId('board-period-mode-month'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].from).toMatch(/^\d{4}-\d{2}-01$/);
+    // ラベルは月表記 (value は 2026-05 のまま)
+    expect(screen.getByTestId('board-period-label').textContent).toContain('2026年5月');
+    // 先月 / 次月で 1 か月ずつ
+    onChange.mockClear();
+    fireEvent.click(screen.getByTestId('board-period-prev'));
+    expect(onChange).toHaveBeenCalledWith({ from: '2026-04-01', to: '2026-04-30' });
+    fireEvent.click(screen.getByTestId('board-period-next'));
+    expect(onChange).toHaveBeenCalledWith({ from: '2026-06-01', to: '2026-06-30' });
   });
 });

@@ -122,22 +122,30 @@ export interface SupportClass {
 }
 
 export class StudentSupportRepository {
-  // since/until: 一言 (baton_notes) を期間で絞る基準時刻。印は現在状態 (トグル) なので日付で絞らない。
+  // since/until: 印 (student_reactions) も一言 (baton_notes) も created_at で期間に絞る基準時刻。
+  // 期間内に印 or 一言があった生徒だけを返す (= その週の活動)。
   async get(
     tx: DrizzleDb,
     ctx: StaffroomContext,
     since: Date,
     until?: Date,
   ): Promise<{ classes: SupportClass[] }> {
-    // 1. 印 (positive/concern) を生徒ごとに集計
+    // その週の活動だけ出す (chimo 2026-06-16): 印・一言ともに created_at で期間に絞り、
+    // 期間内に「印が付いた or 一言が書かれた」生徒だけを対象にする。
+
+    // 1. 印 (positive/concern) を期間内 created_at で生徒ごとに集計
+    const reactionConds: SQL[] = [
+      eq(studentReactions.tenantId, ctx.tenantId),
+      gte(studentReactions.createdAt, since),
+    ];
+    if (until) reactionConds.push(lt(studentReactions.createdAt, until));
     const reactionRows = await tx
       .select({
         studentId: studentReactions.studentId,
         type: studentReactions.reactionType,
       })
       .from(studentReactions)
-      .where(eq(studentReactions.tenantId, ctx.tenantId));
-    if (reactionRows.length === 0) return { classes: [] };
+      .where(and(...reactionConds));
 
     const tally = new Map<string, { positive: number; concern: number }>();
     for (const r of reactionRows) {
@@ -146,24 +154,10 @@ export class StudentSupportRepository {
       else t.concern += 1;
       tally.set(r.studentId, t);
     }
-    const studentIds = [...tally.keys()];
 
-    // 2. 該当生徒 (クラス・名前)
-    const studentRows = await tx
-      .select({
-        id: students.id,
-        classId: students.classId,
-        displayName: students.displayName,
-        createdAt: students.createdAt,
-      })
-      .from(students)
-      .where(and(eq(students.tenantId, ctx.tenantId), inArray(students.id, studentIds)))
-      .orderBy(asc(students.createdAt));
-
-    // 3. 期間内の一言 (created_at >= since, < until) を生徒ごとに
+    // 2. 期間内の一言 (created_at >= since, < until) を生徒ごとに
     const noteConds: SQL[] = [
       eq(batonNotes.tenantId, ctx.tenantId),
-      inArray(batonNotes.studentId, studentIds),
       gte(batonNotes.createdAt, since),
     ];
     if (until) noteConds.push(lt(batonNotes.createdAt, until));
@@ -179,14 +173,30 @@ export class StudentSupportRepository {
       notesByStudent.set(n.studentId, arr);
     }
 
-    // 4. クラス情報
+    // 3. 期間内に印 or 一言があった生徒の集合
+    const studentIds = [...new Set([...tally.keys(), ...notesByStudent.keys()])];
+    if (studentIds.length === 0) return { classes: [] };
+
+    // 4. 該当生徒 (クラス・名前)
+    const studentRows = await tx
+      .select({
+        id: students.id,
+        classId: students.classId,
+        displayName: students.displayName,
+        createdAt: students.createdAt,
+      })
+      .from(students)
+      .where(and(eq(students.tenantId, ctx.tenantId), inArray(students.id, studentIds)))
+      .orderBy(asc(students.createdAt));
+
+    // 5. クラス情報
     const classRows = await tx
       .select({ id: classes.id, name: classes.name, schoolYear: classes.schoolYear })
       .from(classes)
       .where(eq(classes.tenantId, ctx.tenantId))
       .orderBy(asc(classes.name));
 
-    // 5. クラス → 生徒 で組み立て (印が付いた生徒がいるクラスだけ)
+    // 6. クラス → 生徒 で組み立て (期間内に活動があった生徒がいるクラスだけ)
     const studentsByClass = new Map<string, SupportStudent[]>();
     for (const s of studentRows) {
       const t = tally.get(s.id) ?? { positive: 0, concern: 0 };

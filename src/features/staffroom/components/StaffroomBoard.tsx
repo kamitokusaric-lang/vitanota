@@ -44,9 +44,7 @@ export function StaffroomBoard() {
     <div className="space-y-6">
       {/* 2 セクション構成 (chimo 2026-06-14): 生徒の様子 / 情報共有。
           期間フィルタは両セクションに共通適用 (投稿日 / 一言の日付)。 */}
-      <div className="flex justify-end">
-        <StaffroomPeriodFilter value={period} onChange={setPeriod} />
-      </div>
+      <StaffroomPeriodFilter value={period} onChange={setPeriod} />
 
       {/* ── 生徒の様子 (朝バトンをクラス別に集約・A→B seam) ── */}
       <section>

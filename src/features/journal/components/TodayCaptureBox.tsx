@@ -43,6 +43,9 @@ interface TodayCaptureBoxProps {
   // 新規投稿を職員室ノート (右レーン) へ楽観挿入する際、自分の投稿カードに出す表示名。
   // create-mode のみ使用 (編集では使わない)。未指定なら名前は次の再取得で埋まる。
   authorName?: string;
+  // 投稿者が system_admin 兼任 = 右レーンで「vitanota AI」カード表示になる投稿者か。
+  // 楽観挿入したカードを投稿直後から AI カードで描くために渡す (サーバ enrich と一致させる)。
+  isAiAuthor?: boolean;
   // 編集モード (chimo 2026-06-15): 既存の職員室ノート投稿 (tweet/knowledge + board 4 種) の本文を編集。
   // kind は変更不可 (journal 編集 API が kind を書き換えない) ため、種別チップは選択固定・非活性で
   // 本文だけ PUT する。投稿フォームと見た目を統一するためチップ自体は出す。
@@ -55,6 +58,7 @@ export function TodayCaptureBox({
   aiChatEnabled = false,
   onSuccess,
   authorName,
+  isAiAuthor,
   editId,
   initialContent,
   initialKind,
@@ -107,6 +111,9 @@ export function TodayCaptureBox({
       kind: created.kind,
       authorName: authorName ?? null,
       authorNickname: null,
+      // system_admin 兼任の投稿は右レーンで AI カード表示。サーバ enrich(isAiPost)と
+      // 一致させ、投稿直後から通常カードでチラ見えしないようにする。
+      isAiPost: isAiAuthor ?? false,
       tags: [] as Array<{ id: string; name: string }>,
       reactions: {
         knowledge: { count: 0, mine: false },

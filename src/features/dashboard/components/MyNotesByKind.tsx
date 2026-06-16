@@ -31,9 +31,11 @@ interface MyEntry {
 }
 
 const KIND_META: Record<string, { label: string; pill: string }> = {
-  diary: { label: '日々ノート', pill: 'bg-vn-muted-bg text-slate-600' },
-  tweet: { label: 'つぶやき', pill: 'bg-slate-100 text-slate-600' },
-  knowledge: { label: 'ナレッジ', pill: 'bg-sky-50 text-sky-700' },
+  note: { label: 'ノート', pill: 'bg-vn-muted-bg text-slate-600' },
+  // 旧値 (note へ移行済・新規では出ない。万一の残存に備え残置)。
+  diary: { label: 'ノート', pill: 'bg-vn-muted-bg text-slate-600' },
+  tweet: { label: 'ノート', pill: 'bg-slate-100 text-slate-600' },
+  knowledge: { label: 'ノート', pill: 'bg-sky-50 text-sky-700' },
   keep: { label: '続けたい', pill: 'bg-vn-green-bg text-vn-green-text' },
   concern: { label: '気になる', pill: 'bg-vn-warning-bg text-vn-warning-text' },
   help: { label: '相談', pill: 'bg-indigo-50 text-indigo-700' },
@@ -173,14 +175,15 @@ export function MyNotesByKind() {
         open={modal.kind === 'edit'}
         onClose={() => setModal({ kind: 'closed' })}
         title={
-          modal.kind === 'edit' && modal.entry.kind === 'diary'
-            ? '日々ノートを編集'
+          modal.kind === 'edit' && modal.entry.kind === 'note' && !modal.entry.isPublic
+            ? 'メモを編集'
             : '職員室ノートを編集'
         }
         maxWidth="max-w-xl"
       >
         {modal.kind === 'edit' &&
-          (modal.entry.kind === 'diary' ? (
+          // 私的 note (倉庫) は mood つきの DiaryNoteBox で編集。公開投稿・board は TodayCaptureBox。
+          (modal.entry.kind === 'note' && !modal.entry.isPublic ? (
             <DiaryEditModalBody entry={modal.entry} onSuccess={handleEditSuccess} />
           ) : (
             <TodayCaptureBox

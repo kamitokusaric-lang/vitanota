@@ -2,16 +2,17 @@
 // API (pages/api/journal/kind-suggest.ts) と Lambda (scripts/ai-chat-extract/) が共有する。
 //
 // 踏み絵: AI は「分類・評価・感情代弁」をしない。提案は「どこへ渡す / どう残す」のルーティング。
-//   本人が必ず確定する (mood と同原則)。suggestedKind=null は tweet 据え置き提案。
+//   本人が必ず確定する (mood と同原則)。suggestedKind=null は note 据え置き提案。
 import { z } from 'zod';
 
-// AI が提案しうる種別 (tweet は既定なので提案対象外 = null で表す)。
-//   knowledge=役に立つ情報 / thanks=感謝を伝える / help=確認・相談したいこと
-// keep/concern は生徒ノート由来とするため職員室ノートの AI 提案からは外す (chimo 2026-06-13)。
-export const suggestKindSchema = z.enum(['knowledge', 'thanks', 'help']);
+// AI が提案しうる種別 (note は既定なので提案対象外 = null で表す)。
+//   thanks=感謝を伝える / help=確認・相談したいこと
+// 「役に立つ情報(knowledge)」は手動種別を廃止し「なるほど」集計に一本化 (kind 再設計 2026-06-16)。
+// keep/concern は生徒ノート由来とするため職員室ノートの AI 提案からは外す。
+export const suggestKindSchema = z.enum(['thanks', 'help']);
 export type SuggestKind = z.infer<typeof suggestKindSchema>;
 
-// AI 出力 (信頼できないので strict)。suggestedKind=null は「tweet のままでよい」。
+// AI 出力 (信頼できないので strict)。suggestedKind=null は「note のままでよい」。
 export const kindSuggestResultSchema = z
   .object({
     suggestedKind: suggestKindSchema.nullable(),
@@ -30,9 +31,6 @@ export function mockKindSuggest(content: string): KindSuggestResult {
   if (/ありがと|感謝|助かっ|お礼/.test(t)) {
     return { suggestedKind: 'thanks', confidence: 'medium' };
   }
-  if (/方法|やり方|コツ|工夫|知見|まとめ|テンプレ|手順|参考/.test(t)) {
-    return { suggestedKind: 'knowledge', confidence: 'medium' };
-  }
-  // 特定できないときは tweet 据え置き (null)。
+  // 特定できないときは note 据え置き (null)。
   return { suggestedKind: null, confidence: 'low' };
 }

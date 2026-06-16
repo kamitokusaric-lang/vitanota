@@ -12,7 +12,7 @@ describe('createEntrySchema', () => {
   describe('正常系', () => {
     it('最小構成の diary を受け入れる (mood 必須)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'a',
         tagIds: [],
         mood: 'neutral',
@@ -23,7 +23,7 @@ describe('createEntrySchema', () => {
 
     it('最大 1000 文字の diary content を受け入れる', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'x'.repeat(1000),
         tagIds: [],
         mood: 'neutral',
@@ -34,7 +34,7 @@ describe('createEntrySchema', () => {
 
     it('最大 1000 文字の knowledge content を受け入れる', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'knowledge',
+        kind: 'note',
         content: 'x'.repeat(1000),
         tagIds: [],
         isPublic: true,
@@ -44,7 +44,7 @@ describe('createEntrySchema', () => {
 
     it('最大 200 文字の tweet content を受け入れる', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'tweet',
+        kind: 'note',
         content: 'x'.repeat(200),
         tagIds: [],
         isPublic: true,
@@ -54,7 +54,7 @@ describe('createEntrySchema', () => {
 
     it('knowledge は tagIds 11 件以上も受け入れる (上限なし)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'knowledge',
+        kind: 'note',
         content: 'test',
         tagIds: Array.from({ length: 11 }, () => validUuid),
         isPublic: true,
@@ -64,7 +64,7 @@ describe('createEntrySchema', () => {
 
     it('tweet は tagIds (emotion_tags) を受け入れる', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'tweet',
+        kind: 'note',
         content: 'test',
         tagIds: [validUuid, validUuid2],
         isPublic: true,
@@ -74,7 +74,7 @@ describe('createEntrySchema', () => {
 
     it('前後の空白を trim する (diary)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: '  test  ',
         tagIds: [],
         mood: 'neutral',
@@ -88,7 +88,7 @@ describe('createEntrySchema', () => {
 
     it('空白のみの content は trim されて空文字として受け入れられる (knowledge)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'knowledge',
+        kind: 'note',
         content: '   ',
         tagIds: [],
         isPublic: true,
@@ -103,7 +103,7 @@ describe('createEntrySchema', () => {
   describe('異常系', () => {
     it('diary で mood なしを受理する (2026-05-27: kind 分岐撤廃、 mood は全 kind 任意)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'test',
         tagIds: [],
         isPublic: true,
@@ -114,7 +114,7 @@ describe('createEntrySchema', () => {
 
     it('knowledge で mood ありを受理する (2026-05-27: 任意化、 旧禁止ルール撤廃)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'knowledge',
+        kind: 'note',
         content: 'test',
         tagIds: [],
         mood: 'neutral',
@@ -125,7 +125,7 @@ describe('createEntrySchema', () => {
 
     it('tweet で mood ありを受理する (2026-05-27: 任意化、 旧禁止ルール撤廃)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'tweet',
+        kind: 'note',
         content: 'test',
         tagIds: [],
         mood: 'neutral',
@@ -136,7 +136,7 @@ describe('createEntrySchema', () => {
 
     it('diary で tagIds ありを受理する (2026-05-27: kind 分岐撤廃、 tag は全 kind 任意)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'test',
         tagIds: [validUuid],
         mood: 'neutral',
@@ -147,7 +147,7 @@ describe('createEntrySchema', () => {
 
     it('tweet で 1001 文字 content を拒否する (2026-05-27: 200→1000 字制約に統一)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'tweet',
+        kind: 'note',
         content: 'x'.repeat(1001),
         tagIds: [],
         isPublic: true,
@@ -157,7 +157,7 @@ describe('createEntrySchema', () => {
 
     it('tweet で 1000 文字 content は受理する (200 字制約は撤廃済)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'tweet',
+        kind: 'note',
         content: 'x'.repeat(1000),
         tagIds: [],
         isPublic: true,
@@ -167,7 +167,7 @@ describe('createEntrySchema', () => {
 
     it('diary で 1001 文字 content を拒否する (base max 1000)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'x'.repeat(1001),
         tagIds: [],
         mood: 'neutral',
@@ -178,7 +178,7 @@ describe('createEntrySchema', () => {
 
     it('knowledge で 1001 文字 content を拒否する (base max 1000)', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'knowledge',
+        kind: 'note',
         content: 'x'.repeat(1001),
         tagIds: [],
         isPublic: true,
@@ -188,7 +188,7 @@ describe('createEntrySchema', () => {
 
     it('不正な UUID の tagIds を拒否する', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'knowledge',
+        kind: 'note',
         content: 'test',
         tagIds: ['not-a-uuid'],
         isPublic: true,
@@ -198,7 +198,7 @@ describe('createEntrySchema', () => {
 
     it('isPublic が boolean でない場合を拒否する', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'test',
         tagIds: [],
         mood: 'neutral',
@@ -209,7 +209,7 @@ describe('createEntrySchema', () => {
 
     it('必須フィールド (isPublic) 欠落を拒否する', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 'test',
         tagIds: [],
         mood: 'neutral',
@@ -239,7 +239,7 @@ describe('createEntrySchema', () => {
 
     it('content が数値の場合を拒否する', () => {
       const result = createEntrySchema.safeParse({
-        kind: 'diary',
+        kind: 'note',
         content: 123,
         tagIds: [],
         mood: 'neutral',
@@ -253,7 +253,7 @@ describe('createEntrySchema', () => {
 describe('updateEntrySchema', () => {
   it('全フィールド指定の更新を受け入れる (knowledge)', () => {
     const result = updateEntrySchema.safeParse({
-      kind: 'knowledge',
+      kind: 'note',
       content: 'updated',
       tagIds: [validUuid],
       isPublic: false,

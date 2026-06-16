@@ -144,10 +144,12 @@ export function EntryCard({
         </p>
 
         {(() => {
-          // kind 別にタグを表示: knowledge → knowledgeTags / それ以外 → tags (emotion_tags)
-          const displayTags =
-            entry.kind === 'knowledge' ? entry.knowledgeTags : entry.tags;
-          const hasTags = displayTags && displayTags.length > 0;
+          // タグ表示: emotion_tags + 既存 knowledge_tags があれば併せて (legacy・新規 note では空)。
+          const displayTags = [
+            ...(entry.tags ?? []),
+            ...(entry.knowledgeTags ?? []),
+          ];
+          const hasTags = displayTags.length > 0;
           const showReactions = Boolean(onReactionToggle);
           if (!hasTags && !showReactions) return null;
           const reactions = entry.reactions;
@@ -157,7 +159,7 @@ export function EntryCard({
               data-testid={`entry-card-tags-${entry.id}`}
             >
               {hasTags &&
-                displayTags!.map((tag) => (
+                displayTags.map((tag) => (
                   <span
                     key={tag.id}
                     className="text-xs font-medium text-gray-500"

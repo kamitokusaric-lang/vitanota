@@ -126,10 +126,8 @@ components:
         kind:
           type: string
           enum:
-            - diary
-            - knowledge
-            - tweet
-          example: tweet
+            - note
+          example: note
         content:
           type: string
           maxLength: 1000
@@ -165,10 +163,8 @@ components:
         kind:
           type: string
           enum:
-            - diary
-            - knowledge
-            - tweet
-          example: tweet
+            - note
+          example: note
         content:
           type: string
           maxLength: 1000
@@ -1682,7 +1678,7 @@ components:
             - thanks
             - help
             - knowledge
-            - tweet
+            - note
         content:
           type: string
         isPublic:
@@ -5392,7 +5388,7 @@ paths:
               - thanks
               - help
               - knowledge
-              - tweet
+              - note
           required: false
           name: boardKind
           in: query

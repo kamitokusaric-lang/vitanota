@@ -115,16 +115,16 @@ describe('PrivateJournalRepository.create', () => {
     );
 
     expect(mockTx.insert).toHaveBeenCalledTimes(2);
-    // kind が未指定の場合は default 'diary' で INSERT される (現在の実装)
+    // kind 未指定は default 'note' で INSERT される (kind 再設計 2026-06-16)
     expect(entryInsert.values).toHaveBeenCalledWith({
       tenantId: 'tenant-1',
       userId: 'user-1',
       content: 'test',
       isPublic: false,
       mood: 'neutral',
-      kind: 'diary',
+      kind: 'note',
     });
-    // kind='knowledge' でないので journal_entry_tags に INSERT (else 分岐)
+    // note は emotion_tags (journal_entry_tags) に INSERT
     expect(tagsInsert.values).toHaveBeenCalledWith([
       { tenantId: 'tenant-1', entryId: 'entry-1', tagId: 'tag-1' },
       { tenantId: 'tenant-1', entryId: 'entry-1', tagId: 'tag-2' },

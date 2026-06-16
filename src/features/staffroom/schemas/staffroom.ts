@@ -14,15 +14,16 @@ extendZodWithOpenApi(z);
 export const staffroomBoardKindSchema = z.enum(['keep', 'concern', 'thanks', 'help']);
 export type StaffroomBoardKindInput = z.infer<typeof staffroomBoardKindSchema>;
 
-// 職員室ボードに表示する kind = board ネイティブ 4 種 + knowledge + tweet。
-// diary のみ個人面に留める。tweet は「今週のつぶやき」箱 (今週分のみ) で出す (chimo 2026-06-11)。
+// 職員室ボードに集める kind = board ネイティブ 4 種 + knowledge(なるほど集計) + note(公開メモ)。
+// 公開/私的は is_public が持つ (kind 再設計 2026-06-16)。私的 note は届かない。
+// note は旧 tweet/knowledge の公開投稿の集約先 (なるほどが付けば「役に立つ情報」箱に集計)。
 export const staffroomBoxKindSchema = z.enum([
   'keep',
   'concern',
   'thanks',
   'help',
   'knowledge',
-  'tweet',
+  'note',
 ]);
 export type StaffroomBoxKindInput = z.infer<typeof staffroomBoxKindSchema>;
 

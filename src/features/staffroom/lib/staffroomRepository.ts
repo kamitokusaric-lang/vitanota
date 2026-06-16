@@ -24,16 +24,15 @@ export interface StaffroomContext {
 // 職員室ボードで「投稿・編集・削除」できる board ネイティブ kind (journal_entry_kind の直値)。
 export const BOARD_KINDS = ['keep', 'concern', 'thanks', 'help'] as const;
 
-// 職員室ボードに「表示」する kind = board ネイティブ 4 種 + knowledge + tweet。
-// diary は個人面 (マイノート) のみ。tweet は「今週のつぶやき」箱として今週分のみ表示
-// (chimo 2026-06-11)。knowledge は明示ナレッジ + (S6 で) なるほど付き tweet を集約表示。
+// 職員室ボードに「集める」kind = board ネイティブ 4 種 + note(公開メモ)。
+// 公開/私的は is_public が持つ (kind 再設計 2026-06-16)。私的 note は届かない。
+// 公開 note は、なるほどが付けば「役に立つ情報」箱に集計される (旧 tweet/knowledge の役割)。
 export const BOARD_VIEW_KINDS = [
   'keep',
   'concern',
   'thanks',
   'help',
-  'knowledge',
-  'tweet',
+  'note',
 ] as const;
 
 // ── board (journal_entries kind IN BOARD_KINDS) ────────────────
@@ -52,9 +51,17 @@ export class BoardRepository {
   ): Promise<JournalEntry[]> {
     const conds: SQL[] = [
       eq(journalEntries.tenantId, ctx.tenantId),
-      // フィードは「公開 board + 自分の非公開 board」に絞る (RLS と二重・school_admin が
-      // 他人の非公開を覗かないよう app 層で明示)。
-      or(eq(journalEntries.isPublic, true), eq(journalEntries.userId, ctx.userId))!,
+      // 可視性: 「公開された投稿」+「自分の非公開 *board ネイティブ* 投稿」。
+      // ⚠️ 私的 note (is_public=false) は倉庫専用 → 職員室ボードには出さない。
+      //   そのため非公開で見せるのは board kind (keep/concern/thanks/help) に限定する
+      //   (RLS と二重・school_admin が他人の非公開を覗かないよう app 層でも明示)。
+      or(
+        eq(journalEntries.isPublic, true),
+        and(
+          eq(journalEntries.userId, ctx.userId),
+          inArray(journalEntries.kind, [...BOARD_KINDS]),
+        ),
+      )!,
     ];
     if (filter.boardKind) {
       conds.push(eq(journalEntries.kind, filter.boardKind));

@@ -13,22 +13,19 @@ export const moodLevelSchema = z
 
 export type MoodLevel = z.infer<typeof moodLevelSchema>;
 
-// 投稿種別 (migration 0030)
-//   diary     : 日々ノート (mood 必須 + content 1000字、タグ不可) — edit 経路のみで使用
-//   knowledge : ナレッジノート (content 1000字 + knowledge_tags 任意) — edit 経路のみで使用
-//   tweet     : 「ひとこと残す」(content 1000字 + emotion_tags 任意) — 新規投稿のデフォルト
-// 2026-05-27: 新規投稿入口を tweet 単一 CTA に統合 (H6/H8 仮説検証)。
-//   diary / knowledge は既存レコードの edit 経路で kind を保持する目的でのみ enum に残る。
+// 投稿種別。journal (倉庫/職員室ノート) 経路で作るのは 'note' のみ。
+//   note : ただのメモ (is_public=false なら倉庫 / true なら一般の職員室ノート)。
+// 公開/私的は kind ではなく is_public が持つ (chimo 2026-06-16・kind 再設計 / migration 0053-0054)。
+// 意図つきの共有 (keep/concern/thanks/help) は staffroom schema 経由 (createBoardSchema)。
+// 旧値 diary/knowledge/tweet は note へ集約済 (新規では受けない)。
 export const journalEntryKindSchema = z
-  .enum(['diary', 'knowledge', 'tweet'])
-  .openapi({ example: 'tweet' });
+  .enum(['note'])
+  .openapi({ example: 'note' });
 
 export type JournalEntryKind = z.infer<typeof journalEntryKindSchema>;
 
-// エントリ作成入力 (kind 別制約は superRefine で担保、DB CHECK は付けない)
-// content の max は全 kind 1000 字統一 (2026-05-27 tweet を 200→1000 に拡張)
-// tagIds は kind=tweet → emotion_tags ID / kind=knowledge → knowledge_tags ID
-//   (どちらの tag store を参照するかは API 層で kind を見て分岐)
+// エントリ作成入力。note の content max は 1000 字。
+// tagIds は emotion_tags ID (note に一本化。旧 knowledge_tags 経路は廃止)。
 const createEntryBaseSchema = z.object({
   // kind は必須 (default なし)。クライアント側で各 Modal が明示的に渡す。
   kind: journalEntryKindSchema,

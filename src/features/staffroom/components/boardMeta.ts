@@ -53,10 +53,10 @@ export const BOARD_KIND_META: Record<StaffroomBoxKind, BoardKindMeta> = {
     pill: 'bg-sky-50 text-sky-700',
     dot: 'bg-sky-500',
   },
-  tweet: {
-    label: 'つぶやき',
-    boxTitle: 'つぶやき',
-    hint: '日々ノートの公開つぶやき (今週分)',
+  note: {
+    label: 'メモ',
+    boxTitle: 'メモ',
+    hint: '公開したメモ',
     placeholder: '',
     pill: 'bg-slate-100 text-slate-600',
     dot: 'bg-slate-500',
@@ -70,6 +70,6 @@ export const POSTABLE_KIND_ORDER: StaffroomBoardKind[] = ['keep', 'concern', 'th
 // 表示しない (chimo 2026-06-13/14)。BOARD_KIND_META には残す (型・将来連携のため)。
 export const BOX_KIND_ORDER: StaffroomBoxKind[] = [
   'help',
-  'knowledge',
   'thanks',
+  'knowledge',
 ];

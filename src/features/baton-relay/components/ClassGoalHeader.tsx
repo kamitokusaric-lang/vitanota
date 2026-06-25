@@ -25,8 +25,8 @@ export function ClassGoalHeader({ cls, onSaveGoal }: ClassGoalHeaderProps) {
 
   return (
     <div className="px-1">
-      <div className="rounded-md bg-vn-muted-bg p-3">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+      <div className="rounded-md border border-vn-border bg-vn-muted-bg p-3">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-vn-accent">
           <Target size={14} aria-hidden />
           クラス目標
         </h2>

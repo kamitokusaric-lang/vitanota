@@ -8,8 +8,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
-  // primary は唯一のアクセント青 (vn-accent #4F46E5)
-  primary: 'bg-vn-accent text-white hover:bg-indigo-700 disabled:opacity-50',
+  // primary は唯一のアクセント暖色 (vn-accent テラコッタ #D2674A)
+  primary: 'bg-vn-accent text-white hover:bg-vn-accent-hover disabled:opacity-50',
   secondary: 'border border-vn-border bg-white text-gray-700 hover:bg-vn-muted-bg disabled:opacity-50',
   danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300',
 };

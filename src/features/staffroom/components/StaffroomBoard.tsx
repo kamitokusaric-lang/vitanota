@@ -69,8 +69,8 @@ export function StaffroomBoard() {
               const meta = BOARD_KIND_META[kind];
               const items = byKind.get(kind) ?? [];
               return (
-                <div key={kind} className="overflow-hidden rounded-lg border border-vn-border bg-white">
-                  <div className="flex items-baseline gap-2 border-b border-amber-100 bg-amber-50 px-3 py-2">
+                <div key={kind} className="overflow-hidden rounded-lg border border-vn-border bg-vn-surface">
+                  <div className="flex items-baseline gap-2 border-b border-vn-border bg-vn-muted-bg/40 px-3 py-2">
                     <span className={`inline-block h-2.5 w-2.5 shrink-0 self-center rounded-full ${meta.dot}`} aria-hidden />
                     <h3 className="text-sm font-bold text-slate-800">{meta.boxTitle}</h3>
                     {items.length > 0 && (

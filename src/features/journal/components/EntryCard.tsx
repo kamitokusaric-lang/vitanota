@@ -10,9 +10,9 @@ import type {
   MoodLevel,
 } from '@/features/journal/schemas/journal';
 import {
-  REACTION_META,
   REACTION_TYPES_ORDER,
 } from '@/features/journal/components/reactionMeta';
+import { ReactionButton } from '@/features/journal/components/ReactionButton';
 import type { Reactions } from '@/features/journal/lib/privateJournalRepository';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
 import {
@@ -169,34 +169,19 @@ export function EntryCard({
                 ))}
               {showReactions &&
                 REACTION_TYPES_ORDER.map((type) => {
-                  const meta = REACTION_META[type];
                   const r = reactions?.[type] ?? { count: 0, mine: false };
-                  const Icon = meta.Icon;
                   return (
-                    <button
+                    <ReactionButton
                       key={type}
-                      type="button"
-                      onClick={() =>
-                        onReactionToggle!(entry, type, !r.mine)
-                      }
-                      aria-pressed={r.mine}
-                      aria-label={meta.ariaLabel}
-                      className={`group/reaction relative inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
-                        r.mine
-                          ? 'bg-vn-accent/10 text-vn-accent'
-                          : 'bg-vn-muted-bg text-gray-500 hover:text-gray-700'
-                      }`}
-                      data-testid={`entry-card-reaction-${type}-${entry.id}`}
-                    >
-                      <Icon size={13} strokeWidth={1.75} aria-hidden />
-                      {r.count > 0 && <span>{r.count}</span>}
-                      <span
-                        role="tooltip"
-                        className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-within/reaction:opacity-100"
-                      >
-                        {meta.label}
-                      </span>
-                    </button>
+                      type={type}
+                      count={r.count}
+                      mine={r.mine}
+                      onToggle={() => onReactionToggle!(entry, type, !r.mine)}
+                      testId={`entry-card-reaction-${type}-${entry.id}`}
+                      iconSize={14}
+                      shapeClass="group/reaction relative inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium transition-colors"
+                      notMineClass="border-transparent bg-vn-muted-bg text-gray-500 hover:text-gray-700"
+                    />
                   );
                 })}
             </div>

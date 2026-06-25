@@ -24,10 +24,8 @@ import type {
   JournalReactionType,
   MoodLevel,
 } from '@/features/journal/schemas/journal';
-import {
-  REACTION_META,
-  REACTION_TYPES_ORDER,
-} from '@/features/journal/components/reactionMeta';
+import { REACTION_TYPES_ORDER } from '@/features/journal/components/reactionMeta';
+import { ReactionButton } from '@/features/journal/components/ReactionButton';
 import type { Reactions } from '@/features/journal/lib/privateJournalRepository';
 import { formatRelativeTime } from '@/features/journal/lib/relativeTime';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
@@ -79,7 +77,13 @@ interface PublicTimelineRailProps {
   selfUserId: string;
   // chimo 2026-05-21: narrow (< xl) 幅ではモーダルで rail を呼び出す。
   // 'modal' 時は sticky / max-h / border / shadow を外し、 Modal の枠に委ねる。
-  mode?: 'side' | 'modal';
+  // 'page' (chimo 2026-06-25): モバイルの独立タブとして全幅表示 (枠なし)。
+  mode?: 'side' | 'modal' | 'page';
+  // design1 (chimo 2026-06-25): side 幅では rail 上部に投稿フォームをインライン展開。
+  // 投稿フォーム (TodayCaptureBox) に渡す値。narrow (modal) では出さない。
+  aiChatEnabled?: boolean;
+  authorName?: string | null;
+  isAiAuthor?: boolean;
 }
 
 // 編集/削除モーダル状態 (chimo 2026-05-21: 旧 TimelineTab から移管。
@@ -92,6 +96,9 @@ type RailModalState =
 export function PublicTimelineRail({
   selfUserId,
   mode = 'side',
+  aiChatEnabled,
+  authorName,
+  isAiAuthor,
 }: PublicTimelineRailProps) {
   const [modal, setModal] = useState<RailModalState>({ kind: 'closed' });
   const { mutate: globalMutate } = useSWRConfig();
@@ -162,6 +169,18 @@ export function PublicTimelineRail({
 
   const emptyMessage = 'まだ公開された投稿はありません';
 
+  // design1: ヘッダに今週の投稿件数を出す。週初は月曜 0:00 (JST 近似)。
+  const weeklyCount = (() => {
+    const jstNow = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }),
+    );
+    const diffToMonday = (jstNow.getDay() + 6) % 7;
+    const monday = new Date(jstNow);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(jstNow.getDate() - diffToMonday);
+    return visibleEntries.filter((e) => new Date(e.createdAt) >= monday).length;
+  })();
+
   // 削除成功時の楽観的更新: 該当エントリを職員室ノート cache から除去する
   // (server fetch を待つと体感ラグ + race で楽観的更新が古い結果に上書きされるため)。
   // 編集は TodayCaptureBox 内の refreshFeeds (mutate) に委ねる。
@@ -180,7 +199,7 @@ export function PublicTimelineRail({
   };
 
   const asideClass =
-    mode === 'modal'
+    mode === 'modal' || mode === 'page'
       ? 'flex flex-col'
       : 'sticky top-[104px] flex max-h-[calc(100vh-128px)] flex-col overflow-hidden rounded-[14px] border border-vn-border bg-white shadow-[0_4px_16px_rgba(15,23,42,0.04)]';
 
@@ -191,14 +210,32 @@ export function PublicTimelineRail({
       aria-label="職員室ノート"
     >
       {/* chimo 2026-06-12: マイノートタブを撤去し職員室ノート単独に。 */}
-      <header className="border-b border-vn-border px-5">
+      <header className="flex items-baseline justify-between gap-2 border-b border-vn-border px-5">
         <h2
           className="pb-3.5 pt-5 text-[16px] font-bold leading-[1.4] text-slate-800"
           data-testid="public-timeline-rail-title"
         >
           職員室ノート
         </h2>
+        <span
+          className="text-[12px] font-medium text-vn-ink-sub"
+          data-testid="public-timeline-rail-weekly-count"
+        >
+          今週{weeklyCount}件
+        </span>
       </header>
+
+      {/* design1 (chimo 2026-06-25): rail 上部に職員室ノート投稿フォームをインライン展開。
+          side (PC 右レーン) と page (モバイル独立タブ) で表示。modal では出さない。 */}
+      {mode !== 'modal' && (
+        <div className="border-b border-vn-border px-5 py-4">
+          <TodayCaptureBox
+            aiChatEnabled={aiChatEnabled}
+            authorName={authorName ?? undefined}
+            isAiAuthor={isAiAuthor}
+          />
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         {isLoading && (
@@ -395,32 +432,19 @@ function RailItem({
       )}
       <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         {REACTION_TYPES_ORDER.map((type) => {
-          const meta = REACTION_META[type];
           const r = reactions[type];
-          const Icon = meta.Icon;
           return (
-            <button
+            <ReactionButton
               key={type}
-              type="button"
-              onClick={() => void onToggleReaction(entry.id, type, !r.mine)}
-              aria-pressed={r.mine}
-              aria-label={meta.ariaLabel}
-              className={`group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors ${
-                r.mine
-                  ? 'border-indigo-300 bg-indigo-50 text-vn-accent'
-                  : 'border-slate-300 bg-slate-50 text-slate-500 hover:text-slate-700'
-              }`}
-              data-testid={`public-timeline-rail-reaction-${type}-${entry.id}`}
-            >
-              <Icon size={16} strokeWidth={1.75} aria-hidden />
-              {r.count > 0 && <span>{r.count}</span>}
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-visible/reaction:opacity-100"
-              >
-                {meta.label}
-              </span>
-            </button>
+              type={type}
+              count={r.count}
+              mine={r.mine}
+              onToggle={() => void onToggleReaction(entry.id, type, !r.mine)}
+              testId={`public-timeline-rail-reaction-${type}-${entry.id}`}
+              iconSize={16}
+              shapeClass="group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors"
+              notMineClass="border-slate-300 bg-slate-50 text-slate-500 hover:text-slate-700"
+            />
           );
         })}
       </div>
@@ -453,21 +477,21 @@ function AiPostRailItem({
   const reactions = entry.reactions ?? emptyReactions();
   return (
     <li
-      className="border-y border-purple-100 bg-purple-50/60 px-5 py-3.5"
+      className="border-y border-vn-morning-border bg-vn-morning-bg px-5 py-3.5"
       data-testid={`public-timeline-rail-item-${entry.id}`}
       data-ai-post="true"
     >
       <header className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-          <span className="font-semibold text-purple-800">vitanota AI</span>
+          <span className="font-semibold text-vn-morning-text">vitanota AI</span>
           <time
             dateTime={new Date(entry.createdAt).toISOString()}
-            className="font-normal text-purple-400"
+            className="font-normal text-vn-ink-sub"
           >
             {formatRelativeTime(entry.createdAt)}
           </time>
           <span
-            className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700"
+            className="inline-flex items-center gap-1 rounded-full bg-vn-morning-border/50 px-2 py-0.5 text-[10px] font-medium text-vn-morning-text"
             data-testid={`public-timeline-rail-ai-badge-${entry.id}`}
           >
             <Sparkles size={10} strokeWidth={1.75} aria-hidden />
@@ -489,32 +513,19 @@ function AiPostRailItem({
       </p>
       <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         {REACTION_TYPES_ORDER.map((type) => {
-          const meta = REACTION_META[type];
           const r = reactions[type];
-          const Icon = meta.Icon;
           return (
-            <button
+            <ReactionButton
               key={type}
-              type="button"
-              onClick={() => void onToggleReaction(entry.id, type, !r.mine)}
-              aria-pressed={r.mine}
-              aria-label={meta.ariaLabel}
-              className={`group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors ${
-                r.mine
-                  ? 'border-indigo-300 bg-indigo-50 text-vn-accent'
-                  : 'border-purple-200 bg-white/70 text-purple-700 hover:bg-white'
-              }`}
-              data-testid={`public-timeline-rail-reaction-${type}-${entry.id}`}
-            >
-              <Icon size={16} strokeWidth={1.75} aria-hidden />
-              {r.count > 0 && <span>{r.count}</span>}
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/reaction:opacity-100 group-focus-visible/reaction:opacity-100"
-              >
-                {meta.label}
-              </span>
-            </button>
+              type={type}
+              count={r.count}
+              mine={r.mine}
+              onToggle={() => void onToggleReaction(entry.id, type, !r.mine)}
+              testId={`public-timeline-rail-reaction-${type}-${entry.id}`}
+              iconSize={16}
+              shapeClass="group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors"
+              notMineClass="border-vn-border bg-white/70 text-vn-morning-text hover:bg-white"
+            />
           );
         })}
       </div>

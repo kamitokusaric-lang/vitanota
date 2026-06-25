@@ -7,7 +7,7 @@ import { useStudentSupport, type SupportStudent } from '../hooks/useStaffroom';
 
 function StudentRow({ student }: { student: SupportStudent }) {
   return (
-    <div className="rounded-md border border-vn-border bg-white p-2.5">
+    <div className="rounded-md border border-vn-border bg-vn-surface p-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-slate-800">{student.displayName}</span>
         {student.positiveCount > 0 && (
@@ -65,7 +65,7 @@ export function StudentSupportSection({
           const positiveSum = c.students.reduce((a, s) => a + s.positiveCount, 0);
           const concernSum = c.students.reduce((a, s) => a + s.concernCount, 0);
           return (
-            <div key={c.classId} className="overflow-hidden rounded-lg border border-vn-border bg-white">
+            <div key={c.classId} className="overflow-hidden rounded-lg border border-vn-border bg-vn-surface">
               {/* 見出し全体をクリックで開閉。ダイジェスト集計を右に。 */}
               <button
                 type="button"

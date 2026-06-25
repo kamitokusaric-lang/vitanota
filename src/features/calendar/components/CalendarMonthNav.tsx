@@ -33,7 +33,7 @@ export function CalendarMonthNav({
           type="button"
           onClick={onToday}
           data-testid="calendar-month-today"
-          className="inline-flex h-9 items-center rounded-full bg-vn-accent px-4 text-[12px] font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+          className="inline-flex h-9 items-center rounded-full bg-vn-accent px-4 text-[12px] font-semibold text-white shadow-sm transition hover:bg-vn-accent-hover"
         >
           今月
         </button>

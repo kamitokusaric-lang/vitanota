@@ -58,7 +58,7 @@ export function RosterStudentBulkAdd({ selectedClass, onAdded }: RosterStudentBu
   if (!selectedClass) return null;
 
   return (
-    <div className="rounded-vn border border-vn-border bg-white p-3.5">
+    <div className="rounded-vn border border-vn-border bg-vn-surface p-3.5">
       <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
         <UserPlus size={16} aria-hidden />
         「{selectedClass.name}」に生徒をまとめて追加

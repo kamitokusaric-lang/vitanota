@@ -323,54 +323,51 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
               </select>
             </div>
           )}
-          <div className="flex flex-col items-center gap-1.5">
-            {/* 選択中の日付 (上) */}
-            <span className="text-sm font-medium text-slate-700" data-testid="baton-date-label">
+          {/* design (chimo 2026-06-25): 前日 日付 翌日 ┃ 今日 日付選択 を横 1 行に集約 */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setDate(addDays(date, -1))}
+              className="inline-flex items-center gap-0.5 text-sm text-gray-400 transition-colors hover:text-gray-600"
+              data-testid="baton-date-prev"
+            >
+              <ChevronLeft size={16} aria-hidden />
+              前日
+            </button>
+            <span className="text-sm font-bold text-slate-700" data-testid="baton-date-label">
               {formatJaDate(date)}
             </span>
-            {/* 前日 / 今日 / 次の日 を横一列に揃える */}
-            <div className="flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDate(addDays(date, -1))}
-                className="flex flex-shrink-0 flex-col items-center gap-0.5 px-1 text-gray-400 transition-colors hover:text-vn-accent"
-                data-testid="baton-date-prev"
-              >
-                <ChevronLeft size={20} aria-hidden />
-                <span className="text-xs">前日に戻る</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDate(todayDate)}
-                disabled={date === todayDate}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  date === todayDate
-                    ? 'bg-vn-accent/10 text-vn-accent'
-                    : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-                data-testid="baton-date-today"
-              >
-                今日
-              </button>
-              <button
-                type="button"
-                onClick={() => setDate(addDays(date, 1))}
-                disabled={date === todayDate}
-                className={`flex flex-shrink-0 flex-col items-center gap-0.5 px-1 text-gray-400 transition-colors hover:text-vn-accent ${
-                  date === todayDate ? 'invisible' : ''
-                }`}
-                data-testid="baton-date-next"
-              >
-                <ChevronRight size={20} aria-hidden />
-                <span className="text-xs">次の日に進む</span>
-              </button>
-            </div>
-            {/* カレンダーで任意の日付へ (下) */}
+            <button
+              type="button"
+              onClick={() => setDate(addDays(date, 1))}
+              disabled={date === todayDate}
+              className={`inline-flex items-center gap-0.5 text-sm text-gray-400 transition-colors hover:text-gray-600 ${
+                date === todayDate ? 'invisible' : ''
+              }`}
+              data-testid="baton-date-next"
+            >
+              翌日
+              <ChevronRight size={16} aria-hidden />
+            </button>
+            <span className="px-1 text-vn-border-strong" aria-hidden>
+              |
+            </span>
+            <button
+              type="button"
+              onClick={() => setDate(todayDate)}
+              disabled={date === todayDate}
+              className={`rounded-md border border-vn-border bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors ${
+                date === todayDate ? '' : 'hover:bg-gray-50'
+              }`}
+              data-testid="baton-date-today"
+            >
+              今日
+            </button>
             <div className="relative">
               <button
                 type="button"
                 onClick={openDatePicker}
-                className="inline-flex items-center gap-1 text-sm font-medium text-vn-accent underline-offset-2 hover:underline"
+                className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 underline-offset-2 hover:underline"
                 data-testid="baton-date-pick"
               >
                 <Calendar size={16} aria-hidden />

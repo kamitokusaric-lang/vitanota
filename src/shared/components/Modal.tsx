@@ -64,7 +64,7 @@ export function Modal({
           type="button"
           onClick={onClose}
           aria-label="閉じる"
-          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-vn-accent"
           data-testid="modal-close-button"
         >
           <X size={20} strokeWidth={2} aria-hidden />

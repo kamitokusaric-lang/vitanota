@@ -35,11 +35,11 @@ const KIND_META: Record<string, { label: string; pill: string }> = {
   // 旧値 (note へ移行済・新規では出ない。万一の残存に備え残置)。
   diary: { label: 'ノート', pill: 'bg-vn-muted-bg text-slate-600' },
   tweet: { label: 'ノート', pill: 'bg-slate-100 text-slate-600' },
-  knowledge: { label: 'ノート', pill: 'bg-sky-50 text-sky-700' },
+  knowledge: { label: 'ノート', pill: 'bg-vn-yellow-bg text-vn-yellow-text' },
   keep: { label: '続けたい', pill: 'bg-vn-green-bg text-vn-green-text' },
   concern: { label: '気になる', pill: 'bg-vn-warning-bg text-vn-warning-text' },
-  help: { label: '相談', pill: 'bg-indigo-50 text-indigo-700' },
-  thanks: { label: '感謝', pill: 'bg-rose-50 text-rose-700' },
+  help: { label: '相談', pill: 'bg-vn-accent-bg text-vn-accent-text' },
+  thanks: { label: '感謝', pill: 'bg-vn-pink-bg text-vn-pink-text' },
 };
 
 const MINE_KEY = '/api/private/journal/entries/mine?page=1&perPage=50';
@@ -48,8 +48,15 @@ const MINE_KEY = '/api/private/journal/entries/mine?page=1&perPage=50';
 function jstDateKey(iso: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date(iso));
 }
-// YYYY-MM-DD → 「M月D日」
+// YYYY-MM-DD → 「今日」「昨日」、それ以前は「M月D日」(chimo 2026-06-25)
 function dateLabel(key: string): string {
+  const now = new Date();
+  const todayKey = jstDateKey(now.toISOString());
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayKey = jstDateKey(yesterday.toISOString());
+  if (key === todayKey) return '今日';
+  if (key === yesterdayKey) return '昨日';
   const [, m, d] = key.split('-');
   return `${Number(m)}月${Number(d)}日`;
 }
@@ -127,12 +134,16 @@ export function MyNotesByKind() {
     <div className="space-y-5">
       {groups.map(([key, items]) => (
         <div key={key}>
-          <h3 className="mb-1.5 text-base font-bold text-slate-700">{dateLabel(key)}</h3>
-          <div className="divide-y divide-slate-100">
+          <h3 className="mb-2 text-base font-bold text-slate-700">{dateLabel(key)}</h3>
+          <div className="space-y-2.5">
             {items.map((e) => {
               const meta = KIND_META[e.kind];
               return (
-                <div key={e.id} className="py-2.5" data-testid={`my-notes-item-${e.id}`}>
+                <div
+                  key={e.id}
+                  className="rounded-[12px] border border-vn-border bg-vn-surface px-4 py-3 shadow-[0_2px_8px_rgba(15,23,42,0.035)]"
+                  data-testid={`my-notes-item-${e.id}`}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 text-[11px] text-gray-400">
                       <span

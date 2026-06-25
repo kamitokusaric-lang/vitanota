@@ -41,6 +41,8 @@ export function DiaryNoteBox({
     initialMood !== undefined ? initialMood : 'positive',
   );
   const [submitting, setSubmitting] = useState(false);
+  // design2 (chimo 2026-06-25): 入力欄は初期 1 行、フォーカス/入力中にアニメで展開。
+  const [focused, setFocused] = useState(false);
 
   const refreshFeeds = () =>
     globalMutate(
@@ -93,7 +95,7 @@ export function DiaryNoteBox({
     <div className="space-y-4">
       {/* タイトル下: 保存範囲を明示 (職員室ノートと同じ体裁)。 */}
       <div
-        className="flex items-center gap-2 rounded-md border border-sky-200 bg-sky-100 px-3 py-2.5 text-[13px] font-medium text-sky-700"
+        className="flex items-center gap-2 rounded-md border border-vn-green/50 bg-vn-green-bg px-3 py-2.5 text-[13px] font-medium text-vn-green-text"
         data-testid="diary-note-banner"
       >
         <Lock size={15} strokeWidth={2} className="shrink-0" aria-hidden />
@@ -140,15 +142,20 @@ export function DiaryNoteBox({
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        rows={4}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         maxLength={1000}
         placeholder="今日の出来事、気づき、ふりかえり… 自分のために残しておけます。"
-        className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-vn-accent focus:outline-none"
+        className={`w-full resize-none rounded-md border border-vn-border-strong bg-white px-3 py-2 text-sm transition-all duration-200 ease-out focus:border-vn-accent focus:outline-none focus:ring-2 focus:ring-vn-accent/20 ${
+          focused || content.length > 0 ? 'min-h-[96px]' : 'min-h-[42px]'
+        }`}
         data-testid="diary-content-input"
       />
-      <div className="-mt-2 text-right text-xs text-gray-400" data-testid="diary-counter">
-        {content.length} / 1000
-      </div>
+      {(focused || content.length > 0) && (
+        <div className="-mt-2 text-right text-xs text-gray-400" data-testid="diary-counter">
+          {content.length} / 1000
+        </div>
+      )}
 
       {/* 気持ちタグ (emotion_tags)。職員室ノートと同じ体裁。 */}
       <div>
@@ -171,7 +178,7 @@ export function DiaryNoteBox({
           type="button"
           onClick={handleSubmit}
           disabled={!content.trim() || submitting}
-          className="rounded-full bg-vn-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          className="rounded-full bg-vn-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-vn-accent-hover hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
           data-testid="diary-submit"
         >
           {isEdit ? '保存' : '書く'}

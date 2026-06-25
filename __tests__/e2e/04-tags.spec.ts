@@ -1,8 +1,7 @@
 // Step 16b - Spec 04: タグ関連 (US-T-013, US-T-021)
-// 2026-06-14 update (記録入力一本化): 気持ちタグ (emotion_tags) の TagFilter は
-//   「自分用の日々ノート」(DiaryNoteBox) 側に入る。職員室ノート (TodayCaptureBox) は
-//   種別チップのみでタグを持たない。よってタグ系の検証は quick-record-diary → 日々ノートで行う。
-//   表示確認はマイノートタブ (?tab=my-notes) の MyNotesByKind。
+// 2026-06-25 update (UI 刷新): 日々ノート (DiaryNoteBox) はマイノートタブ
+//   (?tab=my-notes) の「今日のふりかえり」インライン入力に移行。気持ちタグ (TagFilter) も
+//   そこに表示される。表示確認はマイノートタブの MyNotesByKind。
 //   migration 0016 で tags → emotion_tags rename + context タグ廃止 (task_categories に移譲)。
 import { test, expect } from '@playwright/test';
 import { SeedClient } from './helpers/seed';
@@ -24,8 +23,7 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
   });
 
   test('日々ノート作成画面でタグ一覧が表示される', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByTestId('quick-record-diary').click();
+    await page.goto('/dashboard?tab=my-notes');
     await expect(page.getByTestId('tag-filter')).toBeVisible();
     await expect(page.getByText('うれしい')).toBeVisible();
     await expect(page.getByText('つかれた')).toBeVisible();
@@ -37,8 +35,7 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     // task_categories に移譲。 emotion_tags 内では全てが感情カテゴリで「業務タグ」概念が
     // 存在しないため、 このテストは現行ドメインで意味を持たない。
     // 将来 task_categories と統合した tag-filter UI を作る場合に復活検討。
-    await page.goto('/dashboard');
-    await page.getByTestId('quick-record-diary').click();
+    await page.goto('/dashboard?tab=my-notes');
     const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
     const taskTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' });
     await expect(emotionTag).toBeVisible();
@@ -46,8 +43,7 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
   });
 
   test('タグを選択してエントリ投稿し、マイノートに表示される', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByTestId('quick-record-diary').click();
+    await page.goto('/dashboard?tab=my-notes');
     await page.getByTestId('diary-content-input').fill('うれしいことがあった');
 
     // タグを選択
@@ -58,16 +54,16 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
     await expect(page.getByTestId('tag-filter-count')).toContainText('1 件選択中');
 
     await page.getByTestId('diary-submit').click();
-    await expect(page.getByTestId('diary-content-input')).not.toBeVisible();
+    await expect(page.getByTestId('diary-content-input')).toHaveValue('');
 
     // マイノートタブで自分の投稿を確認
-    await page.goto('/dashboard?tab=my-notes');
-    await expect(page.getByText('うれしいことがあった')).toBeVisible();
+    await expect(
+      page.getByTestId('tabpanel-my-notes').getByText('うれしいことがあった'),
+    ).toBeVisible();
   });
 
   test('複数タグを選択できる', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByTestId('quick-record-diary').click();
+    await page.goto('/dashboard?tab=my-notes');
     await page.getByTestId('diary-content-input').fill('複数タグ');
     await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' }).click();
     await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: '授業準備' }).click();
@@ -75,8 +71,7 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
   });
 
   test('タグの再クリックで選択解除される', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByTestId('quick-record-diary').click();
+    await page.goto('/dashboard?tab=my-notes');
     const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
     await emotionTag.click();
     await expect(page.getByTestId('tag-filter-count')).toContainText('1 件選択中');

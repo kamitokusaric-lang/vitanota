@@ -107,7 +107,7 @@ export function StudentRow({
   };
 
   return (
-    <div className="rounded-vn border border-vn-border bg-white p-3.5">
+    <div className="rounded-vn border border-vn-border bg-vn-surface p-3.5">
       {/* 氏名 (編集中はインライン入力) + リアクション + 3 点リーダー を 1 行に */}
       <div className="flex items-center gap-2">
         {editingName ? (
@@ -170,10 +170,12 @@ export function StudentRow({
                     type="button"
                     onClick={() => onToggleReaction(student.id, type)}
                     aria-pressed={mine}
-                    className={`inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-sm font-medium transition-colors ${
+                    className={`inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-sm font-medium transition-colors ${
                       mine
-                        ? 'bg-vn-accent/10 text-vn-accent'
-                        : 'bg-vn-muted-bg text-gray-500 hover:text-gray-700'
+                        ? type === 'positive'
+                          ? 'border-vn-green/40 bg-vn-green-bg text-vn-green-text'
+                          : 'border-vn-warning-border bg-vn-warning-bg text-vn-warning-text'
+                        : 'border-vn-border bg-white text-gray-400 hover:text-gray-600'
                     }`}
                   >
                     <Icon size={16} strokeWidth={1.75} aria-hidden />
@@ -323,7 +325,7 @@ export function StudentRow({
           type="button"
           onClick={submitNote}
           disabled={busy || !draft.trim()}
-          className="flex-shrink-0 rounded-md bg-vn-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-vn-accent/90 disabled:opacity-40"
+          className="flex-shrink-0 rounded-md border border-vn-accent bg-white px-3.5 py-2 text-sm font-medium text-vn-accent transition-colors hover:bg-vn-accent-bg disabled:opacity-40"
         >
           残す
         </button>

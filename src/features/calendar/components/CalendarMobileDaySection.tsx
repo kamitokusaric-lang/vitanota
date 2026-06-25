@@ -50,7 +50,7 @@ export function CalendarMobileDaySection({
       className={[
         'rounded-xl border border-slate-200/85 p-3',
         isToday
-          ? 'bg-indigo-100'
+          ? 'bg-vn-accent-bg'
           : outOfMonth
             ? 'bg-slate-50/50'
             : isCurrentWeek

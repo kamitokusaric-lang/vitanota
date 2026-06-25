@@ -13,7 +13,13 @@
 // 踏み絵: 種別は分類・評価ではなく「どこへ渡す / どう残す」のルーティング。mood は扱わない (AI 不可触)。
 import { useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
-import { Globe, Sparkles } from 'lucide-react';
+import {
+  Sparkles,
+  Heart,
+  MessageCircle,
+  MessagesSquare,
+  type LucideIcon,
+} from 'lucide-react';
 import { useToast } from '@/shared/components/Toast';
 import { postStaffroomBoard } from '@/features/staffroom/lib/postStaffroomBoard';
 import type { StaffroomBoardKind } from '@/features/staffroom/types';
@@ -28,14 +34,31 @@ function isBoardKind(kind: CaptureKind): kind is StaffroomBoardKind {
   return (BOARD_KINDS as readonly string[]).includes(kind);
 }
 
-// 種別チップ。語彙は「渡す / 共有」に寄せ、評価語を使わない。既定は note (つぶやき)。
-// keep/concern は生徒ノート由来とするため職員室ノートの選択肢からは外す。
-// 「役に立つ情報」は手動種別をやめ、「なるほど」集計で役に立つ情報箱に集まる (kind 再設計 2026-06-16)。
-const KIND_CHIPS: { kind: CaptureKind; label: string }[] = [
-  { kind: 'note', label: 'つぶやき' },
-  { kind: 'help', label: '確認・相談したいこと' },
-  { kind: 'thanks', label: '感謝を伝える' },
+// 種別チップ (design1 chimo 2026-06-25: 色付き pill 3 種)。語彙は「渡す / 共有」に寄せる。
+// keep/concern (生徒系) は生徒ノート由来なので職員室ノート投稿の選択肢からは外す (踏み絵)。
+// 気づき/ひとりごとは「つぶやき」(note) に統一 (chimo 2026-06-25)。
+// on = 選択時の塗り、off = 非選択の淡色 (案A カテゴリ色)。
+const RAIL_CHIPS: {
+  id: string;
+  kind: CaptureKind;
+  label: string;
+  Icon: LucideIcon;
+  on: string;
+  off: string;
+  placeholder: string;
+}[] = [
+  { id: 'note',   kind: 'note',   label: 'つぶやき',   Icon: MessageCircle,  on: 'border-2 border-vn-blue bg-vn-blue-bg text-vn-blue-text',     off: 'border-2 border-vn-border bg-white text-vn-blue-text',     placeholder: '今日の小さな気づき・なるほどは?' },
+  { id: 'thanks', kind: 'thanks', label: '感謝',       Icon: Heart,          on: 'border-2 border-vn-pink bg-vn-pink-bg text-vn-pink-text',     off: 'border-2 border-vn-border bg-white text-vn-pink-text',     placeholder: '「ありがとう」を伝えたい人や出来事は?' },
+  { id: 'help',   kind: 'help',   label: '相談・確認', Icon: MessagesSquare, on: 'border-2 border-vn-accent bg-vn-accent-bg text-vn-accent-text', off: 'border-2 border-vn-border bg-white text-vn-accent-text', placeholder: 'ちょっと聞きたい・確認したいこと、ありますか? 雑でOK、まず投げてみましょう。' },
 ];
+
+// initialKind / AI 提案 kind → チップ id (現状は kind と 1:1)。
+function kindToChipId(k?: CaptureKind | null): string | null {
+  if (k === 'help') return 'help';
+  if (k === 'thanks') return 'thanks';
+  if (k === 'note') return 'note';
+  return null; // keep/concern は rail チップに無い
+}
 
 interface TodayCaptureBoxProps {
   aiChatEnabled?: boolean;
@@ -67,15 +90,24 @@ export function TodayCaptureBox({
   const { mutate: globalMutate } = useSWRConfig();
   const { showToast } = useToast();
   const [content, setContent] = useState(initialContent ?? '');
-  // 初期は無選択 (null)。本人が選ぶか、未選択なら AI がそっと先選択する。投稿時は未選択なら tweet。
-  // 編集時は既存 kind を固定表示。
-  const [kind, setKind] = useState<CaptureKind | null>(initialKind ?? null);
+  // 新規はデフォルトで「つぶやき」(note) をアクティブ (chimo 2026-06-25)。
+  // 本人が他を選ぶか、AI がそっと提案すれば上書きされる。編集時は既存 kind を固定表示。
+  const [chipId, setChipId] = useState<string | null>(
+    kindToChipId(initialKind) ?? (editId ? null : 'note'),
+  );
   // AI が推した種別 (✨ マーク用。null = 提案なし)。
   const [aiPick, setAiPick] = useState<SuggestKind | null>(null);
   const [busy, setBusy] = useState(false);
+  // design1 (chimo 2026-06-25): 入力欄は初期コンパクト、フォーカス/入力中はアニメで展開。
+  const [focused, setFocused] = useState(false);
   const manuallyPickedRef = useRef(false);
   const lastSuggestedRef = useRef('');
 
+  // 選択中チップ → kind / プレースホルダーを導出。
+  const activeChip = chipId ? RAIL_CHIPS.find((c) => c.id === chipId) ?? null : null;
+  const kind: CaptureKind | null = activeChip?.kind ?? null;
+  const placeholder =
+    activeChip?.placeholder ?? 'ひとことどうぞ。雑でOK、まず投げてみましょう。';
   const maxLength = kind && isBoardKind(kind) ? 2000 : 1000;
 
   // no-store なフィード (マイノート /private・職員室ボード /staffroom) は revalidate で最新化。
@@ -151,7 +183,7 @@ export function TodayCaptureBox({
           const data = (await res.json()) as { suggestedKind: SuggestKind | null };
           if (manuallyPickedRef.current) return; // 待機中に本人が選んでいたら尊重
           setAiPick(data.suggestedKind);
-          setKind(data.suggestedKind); // null なら無選択のまま (投稿時に tweet)
+          setChipId(kindToChipId(data.suggestedKind)); // null なら無選択のまま (投稿時 note)
         } catch {
           /* 提案失敗は無視 (無選択のまま = tweet) */
         }
@@ -160,9 +192,9 @@ export function TodayCaptureBox({
     return () => clearTimeout(timer);
   }, [content, aiChatEnabled, isEdit]);
 
-  const handlePickKind = (k: CaptureKind) => {
+  const handlePickKind = (id: string) => {
     manuallyPickedRef.current = true;
-    setKind(k);
+    setChipId(id);
   };
 
   const handleSubmit = async () => {
@@ -270,7 +302,7 @@ export function TodayCaptureBox({
       // マイノート・職員室ボード (no-store) は revalidate で最新化。
       await refreshFeeds();
       setContent('');
-      setKind(null);
+      setChipId(null);
       setAiPick(null);
       manuallyPickedRef.current = false;
       lastSuggestedRef.current = '';
@@ -284,42 +316,32 @@ export function TodayCaptureBox({
   };
 
   return (
-    <div className="space-y-4">
-      {/* タイトル下: 全投稿が職員室ノートに公開される旨を明示 (日々ノートと同じ体裁)。 */}
-      <div
-        className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-100 px-3 py-2.5 text-[13px] font-medium text-amber-800"
-        data-testid="capture-public-note"
-      >
-        <Globe size={15} strokeWidth={2} className="shrink-0" aria-hidden />
-        職員室ノートに公開され、校内の先生に共有されます
-      </div>
+    <div className="space-y-3.5">
+      {/* 「どのカテゴリで書く?」見出し (アバターは廃止・chimo 2026-06-25) */}
+      <p className="text-[13px] font-semibold text-vn-ink">どのカテゴリで書く?</p>
 
-      {/* 種別チップ (最初から表示・初期は無選択)。AI のおすすめは ✨ で示す (未選択時のみ)。 */}
+      {/* 種別チップ (色付き pill・初期は無選択)。AI のおすすめは ✨ で示す (未選択時のみ)。 */}
       <div className="flex flex-wrap gap-1.5" data-testid="capture-kinds">
-        {KIND_CHIPS.map((c) => {
-          const selected = kind === c.kind;
-          const isAi = aiPick === c.kind;
+        {RAIL_CHIPS.map((c) => {
+          const selected = chipId === c.id;
+          const isAi = !isEdit && c.kind === aiPick;
+          const Icon = c.Icon;
           return (
             <button
-              key={c.kind}
+              key={c.id}
               type="button"
-              onClick={() => handlePickKind(c.kind)}
+              onClick={() => handlePickKind(c.id)}
               disabled={isEdit}
               aria-pressed={selected}
-              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
-                selected
-                  ? 'bg-vn-accent text-white'
-                  : 'bg-vn-muted-bg text-slate-500 hover:bg-slate-200'
-              } ${isEdit ? 'cursor-default opacity-60' : ''}`}
-              data-testid={`capture-kind-${c.kind}`}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                selected ? c.on : c.off
+              } ${isEdit && !selected ? 'opacity-40' : ''} ${isEdit ? 'cursor-default' : ''}`}
+              data-testid={`capture-kind-${c.id}`}
             >
-              {isAi && (
-                <Sparkles
-                  size={11}
-                  strokeWidth={2}
-                  aria-label="AIのおすすめ"
-                  className={selected ? 'text-white' : 'text-indigo-500'}
-                />
+              {isAi ? (
+                <Sparkles size={11} strokeWidth={2} aria-label="AIのおすすめ" />
+              ) : (
+                <Icon size={12} strokeWidth={2} aria-hidden />
               )}
               {c.label}
             </button>
@@ -327,29 +349,38 @@ export function TodayCaptureBox({
         })}
       </div>
 
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={4}
-        maxLength={maxLength}
-        placeholder="今日の出来事、気づき、ありがとう、相談ごと… 雑に書いて大丈夫。"
-        className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-vn-accent focus:outline-none"
-        data-testid="capture-content-input"
-      />
-      <div className="-mt-2 text-right text-xs text-gray-400" data-testid="capture-counter">
-        {content.length} / {maxLength}
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!content.trim() || busy}
-          className="rounded-full bg-vn-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-          data-testid="capture-submit"
+      {/* textarea と公開注記を 1 つの枠に入れ、注記を入力欄の真下に近接させる
+          (親の space-y で離れないよう、ここだけ独立した間隔にする・chimo 2026-06-25) */}
+      <div>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          maxLength={maxLength}
+          placeholder={placeholder}
+          className={`w-full resize-none rounded-md border border-vn-border-strong bg-white px-3 py-2 text-sm transition-all duration-200 ease-out focus:border-vn-accent focus:outline-none focus:ring-2 focus:ring-vn-accent/20 ${
+            focused || content.length > 0 ? 'min-h-[92px]' : 'min-h-[42px]'
+          }`}
+          data-testid="capture-content-input"
+        />
+        <p
+          className="mt-1.5 text-[11px] leading-relaxed text-vn-ink-sub"
+          data-testid="capture-public-note"
         >
-          {isEdit ? '保存' : '書く'}
-        </button>
+          職員室ノートに公開され、校内の先生に共有されます。
+        </p>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!content.trim() || busy}
+            className="shrink-0 rounded-full bg-vn-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-vn-accent-hover hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+            data-testid="capture-submit"
+          >
+            {isEdit ? '保存' : '書く'}
+          </button>
+        </div>
       </div>
     </div>
   );

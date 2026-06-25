@@ -11,6 +11,9 @@ export interface TabDef {
   disabled?: boolean;
   icon?: ReactNode; // pill: ラベル左 / underline: sm 以上はラベル左・モバイルはラベル上に表示
   badge?: ReactNode; // ラベル右に表示する任意のバッジ (例: New)
+  // 上部 tablist には出さないが content は持つ (例: 職員室ノートは PC では右レーン、
+  // モバイルでは下部ナビから開く独立タブ・chimo 2026-06-25)。
+  hideInTabList?: boolean;
 }
 
 interface TabsProps {
@@ -23,6 +26,8 @@ interface TabsProps {
   // タブが実際に切り替わったとき (disabled / 同一タブ再選択を除く) に呼ぶ。
   // 利用計測用 (calendar の view 切替計測など)。
   onSelect?: (id: string) => void;
+  // モバイル (xl 未満) では上部 tablist を隠す (下部タブナビで遷移・chimo 2026-06-25)。
+  hideTabListOnMobile?: boolean;
 }
 
 export function Tabs({
@@ -32,6 +37,7 @@ export function Tabs({
   variant = 'underline',
   rightSlot,
   onSelect,
+  hideTabListOnMobile = false,
 }: TabsProps) {
   const router = useRouter();
   const queryValue = router.query[queryParam];
@@ -62,8 +68,10 @@ export function Tabs({
   // Linear 風 segmented control。 calendar の board / カレンダー切替で使用。
   const tablistClass =
     variant === 'pill'
-      ? 'mb-5 inline-flex items-center gap-1 rounded-full bg-slate-50 p-1'
-      : 'mb-5 flex justify-between gap-2 border-b border-vn-border lg:justify-start lg:gap-8';
+      ? 'mb-5 inline-flex items-center gap-1 rounded-lg bg-vn-muted-bg p-1'
+      : hideTabListOnMobile
+        ? 'mb-5 hidden border-b border-vn-border xl:flex xl:justify-start xl:gap-8'
+        : 'mb-5 flex justify-between gap-2 border-b border-vn-border lg:justify-start lg:gap-8';
 
   const wrapClass = rightSlot
     ? 'mb-5 flex flex-wrap items-center justify-between gap-3'
@@ -74,15 +82,16 @@ export function Tabs({
       <div className={wrapClass}>
       <div role="tablist" className={rightSlot ? tablistClass.replace('mb-5 ', '') : tablistClass}>
         {tabs.map((tab) => {
+          if (tab.hideInTabList) return null;
           const isActive = tab.id === active;
           const buttonClass =
             variant === 'pill'
               ? [
-                  'relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] transition-colors',
+                  'relative inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-[14px] transition-colors',
                   tab.disabled
                     ? 'cursor-not-allowed font-medium text-slate-300'
                     : isActive
-                      ? 'bg-white font-semibold text-slate-900 shadow-sm'
+                      ? 'bg-vn-surface font-semibold text-slate-900 shadow-sm'
                       : 'font-medium text-slate-500 hover:text-slate-700',
                 ].join(' ')
               : [

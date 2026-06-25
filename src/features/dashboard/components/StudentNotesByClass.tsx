@@ -95,8 +95,8 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
               }}
               className={`-mb-px rounded-t-lg border px-4 py-2.5 text-sm transition-colors ${
                 active
-                  ? 'border-vn-border border-b-white bg-white font-bold text-slate-800'
-                  : 'border-transparent bg-slate-100 font-medium text-slate-500 hover:bg-slate-200'
+                  ? 'border-vn-border border-b-vn-surface bg-vn-surface font-bold text-slate-800'
+                  : 'border-transparent bg-transparent font-medium text-slate-500 hover:text-slate-700'
               }`}
               data-testid={`student-notes-tab-${c.id}`}
             >
@@ -113,8 +113,8 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
           onClick={() => setAddingClass(true)}
           className={`-mb-px flex items-center rounded-t-lg border px-3 py-2.5 text-sm transition-colors ${
             addingClass
-              ? 'border-vn-border border-b-white bg-white font-bold text-slate-800'
-              : 'border-transparent bg-slate-100 font-medium text-slate-500 hover:bg-slate-200'
+              ? 'border-vn-border border-b-vn-surface bg-vn-surface font-bold text-slate-800'
+              : 'border-transparent bg-transparent font-medium text-slate-500 hover:text-slate-700'
           }`}
           data-testid="student-notes-tab-add"
         >

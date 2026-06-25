@@ -244,11 +244,11 @@ function FeedbackModal({ open, onClose, onMarkRead, latestUnreadReply }: Feedbac
     <Modal open={open} onClose={resetAndClose} title="フィードバックを送る" maxWidth="max-w-lg">
       {initialUnreadReply && (
         <div
-          className="mb-4 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900"
+          className="mb-4 rounded-md border border-vn-accent/40 bg-vn-accent-bg px-3 py-2 text-sm text-vn-accent"
           data-testid="feedback-modal-latest-unread-reply"
         >
           <p className="mb-1 font-semibold">開発者からの返信が届きました。</p>
-          <p className="whitespace-pre-wrap text-xs leading-relaxed text-indigo-800">
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-vn-accent">
             {initialUnreadReply.body}
           </p>
         </div>

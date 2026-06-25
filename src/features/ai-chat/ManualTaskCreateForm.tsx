@@ -313,7 +313,7 @@ export function ManualTaskCreateForm({
           type="button"
           onClick={addRow}
           data-testid="manual-task-add-row"
-          className="w-full rounded-md border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:border-indigo-500 hover:bg-indigo-100"
+          className="w-full rounded-md border border-vn-accent/50 bg-vn-accent-bg px-4 py-2 text-sm font-medium text-vn-accent transition hover:border-vn-accent hover:bg-vn-accent-bg"
         >
           + さらにタスクを追加
         </button>
@@ -331,7 +331,7 @@ export function ManualTaskCreateForm({
           onClick={handleSubmit}
           disabled={submitting}
           data-testid="manual-task-submit"
-          className="h-9 rounded-full bg-indigo-600 px-5 text-[14px] font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-vn-border-strong disabled:text-white"
+          className="h-9 rounded-full bg-vn-accent px-5 text-[14px] font-medium text-white shadow-sm transition hover:bg-vn-accent-hover disabled:cursor-not-allowed disabled:bg-vn-border-strong disabled:text-white"
         >
           {submitting ? '作成中…' : 'タスクを作成する'}
         </button>
@@ -410,13 +410,13 @@ function ManualRowTagInput({
         {selectedTags.map((t) => (
           <span
             key={t.id}
-            className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700"
+            className="inline-flex items-center gap-0.5 rounded-full bg-vn-accent-bg px-2 py-0.5 text-[10px] text-vn-accent"
           >
             #{t.name}
             <button
               type="button"
               onClick={() => removeTag(t.id)}
-              className="text-indigo-500 hover:text-indigo-700"
+              className="text-vn-accent hover:text-vn-accent-hover"
               aria-label={`タグ ${t.name} を外す`}
             >
               ×
@@ -446,7 +446,7 @@ function ManualRowTagInput({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => addTag(t.id)}
-              className="block w-full px-2 py-1 text-left hover:bg-indigo-50"
+              className="block w-full px-2 py-1 text-left hover:bg-vn-accent-bg"
             >
               #{t.name}
             </button>
@@ -457,7 +457,7 @@ function ManualRowTagInput({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => void commit()}
               disabled={creating}
-              className="block w-full border-t border-gray-100 px-2 py-1 text-left text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+              className="block w-full border-t border-gray-100 px-2 py-1 text-left text-vn-accent hover:bg-vn-accent-bg disabled:opacity-50"
             >
               {creating ? '作成中…' : `+ 「${trimmed}」を作成`}
             </button>

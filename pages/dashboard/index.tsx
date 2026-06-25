@@ -9,17 +9,17 @@
 //     旧 3 種別 (日誌 / ナレッジ / つぶやき) は撤去、 新規投稿は kind='tweet' 固定。
 //     CTA クリックで Modal が開き、 EntryForm が default 'tweet' で起動する。
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import {
-  PenLine,
-  NotebookPen,
-  Users,
   ListChecks,
   BookUser,
   GraduationCap,
   LayoutDashboard,
   BarChart3,
+  Notebook,
 } from 'lucide-react';
+import { BottomTabNav } from '@/shared/components/BottomTabNav';
 import { eq } from 'drizzle-orm';
 import { withAuthSSR } from '@/features/auth/lib/withAuthSSR';
 import { isAiChatEnabledForTenant } from '@/features/ai-chat/featureFlag';
@@ -28,22 +28,15 @@ import { tenants } from '@/db/schema';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
 import { Layout } from '@/shared/components/Layout';
-import { Modal } from '@/shared/components/Modal';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TasksTabWithCalendar } from '@/features/calendar/components/TasksTabWithCalendar';
 import { StaffroomBoard } from '@/features/staffroom/components/StaffroomBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
-import { TodayCaptureBox } from '@/features/journal/components/TodayCaptureBox';
 import { DiaryNoteBox } from '@/features/journal/components/DiaryNoteBox';
 import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimelineRail';
 import { MyNotesByKind } from '@/features/dashboard/components/MyNotesByKind';
 import { StudentNotesByClass } from '@/features/dashboard/components/StudentNotesByClass';
-import {
-  getMoodIcon,
-  getMoodLabel,
-} from '@/features/journal/lib/mood-options';
 import { canUseAdminFeatures, canUseSystemAdminFeatures } from '@/features/auth/lib/role-helpers';
-import type { MoodLevel } from '@/features/journal/schemas/journal';
 import type { VitanotaSession } from '@/shared/types/auth';
 
 interface DashboardPageProps {
@@ -65,7 +58,7 @@ function ComingSoonTab({ label }: { label: string }) {
 // 「観測されてる」感ではなく「教員 → AI」方向の関係を提示するための文言 (chimo 設計 2026-05-13)。
 function AiLearningNotice({ tenantName }: { tenantName: string }) {
   return (
-    <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/40 px-5 py-3 text-xs leading-relaxed text-slate-600">
+    <div className="mb-4 rounded-lg border border-vn-accent/30 bg-vn-accent-bg px-5 py-3 text-xs leading-relaxed text-slate-600">
       <p>
         チャットで雑に呟くだけで、タスク登録ができます。一人につき、一日20件まで呟けます。
       </p>
@@ -83,67 +76,14 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
   );
 }
 
-function RecordEntrances({
-  onWrite,
-  onDiary,
-  onOpenRail,
-  testIdPrefix = 'quick-record',
-}: {
-  onWrite: () => void;
-  onDiary: () => void;
-  // narrow のみ: 渡すと「職員室ノート」を見るボタンを入口 2 つと同じ行に並べる
-  // (xl は右レーンが常時表示なので渡さない → 3 つ目は出ない)。
-  onOpenRail?: () => void;
-  // narrow / xl の 2 箇所に同コンポーネントを置くため testId を出し分け
-  // (Playwright strict mode の重複検出回避)。
-  testIdPrefix?: string;
-}) {
-  // chimo 2026-06-12: 記録入口を右サイドに一本化。
-  //   入口2「今日の出来事を書く」= 雑に書いて種別を選ぶ単一キャプチャ箱 (TodayCaptureBox)。
-  //   入口1「自分用の日誌」= EntryForm を kind='diary' で開く (自分用・既定非公開)。
-  // testId は `${prefix}-tweet` を維持して既存 e2e (02-journal-crud, 04-tags) との互換を保つ。
-  return (
-    <div className="mb-3" data-testid={`${testIdPrefix}-actions`}>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onWrite}
-          data-testid={`${testIdPrefix}-tweet`}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[20px] border-2 border-amber-500 bg-amber-50 px-3 py-2.5 text-center text-[13px] font-medium leading-tight text-amber-700 shadow-sm transition-all hover:bg-amber-100 hover:shadow-md"
-        >
-          <PenLine size={14} strokeWidth={1.75} className="shrink-0" aria-hidden />
-          職員室に投稿する
-        </button>
-        <button
-          type="button"
-          onClick={onDiary}
-          data-testid={`${testIdPrefix}-diary`}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[20px] border-2 border-sky-400 bg-sky-50 px-3 py-2.5 text-center text-[13px] font-medium leading-tight text-sky-700 shadow-sm transition-all hover:bg-sky-100 hover:shadow-md"
-        >
-          <NotebookPen size={14} strokeWidth={1.75} className="shrink-0" aria-hidden />
-          日々ノートを書く
-        </button>
-        {onOpenRail && (
-          <button
-            type="button"
-            onClick={onOpenRail}
-            data-testid="dashboard-open-note-rail-modal-button"
-            aria-label="職員室ノートを見る"
-            className="inline-flex shrink-0 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-[20px] border-2 border-vn-border-strong bg-white px-3 py-1.5 text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md"
-          >
-            <Users size={18} strokeWidth={1.75} className="shrink-0" aria-hidden />
-            <span className="text-[10px] font-medium leading-none">職員室ノート</span>
-          </button>
-        )}
-      </div>
-      <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
-        日々のつぶやき、生徒の様子、相談したいことなどを残せます。
-        <br />
-        小さな出来事が、 他の先生の気づきになることも。
-      </p>
-    </div>
-  );
-}
+// モバイル下部タブナビの 5 タブ (chimo 2026-06-25 スマホ版 design)。
+const MOBILE_TABS = [
+  { id: 'tasks', label: 'タスク', icon: <ListChecks size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'my-notes', label: 'ノート', icon: <BookUser size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'student-notes', label: '生徒', icon: <GraduationCap size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'staffroom', label: 'ボード', icon: <LayoutDashboard size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'staffroom-notes', label: '職員室', icon: <Notebook size={20} strokeWidth={1.75} aria-hidden /> },
+];
 
 export default function DashboardPage({
   session,
@@ -153,17 +93,10 @@ export default function DashboardPage({
 }: DashboardPageProps) {
   const isAdmin = canUseAdminFeatures(session.user.roles);
 
-  // 記録入口モーダル状態 (chimo 2026-06-12: 右サイドに一本化)。
-  //   capture = 今日の出来事 (TodayCaptureBox / 雑入力 + 種別)
-  //   diary   = 自分用の日誌 (EntryForm kind='diary')
-  const [captureModalOpen, setCaptureModalOpen] = useState(false);
-  const [diaryModalOpen, setDiaryModalOpen] = useState(false);
-  // narrow (< xl) 用の日々ノートモーダル状態 (chimo 2026-05-21)
-  const [noteRailModalOpen, setNoteRailModalOpen] = useState(false);
-
-  const handleOpenCapture = () => setCaptureModalOpen(true);
-  const handleOpenDiary = () => setDiaryModalOpen(true);
-
+  const router = useRouter();
+  // モバイル下部ナビ用: 現在のタブ (?tab=)。未指定は tasks。
+  const activeTab =
+    typeof router.query.tab === 'string' ? router.query.tab : 'tasks';
   const mainTabs: TabDef[] = [
     {
       id: 'tasks',
@@ -178,10 +111,23 @@ export default function DashboardPage({
     },
     {
       // chimo 2026-06-11 関係図: マイノートを kind 別に並べる (個人の作業場)。
+      // design2 (chimo 2026-06-25): 上部に「今日のふりかえり」入力をインライン展開。
       id: 'my-notes',
       label: 'マイノート',
       icon: <BookUser size={18} strokeWidth={1.75} aria-hidden />,
-      content: <MyNotesByKind />,
+      content: (
+        <div className="space-y-6">
+          <section className="rounded-[14px] border border-vn-border bg-vn-surface px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+            <header className="mb-3">
+              <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
+                📝 今日のふりかえり
+              </h2>
+            </header>
+            <DiaryNoteBox />
+          </section>
+          <MyNotesByKind />
+        </div>
+      ),
     },
     {
       // chimo 2026-06-11 関係図: 生徒ノート (朝バトンのクラスを学年別に)。
@@ -201,6 +147,21 @@ export default function DashboardPage({
       label: '職員室ボード',
       icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden />,
       content: <StaffroomBoard />,
+    },
+    {
+      // モバイル独立タブ (chimo 2026-06-25): PC は右レーン、モバイルは下部ナビから開く職員室ノート。
+      id: 'staffroom-notes',
+      label: '職員室ノート',
+      hideInTabList: true,
+      content: (
+        <PublicTimelineRail
+          selfUserId={session.user.userId}
+          mode="page"
+          aiChatEnabled={aiChatEnabled}
+          authorName={session.user.name}
+          isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
+        />
+      ),
     },
   ];
 
@@ -224,116 +185,39 @@ export default function DashboardPage({
           {/* chimo 2026-05-20: ダッシュボードを 2 カラム化。 右レーンに「公開中の日々ノート」 を常時。
               踏み絵: 観測感を作らないため mood は出さず、 文言は柔らかく (PublicTimelineRail 参照)。 */}
           <div
-            className="grid grid-cols-1 gap-7 pb-6 xl:grid-cols-[minmax(0,1fr)_440px]"
+            className="grid grid-cols-1 gap-7 pb-24 xl:grid-cols-[minmax(0,1fr)_440px] xl:pb-6"
             data-testid="dashboard-page"
           >
             <div className="min-w-0">
-              {/* narrow (< xl) 専用: 記録入口 2 つ + 職員室ノート閲覧を 1 行横並び。
-                  xl 以上では右レーン上部に集約 (chimo 2026-05-21) */}
+              {/* モバイル: 画面名ヘッダ (上部タブを下部ナビに移したため・chimo 2026-06-25) */}
               <div className="mb-4 xl:hidden">
-                <RecordEntrances
-                  onWrite={handleOpenCapture}
-                  onDiary={handleOpenDiary}
-                  onOpenRail={() => setNoteRailModalOpen(true)}
-                  testIdPrefix="narrow-quick-record"
-                />
+                <h1 className="text-[22px] font-bold text-vn-ink">
+                  {mainTabs.find((t) => t.id === activeTab)?.label ?? 'タスクボード'}
+                </h1>
               </div>
-              {/* タスク雑入力フォーム (TaskCreateTabs) は タスクボードタブの一番上へ移設
-                  (chimo 2026-06-12)。 タスク文脈の入口を board の中に収める。 */}
-              <Tabs tabs={mainTabs} defaultTabId="tasks" queryParam="tab" />
+              <Tabs
+                tabs={mainTabs}
+                defaultTabId="tasks"
+                queryParam="tab"
+                hideTabListOnMobile
+              />
             </div>
             <div className="hidden xl:block">
-              {/* 記録入口は右レーン上部に集約 (chimo 2026-05-20)。
-                  「書く → 公開する → 職員室ノートに並ぶ」 動線を視覚的に直結。 */}
-              <RecordEntrances
-                onWrite={handleOpenCapture}
-                onDiary={handleOpenDiary}
-              />
-              <PublicTimelineRail selfUserId={session.user.userId} />
-            </div>
-          </div>
-
-          {/* narrow 用日々ノートモーダル (chimo 2026-05-21): xl 未満では右レーンが
-              畳まれるため、 ボタンから rail を呼び出す。 mode='modal' で
-              sticky / max-h を抑制し、 Modal の枠に表示を委ねる。 */}
-          <Modal
-            open={noteRailModalOpen}
-            onClose={() => setNoteRailModalOpen(false)}
-            title="職員室ノート"
-            maxWidth="max-w-2xl"
-          >
-            <PublicTimelineRail
-              selfUserId={session.user.userId}
-              mode="modal"
-            />
-          </Modal>
-
-          {/* 入口2: 今日の出来事 (雑入力 + 種別ルーティング)。投稿後の一覧更新は
-              TodayCaptureBox 内で行う (SWR mutate)。 */}
-          <Modal
-            open={captureModalOpen}
-            onClose={() => setCaptureModalOpen(false)}
-            title={
-              <span className="inline-flex items-center gap-2">
-                <PenLine size={20} strokeWidth={1.75} className="text-gray-900" aria-hidden />
-                職員室ノートに投稿する
-              </span>
-            }
-            maxWidth="max-w-xl"
-          >
-            {captureModalOpen && (
-              <TodayCaptureBox
+              {/* design1 (chimo 2026-06-25): 記録入口 (職員室ノート投稿) を rail 上部に
+                  インライン展開。日々ノートは rail 内リンクから。narrow は RecordEntrances。 */}
+              <PublicTimelineRail
+                selfUserId={session.user.userId}
                 aiChatEnabled={aiChatEnabled}
                 authorName={session.user.name}
                 isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
-                onSuccess={() => setCaptureModalOpen(false)}
               />
-            )}
-          </Modal>
+            </div>
+          </div>
 
-          {/* 入口1: 自分用の日々ノート (diary 固定・常に非公開)。職員室ノートと同じ体裁。 */}
-          <Modal
-            open={diaryModalOpen}
-            onClose={() => setDiaryModalOpen(false)}
-            title={
-              <span className="inline-flex items-center gap-2">
-                <NotebookPen size={20} strokeWidth={1.75} className="text-gray-900" aria-hidden />
-                自分用の日々ノートを書く
-              </span>
-            }
-            maxWidth="max-w-xl"
-          >
-            {diaryModalOpen && (
-              <DiaryNoteBox onSuccess={() => setDiaryModalOpen(false)} />
-            )}
-          </Modal>
+          <BottomTabNav tabs={MOBILE_TABS} activeId={activeTab} />
         </Layout>
       </RoleGuard>
     </TenantGuard>
-  );
-}
-
-function ModalMoodTitle({
-  mood,
-  prompt,
-}: {
-  mood: MoodLevel;
-  prompt: string;
-}) {
-  const Icon = getMoodIcon(mood);
-  const label = getMoodLabel(mood);
-  return (
-    <span className="flex items-center gap-2 font-normal">
-      {Icon && (
-        <Icon
-          size={20}
-          strokeWidth={1.75}
-          className="text-gray-700"
-          aria-label={label ?? 'mood'}
-        />
-      )}
-      <span>{prompt}</span>
-    </span>
   );
 }
 

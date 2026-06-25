@@ -127,11 +127,11 @@ export function CalendarMonthCell({
       className={[
         'flex min-h-[96px] flex-col gap-1 rounded-lg border p-1.5 transition',
         isDropOver
-          ? 'border-vn-accent bg-indigo-50/50'
+          ? 'border-vn-accent bg-vn-accent-bg'
           : 'border-slate-200/85',
         !isDropOver &&
           (isToday
-            ? 'bg-indigo-100'
+            ? 'bg-vn-accent-bg'
             : outOfMonth
               ? 'bg-slate-50/50'
               : isCurrentWeek

@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSWRConfig } from 'swr';
-import { ArrowRight, Save, Columns3, Calendar } from 'lucide-react';
+import { ArrowRight, Plus, Columns3, Calendar } from 'lucide-react';
 import { Modal } from '@/shared/components/Modal';
 import { useToast } from '@/shared/components/Toast';
 import {
@@ -243,12 +243,12 @@ export function TasksTabWithCalendar({
       <button
         type="button"
         onClick={handleSaveFilter}
-        className="inline-flex h-[30px] items-center gap-1 rounded-full border border-vn-border-strong bg-white px-[11px] text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
+        className="inline-flex h-[30px] items-center gap-1 rounded-full border border-vn-accent/50 bg-white px-[11px] text-[12px] font-medium text-vn-accent transition-colors hover:border-vn-accent hover:bg-vn-accent-bg"
         data-testid="task-board-save-filter-button"
         title="現在のフィルタを次回以降のデフォルトとして保存"
       >
-        <Save size={14} aria-hidden />
-        フィルタを保存
+        <Plus size={14} aria-hidden />
+        今の条件を保存
       </button>
     </>
   );
@@ -284,7 +284,7 @@ export function TasksTabWithCalendar({
                 type="button"
                 onClick={() => handlePushToNextWeek(task)}
                 data-testid="calendar-push-to-next-week"
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-vn-accent px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow-md"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-vn-accent px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-vn-accent-hover hover:shadow-md"
               >
                 <ArrowRight size={16} strokeWidth={2} aria-hidden />
                 来週に渡す

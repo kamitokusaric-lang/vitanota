@@ -447,12 +447,9 @@ export function RoughCaptureSection({
       className="mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]"
     >
       <header className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
-            タスクを書き出す
-          </h2>
-          <span className="text-[11px] text-slate-400">β</span>
-        </div>
+        <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
+          タスクを書き出す
+        </h2>
         {headerRight}
       </header>
 
@@ -529,6 +526,8 @@ function InputView({
   canSubmit: boolean;
   error: string | null;
 }) {
+  // chimo 2026-06-25: 入力欄は初期 1 行、フォーカス/入力中にアニメで展開。
+  const [focused, setFocused] = useState(false);
   return (
     <div>
       <p className="mb-2 text-[13px] font-normal leading-[1.6] text-slate-500">{INPUT_LEAD}</p>
@@ -536,11 +535,14 @@ function InputView({
         value={input}
         onChange={(e) => onChange(e.target.value)}
         placeholder={PLACEHOLDER}
-        rows={2}
         maxLength={2000}
         disabled={loading}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         data-testid="rough-capture-input"
-        className="min-h-[60px] w-full resize-y rounded-[10px] border border-vn-border-strong bg-white px-4 py-2.5 text-[15px] leading-[1.55] text-slate-900 placeholder:text-vn-border-strong focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50"
+        className={`w-full resize-y rounded-[10px] border border-vn-border-strong bg-white px-4 py-3 text-[15px] leading-[1.55] text-slate-900 transition-all duration-200 ease-out placeholder:text-vn-border-strong focus:border-vn-accent focus:outline-none focus:ring-1 focus:ring-vn-accent disabled:bg-slate-50 ${
+          focused || input.length > 0 ? 'min-h-[120px]' : 'min-h-[44px]'
+        }`}
       />
       {error && (
         <p className="mt-2 text-sm text-red-600" role="alert">
@@ -553,7 +555,7 @@ function InputView({
           onClick={onSubmit}
           disabled={!canSubmit || loading}
           data-testid="rough-capture-submit"
-          className="h-9 rounded-full bg-indigo-600 px-5 text-[14px] font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-vn-border-strong disabled:text-white"
+          className="h-9 rounded-full bg-vn-accent px-5 text-[14px] font-medium text-white shadow-sm transition hover:bg-vn-accent-hover disabled:cursor-not-allowed disabled:bg-vn-border-strong disabled:text-white"
         >
           {loading ? '整理中…' : '整理する'}
         </button>
@@ -617,7 +619,7 @@ function ReviewView({
             key={i}
             data-testid={`rough-capture-candidate-${i}`}
             className={`rounded-md border p-3 ${
-              r.include ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-200 bg-gray-50'
+              r.include ? 'border-vn-accent/40 bg-vn-accent-bg' : 'border-gray-200 bg-gray-50'
             }`}
           >
             <div className="flex items-start gap-2">
@@ -721,7 +723,7 @@ function ReviewView({
           type="button"
           onClick={onAddRow}
           data-testid="rough-capture-add-row"
-          className="w-full rounded-md border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:border-indigo-500 hover:bg-indigo-100"
+          className="w-full rounded-md border border-vn-accent/50 bg-vn-accent-bg px-4 py-2 text-sm font-medium text-vn-accent transition hover:border-vn-accent hover:bg-vn-accent-bg"
         >
           + さらにタスクを追加
         </button>
@@ -746,7 +748,7 @@ function ReviewView({
           onClick={onConfirm}
           disabled={includedCount === 0}
           data-testid="rough-capture-confirm"
-          className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-md bg-vn-accent px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-vn-accent-hover disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           選んだタスクを作成する{includedCount > 0 ? `(${includedCount})` : ''}
         </button>
@@ -827,13 +829,13 @@ function RowTagInput({
         {selectedTags.map((t) => (
           <span
             key={t.id}
-            className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700"
+            className="inline-flex items-center gap-0.5 rounded-full bg-vn-accent-bg px-2 py-0.5 text-[10px] text-vn-accent"
           >
             #{t.name}
             <button
               type="button"
               onClick={() => removeTag(t.id)}
-              className="text-indigo-500 hover:text-indigo-700"
+              className="text-vn-accent hover:text-vn-accent-hover"
               aria-label={`タグ ${t.name} を外す`}
             >
               ×
@@ -863,7 +865,7 @@ function RowTagInput({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => addTag(t.id)}
-              className="block w-full px-2 py-1 text-left hover:bg-indigo-50"
+              className="block w-full px-2 py-1 text-left hover:bg-vn-accent-bg"
             >
               #{t.name}
             </button>
@@ -874,7 +876,7 @@ function RowTagInput({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => void commit()}
               disabled={creating}
-              className="block w-full border-t border-gray-100 px-2 py-1 text-left text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+              className="block w-full border-t border-gray-100 px-2 py-1 text-left text-vn-accent hover:bg-vn-accent-bg disabled:opacity-50"
             >
               {creating ? '作成中…' : `+ 「${trimmed}」を作成`}
             </button>
@@ -949,7 +951,7 @@ function SurveyView({
   return (
     <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-7 shadow-sm">
       <p className="text-[15px] font-medium leading-relaxed text-slate-700">
-        <span className="text-indigo-600">{createdCount}件のタスク</span>
+        <span className="text-vn-accent">{createdCount}件のタスク</span>
         を作成しました。
         {factLine ? ` ${factLine}` : ''}
         {suggestionLine ? ` ${suggestionLine}` : ''}
@@ -990,7 +992,7 @@ function SurveyView({
           type="button"
           onClick={submit}
           disabled={!hasAnyInput || submitting}
-          className="h-12 min-w-[128px] rounded-xl bg-indigo-600 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] transition hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_22px_rgba(79,70,229,0.26)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
+          className="h-12 min-w-[128px] rounded-xl bg-vn-accent text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(232, 105, 74,0.2)] transition hover:-translate-y-0.5 hover:bg-vn-accent-hover hover:shadow-[0_10px_22px_rgba(232, 105, 74,0.26)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
         >
           {submitting ? '送信中…' : '送信する'}
         </button>
@@ -1036,7 +1038,7 @@ function ReasonPanel({
             key={opt.value}
             className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2.5 text-sm font-medium leading-none transition ${
               selected === opt.value
-                ? 'border-indigo-600 bg-indigo-600 text-white'
+                ? 'border-vn-accent bg-vn-accent text-white'
                 : 'border-slate-300 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-100'
             }`}
           >
@@ -1060,7 +1062,7 @@ function ReasonPanel({
           placeholder="差し支えなければ、もう少し教えてください"
           rows={3}
           maxLength={500}
-          className="mt-4 w-full resize-y rounded-xl border-[1.5px] border-slate-300 bg-white px-4 py-3.5 text-[15px] font-semibold leading-relaxed text-slate-700 placeholder:text-slate-400 transition focus:border-indigo-400 focus:outline-none focus:ring-[3px] focus:ring-indigo-200/40"
+          className="mt-4 w-full resize-y rounded-xl border-[1.5px] border-slate-300 bg-white px-4 py-3.5 text-[15px] font-semibold leading-relaxed text-slate-700 placeholder:text-slate-400 transition focus:border-vn-accent focus:outline-none focus:ring-[3px] focus:ring-vn-accent/30"
         />
       )}
       <style jsx>{`
@@ -1120,7 +1122,7 @@ function ScaleField({
                 aria-pressed={value === n}
                 className={`flex h-12 w-12 items-center justify-center rounded-full border-[1.5px] text-xl font-medium transition ${
                   value === n
-                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-[0_8px_18px_rgba(79,70,229,0.22)]'
+                    ? 'border-vn-accent bg-vn-accent text-white shadow-[0_8px_18px_rgba(232, 105, 74,0.22)]'
                     : 'border-slate-300 bg-white text-slate-500 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50'
                 }`}
               >
@@ -1158,8 +1160,8 @@ function ThanksView({
   return (
     <div className="py-2">
       {(factLine || suggestionLine) && (
-        <p className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-3 text-xs leading-relaxed text-indigo-800">
-          <span className="font-medium text-indigo-700">
+        <p className="rounded-2xl border border-vn-accent/30 bg-vn-accent-bg px-5 py-3 text-xs leading-relaxed text-vn-accent">
+          <span className="font-medium text-vn-accent">
             {createdCount}件のタスクを作成しました。
           </span>
           {factLine ? ` ${factLine}` : ''}
@@ -1170,7 +1172,7 @@ function ThanksView({
         <button
           type="button"
           onClick={onReset}
-          className="text-xs text-indigo-600 hover:underline"
+          className="text-xs text-vn-accent hover:underline"
         >
           続けて書く
         </button>

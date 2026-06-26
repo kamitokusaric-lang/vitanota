@@ -226,9 +226,17 @@ export function PublicTimelineRail({
       </header>
 
       {/* design1 (chimo 2026-06-25): rail 上部に職員室ノート投稿フォームをインライン展開。
-          side (PC 右レーン) と page (モバイル独立タブ) で表示。modal では出さない。 */}
+          side (PC 右レーン) と page (モバイル独立タブ) で表示。modal では出さない。
+          chimo 2026-06-26: page は暗いページ背景に直置きで暗く見えたため、他タブ (ふりかえり) と
+          同じ bg-vn-surface カードに載せて明るさを揃える。side は白の rail 内なので従来の区切り線。 */}
       {mode !== 'modal' && (
-        <div className="border-b border-vn-border px-5 py-4">
+        <div
+          className={
+            mode === 'page'
+              ? 'mx-4 my-4 rounded-[14px] border border-vn-border bg-vn-surface px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)]'
+              : 'border-b border-vn-border px-5 py-4'
+          }
+        >
           <TodayCaptureBox
             aiChatEnabled={aiChatEnabled}
             authorName={authorName ?? undefined}

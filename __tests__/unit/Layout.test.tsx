@@ -31,7 +31,8 @@ describe('Layout', () => {
       </Layout>
     );
     expect(screen.getByTestId('nav-logo')).toHaveTextContent('vitanota');
-    expect(screen.getByTestId('nav-username')).toHaveTextContent('テスト教員');
+    // 名前はアイコン (人) の aria-label に入る。クリックで開くメニュー見出しにも出る。
+    expect(screen.getByTestId('nav-username')).toHaveAttribute('aria-label', 'テスト教員');
   });
 
   it('renders children', () => {
@@ -55,16 +56,21 @@ describe('Layout', () => {
     expect(screen.queryByTestId('nav-alerts-link')).toBeNull();
   });
 
-  it('username button opens profile modal on click', () => {
+  it('名前クリックでメニューが開き、プロフィールでモーダルが開く', () => {
     render(
       <Layout session={baseSession}>
         <div />
       </Layout>
     );
-    // モーダル未開 時点
+    // 初期はメニュー・モーダルとも閉じている
+    expect(screen.queryByTestId('nav-user-menu')).toBeNull();
     expect(screen.queryByTestId('modal-content')).toBeNull();
+    // 名前クリックでメニュー (プロフィール / ログアウト) が出る
     fireEvent.click(screen.getByTestId('nav-username'));
-    // モーダルが開く
+    expect(screen.getByTestId('nav-user-menu')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-signout-button')).toBeInTheDocument();
+    // プロフィールでモーダルが開く
+    fireEvent.click(screen.getByTestId('nav-profile'));
     expect(screen.getByTestId('modal-content')).toBeInTheDocument();
   });
 

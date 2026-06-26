@@ -1,5 +1,5 @@
-// 職員室ボードの期間ナビ。生徒ノートの日付ナビと同じ体裁の「週/月」版。
-// 右上で 週毎 / 月毎 を切替。既定=今週。先(週/月)に戻る / 次の(週/月)に進む で 1 つずつめくる。
+// 職員室ボードの期間ナビ。生徒ノートの日付ナビと同じ「前◯ 期間 翌◯ ┃ 今◯」の横 1 行体裁の「週/月」版。
+// 右上で 週毎 / 月毎 を切替。既定=今週。前(週/月) / 翌(週/月) で 1 つずつめくる。
 // 値は常に {from,to} (YYYY-MM-DD・週=月曜〜日曜 / 月=1日〜末日)。
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -113,47 +113,46 @@ export function StaffroomPeriodFilter({ value, onChange }: Props) {
         </div>
       </div>
 
-      {/* 中央: 期間ナビ (モードに応じて 週 / 月) */}
-      <div className="flex flex-col items-center gap-1.5">
-        <span className="text-sm font-medium text-slate-700" data-testid="board-period-label">
+      {/* 中央: 期間ナビ (生徒ノートの日付ナビと同じ 前◯ 期間 翌◯ ┃ 今◯ の横 1 行体裁) */}
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => onChange(prev)}
+          className="inline-flex items-center gap-0.5 text-sm text-gray-400 transition-colors hover:text-gray-600"
+          data-testid="board-period-prev"
+        >
+          <ChevronLeft size={16} aria-hidden />
+          {isWeek ? '前週' : '前月'}
+        </button>
+        <span className="text-sm font-bold text-slate-700" data-testid="board-period-label">
           {label}
         </span>
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => onChange(prev)}
-            className="flex flex-shrink-0 flex-col items-center gap-0.5 px-1 text-gray-400 transition-colors hover:text-vn-accent"
-            data-testid="board-period-prev"
-          >
-            <ChevronLeft size={20} aria-hidden />
-            <span className="text-xs">{isWeek ? '先週に戻る' : '先月に戻る'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange(current)}
-            disabled={isCurrent}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-              isCurrent
-                ? 'bg-vn-accent/10 text-vn-accent'
-                : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-            data-testid="board-period-this"
-          >
-            {isWeek ? '今週' : '今月'}
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange(next)}
-            disabled={isCurrent}
-            className={`flex flex-shrink-0 flex-col items-center gap-0.5 px-1 text-gray-400 transition-colors hover:text-vn-accent ${
-              isCurrent ? 'invisible' : ''
-            }`}
-            data-testid="board-period-next"
-          >
-            <ChevronRight size={20} aria-hidden />
-            <span className="text-xs">{isWeek ? '次の週に進む' : '次の月に進む'}</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onChange(next)}
+          disabled={isCurrent}
+          className={`inline-flex items-center gap-0.5 text-sm text-gray-400 transition-colors hover:text-gray-600 ${
+            isCurrent ? 'invisible' : ''
+          }`}
+          data-testid="board-period-next"
+        >
+          {isWeek ? '翌週' : '翌月'}
+          <ChevronRight size={16} aria-hidden />
+        </button>
+        <span className="px-1 text-vn-border-strong" aria-hidden>
+          |
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(current)}
+          disabled={isCurrent}
+          className={`rounded-md border border-vn-border bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors ${
+            isCurrent ? '' : 'hover:bg-gray-50'
+          }`}
+          data-testid="board-period-this"
+        >
+          {isWeek ? '今週' : '今月'}
+        </button>
       </div>
     </div>
   );

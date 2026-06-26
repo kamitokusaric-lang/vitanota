@@ -22,6 +22,11 @@ import {
 } from '@/features/journal/components/TodayCaptureBox';
 import type { MoodLevel } from '@/features/journal/schemas/journal';
 import {
+  getMoodIcon,
+  getMoodLabel,
+  getMoodOption,
+} from '@/features/journal/lib/mood-options';
+import {
   parseReflection,
   REFLECTION_SECTIONS,
 } from '@/features/journal/lib/reflectionTemplate';
@@ -32,6 +37,21 @@ interface MyEntry {
   content: string;
   isPublic: boolean;
   createdAt: string;
+  // mine API は mood / 気持ちタグ (emotion_tags) も返す (今まで型で受けていなかった)。
+  mood?: MoodLevel | null;
+  tags?: Array<{ id: string; name: string; category?: SentimentCategory }>;
+}
+
+// 感情カテゴリ (positive/neutral/negative) → 文字色。mood マークと気持ちタグで共通 (chimo 2026-06-26)。
+// positive=緑 / neutral=スレート / negative=暖色 (リアクションの意味色分けと一貫)。
+type SentimentCategory = 'positive' | 'neutral' | 'negative';
+const SENTIMENT_TEXT: Record<SentimentCategory, string> = {
+  positive: 'text-vn-green-text',
+  neutral: 'text-slate-500',
+  negative: 'text-vn-warning-text',
+};
+function sentimentText(cat: SentimentCategory | undefined | null): string {
+  return cat ? SENTIMENT_TEXT[cat] : 'text-gray-500';
 }
 
 const KIND_META: Record<string, { label: string; pill: string }> = {
@@ -211,6 +231,23 @@ export function MyNotesByKind() {
                         </span>
                       )}
                       <span>{jstTime(e.createdAt)}</span>
+                      {(() => {
+                        // 気分を時刻の後ろにマーク表示 (本人選択・自分のカードのみ可視)。
+                        const MoodIcon = getMoodIcon(e.mood);
+                        if (!MoodIcon) return null;
+                        const moodLabel = getMoodLabel(e.mood);
+                        const cat = getMoodOption(e.mood)?.value as
+                          | SentimentCategory
+                          | undefined;
+                        return (
+                          <MoodIcon
+                            size={13}
+                            className={sentimentText(cat)}
+                            aria-label={moodLabel ?? '気分'}
+                            data-testid={`my-notes-mood-${e.id}`}
+                          />
+                        );
+                      })()}
                     </div>
                     <MyNoteRowActions
                       entryId={e.id}
@@ -219,6 +256,21 @@ export function MyNotesByKind() {
                     />
                   </div>
                   <EntryBody entry={e} />
+                  {e.tags && e.tags.length > 0 && (
+                    <div
+                      className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"
+                      data-testid={`my-notes-tags-${e.id}`}
+                    >
+                      {e.tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className={`text-xs font-medium ${sentimentText(tag.category)}`}
+                        >
+                          #{tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

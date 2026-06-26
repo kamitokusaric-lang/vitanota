@@ -79,9 +79,9 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
 // モバイル下部タブナビの 5 タブ (chimo 2026-06-25 スマホ版 design)。
 const MOBILE_TABS = [
   { id: 'tasks', label: 'タスク', icon: <ListChecks size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'my-notes', label: 'ノート', icon: <BookUser size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'student-notes', label: '生徒', icon: <GraduationCap size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'staffroom', label: 'ボード', icon: <LayoutDashboard size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'student-notes', label: '生徒', icon: <GraduationCap size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'my-notes', label: 'ノート', icon: <BookUser size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'staffroom-notes', label: '職員室', icon: <Notebook size={20} strokeWidth={1.75} aria-hidden /> },
 ];
 
@@ -110,6 +110,25 @@ export default function DashboardPage({
       ),
     },
     {
+      // chimo 2026-06-26: タブ順を タスク → 職員室ボード → 生徒ノート → マイノート に並べ替え。
+      id: 'staffroom',
+      label: '職員室ボード',
+      icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden />,
+      content: <StaffroomBoard />,
+    },
+    {
+      // chimo 2026-06-11 関係図: 生徒ノート (朝バトンのクラスを学年別に)。
+      id: 'student-notes',
+      label: '生徒ノート',
+      icon: <GraduationCap size={18} strokeWidth={1.75} aria-hidden />,
+      content: (
+        <StudentNotesByClass
+          selfUserId={session.user.userId}
+          todayDate={todayDate}
+        />
+      ),
+    },
+    {
       // chimo 2026-06-11 関係図: マイノートを kind 別に並べる (個人の作業場)。
       // design2 (chimo 2026-06-25): 上部に「今日のふりかえり」入力をインライン展開。
       id: 'my-notes',
@@ -128,25 +147,6 @@ export default function DashboardPage({
           <MyNotesByKind />
         </div>
       ),
-    },
-    {
-      // chimo 2026-06-11 関係図: 生徒ノート (朝バトンのクラスを学年別に)。
-      id: 'student-notes',
-      label: '生徒ノート',
-      icon: <GraduationCap size={18} strokeWidth={1.75} aria-hidden />,
-      content: (
-        <StudentNotesByClass
-          selfUserId={session.user.userId}
-          todayDate={todayDate}
-        />
-      ),
-    },
-    {
-      // chimo 2026-06-14: 職員室ボード(循環の出口)は生徒ノートの後ろに。
-      id: 'staffroom',
-      label: '職員室ボード',
-      icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden />,
-      content: <StaffroomBoard />,
     },
     {
       // モバイル独立タブ (chimo 2026-06-25): PC は右レーン、モバイルは下部ナビから開く職員室ノート。

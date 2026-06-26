@@ -83,17 +83,26 @@ describe('TodayCaptureBox', () => {
 });
 
 describe('DiaryNoteBox', () => {
-  it('非公開バナー・mood・本文を描画する', () => {
+  it('非公開バナー・mood・モード切替を描画し、既定はテンプレ3欄', () => {
     wrap(<DiaryNoteBox />);
     expect(screen.getByTestId('diary-note-banner')).toBeInTheDocument();
     expect(screen.getByTestId('diary-mood-picker')).toBeInTheDocument();
+    expect(screen.getByTestId('diary-mode-toggle')).toBeInTheDocument();
+    // 既定はテンプレモード = 3 欄が出て単一欄は出ない
+    expect(screen.getByTestId('diary-template-fields')).toBeInTheDocument();
+    expect(screen.getByTestId('diary-reflection-keep')).toBeInTheDocument();
+    expect(screen.queryByTestId('diary-content-input')).not.toBeInTheDocument();
+    // 「自由に書く」で単一欄に切替
+    fireEvent.click(screen.getByTestId('diary-mode-free'));
     expect(screen.getByTestId('diary-content-input')).toBeInTheDocument();
   });
 
-  it('投稿すると note/非公開で POST する', async () => {
+  it('テンプレで投稿すると見出し付きで note/非公開 POST する', async () => {
     const onSuccess = vi.fn();
     wrap(<DiaryNoteBox onSuccess={onSuccess} />);
-    fireEvent.change(screen.getByTestId('diary-content-input'), { target: { value: 'ふりかえり' } });
+    fireEvent.change(screen.getByTestId('diary-reflection-keep'), {
+      target: { value: 'たのしかった' },
+    });
     fireEvent.click(screen.getByTestId('diary-submit'));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find((c) =>
@@ -101,6 +110,22 @@ describe('DiaryNoteBox', () => {
     );
     const body = JSON.parse((call![1] as RequestInit).body as string);
     expect(body).toMatchObject({ kind: 'note', isPublic: false });
+    expect(body.content).toContain('よかった・続けたいこと');
+    expect(body.content).toContain('たのしかった');
+  });
+
+  it('自由モードで投稿すると本文そのままで note/非公開 POST する', async () => {
+    const onSuccess = vi.fn();
+    wrap(<DiaryNoteBox onSuccess={onSuccess} />);
+    fireEvent.click(screen.getByTestId('diary-mode-free'));
+    fireEvent.change(screen.getByTestId('diary-content-input'), { target: { value: 'ふりかえり' } });
+    fireEvent.click(screen.getByTestId('diary-submit'));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find((c) =>
+      String(c[0]).includes('/api/private/journal/entries') && (c[1] as RequestInit)?.method === 'POST',
+    );
+    const body = JSON.parse((call![1] as RequestInit).body as string);
+    expect(body).toMatchObject({ kind: 'note', isPublic: false, content: 'ふりかえり' });
   });
 
   it('編集モードは PUT・ボタンは「保存」', async () => {

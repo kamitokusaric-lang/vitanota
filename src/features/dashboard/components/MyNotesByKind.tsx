@@ -21,6 +21,10 @@ import {
   type CaptureKind,
 } from '@/features/journal/components/TodayCaptureBox';
 import type { MoodLevel } from '@/features/journal/schemas/journal';
+import {
+  parseReflection,
+  REFLECTION_SECTIONS,
+} from '@/features/journal/lib/reflectionTemplate';
 
 interface MyEntry {
   id: string;
@@ -41,6 +45,50 @@ const KIND_META: Record<string, { label: string; pill: string }> = {
   help: { label: '相談', pill: 'bg-vn-accent-bg text-vn-accent-text' },
   thanks: { label: '感謝', pill: 'bg-vn-pink-bg text-vn-pink-text' },
 };
+
+// note 系 (私的記録を集約した kind・旧 diary/tweet/knowledge 含む) は公開先で呼び名が変わる。
+// 自分だけ (非公開) = ふりかえり / 職員室に投稿 (公開) = つぶやき (chimo 2026-06-26)。
+// つぶやきの pill は右レーンの「つぶやき」チップと同じ青系で揃える (chimo 2026-06-26)。
+// board ネイティブ種別 (keep/concern/help/thanks) は KIND_META の名前・色のまま。
+const NOTE_FAMILY = new Set(['note', 'diary', 'tweet', 'knowledge']);
+function entryMeta(e: MyEntry): { label: string; pill: string } {
+  if (NOTE_FAMILY.has(e.kind)) {
+    return e.isPublic
+      ? { label: 'つぶやき', pill: 'bg-vn-blue-bg text-vn-blue-text' }
+      : { label: 'ふりかえり', pill: 'bg-vn-muted-bg text-slate-600' };
+  }
+  return KIND_META[e.kind] ?? { label: e.kind, pill: 'bg-slate-100 text-slate-600' };
+}
+
+// 本文表示。3 行日誌テンプレ (ふりかえり) は見出しを太字にして本文と区別する (chimo 2026-06-26)。
+// テンプレ以外 (自由記述・つぶやき・board 種別) は従来どおり本文をそのまま表示。
+function EntryBody({ entry }: { entry: MyEntry }) {
+  const parsed =
+    NOTE_FAMILY.has(entry.kind) && !entry.isPublic
+      ? parseReflection(entry.content)
+      : null;
+  if (parsed?.isTemplate) {
+    return (
+      <div className="mt-1 space-y-2">
+        {REFLECTION_SECTIONS.filter((s) => parsed.values[s.key].trim() !== '').map(
+          (s) => (
+            <div key={s.key}>
+              <p className="text-[13px] font-bold text-slate-600">{s.heading}</p>
+              <p className="whitespace-pre-wrap break-words text-sm text-slate-800">
+                {parsed.values[s.key]}
+              </p>
+            </div>
+          ),
+        )}
+      </div>
+    );
+  }
+  return (
+    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">
+      {entry.content}
+    </p>
+  );
+}
 
 const MINE_KEY = '/api/private/journal/entries/mine?page=1&perPage=50';
 
@@ -137,7 +185,7 @@ export function MyNotesByKind() {
           <h3 className="mb-2 text-base font-bold text-slate-700">{dateLabel(key)}</h3>
           <div className="space-y-2.5">
             {items.map((e) => {
-              const meta = KIND_META[e.kind];
+              const meta = entryMeta(e);
               return (
                 <div
                   key={e.id}
@@ -147,11 +195,9 @@ export function MyNotesByKind() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 text-[11px] text-gray-400">
                       <span
-                        className={`rounded-full px-2 py-0.5 font-medium ${
-                          meta?.pill ?? 'bg-slate-100 text-slate-600'
-                        }`}
+                        className={`rounded-full px-2 py-0.5 font-medium ${meta.pill}`}
                       >
-                        {meta?.label ?? e.kind}
+                        {meta.label}
                       </span>
                       {e.isPublic ? (
                         <span className="inline-flex items-center gap-0.5">
@@ -172,9 +218,7 @@ export function MyNotesByKind() {
                       onDelete={() => setModal({ kind: 'confirm-delete', entryId: e.id })}
                     />
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">
-                    {e.content}
-                  </p>
+                  <EntryBody entry={e} />
                 </div>
               );
             })}

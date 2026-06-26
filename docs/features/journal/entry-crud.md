@@ -18,9 +18,22 @@ journal (倉庫/職員室ノート) 経路で作るのは `note` のみ (旧 dia
 
 | kind | mood | 付けられるタグ | 入口 |
 |---|---|---|---|
-| note (メモ) | 任意 | emotion_tags | 非公開=`DiaryNoteBox` (倉庫) / 公開=`TodayCaptureBox` (職員室ノート) |
+| note (メモ) | 任意 | emotion_tags | 非公開=`DiaryNoteBox` (倉庫・「ふりかえり」) / 公開=`TodayCaptureBox` (職員室ノート・「つぶやき」) |
 
 意図つきの共有 (`keep`/`concern`/`thanks`/`help`) は職員室ボード経路 ([staffroom](../staffroom/overview.md))。
+
+#### ふりかえりの「3行日誌テンプレ」 (chimo 2026-06-26)
+
+非公開 note (`DiaryNoteBox`) は本文を **テンプレ / 自由記述** で切替できる (既定=テンプレ)。
+テンプレは KPT を和らげた 3 区分:「**よかった・続けたいこと / 気になった・困ったこと / 次に試したいこと**」。
+
+- 一部の欄だけでも保存可。**空欄の見出しは保存本文に含めない**。
+- **DB スキーマは変えない**。3 区分は `content` 単一カラムに見出し行付きで直列化する
+  (直列化/復元は `lib/reflectionTemplate.ts`)。編集時は見出しを検出してテンプレ復元、
+  無ければ自由記述として開く (テンプレ導入前の自由記述ふりかえりも壊れない)。
+- 公開つぶやき (`TodayCaptureBox`) はテンプレ対象外。
+- 踏み絵: ふりかえりは「自分だけ」= 観測されない自己向けの型。語彙は改善/評価を避け和語に寄せ、
+  「自由に書く」を残して〈雑に残す〉動線も維持する。
 
 ## CRUD の挙動
 
@@ -83,5 +96,5 @@ journal (倉庫/職員室ノート) 経路で作るのは `note` のみ (旧 dia
 
 - `lib/journalEntryService.ts` (CRUD・所有者検証・トランザクション)
 - `lib/privateJournalRepository.ts` / `lib/publicTimelineRepository.ts`
-- `components/DiaryNoteBox.tsx` (倉庫=非公開 note) / `components/TodayCaptureBox.tsx` (公開 note / 職員室ボード) / `components/EntryCard.tsx`
+- `components/DiaryNoteBox.tsx` (倉庫=非公開 note・ふりかえりテンプレ/自由切替) / `lib/reflectionTemplate.ts` (3行日誌テンプレの直列化・復元) / `components/TodayCaptureBox.tsx` (公開 note / 職員室ボード) / `components/EntryCard.tsx`
 - `pages/api/private/journal/entries*` / `pages/api/public/journal/entries.ts`

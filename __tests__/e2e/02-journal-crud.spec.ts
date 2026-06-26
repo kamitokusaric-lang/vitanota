@@ -51,7 +51,9 @@ test.describe('日誌エントリ CRUD', () => {
 
   test('US-T-010: 自分用の日々ノート (非公開) を作成できる', async ({ page }) => {
     // 日々ノートはマイノートタブの「今日のふりかえり」インライン入力
+    // 既定はテンプレモードなので「自由に書く」に切替えて単一欄を出す
     await page.goto('/dashboard?tab=my-notes');
+    await page.getByTestId('diary-mode-free').click();
     await page.getByTestId('diary-content-input').fill('非公開の日記');
     await page.getByTestId('diary-submit').click();
     await expect(page.getByTestId('diary-content-input')).toHaveValue('');

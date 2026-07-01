@@ -11,14 +11,21 @@
 //   - input_text の中身は構造化ログに流さない (個人情報混入前提)
 //   - 構造化ログには event 名 + 入力長 + 候補数 + type のみ
 
-import { invokeExtraction, invokeKindSuggest } from './bedrockInvoker';
+import {
+  invokeExtraction,
+  invokeKindSuggest,
+  invokeRetroRecommend,
+} from './bedrockInvoker';
 import {
   AiChatEventSchema,
   ExtractEventSchema,
   KindSuggestEventSchema,
+  RetroRecommendEventSchema,
   type ExtractionResult,
+  type RetroRecommendEvent,
 } from './schemas';
 import type { KindSuggestResult } from '../../src/features/ai-chat/kindSuggest';
+import type { RetroRecommendResult } from '../../src/features/journal/recommend/recommendSchema';
 import {
   AI_CATEGORY_DEFINITIONS,
   AI_CATEGORY_PROMPT_RULES,
@@ -98,13 +105,24 @@ interface KindSuggestSuccess {
   result: KindSuggestResult;
 }
 
+interface RetroRecommendSuccess {
+  ok: true;
+  type: 'retrospective_recommend';
+  modelId: string;
+  result: RetroRecommendResult;
+}
+
 interface ErrorResult {
   ok: false;
   error: 'invalid_event' | 'invalid_ai_output' | 'bedrock_error';
   message: string;
 }
 
-type HandlerResult = ExtractionSuccess | KindSuggestSuccess | ErrorResult;
+type HandlerResult =
+  | ExtractionSuccess
+  | KindSuggestSuccess
+  | RetroRecommendSuccess
+  | ErrorResult;
 
 export async function handler(event: unknown): Promise<HandlerResult> {
   // 1. Event 検証
@@ -122,6 +140,11 @@ export async function handler(event: unknown): Promise<HandlerResult> {
   if (parsed.data.type === 'kind_suggestion') {
     const ev = KindSuggestEventSchema.parse(parsed.data);
     return handleKindSuggestion(ev.inputText);
+  }
+
+  if (parsed.data.type === 'retrospective_recommend') {
+    const ev = RetroRecommendEventSchema.parse(parsed.data);
+    return handleRetroRecommend(ev);
   }
 
   const extractEvent = ExtractEventSchema.parse(parsed.data);
@@ -255,4 +278,134 @@ async function handleKindSuggestion(
   );
 
   return { ok: true, type: 'kind_suggestion', modelId, result };
+}
+
+// ── retrospective_recommend (ふりかえり → AIリコメンド) ──────────
+// 設計: docs/proposal/retrospective.md §1/§5/§6。
+// 非対称設計: 気づき(awareness)は能動的に返してよいが、公開という行動は 100% 本人。
+// AI は区分を選ばない (ルール側 candidateCategory を尊重し、surface だけ判断)。
+// 踏み絵: 感情代弁・励まし・評価をしない。mood は読むだけ (推定・採点・上書きしない)。
+function buildRetroSystemPrompt(): string {
+  return [
+    'あなたは中学校教員が「自分だけの記録 (マイノート)」に書いた今日のふりかえりを読み、',
+    '職員室の同僚に向けて出す価値があれば、その下書きをそっと用意するアシスタントです。',
+    '',
+    '# 大原則 (非対称設計)',
+    '- 「気づき」は能動的に返してよい (本人が抱えていることに名前をつけて差し出す)。',
+    '- だが「出すかどうか」は 100% 本人が決める。あなたは決めない・急かさない・誘導しない。',
+    '- 出す価値が薄い日は surface=false でよい (ゼロ件を許容)。無理に出さない。',
+    '',
+    '# 禁止事項 (踏み絵)',
+    '- 教員を評価・診断・採点・分類しない。感情を代弁しない。励まさない。寄り添い表現を書かない。',
+    '- mood (気分) は本人が選んだものを文脈として読むだけ。mood を推定・上書き・スコア化しない。出力に mood を含めない。',
+    '- 生徒名・保護者名・個人を特定する情報はドラフトから必ず外す (抽象化する)。',
+    '- 感情の生々しい表現は公開用に和らげる。',
+    '',
+    '# 区分 (category) — ルール側が candidateCategory を渡す。原則それを尊重する',
+    '- "soudan" 相談: 困っている・確認したいこと。会議の議題として扱われる。',
+    '- "kansha" 感謝: 誰かへのありがとう。',
+    '- "knowledge" ナレッジ: 再現できる工夫・やり方。',
+    '- "tweet" つぶやき: 軽い共有。← この場合は primary を null にし、tweet.nudge だけ返す (ドラフトは作らない)。',
+    '',
+    '# 何を拾うか (優先順位)',
+    '- ふりかえりに「よかったこと」と「気になった・困ったこと」が両方書かれていても、よかったことは当たり前として主提案にしない。',
+    '  拾うべきは「気になった・困ったこと」(気がかり・心配を含む)。それがあれば相談として surface する (候補区分は soudan で来る)。',
+    '  例: 「よかった: 生徒と雑談できた / 気になった: 一人でいる子が気になる」→ 一人でいる子の話を相談として拾う (雑談の話をつぶやきにしない)。',
+    '',
+    '# ドラフト(draft)の書き方 — 最重要',
+    'draft は「本人が一切手を加えずに、そのまま職員室ボード/ノートに投稿できる完成文」にする。整形不足の下書きは失敗。',
+    '- ふりかえりの見出し(「よかった・続けたいこと」「気になった・困ったこと」「次に試したいこと」)や箇条書き構造を絶対に持ち込まない。地の文の自然な文章に書き直す。',
+    '- 主提案の区分に関係する部分だけを扱う。無関係な欄は入れない (例: 相談なら「困ったこと」だけを素材にし、「よかったこと」は使わない)。',
+    '- 一人称の自然な話し言葉。教員が同僚に向けて職員室で話しかけるトーン。硬い書き言葉や説明口調にしない。',
+    '- 文は必ず完結させる。途中で切らない。原文の言い回しをそのままコピペせず、意味を汲んで書き直す。',
+    '- 長さの目安は 1〜3 文。冗長にしない。',
+    '- 生徒名・保護者名・固有名詞は出さない。感情の生々しい表現は和らげる。',
+    '- 区分ごとの型:',
+    '  - 相談: 状況を一言添えつつ、困りごとの核心(「どうすれば〜できるか」など・「次に試したいこと」欄に書かれることが多い)を具体的な問いにして締める。観察の言い換えだけで終えない。例:「授業中にそわそわしている子がいて、どうすれば集中してもらえるか悩んでいます。みなさんはどんな工夫をしていますか?」',
+    '  - 感謝: 何が助かった/嬉しかったかを簡潔に。宛先の名前は出さず「学年の先生」等に留める。',
+    '  - ナレッジ: 何をどうしたら良かったかを、他の先生が再現できる形で簡潔に。',
+    '',
+    '# その他の出力',
+    '- awareness: 本人にそっと差し出す気づきの一文 (評価でなく、抱えていることに名前をつける)。',
+    '- meta: 感謝=recipientHint (誰への感謝か・名前は出さない) / ナレッジ=title (短いタイトル) + points (要点 1〜3 個)。相談は meta を空 {} にする (どこに共有されるかの案内はアプリ側が出す)。',
+    '- tweet (つぶやきのとき): nudge=「これ、ひとりで持っておくのもったいないかも」等の軽い気づき一言。投稿への誘い文はアプリ側が出すので nudge には入れない。draft は作らない (本人が素のまま書く)。',
+    '- reason: なぜこの判断にしたかの短いメモ (本人には見せない・計測用)。',
+    '',
+    '# 安全 (最優先)',
+    '- 自傷・強い心理的危機の兆候を読み取ったら、公開の提案は一切しない。surface=false にし、reason に "crisis_signal" と書く。',
+    '',
+    '# 出力形式 (この JSON のみ・前後の説明や markdown を一切付けない)',
+    '{',
+    '  "surface": true | false,',
+    '  "primary": null | { "category": "soudan"|"kansha"|"knowledge", "awareness": "string", "draft": "string", "meta": { "recipientHint"?: "string", "title"?: "string", "points"?: ["string"] } },',
+    '  "tweet": null | { "nudge": "string" },',
+    '  "reason": "string"',
+    '}',
+  ].join('\n');
+}
+
+// Lambda に渡る本文は route 側で PII マスク済。tags/mood は読むだけの信号として添える。
+function buildRetroUserMessage(ev: RetroRecommendEvent): string {
+  const tagsLine =
+    ev.tags.length > 0
+      ? ev.tags.map((t) => `${t.name}(${t.category})`).join(', ')
+      : 'なし';
+  return [
+    '# 今日のふりかえり (本文)',
+    ev.inputText,
+    '',
+    `# 気持ちタグ: ${tagsLine}`,
+    `# 気分(mood・本人選択・読むだけ): ${ev.mood ?? '未選択'}`,
+    `# ルール側の候補区分: ${ev.candidateCategory ?? 'なし'}`,
+  ].join('\n');
+}
+
+async function handleRetroRecommend(
+  ev: RetroRecommendEvent,
+): Promise<RetroRecommendSuccess | ErrorResult> {
+  // 本文は構造化ログに出さない (観測者原則)。長さと候補区分のみ。
+  console.info(
+    JSON.stringify({
+      event: 'ai_chat.invoke_start',
+      type: 'retrospective_recommend',
+      input_length: ev.inputText.length,
+      candidate_category: ev.candidateCategory ?? 'none',
+    }),
+  );
+
+  let result: RetroRecommendResult;
+  let modelId: string;
+  try {
+    const invoked = await invokeRetroRecommend({
+      systemPrompt: buildRetroSystemPrompt(),
+      userMessage: buildRetroUserMessage(ev),
+      candidateCategory: ev.candidateCategory,
+      rawContent: ev.inputText,
+    });
+    result = invoked.result;
+    modelId = invoked.modelId;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        event: 'ai_chat.bedrock_error',
+        type: 'retrospective_recommend',
+        error_name: err instanceof Error ? err.name : 'unknown',
+        error_message: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return { ok: false, error: 'bedrock_error', message: 'retro recommend failed' };
+  }
+
+  console.info(
+    JSON.stringify({
+      event: 'ai_chat.invoke_success',
+      type: 'retrospective_recommend',
+      input_length: ev.inputText.length,
+      surface: result.surface,
+      primary_category: result.primary?.category ?? 'none',
+      has_tweet: result.tweet !== null,
+    }),
+  );
+
+  return { ok: true, type: 'retrospective_recommend', modelId, result };
 }

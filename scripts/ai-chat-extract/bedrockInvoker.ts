@@ -18,6 +18,12 @@ import {
   mockKindSuggest,
   type KindSuggestResult,
 } from '../../src/features/ai-chat/kindSuggest';
+import {
+  retroRecommendResultSchema,
+  mockRetroRecommend,
+  type RetroRecommendResult,
+  type RetroCategory,
+} from '../../src/features/journal/recommend/recommendSchema';
 import type { ZodSchema } from 'zod';
 
 const REGION = process.env.AWS_REGION_OVERRIDE ?? process.env.AWS_REGION ?? 'ap-northeast-1';
@@ -106,6 +112,29 @@ export async function invokeKindSuggest(args: {
     userMessage: args.userMessage,
     schema: kindSuggestResultSchema,
     maxTokens: 150,
+  });
+  return { result, modelId: MODEL_ID };
+}
+
+// ふりかえり → AIリコメンド。出力は中程度 (気づき + ドラフト + 付随情報) なので max_tokens やや多め。
+// MOCK_BEDROCK=true 時は candidateCategory を主信号に mockRetroRecommend を返す。
+export async function invokeRetroRecommend(args: {
+  systemPrompt: string;
+  userMessage: string;
+  candidateCategory: RetroCategory | null;
+  rawContent: string;
+}): Promise<{ result: RetroRecommendResult; modelId: string }> {
+  if (USE_MOCK) {
+    return {
+      result: mockRetroRecommend(args.candidateCategory, args.rawContent),
+      modelId: MODEL_ID,
+    };
+  }
+  const result = await invokeBedrock({
+    systemPrompt: args.systemPrompt,
+    userMessage: args.userMessage,
+    schema: retroRecommendResultSchema,
+    maxTokens: 600,
   });
   return { result, modelId: MODEL_ID };
 }

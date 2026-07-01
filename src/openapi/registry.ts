@@ -107,6 +107,12 @@ import {
   aiChatEventRequestSchema,
   aiChatFeedbackRequestSchema,
 } from './aiChatFeedbackSchemas';
+import {
+  journalRecommendResponseSchema,
+  journalRecommendPostRequestSchema,
+  journalRecommendPatchRequestSchema,
+  journalRecommendStatusResponseSchema,
+} from './journalRecommendSchemas';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -1024,6 +1030,89 @@ export function buildOpenApiDocument() {
       503: {
         description: 'AI 基盤が一時的に利用不可',
         content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ふりかえり → AIリコメンド (マイノートの非公開ふりかえりを読み、公開をそっと提案)
+  registry.registerPath({
+    method: 'post',
+    path: '/api/journal/recommend',
+    summary: 'ふりかえりから公開リコメンドを計算 or キャッシュ取得',
+    description:
+      'マイノート(非公開 note)のふりかえりを AI が読み、区分つきで公開をそっと提案する。idempotent (entry あたり最大1回計算)。フラグ off は 404、対象外 entry は 400、利用上限超過は 429、AI 基盤不可は 503。',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: journalRecommendPostRequestSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'リコメンド (surface=false は出す価値なし)',
+        content: {
+          'application/json': { schema: journalRecommendResponseSchema },
+        },
+      },
+      429: {
+        description: '1 日の利用上限に到達',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      503: {
+        description: 'AI 基盤が一時的に利用不可',
+        content: { 'application/json': { schema: errorResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/journal/recommend',
+    summary: 'ふりかえりの既存リコメンドを取得',
+    description:
+      'マイノート詳細での表示用。未計算なら recommendation=null。フラグ off は 404。',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      query: z.object({ entryId: z.string().guid() }),
+    },
+    responses: {
+      200: {
+        description: '既存リコメンド (なければ null)',
+        content: {
+          'application/json': { schema: journalRecommendResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/journal/recommend',
+    summary: 'リコメンドの対応状態を更新（出した / やめておく）',
+    description:
+      'published=公開した / dismissed=今日はやめておく。本人のみ。対象なしは 404。',
+    tags: ['AI Chat'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: journalRecommendPatchRequestSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: '更新後の状態',
+        content: {
+          'application/json': { schema: journalRecommendStatusResponseSchema },
+        },
       },
       ...errorResponses,
     },

@@ -63,8 +63,14 @@ export const BOARD_KIND_META: Record<StaffroomBoxKind, BoardKindMeta> = {
   },
 };
 
-// 投稿フォームで選べる board ネイティブ kind (4)。knowledge は集約表示のみ。
-export const POSTABLE_KIND_ORDER: StaffroomBoardKind[] = ['keep', 'concern', 'thanks', 'help'];
+// 投稿フォームで選べる board ネイティブ kind。knowledge は投稿区分として復活 (chimo 2026-06-30)。
+export const POSTABLE_KIND_ORDER: StaffroomBoardKind[] = [
+  'keep',
+  'concern',
+  'thanks',
+  'help',
+  'knowledge',
+];
 
 // 職員室ボードに表示する箱の順。keep/concern は生徒ノート由来、tweet(つぶやき)は
 // 表示しない (chimo 2026-06-13/14)。BOARD_KIND_META には残す (型・将来連携のため)。

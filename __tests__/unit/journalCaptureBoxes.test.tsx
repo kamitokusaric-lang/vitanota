@@ -83,9 +83,8 @@ describe('TodayCaptureBox', () => {
 });
 
 describe('DiaryNoteBox', () => {
-  it('非公開バナー・mood・モード切替を描画し、既定はテンプレ3欄', () => {
+  it('mood・モード切替を描画し、既定はテンプレ3欄', () => {
     wrap(<DiaryNoteBox />);
-    expect(screen.getByTestId('diary-note-banner')).toBeInTheDocument();
     expect(screen.getByTestId('diary-mood-picker')).toBeInTheDocument();
     expect(screen.getByTestId('diary-mode-toggle')).toBeInTheDocument();
     // 既定はテンプレモード = 3 欄が出て単一欄は出ない

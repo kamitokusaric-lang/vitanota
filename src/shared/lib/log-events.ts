@@ -71,6 +71,13 @@ export const LogEvents = {
   // 数値化・ランキングしない)。閲覧率・役立ち率の計測は UI スライス S4 で追加。
   StaffroomBoardPosted: 'staffroom_board_posted',
   StaffroomBoardReacted: 'staffroom_board_reacted',
+
+  // ふりかえり → AIリコメンド (chimo 2026-06-30)。§9 の転換率/見送り率/編集率の素地。
+  // 全て info 出力 (踏み絵: 観測感を作らない・集計のみ・個票を管理者俯瞰に流さない)。
+  // 編集の有無は Converted の bodyChanged/categoryChanged に畳んで持つ (別イベントにしない)。
+  RetroRecommendSurfaced: 'retro_recommend_surfaced',
+  RetroRecommendConverted: 'retro_recommend_converted',
+  RetroRecommendDismissed: 'retro_recommend_dismissed',
 } as const;
 
 export type LogEventName = (typeof LogEvents)[keyof typeof LogEvents];
@@ -232,12 +239,28 @@ interface CalendarDayDetailOpenedPayload extends BaseEventFields {
 // H7-B 職員室ボード (staffroom) 循環計測。数値化・スコア化はしない (踏み絵ガード 2/3/7)。
 interface StaffroomBoardPostedPayload extends BaseEventFields {
   boardEntryId: string;
-  boardKind: 'keep' | 'concern' | 'thanks' | 'help';
+  boardKind: 'keep' | 'concern' | 'thanks' | 'help' | 'knowledge';
 }
 interface StaffroomBoardReactedPayload extends BaseEventFields {
   boardEntryId: string;
   reactionType: 'knowledge' | 'appreciation' | 'endorsement';
 }
+
+// ふりかえり → AIリコメンド計測。区分は集計のみ (本人特定の感情データに踏み込まない)。
+type RetroCategoryLog = 'soudan' | 'kansha' | 'knowledge' | 'tweet';
+interface RetroRecommendSurfacedPayload extends BaseEventFields {
+  // surface=true で本人に提示された主提案区分 (つぶやきのみは 'tweet')。
+  primaryCategory: RetroCategoryLog | 'none';
+  hasTweet: boolean;
+}
+interface RetroRecommendConvertedPayload extends BaseEventFields {
+  // 公開した最終区分と、AI 提案からの差分 (categoryChanged/bodyChanged)。
+  proposedCategory: RetroCategoryLog | 'none';
+  finalCategory: RetroCategoryLog;
+  categoryChanged: boolean;
+  bodyChanged: boolean;
+}
+type RetroRecommendDismissedPayload = BaseEventFields;
 
 // ─────────────────────────────────────────────────────────────
 // イベント名 → ペイロード型のマッピング
@@ -271,6 +294,9 @@ export interface LogEventPayloads {
   [LogEvents.CalendarDayDetailOpened]: CalendarDayDetailOpenedPayload;
   [LogEvents.StaffroomBoardPosted]: StaffroomBoardPostedPayload;
   [LogEvents.StaffroomBoardReacted]: StaffroomBoardReactedPayload;
+  [LogEvents.RetroRecommendSurfaced]: RetroRecommendSurfacedPayload;
+  [LogEvents.RetroRecommendConverted]: RetroRecommendConvertedPayload;
+  [LogEvents.RetroRecommendDismissed]: RetroRecommendDismissedPayload;
 }
 
 // ─────────────────────────────────────────────────────────────

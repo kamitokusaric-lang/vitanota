@@ -76,6 +76,13 @@ export const aiSessionStatusEnum = pgEnum('ai_session_status', [
   'discarded',
 ]);
 
+// ふりかえり → AIリコメンドの対応状態 (migration 0055)
+// proposed: 提示済・未対応 / published: 本人が公開した / dismissed: 本人が見送った
+export const journalRecommendationStatusEnum = pgEnum(
+  'journal_recommendation_status',
+  ['proposed', 'published', 'dismissed'],
+);
+
 // カレンダー機能 (Unit-06) のクライアント発火イベント種別 (migration 0047)
 export const calendarEventTypeEnum = pgEnum('calendar_event_type', [
   'view_switched',
@@ -855,6 +862,50 @@ export const aiSessions = pgTable(
   }),
 );
 
+// ── journal_recommendations (migration 0055) ─────────────────
+// ふりかえり (マイノート=非公開 note) → AIリコメンドの結果と本人の対応状態。
+// entry と 1:1 (journal_entry_id UNIQUE)・連動削除。
+// RLS: 本人 + system_admin (school_admin は自分の分のみ、他人不可 = 踏み絵)。
+export const journalRecommendations = pgTable(
+  'journal_recommendations',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    journalEntryId: uuid('journal_entry_id')
+      .notNull()
+      .references(() => journalEntries.id, { onDelete: 'cascade' }),
+    aiOutputJson: jsonb('output_json').notNull().default({}),
+    status: journalRecommendationStatusEnum('status').notNull().default('proposed'),
+    // プロンプト改善用メタ (system_admin 匿名エクスポート/集計。output_json とは分離)。
+    inputMasked: text('input_masked'),
+    modelId: text('model_id'),
+    promptVersion: text('prompt_version'),
+    finalCategory: text('final_category'),
+    bodyChanged: boolean('body_changed'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    entryUnique: unique('journal_recommendations_journal_entry_id_key').on(
+      table.journalEntryId,
+    ),
+    userIdx: index('journal_recommendations_user_idx').on(
+      table.userId,
+      table.createdAt,
+    ),
+    tenantIdx: index('journal_recommendations_tenant_idx').on(table.tenantId),
+  }),
+);
+
 // ── calendar_events (migration 0047) ─────────────────────────
 // カレンダー機能 (Unit-06) の教員行動ログ。
 // RLS: 本人 + system_admin (school_admin 不可視、 ai_sessions と同水準の踏み絵)。
@@ -1127,6 +1178,8 @@ export type UserOnboardingState = typeof userOnboardingStates.$inferSelect;
 export type NewUserOnboardingState = typeof userOnboardingStates.$inferInsert;
 export type AiSession = typeof aiSessions.$inferSelect;
 export type NewAiSession = typeof aiSessions.$inferInsert;
+export type JournalRecommendation = typeof journalRecommendations.$inferSelect;
+export type NewJournalRecommendation = typeof journalRecommendations.$inferInsert;
 export type TodayPlanItem = typeof todayPlanItems.$inferSelect;
 export type NewTodayPlanItem = typeof todayPlanItems.$inferInsert;
 export type ApiRateLimit = typeof apiRateLimits.$inferSelect;

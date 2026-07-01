@@ -18,6 +18,7 @@ import {
   Heart,
   MessageCircle,
   MessagesSquare,
+  Lightbulb,
   type LucideIcon,
 } from 'lucide-react';
 import { useToast } from '@/shared/components/Toast';
@@ -28,7 +29,13 @@ import type { SuggestKind } from '@/features/ai-chat/kindSuggest';
 // note = 一般の公開メモ (旧 tweet/knowledge を集約)。board 4 種は意図つきの共有。
 export type CaptureKind = 'note' | StaffroomBoardKind;
 
-const BOARD_KINDS: readonly StaffroomBoardKind[] = ['keep', 'concern', 'thanks', 'help'];
+const BOARD_KINDS: readonly StaffroomBoardKind[] = [
+  'keep',
+  'concern',
+  'thanks',
+  'help',
+  'knowledge',
+];
 
 function isBoardKind(kind: CaptureKind): kind is StaffroomBoardKind {
   return (BOARD_KINDS as readonly string[]).includes(kind);
@@ -50,12 +57,14 @@ const RAIL_CHIPS: {
   { id: 'note',   kind: 'note',   label: 'つぶやき',   Icon: MessageCircle,  on: 'border-2 border-vn-blue bg-vn-blue-bg text-vn-blue-text',     off: 'border-2 border-vn-border bg-white text-vn-blue-text',     placeholder: '今日の小さな気づき・なるほどは?' },
   { id: 'thanks', kind: 'thanks', label: '感謝',       Icon: Heart,          on: 'border-2 border-vn-pink bg-vn-pink-bg text-vn-pink-text',     off: 'border-2 border-vn-border bg-white text-vn-pink-text',     placeholder: '「ありがとう」を伝えたい人や出来事は?' },
   { id: 'help',   kind: 'help',   label: '相談・確認', Icon: MessagesSquare, on: 'border-2 border-vn-accent bg-vn-accent-bg text-vn-accent-text', off: 'border-2 border-vn-border bg-white text-vn-accent-text', placeholder: 'ちょっと聞きたい・確認したいこと、ありますか? 雑でOK、まず投げてみましょう。' },
+  { id: 'knowledge', kind: 'knowledge', label: 'ナレッジ', Icon: Lightbulb, on: 'border-2 border-vn-yellow bg-vn-yellow-bg text-vn-yellow-text', off: 'border-2 border-vn-border bg-white text-vn-yellow-text', placeholder: '他の先生の役に立ちそうな工夫・やり方・手順は?' },
 ];
 
 // initialKind / AI 提案 kind → チップ id (現状は kind と 1:1)。
 function kindToChipId(k?: CaptureKind | null): string | null {
   if (k === 'help') return 'help';
   if (k === 'thanks') return 'thanks';
+  if (k === 'knowledge') return 'knowledge';
   if (k === 'note') return 'note';
   return null; // keep/concern は rail チップに無い
 }

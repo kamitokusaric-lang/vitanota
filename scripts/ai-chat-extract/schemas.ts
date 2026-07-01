@@ -51,13 +51,41 @@ export const KindSuggestEventSchema = z
 
 export type KindSuggestEvent = z.infer<typeof KindSuggestEventSchema>;
 
+// ── retrospective_recommend Lambda Event (ふりかえり → AIリコメンド) ──
+// 出力 schema (retroRecommendResultSchema) は src/features/journal/recommend/recommendSchema.ts が正本。
+// inputText は route 側で PII マスク済の本文。candidateCategory はルール側が絞った候補区分 (mock の主信号)。
+// tags/mood は読むだけの信号 (AI は mood を推定・上書きしない)。
+export const RetroRecommendEventSchema = z
+  .object({
+    type: z.literal('retrospective_recommend'),
+    inputText: z.string().min(1).max(2000),
+    candidateCategory: z
+      .enum(['soudan', 'kansha', 'knowledge', 'tweet'])
+      .nullable(),
+    tags: z
+      .array(
+        z.object({
+          name: z.string().max(50),
+          category: z.enum(['positive', 'negative', 'neutral']),
+        }),
+      )
+      .max(20),
+    mood: z
+      .enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative'])
+      .nullable(),
+  })
+  .strict();
+
+export type RetroRecommendEvent = z.infer<typeof RetroRecommendEventSchema>;
+
 // ── Lambda Event ────────────────────────────────────────────
 // chimo 2026-05-20: H3 morning_plan 機能を撤去 (project_h3_reframing_20260520)。
-// task_extraction (type 省略可) + kind_suggestion の union。
-// ExtractEventSchema は type optional のため discriminatedUnion 不可。両者 strict なので
-// union で相互排他に解決される (kind_suggestion は ExtractEventSchema.strict に弾かれる)。
+// task_extraction (type 省略可) + kind_suggestion + retrospective_recommend の union。
+// ExtractEventSchema は type optional のため discriminatedUnion 不可。各 schema が strict なので
+// union で相互排他に解決される (type literal + strict で他 schema に弾かれる)。
 export const AiChatEventSchema = z.union([
   ExtractEventSchema,
   KindSuggestEventSchema,
+  RetroRecommendEventSchema,
 ]);
 export type AiChatEvent = z.infer<typeof AiChatEventSchema>;

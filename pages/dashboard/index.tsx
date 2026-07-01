@@ -32,7 +32,7 @@ import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TasksTabWithCalendar } from '@/features/calendar/components/TasksTabWithCalendar';
 import { StaffroomBoard } from '@/features/staffroom/components/StaffroomBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
-import { DiaryNoteBox } from '@/features/journal/components/DiaryNoteBox';
+import { TodayReflectionCard } from '@/features/journal/components/TodayReflectionCard';
 import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimelineRail';
 import { MyNotesByKind } from '@/features/dashboard/components/MyNotesByKind';
 import { StudentNotesByClass } from '@/features/dashboard/components/StudentNotesByClass';
@@ -136,14 +136,7 @@ export default function DashboardPage({
       icon: <BookUser size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <div className="space-y-6">
-          <section className="rounded-[14px] border border-vn-border bg-vn-surface px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
-            <header className="mb-3">
-              <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
-                📝 今日のふりかえり
-              </h2>
-            </header>
-            <DiaryNoteBox />
-          </section>
+          <TodayReflectionCard />
           <MyNotesByKind />
         </div>
       ),

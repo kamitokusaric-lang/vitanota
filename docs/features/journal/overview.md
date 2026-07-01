@@ -18,9 +18,10 @@
 
 記録を「書く」入口はダッシュボード右サイドの 2 つだけ。職員室ボードからは起票しない。
 
-- **今日の出来事を書く** (`TodayCaptureBox`): 雑に一文を書いて種別を選んで残す単一キャプチャ箱。既定は `note` (つぶやき)。種別で確定先を振り分ける —— `note` (公開) → 職員室ノート (`POST /api/private/journal/entries`・`is_public=true`)、`thanks`/`help` → 職員室ボード (`POST /api/staffroom/board`)。
-  - 種別は「分類・評価」ではなく「どこへ渡す / どう残す」のルーティング。AI が種別 (thanks/help) を**そっと提案**する (確定は必ず本人)。「役に立つ情報」の手動種別は廃止し「なるほど」集計に一本化。
-- **自分用の日誌** (`DiaryNoteBox` kind=`note`・`is_public=false`): 倉庫 (自分だけ)。mood + 感情タグ任意。
+- **今日の出来事を書く** (`TodayCaptureBox`): 雑に一文を書いて種別を選んで残す単一キャプチャ箱。既定は `note` (つぶやき)。種別で確定先を振り分ける —— `note` (公開) → 職員室ノート (`POST /api/private/journal/entries`・`is_public=true`)、`thanks`/`help`/`knowledge` → 職員室ボード (`POST /api/staffroom/board`)。
+  - 種別は「分類・評価」ではなく「どこへ渡す / どう残す」のルーティング。AI が種別 (thanks/help) を**そっと提案**する (確定は必ず本人)。**ナレッジ (knowledge) は投稿区分として復活** (chimo 2026-06-30・職員室ノートからも書ける)。「なるほど」リアクションによる自動ナレッジ集計とも共存。
+- **今日のふりかえり** (`TodayReflectionCard` → `DiaryNoteBox` kind=`note`・`is_public=false`): 倉庫 (自分だけ)。既定は折りたたみ、「今日のふりかえりを書く」で展開。3 行日誌テンプレ + mood + 感情タグ任意。
+  - 保存を起点に **AI がふりかえりを読み、職員室ノートへの投稿をそっと促す** ([retro-recommend.md](./retro-recommend.md))。気づき + 公開用の下書きを本人に控えめに提示 (出すかどうかは本人・公開はコピー)。
 - 共有タイムライン (テナント内の公開エントリ) と マイ記録 (自分の公開+非公開) の 2 ビュー
 - 感情タグ (emotion_tags) の付与 (note は emotion_tags に一本化。旧 knowledge_tags は新規書き込みなし)
 - リアクション 3 種 (参考になった / お疲れ様です / すてきです) — 自分の投稿にも付けられる
@@ -29,10 +30,12 @@
 
 - [entry-crud.md](./entry-crud.md) — エントリの作成・更新・削除、タイムライン、リアクション
 - [tags.md](./tags.md) — 感情タグ・ナレッジタグの仕様と権限
+- [retro-recommend.md](./retro-recommend.md) — ふりかえり → AIリコメンド (区分判定・公開コピー・分析)
 - [api.md](./api.md) — エンドポイント一覧 (契約の正本は OpenAPI registry)
 
 ## 横断依存
 
 - データモデル → [foundation/data-model.md](../../foundation/data-model.md#日誌記録-journal)
 - 公開/非公開の RLS とテナント隔離 → [foundation/rls-and-tenancy.md](../../foundation/rls-and-tenancy.md#可視性の特殊ケース)
-- **踏み絵**: mood・感情データは集計・AI 化しない。観測されると壊れる ([PHILOSOPHY §4](../../PHILOSOPHY.md))
+- **踏み絵**: mood・感情データを**スコア化・評価・管理者への俯瞰集計に流さない**。観測されると壊れる ([PHILOSOPHY §4](../../PHILOSOPHY.md))。
+  - 例外の線引き (chimo 2026-06-30): ふりかえり→AIリコメンドで **mood を AI の入力信号として「読む」のは可** (推定・上書き・スコア化・admin 提示は不可)。「読む」と「触る」を分ける ([retro-recommend.md](./retro-recommend.md))。

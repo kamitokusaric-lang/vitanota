@@ -84,6 +84,12 @@ const aiChatEnableExtraction =
 const aiChatRateLimitPerDay =
   ((app.node.tryGetContext('aiChatRateLimitPerDay') as string | undefined) ??
     '20');
+// ふりかえり→AIリコメンド master flag。aiChatEnableExtraction と同型で prod は default 'true' に固定
+// (context 渡し忘れで本番 env が false 上書きされる事故を防ぐ)。allowlist は AI チャットと共有。
+// OFF に戻すとき: -c retroRecommendEnable=false
+const retroRecommendEnable =
+  ((app.node.tryGetContext('retroRecommendEnable') as string | undefined) ??
+    (envName === 'prod' ? 'true' : 'false'));
 
 const appStack = new AppStack(app, `${prefix}-app`, {
   env,
@@ -105,6 +111,7 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   aiChatEnableExtraction,
   aiChatAllowlistTenantIds,
   aiChatRateLimitPerDay,
+  retroRecommendEnable,
   jwksRefresherFunction: jwksStack.refresherFunction,
   googleJwksSecret: jwksStack.jwksSecret,
 });

@@ -24,15 +24,17 @@ export interface StaffroomContext {
 // 職員室ボードで「投稿・編集・削除」できる board ネイティブ kind (journal_entry_kind の直値)。
 export const BOARD_KINDS = ['keep', 'concern', 'thanks', 'help'] as const;
 
-// 職員室ボードに「集める」kind = board ネイティブ 4 種 + note(公開メモ)。
+// 職員室ボードに「集める」kind = board ネイティブ + note(公開メモ) + knowledge(復活した投稿区分)。
 // 公開/私的は is_public が持つ (kind 再設計 2026-06-16)。私的 note は届かない。
 // 公開 note は、なるほどが付けば「役に立つ情報」箱に集計される (旧 tweet/knowledge の役割)。
+// knowledge は投稿区分として復活 (chimo 2026-06-30)。native knowledge も「役に立つ情報」箱に出す。
 export const BOARD_VIEW_KINDS = [
   'keep',
   'concern',
   'thanks',
   'help',
   'note',
+  'knowledge',
 ] as const;
 
 // ── board (journal_entries kind IN BOARD_KINDS) ────────────────

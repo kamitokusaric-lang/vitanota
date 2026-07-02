@@ -2,8 +2,10 @@
 // delegated: 自分が作成したが assignees に自分が含まれないタスク (色違い表示、「あの先生に振ったやつ」を識別)
 // ステータス変更は (1) 編集モーダル の status select、(2) 横方向ドラッグ&ドロップ (PC)、
 // または (3) モバイル (lg 未満) ではカード上の status select で行う (chimo 2026-06-15)。
+import { Calendar } from 'lucide-react';
 import type { TaskAssigneeSummary, TaskWithAssignees } from '../hooks/useTasks';
 import type { TaskStatus } from '../schemas/task';
+import { categoryColorClass } from '../lib/categoryColor';
 
 interface TaskCardProps {
   task: TaskWithAssignees;
@@ -114,11 +116,11 @@ export function TaskCard({
         className="block w-full text-left"
         data-testid={`task-card-edit-${task.id}`}
       >
-        {/* chimo 2026-05-21: カテゴリ表示は「今日の記録」 pill と同じ白 + slate border 系に統一。
-            ただし表示のみで非クリック → hover 効果なし、 サイズはカード内なので h-6 / 11px / 700。 */}
+        {/* カテゴリ chip はカテゴリ名から決定的に淡色を割り当てて色分け (categoryColorClass)。
+            表示のみで非クリック → hover 効果なし、 サイズはカード内なので h-6 / 11px。 */}
         {categoryName && (
           <div
-            className="mb-2 inline-flex h-6 items-center rounded-full border border-vn-border-strong bg-white px-2.5 text-[11px] font-medium leading-none text-slate-700"
+            className={`mb-2 inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-medium leading-none ${categoryColorClass(categoryName)}`}
             data-testid={`task-card-category-${task.id}`}
           >
             {categoryName}
@@ -164,20 +166,16 @@ export function TaskCard({
                 const dueToday = isDueToday(task.dueDate);
                 const overdueActive =
                   isOverdue(task.dueDate) && task.status !== 'done';
-                // chimo 2026-05-21: 期限切れ = 赤 (警告)、 今日期限 = 青 (注意喚起) で区別
-                const dotClass = overdueActive
-                  ? 'bg-red-600'
-                  : dueToday
-                    ? 'bg-vn-accent'
-                    : '';
+                // chimo 2026-05-21: 期限切れ = 赤 (警告)、 今日期限 = 青 (注意喚起) で区別。
+                // 2026-07-02: ドット → カレンダーアイコン、今日は「今日」表示 (デザイン刷新)。
                 const textClass = overdueActive
-                  ? 'inline-flex items-center gap-1 text-red-600'
+                  ? 'text-red-600'
                   : dueToday
-                    ? 'inline-flex items-center gap-1 text-vn-accent'
+                    ? 'text-vn-accent'
                     : 'text-slate-500';
                 return (
                   <span
-                    className={textClass}
+                    className={`inline-flex items-center gap-1 ${textClass}`}
                     data-testid={
                       dueToday
                         ? `task-card-due-today-${task.id}`
@@ -186,13 +184,8 @@ export function TaskCard({
                           : undefined
                     }
                   >
-                    {dotClass && (
-                      <span
-                        aria-hidden
-                        className={`h-1.5 w-1.5 rounded-full ${dotClass}`}
-                      />
-                    )}
-                    期限: {formatDate(task.dueDate)}
+                    <Calendar size={13} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                    {dueToday ? '今日' : formatDate(task.dueDate)}
                   </span>
                 );
               })()}

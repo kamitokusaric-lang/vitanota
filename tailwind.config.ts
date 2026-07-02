@@ -9,28 +9,37 @@ const config: Config = {
     extend: {
       colors: {
         vn: {
-          // 2026-06-25 chimo 案A パレット: 青灰→暖クリーム/コーラルへ全面転換。
-          bg: '#FAF4EA', // クリーム背景
-          surface: '#FFFCF6', // カード白
-          header: '#36302A', // ダークトップバー
-          // 主役コーラル (投稿・CTA・タブ active・選択・フォーカス: 唯一のアクセント)
-          accent: '#E8694A',
-          'accent-hover': '#D4512F', // primary ボタン hover / 旧 indigo-700 の置換先
+          // 2026-07-02 chimo パレット: 暖クリーム→寒色グレー地 + オレンジへ転換。
+          // (旧 2026-06-25 案A は暖クリーム/コーラル。 構造色 5 つを差し替え。)
+          // oklch 定義は ` / <alpha-value>` を付けて Tailwind v3 の不透明度修飾子 (/20 等) を
+          // 効かせる。付けないと oklch は opacity を解釈できず ring 等が既定の青にフォールバックする。
+          bg: 'oklch(0.965 0.006 255 / <alpha-value>)', // ページ地: ごく薄い寒色グレー
+          surface: '#fff', // カード・パネル・トップバー: 白
+          header: 'oklch(0.26 0.015 265 / <alpha-value>)', // 左サイドバー: ダーク寒色
+          'header-hover': 'oklch(0.32 0.015 265 / <alpha-value>)', // サイドバー hover
+          // 主役オレンジ (投稿・CTA・タブ active・選択・フォーカス: 唯一のアクセント)
+          accent: 'oklch(0.64 0.16 38 / <alpha-value>)',
+          'accent-hover': 'oklch(0.58 0.16 38 / <alpha-value>)', // primary ボタン hover (同色相・暗め)
           'accent-bg': '#FBE7DC', // active チップ淡面 (相談オレンジ淡) / 旧 indigo-50・100 の置換先
           // 文字 (案A)
           ink: '#3F3528', // 本文インク
           'ink-sub': '#9A8C76', // サブ文字
           'ink-sub2': '#A99A84', // サブ文字 (淡)
-          // 枠線 (案A)
-          border: '#F0E7D6',
-          'border-strong': '#EAE0CE',
-          'cell-border': '#E3D7C0', // 点線・カンバン空セル枠
+          // 枠線 (chimo 2026-07-02: 寒色グレー地への転換に合わせ暖クリーム→slate グレーへ)
+          border: '#E2E8F0', // slate-200
+          'border-strong': '#CBD5E1', // slate-300
+          'cell-border': '#CBD5E1', // slate-300: 点線・カンバン空セル枠
           // hover / 補助面 (タグ背景・hover 統一色)
           'muted-bg': '#F3EBDC',
           // 朝カード (H3-B): 黄色は淡く、 ivory cream + amber border 系 (chimo 2026-05-20 final-tune)
           'morning-bg': '#FFFDF7',
           'morning-border': '#FDE68A',
           'morning-text': '#92400E',
+          // AI 週次日誌カード (chimo 2026-07-02): 寒色地に琥珀が浮いたため、寒色ラベンダーへ。
+          // キャプチャの AI 系ラベンダーに合わせる。
+          'ai-bg': 'oklch(0.972 0.015 285 / <alpha-value>)',
+          'ai-border': 'oklch(0.9 0.035 285 / <alpha-value>)',
+          'ai-text': 'oklch(0.52 0.12 285 / <alpha-value>)',
           // danger / warning / neutral: chimo 設計憲法
           'danger-bg': '#FFF1F2',
           'danger-border': '#FDA4AF',

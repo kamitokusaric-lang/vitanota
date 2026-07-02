@@ -18,9 +18,18 @@ type ActiveTab = 'ai' | 'manual';
 export function TaskCreateTabs({
   selfUserId,
   aiChatEnabled,
+  initialInput = '',
+  autoExtract = false,
+  embedded = false,
+  onManualSuccess,
 }: {
   selfUserId: string;
   aiChatEnabled: boolean;
+  // コンパクトバー → モーダル起動時: 文字引き継ぎ / 即整理 / 外枠省略 / 作成後の後処理。
+  initialInput?: string;
+  autoExtract?: boolean;
+  embedded?: boolean;
+  onManualSuccess?: () => void;
 }) {
   // aiChatEnabled=false なら強制的に manual のみ。state の初期値も manual。
   const [active, setActive] = useState<ActiveTab>(
@@ -31,6 +40,9 @@ export function TaskCreateTabs({
     return (
       <RoughCaptureSection
         selfUserId={selfUserId}
+        initialInput={initialInput}
+        autoExtract={autoExtract}
+        embedded={embedded}
         headerRight={
           <button
             type="button"
@@ -46,26 +58,39 @@ export function TaskCreateTabs({
   }
 
   return (
-    <section className="mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
-      <header className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
-          {aiChatEnabled ? '手動でタスクを追加する' : 'タスクを追加する'}
-        </h2>
-        {aiChatEnabled && (
-          <button
-            type="button"
-            onClick={() => setActive('ai')}
-            data-testid="task-create-tabs-to-ai"
-            className="text-[13px] font-medium text-vn-accent underline underline-offset-2 transition-colors hover:text-vn-accent-hover"
-          >
-            タスクをAIで整理する
-          </button>
-        )}
-      </header>
+    <section
+      className={
+        embedded
+          ? ''
+          : 'mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]'
+      }
+    >
+      {(!embedded || aiChatEnabled) && (
+        <header className="mb-2 flex items-baseline justify-between">
+          {embedded ? (
+            <span aria-hidden />
+          ) : (
+            <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
+              {aiChatEnabled ? '手動でタスクを追加する' : 'タスクを追加する'}
+            </h2>
+          )}
+          {aiChatEnabled && (
+            <button
+              type="button"
+              onClick={() => setActive('ai')}
+              data-testid="task-create-tabs-to-ai"
+              className="text-[13px] font-medium text-vn-accent underline underline-offset-2 transition-colors hover:text-vn-accent-hover"
+            >
+              タスクをAIで整理する
+            </button>
+          )}
+        </header>
+      )}
       <ManualTaskCreateForm
         selfUserId={selfUserId}
         onSuccess={() => {
           if (aiChatEnabled) setActive('ai');
+          onManualSuccess?.();
         }}
       />
     </section>

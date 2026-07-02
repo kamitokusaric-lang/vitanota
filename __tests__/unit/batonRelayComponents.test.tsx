@@ -78,14 +78,25 @@ describe('ClassGoalHeader', () => {
 });
 
 describe('BatonNoteItem', () => {
-  it('自分の行は編集・削除ボタンを出す', () => {
+  it('自分の行は編集・削除ボタンを出し、著者名は tooltip で確認できる', () => {
     render(
       <BatonNoteItem note={makeNote()} authorName="先生A" isMine onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
     expect(screen.getByText(/朝、元気そうでした/)).toBeInTheDocument();
-    expect(screen.getByText(/先生A/)).toBeInTheDocument();
+    // 氏名はアバターの tooltip (フォーカス / ホバーで可視) に入る
+    expect(screen.getByRole('tooltip')).toHaveTextContent('先生A');
     expect(screen.getByRole('button', { name: '編集' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '削除' })).toBeInTheDocument();
+  });
+
+  it('他人の行は著者名の頭文字アバターを出し、編集・削除は出さない', () => {
+    render(
+      <BatonNoteItem note={makeNote()} authorName="先生B" isMine={false} onEdit={vi.fn()} onDelete={vi.fn()} />,
+    );
+    // アバター頭文字 = 氏名の 1 文字目、フルネームは tooltip
+    expect(screen.getByText('先')).toBeInTheDocument();
+    expect(screen.getByRole('tooltip')).toHaveTextContent('先生B');
+    expect(screen.queryByRole('button', { name: '編集' })).not.toBeInTheDocument();
   });
 
   it('他人の行は編集・削除ボタンを出さない', () => {

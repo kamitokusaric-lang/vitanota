@@ -36,9 +36,8 @@ afterEach(() => {
 });
 
 describe('TodayCaptureBox', () => {
-  it('種別チップ・本文・公開バナーを描画し、空のとき書くボタンは disabled', () => {
+  it('種別チップ・本文を描画し、空のとき書くボタンは disabled', () => {
     wrap(<TodayCaptureBox />);
-    expect(screen.getByTestId('capture-public-note')).toBeInTheDocument();
     expect(screen.getByTestId('capture-kind-note')).toBeInTheDocument();
     expect(screen.getByTestId('capture-kind-help')).toBeInTheDocument();
     expect(screen.getByTestId('capture-submit')).toBeDisabled();
@@ -83,9 +82,8 @@ describe('TodayCaptureBox', () => {
 });
 
 describe('DiaryNoteBox', () => {
-  it('非公開バナー・mood・モード切替を描画し、既定はテンプレ3欄', () => {
+  it('mood・モード切替を描画し、既定はテンプレ3欄', () => {
     wrap(<DiaryNoteBox />);
-    expect(screen.getByTestId('diary-note-banner')).toBeInTheDocument();
     expect(screen.getByTestId('diary-mood-picker')).toBeInTheDocument();
     expect(screen.getByTestId('diary-mode-toggle')).toBeInTheDocument();
     // 既定はテンプレモード = 3 欄が出て単一欄は出ない

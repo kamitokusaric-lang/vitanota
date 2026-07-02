@@ -30,6 +30,7 @@ import {
   parseReflection,
   REFLECTION_SECTIONS,
 } from '@/features/journal/lib/reflectionTemplate';
+import { RetroRecommendation } from '@/features/journal/components/RetroRecommendation';
 
 interface MyEntry {
   id: string;
@@ -111,6 +112,13 @@ function EntryBody({ entry }: { entry: MyEntry }) {
 }
 
 const MINE_KEY = '/api/private/journal/entries/mine?page=1&perPage=50';
+
+// AIリコメンドを当てる対象 = 直近のふりかえりだけ (保存起点で計算済みのものを表示)。
+// 古い大量のマイノートに無駄な fetch を投げないための窓 (72h)。
+const RETRO_RECENT_MS = 72 * 60 * 60 * 1000;
+function isRecentForRetro(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() <= RETRO_RECENT_MS;
+}
 
 // ISO → JST の YYYY-MM-DD (グループキー)
 function jstDateKey(iso: string): string {
@@ -270,6 +278,10 @@ export function MyNotesByKind() {
                         </span>
                       ))}
                     </div>
+                  )}
+                  {/* ふりかえり (非公開 note) にだけ、AIリコメンドをそっと出す。 */}
+                  {NOTE_FAMILY.has(e.kind) && !e.isPublic && isRecentForRetro(e.createdAt) && (
+                    <RetroRecommendation entryId={e.id} entryContent={e.content} />
                   )}
                 </div>
               );

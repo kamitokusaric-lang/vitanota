@@ -14,9 +14,11 @@ export interface ReactionMeta {
 }
 
 export const REACTION_META: Record<JournalReactionType, ReactionMeta> = {
-  knowledge:    { Icon: Lightbulb, label: 'なるほど', ariaLabel: 'なるほどをつける', mineClass: 'border-vn-blue/50 bg-vn-blue-bg text-vn-blue-text' },
-  appreciation: { Icon: Coffee,    label: 'お疲れ様', ariaLabel: 'お疲れ様をつける', mineClass: 'border-vn-coffee-border bg-vn-coffee-bg text-vn-coffee-text' },
-  endorsement:  { Icon: ThumbsUp,  label: 'いいね',   ariaLabel: 'いいねをつける',   mineClass: 'border-vn-yellow/50 bg-vn-yellow-bg text-vn-yellow-text' },
+  // 完全フラット + 単色 (chimo 2026-07-02): mine は背景を持たず、アイコン + 数字を
+  // 唯一のアクセント色 (オレンジ) で示す。種類はアイコンで判別するため色は 1 色に統一。
+  knowledge:    { Icon: Lightbulb, label: 'なるほど', ariaLabel: 'なるほどをつける', mineClass: 'text-vn-accent' },
+  appreciation: { Icon: Coffee,    label: 'お疲れ様', ariaLabel: 'お疲れ様をつける', mineClass: 'text-vn-accent' },
+  endorsement:  { Icon: ThumbsUp,  label: 'いいね',   ariaLabel: 'いいねをつける',   mineClass: 'text-vn-accent' },
 };
 
 // UI で 3 ボタンを並べる順序 (左 → 右)

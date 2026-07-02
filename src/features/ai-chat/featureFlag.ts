@@ -15,6 +15,11 @@
 const MASTER_ENABLED =
   (process.env.ENABLE_AI_CHAT_EXTRACTION ?? 'false').toLowerCase() === 'true';
 
+// ふりかえり → AIリコメンド機能の master flag (AI チャットとは独立に段階公開できるよう別 env)。
+// allowlist (AI_CHAT_ALLOWLIST_TENANT_IDS) は AI チャットと共有する (同じ先行テナント群)。
+const RETRO_RECOMMEND_ENABLED =
+  (process.env.ENABLE_RETRO_RECOMMEND ?? 'false').toLowerCase() === 'true';
+
 // Lazy parse して memo (process.env は env reload で変わらない、コールド起動時に確定)
 let cachedAllowlist: ReadonlySet<string> | null = null;
 
@@ -38,5 +43,20 @@ export function isAiChatEnabledForTenant(tenantId: string | undefined | null): b
   if (!tenantId) return false;
   const allowlist = getAllowlist();
   if (allowlist.size === 0) return true; // 未設定 = 全テナント ON (Phase 7 公開時)
+  return allowlist.has(tenantId);
+}
+
+/**
+ * 当該テナントで「ふりかえり → AIリコメンド」機能が利用可能か判定。
+ * ENABLE_RETRO_RECOMMEND が master。allowlist は AI チャットと共有 (空なら全テナント ON)。
+ * 観測者原則: allowlist 外は route 側で 404 を返し、機能の存在を悟らせない。
+ */
+export function isRetroRecommendEnabledForTenant(
+  tenantId: string | undefined | null,
+): boolean {
+  if (!RETRO_RECOMMEND_ENABLED) return false;
+  if (!tenantId) return false;
+  const allowlist = getAllowlist();
+  if (allowlist.size === 0) return true;
   return allowlist.has(tenantId);
 }

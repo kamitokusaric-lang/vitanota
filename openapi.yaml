@@ -742,6 +742,65 @@ components:
           example: knowledge
       required:
         - type
+    JournalCommentsResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalComment"
+      required:
+        - comments
+    JournalComment:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        journalEntryId:
+          type: string
+        userId:
+          type:
+            - string
+            - "null"
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        userName:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - tenantId
+        - journalEntryId
+        - userId
+        - body
+        - createdAt
+        - updatedAt
+        - userName
+    JournalCommentResponse:
+      type: object
+      properties:
+        comment:
+          $ref: "#/components/schemas/JournalComment"
+      required:
+        - comment
+    CreateJournalCommentInput:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - body
     KnowledgeTagListResponse:
       type: object
       properties:
@@ -1084,6 +1143,121 @@ components:
           maxLength: 2000
       required:
         - inputText
+    JournalRecommendResponse:
+      type: object
+      properties:
+        recommendation:
+          $ref: "#/components/schemas/RetroRecommendResult"
+        status:
+          type:
+            - string
+            - "null"
+          enum:
+            - proposed
+            - published
+            - dismissed
+            - null
+      required:
+        - recommendation
+        - status
+    RetroRecommendResult:
+      type:
+        - object
+        - "null"
+      properties:
+        surface:
+          type: boolean
+        primary:
+          $ref: "#/components/schemas/RetroRecommendPrimary"
+        tweet:
+          type:
+            - object
+            - "null"
+          properties:
+            nudge:
+              type: string
+          required:
+            - nudge
+        reason:
+          type: string
+      required:
+        - surface
+        - primary
+        - tweet
+        - reason
+    RetroRecommendPrimary:
+      type:
+        - object
+        - "null"
+      properties:
+        category:
+          type: string
+          enum:
+            - soudan
+            - kansha
+            - knowledge
+        awareness:
+          type: string
+        draft:
+          type: string
+        meta:
+          $ref: "#/components/schemas/RetroRecommendPrimaryMeta"
+      required:
+        - category
+        - awareness
+        - draft
+        - meta
+    RetroRecommendPrimaryMeta:
+      type: object
+      properties:
+        recipientHint:
+          type: string
+        title:
+          type: string
+        points:
+          type: array
+          items:
+            type: string
+    JournalRecommendPostInput:
+      type: object
+      properties:
+        entryId:
+          type: string
+      required:
+        - entryId
+    JournalRecommendStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - proposed
+            - published
+            - dismissed
+      required:
+        - status
+    JournalRecommendPatchInput:
+      type: object
+      properties:
+        entryId:
+          type: string
+        status:
+          type: string
+          enum:
+            - published
+            - dismissed
+        finalCategory:
+          type: string
+          enum:
+            - soudan
+            - kansha
+            - knowledge
+            - tweet
+        bodyChanged:
+          type: boolean
+      required:
+        - entryId
+        - status
     AiChatConfirmResponse:
       type: object
       properties:
@@ -1757,6 +1931,7 @@ components:
             - concern
             - thanks
             - help
+            - knowledge
         content:
           type: string
           minLength: 1
@@ -3503,6 +3678,179 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/private/journal/entries/{id}/comments:
+    get:
+      summary: エントリのコメント一覧取得
+      tags:
+        - Journal (Private)
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: コメント一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalCommentsResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: エントリにコメント追加
+      tags:
+        - Journal (Private)
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJournalCommentInput"
+      responses:
+        "201":
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalCommentResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/private/journal/entries/{id}/comments/{commentId}:
+    delete:
+      summary: コメント削除（本人 or school_admin）
+      tags:
+        - Journal (Private)
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+          required: true
+          name: commentId
+          in: path
+      responses:
+        "204":
+          description: 削除成功
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/private/journal/knowledge-tags:
     get:
       summary: ナレッジタグ一覧取得（利用件数付き）
@@ -4430,6 +4778,186 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: AI 基盤が一時的に利用不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/journal/recommend:
+    post:
+      summary: ふりかえりから公開リコメンドを計算 or キャッシュ取得
+      description: マイノート(非公開 note)のふりかえりを AI が読み、区分つきで公開をそっと提案する。idempotent (entry あたり最大1回計算)。フラグ off は 404、対象外 entry は
+        400、利用上限超過は 429、AI 基盤不可は 503。
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalRecommendPostInput"
+      responses:
+        "200":
+          description: リコメンド (surface=false は出す価値なし)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalRecommendResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: 1 日の利用上限に到達
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: AI 基盤が一時的に利用不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: ふりかえりの既存リコメンドを取得
+      description: マイノート詳細での表示用。未計算なら recommendation=null。フラグ off は 404。
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: entryId
+          in: query
+      responses:
+        "200":
+          description: 既存リコメンド (なければ null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalRecommendResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      summary: リコメンドの対応状態を更新（出した / やめておく）
+      description: published=公開した / dismissed=今日はやめておく。本人のみ。対象なしは 404。
+      tags:
+        - AI Chat
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalRecommendPatchInput"
+      responses:
+        "200":
+          description: 更新後の状態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalRecommendStatusResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
           content:
             application/json:
               schema:

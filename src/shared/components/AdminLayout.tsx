@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'タグ管理',      href: '/admin/tags',             matchPrefix: '/admin/tags' },
   { label: 'データエクスポート', href: '/admin/data-export',    matchPrefix: '/admin/data-export' },
   { label: 'アクセス分布',  href: '/admin/access-distribution', matchPrefix: '/admin/access-distribution' },
+  { label: 'AIリコメンド',  href: '/admin/retro-recommend',    matchPrefix: '/admin/retro-recommend' },
 ];
 
 export function AdminLayout({ children, session }: AdminLayoutProps) {

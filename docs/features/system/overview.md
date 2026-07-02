@@ -12,6 +12,7 @@
 - **タスクエクスポート** (`task-export`): 全スコープ CSV (タスクに本人限定可視はない)
 - **AI セッションエクスポート** (`ai-session-export`): 全テナント横断・**匿名** CSV。user_id/tenant_id は出力しない。`input_text` は PII を含みうるため system_admin のみ
 - **AI 改善指標** (`ai-analytics`): 確定/破棄率・編集率などプロンプト改善指標 (個人指標は出さない)
+- **ふりかえり AIリコメンド 集計 + エクスポート** (`retro-analytics` / `retro-recommend-export`): 気づき提示率・転換率・見送り率・編集率・区分別の集計 (画面 `pages/admin/retro-recommend.tsx`) と、reason/awareness/draft を含む**匿名** CSV (prompt 改善用・PII マスク済)。詳細は [journal/retro-recommend.md](../journal/retro-recommend.md)
 - **テナント管理** (`tenants`): テナント一覧・作成 (デフォルトタグ/カテゴリ seed)・状態変更
 
 ## 踏み絵
@@ -28,6 +29,8 @@
 | GET | `/api/system/task-export` | タスク CSV (tenantId/from/to) |
 | GET | `/api/system/ai-session-export` | AI セッション CSV (from/to, 全テナント匿名) |
 | GET | `/api/system/ai-analytics` | AI 改善指標 |
+| GET | `/api/system/retro-analytics` | ふりかえり AIリコメンド 集計 (start/end) |
+| GET | `/api/system/retro-recommend-export` | AIリコメンド CSV (from/to, 匿名・PII マスク) |
 | GET/POST/PATCH | `/api/system/tenants` | テナント一覧/作成/状態変更 |
 
 すべて system_admin 限定、`withSystemAdmin()` で全テナント横断。`/api/system/*` は OpenAPI 対象外。管理画面は `pages/admin/data-export.tsx`。CSV は UTF-8 BOM 付き (Excel 互換)。

@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSWRConfig } from 'swr';
-import { ArrowRight, Plus, Columns3, Calendar } from 'lucide-react';
+import { ArrowRight, Plus, Columns3, Calendar, Sparkles } from 'lucide-react';
 import { Modal } from '@/shared/components/Modal';
 import { useToast } from '@/shared/components/Toast';
 import {
@@ -96,6 +96,20 @@ export function TasksTabWithCalendar({
 
   const [editing, setEditing] = useState<TaskWithAssignees | null>(null);
   const [createDate, setCreateDate] = useState<string | null>(null);
+
+  // コンパクト書き出しバー → モーダル (chimo 2026-07-02)。
+  // バーで打った文字を initialInput で引き継ぎ、文字があれば即整理 (autoExtract)。
+  const [captureText, setCaptureText] = useState('');
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureInitial, setCaptureInitial] = useState('');
+  const [captureAuto, setCaptureAuto] = useState(false);
+
+  const openCapture = () => {
+    setCaptureInitial(captureText);
+    setCaptureAuto(captureText.trim().length > 0);
+    setCaptureOpen(true);
+    setCaptureText('');
+  };
 
   const handleEditTask = (task: TaskWithAssignees) => setEditing(task);
   const handleCloseEdit = () => setEditing(null);
@@ -255,9 +269,36 @@ export function TasksTabWithCalendar({
 
   return (
     <>
-      {/* 雑に入力するフォーム (AI 整理 / 手動) はタスクボードの一番上に置く (chimo 2026-06-12)。
-          旧位置は dashboard の main Tabs より上だったが、 タスク文脈の入口なのでここへ移設。 */}
-      <TaskCreateTabs selfUserId={selfUserId} aiChatEnabled={aiChatEnabled} />
+      {/* 書き出し欄はコンパクトな 1 行バーに集約 (chimo 2026-07-02 キャプチャ準拠)。
+          打った文字を持って「整理」でモーダルを開き、そこで AI 整理 / 手動追加の全フローを回す。 */}
+      <div className="mb-5 flex justify-end">
+        <div className="flex w-full max-w-[560px] items-center gap-2 rounded-full border border-vn-border bg-white px-3.5 py-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.04)] focus-within:border-vn-accent">
+          <Sparkles size={18} strokeWidth={1.75} className="shrink-0 text-vn-accent" aria-hidden />
+          <input
+            type="text"
+            value={captureText}
+            onChange={(e) => setCaptureText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                openCapture();
+              }
+            }}
+            placeholder="仕事を書き出す…"
+            maxLength={2000}
+            data-testid="task-capture-bar-input"
+            className="min-w-0 flex-1 bg-transparent text-[14px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={openCapture}
+            data-testid="task-capture-bar-submit"
+            className="shrink-0 rounded-full bg-vn-accent px-4 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-vn-accent-hover"
+          >
+            整理
+          </button>
+        </div>
+      </div>
       <Tabs
         tabs={tabs}
         defaultTabId="board"
@@ -293,6 +334,28 @@ export function TasksTabWithCalendar({
           );
         }}
       />
+      {/* 書き出しバー起動: AI 整理 / 手動追加の全フローをモーダルで回す。
+          閉じたら unmount して state を初期化 (次回は新しい initialInput で開き直す)。 */}
+      <Modal
+        open={captureOpen}
+        onClose={() => setCaptureOpen(false)}
+        title="タスクを書き出す"
+        maxWidth="max-w-5xl"
+      >
+        {captureOpen && (
+          <TaskCreateTabs
+            selfUserId={selfUserId}
+            aiChatEnabled={aiChatEnabled}
+            embedded
+            initialInput={captureInitial}
+            autoExtract={captureAuto}
+            onManualSuccess={() => {
+              void invalidateTasks();
+              setCaptureOpen(false);
+            }}
+          />
+        )}
+      </Modal>
       <Modal
         open={createDate !== null}
         onClose={handleCloseCreate}

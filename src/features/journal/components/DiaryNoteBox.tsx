@@ -5,7 +5,6 @@
 //   テンプレは content 単一カラムに見出し付きで束ねる (reflectionTemplate.ts・DB 変更なし)。
 import { useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { Lock } from 'lucide-react';
 import { jsonFetcher } from '@/shared/lib/fetcher';
 import { useToast } from '@/shared/components/Toast';
 import type { EmotionTag } from '@/db/schema';
@@ -99,6 +98,23 @@ export function DiaryNoteBox({
         showToast('保存に失敗しました', 'error');
         return;
       }
+      // 新規ふりかえり保存を起点に AIリコメンド計算を裏で走らせる (fire-and-forget・保存を邪魔しない)。
+      // 結果はマイノート詳細で受け取る。フラグ off / 失敗時は何も起きない (best-effort)。
+      if (!isEdit) {
+        try {
+          const created = await res.json();
+          const newId: string | undefined = created?.entry?.id;
+          if (newId) {
+            void fetch('/api/journal/recommend', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ entryId: newId }),
+            }).catch(() => {});
+          }
+        } catch {
+          /* リコメンドは best-effort。本体の保存は成功している。 */
+        }
+      }
       await refreshFeeds();
       if (!isEdit) {
         setContent('');
@@ -117,15 +133,6 @@ export function DiaryNoteBox({
 
   return (
     <div className="space-y-4">
-      {/* タイトル下: 保存範囲を明示 (職員室ノートと同じ体裁)。 */}
-      <div
-        className="flex items-center gap-2 rounded-md border border-vn-green/50 bg-vn-green-bg px-3 py-2.5 text-[13px] font-medium text-vn-green-text"
-        data-testid="diary-note-banner"
-      >
-        <Lock size={15} strokeWidth={2} className="shrink-0" aria-hidden />
-        自分だけが見られる記録としてマイノートに保存されます
-      </div>
-
       {/* 今の気持ち (mood)。本人選択・AI 不可触。職員室ノートと同じ独立した行の体裁。 */}
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-700">

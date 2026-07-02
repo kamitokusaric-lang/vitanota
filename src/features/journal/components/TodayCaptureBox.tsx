@@ -15,9 +15,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import {
   Sparkles,
-  Heart,
   MessageCircle,
+  Flower2,
   MessagesSquare,
+  Lightbulb,
   type LucideIcon,
 } from 'lucide-react';
 import { useToast } from '@/shared/components/Toast';
@@ -28,34 +29,46 @@ import type { SuggestKind } from '@/features/ai-chat/kindSuggest';
 // note = 一般の公開メモ (旧 tweet/knowledge を集約)。board 4 種は意図つきの共有。
 export type CaptureKind = 'note' | StaffroomBoardKind;
 
-const BOARD_KINDS: readonly StaffroomBoardKind[] = ['keep', 'concern', 'thanks', 'help'];
+const BOARD_KINDS: readonly StaffroomBoardKind[] = [
+  'keep',
+  'concern',
+  'thanks',
+  'help',
+  'knowledge',
+];
 
 function isBoardKind(kind: CaptureKind): kind is StaffroomBoardKind {
   return (BOARD_KINDS as readonly string[]).includes(kind);
 }
 
-// 種別チップ (design1 chimo 2026-06-25: 色付き pill 3 種)。語彙は「渡す / 共有」に寄せる。
+// 種別チップ (chimo 2026-07-02 スクショ準拠: テキストのみの pill・アバターがカテゴリ別に変化)。
 // keep/concern (生徒系) は生徒ノート由来なので職員室ノート投稿の選択肢からは外す (踏み絵)。
 // 気づき/ひとりごとは「つぶやき」(note) に統一 (chimo 2026-06-25)。
-// on = 選択時の塗り、off = 非選択の淡色 (案A カテゴリ色)。
+// Icon = 選択時にアバターへ出すカテゴリアイコン。chipOn = 選択チップの配色 (カテゴリ別)。
+// avatar = 選択時のアバター丸の地色 (カテゴリ別・白アイコン)。非選択チップは CHIP_OFF (グレー)。
 const RAIL_CHIPS: {
   id: string;
   kind: CaptureKind;
   label: string;
   Icon: LucideIcon;
-  on: string;
-  off: string;
+  chipOn: string;
+  avatar: string;
   placeholder: string;
 }[] = [
-  { id: 'note',   kind: 'note',   label: 'つぶやき',   Icon: MessageCircle,  on: 'border-2 border-vn-blue bg-vn-blue-bg text-vn-blue-text',     off: 'border-2 border-vn-border bg-white text-vn-blue-text',     placeholder: '今日の小さな気づき・なるほどは?' },
-  { id: 'thanks', kind: 'thanks', label: '感謝',       Icon: Heart,          on: 'border-2 border-vn-pink bg-vn-pink-bg text-vn-pink-text',     off: 'border-2 border-vn-border bg-white text-vn-pink-text',     placeholder: '「ありがとう」を伝えたい人や出来事は?' },
-  { id: 'help',   kind: 'help',   label: '相談・確認', Icon: MessagesSquare, on: 'border-2 border-vn-accent bg-vn-accent-bg text-vn-accent-text', off: 'border-2 border-vn-border bg-white text-vn-accent-text', placeholder: 'ちょっと聞きたい・確認したいこと、ありますか? 雑でOK、まず投げてみましょう。' },
+  { id: 'note',   kind: 'note',   label: 'つぶやき',   Icon: MessageCircle,  chipOn: 'border border-vn-blue bg-vn-blue-bg text-vn-blue-text',       avatar: 'bg-vn-blue',   placeholder: '今日の小さな気づき・なるほどは?' },
+  { id: 'thanks', kind: 'thanks', label: '感謝',       Icon: Flower2,        chipOn: 'border border-vn-pink bg-vn-pink-bg text-vn-pink-text',       avatar: 'bg-vn-pink',   placeholder: '「ありがとう」を伝えたい人や出来事は?' },
+  { id: 'help',   kind: 'help',   label: '相談・確認', Icon: MessagesSquare, chipOn: 'border border-vn-accent bg-vn-accent-bg text-vn-accent-text', avatar: 'bg-vn-accent', placeholder: 'ちょっと聞きたい・確認したいこと、ありますか? 雑でOK、まず投げてみましょう。' },
+  { id: 'knowledge', kind: 'knowledge', label: 'ナレッジ', Icon: Lightbulb,  chipOn: 'border border-vn-yellow bg-vn-yellow-bg text-vn-yellow-text', avatar: 'bg-vn-yellow', placeholder: '他の先生の役に立ちそうな工夫・やり方・手順は?' },
 ];
+
+// 非選択チップの配色 (グレー・スクショ準拠)。
+const CHIP_OFF = 'border border-vn-border-strong bg-white text-slate-500';
 
 // initialKind / AI 提案 kind → チップ id (現状は kind と 1:1)。
 function kindToChipId(k?: CaptureKind | null): string | null {
   if (k === 'help') return 'help';
   if (k === 'thanks') return 'thanks';
+  if (k === 'knowledge') return 'knowledge';
   if (k === 'note') return 'note';
   return null; // keep/concern は rail チップに無い
 }
@@ -103,9 +116,11 @@ export function TodayCaptureBox({
   const manuallyPickedRef = useRef(false);
   const lastSuggestedRef = useRef('');
 
-  // 選択中チップ → kind / プレースホルダーを導出。
+  // 選択中チップ → kind / プレースホルダー / アバターアイコンを導出。
   const activeChip = chipId ? RAIL_CHIPS.find((c) => c.id === chipId) ?? null : null;
   const kind: CaptureKind | null = activeChip?.kind ?? null;
+  // アバターは選択カテゴリのアイコン (未選択時は既定のつぶやきアイコン)。
+  const AvatarIcon = activeChip?.Icon ?? MessageCircle;
   const placeholder =
     activeChip?.placeholder ?? 'ひとことどうぞ。雑でOK、まず投げてみましょう。';
   const maxLength = kind && isBoardKind(kind) ? 2000 : 1000;
@@ -316,42 +331,17 @@ export function TodayCaptureBox({
   };
 
   return (
-    <div className="space-y-3.5">
-      {/* 「どのカテゴリで書く?」見出し (アバターは廃止・chimo 2026-06-25) */}
-      <p className="text-[13px] font-semibold text-vn-ink">どのカテゴリで書く?</p>
-
-      {/* 種別チップ (色付き pill・初期は無選択)。AI のおすすめは ✨ で示す (未選択時のみ)。 */}
-      <div className="flex flex-wrap gap-1.5" data-testid="capture-kinds">
-        {RAIL_CHIPS.map((c) => {
-          const selected = chipId === c.id;
-          const isAi = !isEdit && c.kind === aiPick;
-          const Icon = c.Icon;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => handlePickKind(c.id)}
-              disabled={isEdit}
-              aria-pressed={selected}
-              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                selected ? c.on : c.off
-              } ${isEdit && !selected ? 'opacity-40' : ''} ${isEdit ? 'cursor-default' : ''}`}
-              data-testid={`capture-kind-${c.id}`}
-            >
-              {isAi ? (
-                <Sparkles size={11} strokeWidth={2} aria-label="AIのおすすめ" />
-              ) : (
-                <Icon size={12} strokeWidth={2} aria-hidden />
-              )}
-              {c.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* textarea と公開注記を 1 つの枠に入れ、注記を入力欄の真下に近接させる
-          (親の space-y で離れないよう、ここだけ独立した間隔にする・chimo 2026-06-25) */}
-      <div>
+    <div className="space-y-3">
+      {/* 段1: カテゴリ別アバター (選択カテゴリでアイコン・色が変わる) + 横長インプット。 */}
+      <div className="flex items-start gap-3">
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-colors ${
+            activeChip?.avatar ?? 'bg-vn-accent'
+          }`}
+          aria-hidden
+        >
+          <AvatarIcon size={18} strokeWidth={1.75} />
+        </span>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -359,28 +349,49 @@ export function TodayCaptureBox({
           onBlur={() => setFocused(false)}
           maxLength={maxLength}
           placeholder={placeholder}
-          className={`w-full resize-none rounded-md border border-vn-border-strong bg-white px-3 py-2 text-sm transition-all duration-200 ease-out focus:border-vn-accent focus:outline-none focus:ring-2 focus:ring-vn-accent/20 ${
-            focused || content.length > 0 ? 'min-h-[92px]' : 'min-h-[42px]'
+          className={`flex-1 resize-none rounded-[12px] border border-vn-border-strong bg-white px-3.5 py-2.5 text-sm transition-all duration-200 ease-out focus:border-vn-accent focus:outline-none focus:ring-2 focus:ring-vn-accent/20 ${
+            focused || content.length > 0 ? 'min-h-[92px]' : 'min-h-[46px]'
           }`}
           data-testid="capture-content-input"
         />
-        <p
-          className="mt-1.5 text-[11px] leading-relaxed text-vn-ink-sub"
-          data-testid="capture-public-note"
-        >
-          職員室ノートに公開され、校内の先生に共有されます。
-        </p>
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!content.trim() || busy}
-            className="shrink-0 rounded-full bg-vn-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-vn-accent-hover hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-            data-testid="capture-submit"
-          >
-            {isEdit ? '保存' : '書く'}
-          </button>
+      </div>
+
+      {/* 段2: 種別チップ (テキストのみ・選択=オレンジ/非選択=グレー) + 書くボタン。
+          AI のおすすめは ✨ で示す (未選択時のみ)。 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5" data-testid="capture-kinds">
+          {RAIL_CHIPS.map((c) => {
+            const selected = chipId === c.id;
+            const isAi = !isEdit && c.kind === aiPick;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => handlePickKind(c.id)}
+                disabled={isEdit}
+                aria-pressed={selected}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                  selected ? c.chipOn : CHIP_OFF
+                } ${isEdit && !selected ? 'opacity-40' : ''} ${isEdit ? 'cursor-default' : ''}`}
+                data-testid={`capture-kind-${c.id}`}
+              >
+                {isAi && (
+                  <Sparkles size={11} strokeWidth={2} aria-label="AIのおすすめ" />
+                )}
+                {c.label}
+              </button>
+            );
+          })}
         </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!content.trim() || busy}
+          className="shrink-0 rounded-full bg-vn-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-vn-accent-hover hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          data-testid="capture-submit"
+        >
+          {isEdit ? '保存' : '書く'}
+        </button>
       </div>
     </div>
   );

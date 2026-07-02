@@ -14,6 +14,7 @@
 | GET | `/api/private/journal/entries/mine` | マイ記録取得 (公開+非公開) | teacher+ | Journal (Private) |
 | POST | `/api/private/journal/entries/{id}/reactions` | リアクション付与 | teacher+ | Journal (Private) |
 | DELETE | `/api/private/journal/entries/{id}/reactions` | リアクション削除 | teacher+ | Journal (Private) |
+| POST/GET/PATCH | `/api/journal/recommend` | ふりかえり→AIリコメンド (計算/取得/状態更新) | teacher+ | AI Chat |
 | GET | `/api/private/journal/tags` | 感情タグ一覧 | teacher+ | Tag |
 | POST | `/api/private/journal/tags` | 感情タグ作成 | school_admin+ | Tag |
 | DELETE | `/api/private/journal/tags/{id}` | 感情タグ削除 (default 不可) | school_admin+ | Tag |

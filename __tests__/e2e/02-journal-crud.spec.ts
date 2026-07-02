@@ -53,6 +53,8 @@ test.describe('日誌エントリ CRUD', () => {
     // 日々ノートはマイノートタブの「今日のふりかえり」インライン入力
     // 既定はテンプレモードなので「自由に書く」に切替えて単一欄を出す
     await page.goto('/dashboard?tab=my-notes');
+    // ふりかえりカードは折りたたみ既定。CTA で展開してからモード切替 (retro-recommend UI)。
+    await page.getByTestId('reflection-open-cta').click();
     await page.getByTestId('diary-mode-free').click();
     await page.getByTestId('diary-content-input').fill('非公開の日記');
     await page.getByTestId('diary-submit').click();

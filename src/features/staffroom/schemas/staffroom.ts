@@ -10,8 +10,16 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 extendZodWithOpenApi(z);
 
 // 職員室ボードで投稿できる board ネイティブ kind (= journal_entry_kind の直値)。
-//   keep 続けたい / concern 気になる / thanks ありがとう / help たすけて
-export const staffroomBoardKindSchema = z.enum(['keep', 'concern', 'thanks', 'help']);
+//   keep 続けたい / concern 気になる / thanks ありがとう / help たすけて / knowledge 役に立つ情報
+// knowledge は投稿区分として復活 (chimo 2026-06-30)。is_public=true で出し、ボードの「役に立つ情報」箱と
+// 公開タイムライン(職員室ノート)の両方に出る。なるほど集計による自動ナレッジ表示とも共存する。
+export const staffroomBoardKindSchema = z.enum([
+  'keep',
+  'concern',
+  'thanks',
+  'help',
+  'knowledge',
+]);
 export type StaffroomBoardKindInput = z.infer<typeof staffroomBoardKindSchema>;
 
 // 職員室ボードに集める kind = board ネイティブ 4 種 + knowledge(なるほど集計) + note(公開メモ)。

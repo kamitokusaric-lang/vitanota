@@ -28,9 +28,11 @@
 
 `featureFlag.ts` の `isAiChatEnabledForTenant()` で判定。管理画面化は backlog 行き。
 
+ふりかえり→AIリコメンドは別マスター `ENABLE_RETRO_RECOMMEND` + `isRetroRecommendEnabledForTenant()` (allowlist は共有)。同 Lambda (`scripts/ai-chat-extract/`) が `task_extraction` / `kind_suggestion` / `retrospective_recommend` を捌く。詳細は [journal/retro-recommend.md](../journal/retro-recommend.md)。
+
 ## 踏み絵 (最重要)
 
-- **mood は AI に触らせない**: 出力 schema に mood フィールド自体を含めない ([PHILOSOPHY §4.1](../../PHILOSOPHY.md))
+- **mood は AI に触らせない (触る=推定・上書き・スコア化)**: 出力 schema に mood フィールドを含めない ([PHILOSOPHY §4.1](../../PHILOSOPHY.md))。ただし**入力信号として「読む」のは可** — ふりかえり→AIリコメンド (同 Lambda の `retrospective_recommend`) は mood を文脈として渡す。読むと触るを分ける (chimo 2026-06-30 / [journal/retro-recommend.md](../journal/retro-recommend.md))
 - **感情代弁・励まし・評価を禁止**: 出力は事実 + 提案のみ ([PHILOSOPHY §4.3](../../PHILOSOPHY.md))
 - **観測装置化しない**: チャット本文は構造化ログに残さない。`input_text` は DB に保存し RLS で本人 + system_admin のみ可視。**school_admin には不可視**
 - **個人評価に使わない**: 承認率/棄却率は運営内部のプロンプト改善指標のみ、管理者に個人指標を見せない

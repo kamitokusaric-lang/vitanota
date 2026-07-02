@@ -1,23 +1,24 @@
-// /dashboard - 統合ダッシュボード (大タブ切替: タスクボード / マイレポート / 学校レポート)
-// 大タブはシンプルな underline スタイル (Tabs default variant)
-// 各タブ内の構造:
-//   - タスクボード: デフォルト「自分」フィルタ、期限早い順、今日期限赤マーク
-//   - マイレポート (準備中・disabled)
-//   - 学校レポート (school_admin のみ)
-// 全タブ共通:
-//   - H6/H8/H9 検証中 (2026-05-27): 投稿入口を「ひとこと残す」単一 CTA に統合。
-//     旧 3 種別 (日誌 / ナレッジ / つぶやき) は撤去、 新規投稿は kind='tweet' 固定。
-//     CTA クリックで Modal が開き、 EntryForm が default 'tweet' で起動する。
+// /dashboard - 統合ダッシュボード (chimo 2026-07-02 デザイン刷新)。
+// ナビは左サイドバー (DashboardSidebarLayout)、 モバイルは下部タブナビ (BottomTabNav)。
+// Tabs は hideTabList でパネルのみ描画し、 遷移は外側のナビが ?tab= で駆動する。
+// タブ (サイドバー並び順):
+//   1. 職員室でつぶやく    (staffroom-notes) = 職員室ノート。default。メインへ昇格 (旧・右レーン)。
+//   2. 会議で話す      (staffroom)       = 職員室ボード。
+//   ── 区切り ──
+//   3. 自分をふりかえる (my-notes)        = 今日のふりかえり + マイノート。
+//   4. 生徒を観察する   (student-notes)   = 生徒ノート (朝バトンを学年別)。
+//   5. タスク整理する   (tasks)           = タスクボード。
+//   ( 学校レポート (engagement) は school_admin のみ・showSchoolReport で現在非表示。 )
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import {
   ListChecks,
-  BookUser,
+  BookOpen,
   GraduationCap,
-  LayoutDashboard,
+  CalendarCheck,
   BarChart3,
-  Notebook,
+  Users,
 } from 'lucide-react';
 import { BottomTabNav } from '@/shared/components/BottomTabNav';
 import { eq } from 'drizzle-orm';
@@ -27,12 +28,15 @@ import { withTenantUser } from '@/shared/lib/db';
 import { tenants } from '@/db/schema';
 import { TenantGuard } from '@/features/auth/components/TenantGuard';
 import { RoleGuard } from '@/features/auth/components/RoleGuard';
-import { Layout } from '@/shared/components/Layout';
+import {
+  DashboardSidebarLayout,
+  type SidebarNavItem,
+} from '@/shared/components/DashboardSidebarLayout';
 import { Tabs, type TabDef } from '@/shared/components/Tabs';
 import { TasksTabWithCalendar } from '@/features/calendar/components/TasksTabWithCalendar';
 import { StaffroomBoard } from '@/features/staffroom/components/StaffroomBoard';
 import { SchoolEngagementTab } from '@/features/dashboard/components/SchoolEngagementTab';
-import { DiaryNoteBox } from '@/features/journal/components/DiaryNoteBox';
+import { TodayReflectionCard } from '@/features/journal/components/TodayReflectionCard';
 import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimelineRail';
 import { MyNotesByKind } from '@/features/dashboard/components/MyNotesByKind';
 import { StudentNotesByClass } from '@/features/dashboard/components/StudentNotesByClass';
@@ -76,13 +80,24 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
   );
 }
 
-// モバイル下部タブナビの 5 タブ (chimo 2026-06-25 スマホ版 design)。
+// 各タブの上部ヘッダーバーに出す説明文 (chimo 2026-07-02)。
+// 「<機能の実体> ・ <ひとこと>」の形。 設計語彙 (整える/しまう/残す/渡す) 寄りで、
+// 分析/評価/最適化は使わない。
+const TAB_DESCRIPTIONS: Record<string, string> = {
+  'staffroom-notes': '職員室ノート ・ コミュニケーションの場',
+  staffroom: '職員室ボード ・ 会議で話したいことを持ち寄る',
+  'my-notes': 'マイノート ・ 今日をふりかえる',
+  'student-notes': '生徒ノート ・ 生徒たちの様子を書きとめる',
+  tasks: 'タスクボード ・ やることを整える',
+};
+
+// モバイル下部タブナビの 5 タブ (chimo 2026-07-02 刷新: サイドバーと同順・短ラベル)。
 const MOBILE_TABS = [
-  { id: 'tasks', label: 'タスク', icon: <ListChecks size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'staffroom', label: 'ボード', icon: <LayoutDashboard size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'staffroom-notes', label: 'つぶやき', icon: <Users size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'staffroom', label: '会議', icon: <CalendarCheck size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'my-notes', label: 'ふりかえり', icon: <BookOpen size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'student-notes', label: '生徒', icon: <GraduationCap size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'my-notes', label: 'ノート', icon: <BookUser size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'staffroom-notes', label: '職員室', icon: <Notebook size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'tasks', label: 'タスク', icon: <ListChecks size={20} strokeWidth={1.75} aria-hidden /> },
 ];
 
 export default function DashboardPage({
@@ -94,32 +109,49 @@ export default function DashboardPage({
   const isAdmin = canUseAdminFeatures(session.user.roles);
 
   const router = useRouter();
-  // モバイル下部ナビ用: 現在のタブ (?tab=)。未指定は tasks。
+  // 現在のタブ (?tab=)。未指定は staffroom-notes (職員室でつぶやく = 職員室ノート)。
   const activeTab =
-    typeof router.query.tab === 'string' ? router.query.tab : 'tasks';
+    typeof router.query.tab === 'string' ? router.query.tab : 'staffroom-notes';
   const mainTabs: TabDef[] = [
     {
-      id: 'tasks',
-      label: 'タスクボード',
-      icon: <ListChecks size={18} strokeWidth={1.75} aria-hidden />,
+      // 職員室でつぶやく: 職員室ノート。旧・右レーンからメインへ昇格。default。
+      id: 'staffroom-notes',
+      label: '職員室でつぶやく',
+      icon: <Users size={18} strokeWidth={1.75} aria-hidden />,
       content: (
-        <TasksTabWithCalendar
+        <PublicTimelineRail
           selfUserId={session.user.userId}
+          mode="page"
           aiChatEnabled={aiChatEnabled}
+          authorName={session.user.name}
+          isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
+          canModerate={isAdmin}
         />
       ),
     },
     {
-      // chimo 2026-06-26: タブ順を タスク → 職員室ボード → 生徒ノート → マイノート に並べ替え。
+      // 会議で話す: 職員室ボード。
       id: 'staffroom',
-      label: '職員室ボード',
-      icon: <LayoutDashboard size={18} strokeWidth={1.75} aria-hidden />,
+      label: '会議で話す',
+      icon: <CalendarCheck size={18} strokeWidth={1.75} aria-hidden />,
       content: <StaffroomBoard />,
     },
     {
-      // chimo 2026-06-11 関係図: 生徒ノート (朝バトンのクラスを学年別に)。
+      // 自分をふりかえる: 今日のふりかえり + マイノートを kind 別に (個人の作業場)。
+      id: 'my-notes',
+      label: '自分をふりかえる',
+      icon: <BookOpen size={18} strokeWidth={1.75} aria-hidden />,
+      content: (
+        <div className="space-y-6">
+          <TodayReflectionCard />
+          <MyNotesByKind />
+        </div>
+      ),
+    },
+    {
+      // 生徒を観察する: 生徒ノート (朝バトンのクラスを学年別に)。
       id: 'student-notes',
-      label: '生徒ノート',
+      label: '生徒を観察する',
       icon: <GraduationCap size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <StudentNotesByClass
@@ -129,37 +161,14 @@ export default function DashboardPage({
       ),
     },
     {
-      // chimo 2026-06-11 関係図: マイノートを kind 別に並べる (個人の作業場)。
-      // design2 (chimo 2026-06-25): 上部に「今日のふりかえり」入力をインライン展開。
-      id: 'my-notes',
-      label: 'マイノート',
-      icon: <BookUser size={18} strokeWidth={1.75} aria-hidden />,
+      // タスク整理する: タスクボード。
+      id: 'tasks',
+      label: 'タスク整理する',
+      icon: <ListChecks size={18} strokeWidth={1.75} aria-hidden />,
       content: (
-        <div className="space-y-6">
-          <section className="rounded-[14px] border border-vn-border bg-vn-surface px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
-            <header className="mb-3">
-              <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
-                📝 今日のふりかえり
-              </h2>
-            </header>
-            <DiaryNoteBox />
-          </section>
-          <MyNotesByKind />
-        </div>
-      ),
-    },
-    {
-      // モバイル独立タブ (chimo 2026-06-25): PC は右レーン、モバイルは下部ナビから開く職員室ノート。
-      id: 'staffroom-notes',
-      label: '職員室ノート',
-      hideInTabList: true,
-      content: (
-        <PublicTimelineRail
+        <TasksTabWithCalendar
           selfUserId={session.user.userId}
-          mode="page"
           aiChatEnabled={aiChatEnabled}
-          authorName={session.user.name}
-          isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
         />
       ),
     },
@@ -178,44 +187,42 @@ export default function DashboardPage({
     });
   }
 
+  // 左サイドバー用のナビ項目 (mainTabs と同じ並び)。グループ2 (自分をふりかえる〜) の前に区切り線。
+  const navItems: SidebarNavItem[] = mainTabs.map((t) => ({
+    id: t.id,
+    label: t.label,
+    icon: t.icon,
+    dividerAfter: t.id === 'staffroom',
+  }));
+
+  const activeLabel =
+    mainTabs.find((t) => t.id === activeTab)?.label ?? '職員室でつぶやく';
+  const activeDesc = TAB_DESCRIPTIONS[activeTab];
+
   return (
     <TenantGuard session={session}>
       <RoleGuard session={session} requiredRole="teacher">
-        <Layout session={session}>
-          {/* chimo 2026-05-20: ダッシュボードを 2 カラム化。 右レーンに「公開中の日々ノート」 を常時。
-              踏み絵: 観測感を作らないため mood は出さず、 文言は柔らかく (PublicTimelineRail 参照)。 */}
-          <div
-            className="grid grid-cols-1 gap-7 pb-24 xl:grid-cols-[minmax(0,1fr)_440px] xl:pb-6"
-            data-testid="dashboard-page"
-          >
-            <div className="min-w-0">
-              {/* モバイル: 画面名ヘッダ (上部タブを下部ナビに移したため・chimo 2026-06-25) */}
-              <div className="mb-4 xl:hidden">
-                <h1 className="text-[22px] font-bold text-vn-ink">
-                  {mainTabs.find((t) => t.id === activeTab)?.label ?? 'タスクボード'}
-                </h1>
-              </div>
-              <Tabs
-                tabs={mainTabs}
-                defaultTabId="tasks"
-                queryParam="tab"
-                hideTabListOnMobile
-              />
-            </div>
-            <div className="hidden xl:block">
-              {/* design1 (chimo 2026-06-25): 記録入口 (職員室ノート投稿) を rail 上部に
-                  インライン展開。日々ノートは rail 内リンクから。narrow は RecordEntrances。 */}
-              <PublicTimelineRail
-                selfUserId={session.user.userId}
-                aiChatEnabled={aiChatEnabled}
-                authorName={session.user.name}
-                isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
-              />
-            </div>
+        <DashboardSidebarLayout
+          session={session}
+          navItems={navItems}
+          activeId={activeTab}
+          queryParam="tab"
+          title={activeLabel}
+          subtitle={activeDesc}
+        >
+          <div data-testid="dashboard-page">
+            {/* タイトル / 説明は上部ヘッダーバー (DashboardSidebarLayout) が担う。
+                ここはパネルのみ。ナビは左サイドバー / 下部ナビが ?tab= で駆動。 */}
+            <Tabs
+              tabs={mainTabs}
+              defaultTabId="staffroom-notes"
+              queryParam="tab"
+              hideTabList
+            />
           </div>
 
           <BottomTabNav tabs={MOBILE_TABS} activeId={activeTab} />
-        </Layout>
+        </DashboardSidebarLayout>
       </RoleGuard>
     </TenantGuard>
   );

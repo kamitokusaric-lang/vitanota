@@ -39,6 +39,8 @@ export interface AppStackProps extends cdk.StackProps {
   aiChatAllowlistTenantIds: string;
   /** AI_CHAT_RATE_LIMIT_PER_DAY env (Bedrock コスト保護、default '20') */
   aiChatRateLimitPerDay: string;
+  /** ENABLE_RETRO_RECOMMEND env (ふりかえり→AIリコメンドの master flag。allowlist は AI チャットと共有) */
+  retroRecommendEnable: string;
   /** JWKS リフレッシャ Lambda (kid 不一致時に AppRunner から on-demand invoke) */
   jwksRefresherFunction: lambda.IFunction;
   /** Google JWKS を保管した Secret (AppRunner が verifyGoogleIdToken で読む) */
@@ -161,6 +163,8 @@ export class AppStack extends cdk.Stack {
               { name: 'AI_CHAT_ALLOWLIST_TENANT_IDS', value: props.aiChatAllowlistTenantIds },
               // 1 日あたりの上限 (Bedrock コスト保護)
               { name: 'AI_CHAT_RATE_LIMIT_PER_DAY', value: props.aiChatRateLimitPerDay },
+              // ふりかえり→AIリコメンド master flag (allowlist は AI チャットと共有)
+              { name: 'ENABLE_RETRO_RECOMMEND', value: props.retroRecommendEnable },
               // AppRunner から InvokeFunction で呼び出す Lambda の ARN
               { name: 'AI_CHAT_LAMBDA_ARN', value: props.aiChatExtractFunction.functionArn },
               // JWKS: 検証時に読む Secret と、kid 不一致時に叩くリフレッシャ Lambda

@@ -93,7 +93,7 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
 
 // モバイル下部タブナビの 5 タブ (chimo 2026-07-02 刷新: サイドバーと同順・短ラベル)。
 const MOBILE_TABS = [
-  { id: 'staffroom-notes', label: 'つぶやき', icon: <Users size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'staffroom-notes', label: '交流', icon: <Users size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'staffroom', label: '会議', icon: <CalendarCheck size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'my-notes', label: 'ふりかえり', icon: <BookOpen size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'student-notes', label: '生徒', icon: <GraduationCap size={20} strokeWidth={1.75} aria-hidden /> },
@@ -116,7 +116,7 @@ export default function DashboardPage({
     {
       // 職員室でつぶやく: 職員室ノート。旧・右レーンからメインへ昇格。default。
       id: 'staffroom-notes',
-      label: '職員室でつぶやく',
+      label: '職員室で交流する',
       icon: <Users size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <PublicTimelineRail
@@ -139,7 +139,7 @@ export default function DashboardPage({
     {
       // 自分をふりかえる: 今日のふりかえり + マイノートを kind 別に (個人の作業場)。
       id: 'my-notes',
-      label: '自分をふりかえる',
+      label: '今日をふりかえる',
       icon: <BookOpen size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <div className="space-y-6">
@@ -196,7 +196,7 @@ export default function DashboardPage({
   }));
 
   const activeLabel =
-    mainTabs.find((t) => t.id === activeTab)?.label ?? '職員室でつぶやく';
+    mainTabs.find((t) => t.id === activeTab)?.label ?? '職員室で交流する';
   const activeDesc = TAB_DESCRIPTIONS[activeTab];
 
   return (

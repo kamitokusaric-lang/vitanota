@@ -36,6 +36,10 @@ import {
   TodayCaptureBox,
   type CaptureKind,
 } from '@/features/journal/components/TodayCaptureBox';
+import {
+  JournalCommentThread,
+  type ThreadComment,
+} from '@/features/journal/components/JournalCommentThread';
 
 function emptyReactions(): Reactions {
   return {
@@ -64,6 +68,8 @@ interface RailEntry {
   // 投稿者が system_admin ロールを持つ「AI 風」投稿のとき true。 RailItem 側で
   // 別の見た目 (AI 週次日誌 β カード) に切り替える。
   isAiPost?: boolean;
+  // 職員室ノートのコメント (右側の吹き出し・chimo 2026-07-02)。
+  comments?: ThreadComment[];
 }
 
 interface RailResponse {
@@ -84,6 +90,8 @@ interface PublicTimelineRailProps {
   aiChatEnabled?: boolean;
   authorName?: string | null;
   isAiAuthor?: boolean;
+  // school_admin は誰のコメントでも削除できる (コメントの moderation 権限)。
+  canModerate?: boolean;
 }
 
 // 編集/削除モーダル状態 (chimo 2026-05-21: 旧 TimelineTab から移管。
@@ -99,6 +107,7 @@ export function PublicTimelineRail({
   aiChatEnabled,
   authorName,
   isAiAuthor,
+  canModerate = false,
 }: PublicTimelineRailProps) {
   const [modal, setModal] = useState<RailModalState>({ kind: 'closed' });
   const { mutate: globalMutate } = useSWRConfig();
@@ -162,6 +171,95 @@ export function PublicTimelineRail({
             })
           : await fetch(`${url}?type=${type}`, { method: 'DELETE' });
       if (!res.ok) await mutate();
+    } catch {
+      await mutate();
+    }
+  };
+
+  // コメント追加: reaction と同じ楽観的更新パターン。
+  //   optimistic に temp コメントを差し込み → POST → 成功時は返却 id で差し替え / 失敗時 mutate() で戻す。
+  const addComment = async (entryId: string, body: string) => {
+    if (!data) return;
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const optimisticComment: ThreadComment = {
+      id: tempId,
+      userId: selfUserId,
+      authorName: authorName ?? null,
+      authorNickname: null,
+      body: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+    const optimistic: RailResponse = {
+      entries: data.entries.map((it) =>
+        it.id === entryId
+          ? { ...it, comments: [...(it.comments ?? []), optimisticComment] }
+          : it,
+      ),
+    };
+    await mutate(optimistic, { revalidate: false });
+    try {
+      const res = await fetch(
+        `/api/private/journal/entries/${entryId}/comments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: trimmed }),
+        },
+      );
+      if (!res.ok) {
+        await mutate();
+        return;
+      }
+      const { comment } = (await res.json()) as {
+        comment: { id: string; createdAt: string };
+      };
+      // temp を確定 id / createdAt に差し替え (以後の削除が正しい id を叩ける)
+      await mutate(
+        (cur: RailResponse | undefined): RailResponse | undefined =>
+          cur
+            ? {
+                entries: cur.entries.map((it) =>
+                  it.id === entryId
+                    ? {
+                        ...it,
+                        comments: (it.comments ?? []).map((c) =>
+                          c.id === tempId
+                            ? { ...c, id: comment.id, createdAt: comment.createdAt }
+                            : c,
+                        ),
+                      }
+                    : it,
+                ),
+              }
+            : cur,
+        { revalidate: false },
+      );
+    } catch {
+      await mutate();
+    }
+  };
+
+  const deleteComment = async (entryId: string, commentId: string) => {
+    if (!data) return;
+    const optimistic: RailResponse = {
+      entries: data.entries.map((it) =>
+        it.id === entryId
+          ? {
+              ...it,
+              comments: (it.comments ?? []).filter((c) => c.id !== commentId),
+            }
+          : it,
+      ),
+    };
+    await mutate(optimistic, { revalidate: false });
+    try {
+      const res = await fetch(
+        `/api/private/journal/entries/${entryId}/comments/${commentId}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok && res.status !== 204) await mutate();
     } catch {
       await mutate();
     }
@@ -242,7 +340,11 @@ export function PublicTimelineRail({
                 key={e.id}
                 entry={e}
                 isMine={e.userId === selfUserId}
+                selfUserId={selfUserId}
+                canModerate={canModerate}
                 onToggleReaction={toggleReaction}
+                onAddComment={addComment}
+                onDeleteComment={deleteComment}
                 onEdit={(en) =>
                   setModal({
                     kind: 'edit',
@@ -311,17 +413,25 @@ function AuthorAvatar({ name }: { name: string }) {
 function RailItem({
   entry,
   isMine,
+  selfUserId,
+  canModerate,
   onToggleReaction,
+  onAddComment,
+  onDeleteComment,
   onEdit,
   onDelete,
 }: {
   entry: RailEntry;
   isMine: boolean;
+  selfUserId: string;
+  canModerate: boolean;
   onToggleReaction: (
     entryId: string,
     type: JournalReactionType,
     next: boolean,
   ) => void | Promise<void>;
+  onAddComment: (entryId: string, body: string) => void | Promise<void>;
+  onDeleteComment: (entryId: string, commentId: string) => void | Promise<void>;
   // 編集/削除コールバック (isMine=true のときのみ kebab メニューから発火)
   onEdit: (entry: RailEntry) => void;
   onDelete: (entryId: string) => void;
@@ -360,6 +470,10 @@ function RailItem({
       className="rounded-[16px] border border-vn-border bg-vn-surface px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
       data-testid={`public-timeline-rail-item-${entry.id}`}
     >
+      {/* chimo 2026-07-02「4a 吹き出し型」: lg 以上は 投稿(左) + コメント吹き出し(右) の 2 カラム。
+          モバイルは縦積み (投稿の下にコメント)。 */}
+      <div className="lg:flex lg:items-start lg:gap-5">
+        <div className="min-w-0 lg:flex-1">
       {/* 1 行目: アバター + 投稿者 / 時刻 + mood (左) / 3 点リーダー (右、 isMine のみ)
           chimo 2026-07-02 デザイン刷新: 独立カード + 頭文字アバター + 名前上・時刻下の縦積み。 */}
       <header className="flex items-start justify-between gap-3">
@@ -452,6 +566,19 @@ function RailItem({
             />
           );
         })}
+      </div>
+        </div>
+        {/* 右カラム: コメント吹き出し (投稿の余白で会話が育つ)。 */}
+        <div className="mt-4 border-t border-vn-border pt-4 lg:mt-0 lg:w-[360px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <JournalCommentThread
+            entryId={entry.id}
+            comments={entry.comments ?? []}
+            selfUserId={selfUserId}
+            canModerate={canModerate}
+            onAdd={onAddComment}
+            onDelete={onDeleteComment}
+          />
+        </div>
       </div>
     </li>
   );

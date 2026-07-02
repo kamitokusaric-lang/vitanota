@@ -47,20 +47,31 @@ function makeReactionMyChain(rows: unknown[] = []) {
   };
 }
 
+// attachComments: from → leftJoin×2 → where → orderBy (resolve)
+function makeCommentsSelectChain(rows: unknown[] = []) {
+  return {
+    from: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockResolvedValue(rows),
+  };
+}
+
 describe('PublicTimelineRepository', () => {
   describe('findTimeline', () => {
     it('limit と offset を渡して結果を返す（タグ付き）', async () => {
       const mockRows = [
         { id: 'entry-1', tenantId: 't1', userId: 'u1', content: 'hello', createdAt: new Date(), updatedAt: new Date() },
       ];
-      // select 呼出順: 1=本体 findTimeline / 2=emotion / 3=knowledge / 4=count / 5=my
+      // select 呼出順: 1=本体 findTimeline / 2=emotion / 3=knowledge / 4=count / 5=my / 6=comments
       const mockTx = {
         select: vi.fn()
           .mockReturnValueOnce(makeSelectChain(mockRows))
           .mockReturnValueOnce(makeTagsSelectChain([]))  // emotion
           .mockReturnValueOnce(makeTagsSelectChain([]))  // knowledge
           .mockReturnValueOnce(makeReactionCountChain([]))
-          .mockReturnValueOnce(makeReactionMyChain([])),
+          .mockReturnValueOnce(makeReactionMyChain([]))
+          .mockReturnValueOnce(makeCommentsSelectChain([])),
       };
 
       const repo = new PublicTimelineRepository();
@@ -93,14 +104,15 @@ describe('PublicTimelineRepository', () => {
       const tagRows = [
         { entryId: 'e1', tagId: 'tag1', tagName: '喜び', tagCategory: 'positive' },
       ];
-      // select 呼出順: 1=本体 / 2=emotion (1件) / 3=knowledge (空) / 4=count (空) / 5=my (空)
+      // select 呼出順: 1=本体 / 2=emotion (1件) / 3=knowledge (空) / 4=count (空) / 5=my (空) / 6=comments (空)
       const mockTx = {
         select: vi.fn()
           .mockReturnValueOnce(makeSelectChain(mockRows))
           .mockReturnValueOnce(makeTagsSelectChain(tagRows))
           .mockReturnValueOnce(makeTagsSelectChain([]))
           .mockReturnValueOnce(makeReactionCountChain([]))
-          .mockReturnValueOnce(makeReactionMyChain([])),
+          .mockReturnValueOnce(makeReactionMyChain([]))
+          .mockReturnValueOnce(makeCommentsSelectChain([])),
       };
 
       const repo = new PublicTimelineRepository();

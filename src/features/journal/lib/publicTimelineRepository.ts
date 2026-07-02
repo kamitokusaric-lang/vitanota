@@ -16,7 +16,12 @@ import {
 import type * as schema from '@/db/schema';
 import type { EmotionTag } from '@/db/schema';
 import type { PublicJournalEntry } from '@/shared/types/brand';
-import { attachReactions, type Reactions } from './privateJournalRepository';
+import {
+  attachReactions,
+  attachComments,
+  type Reactions,
+  type TimelineComment,
+} from './privateJournalRepository';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -31,6 +36,8 @@ export type PublicEntryWithTags = PublicJournalEntry & {
   tags: Array<Pick<EmotionTag, 'id' | 'name' | 'category'>>;
   knowledgeTags: Array<{ id: string; name: string }>;
   reactions: Reactions;
+  // 職員室ノートのコメント (吹き出し)。時系列 asc。
+  comments: TimelineComment[];
   // 投稿者が system_admin ロールを持つ場合 true (兼任アカウントによる「AI 風」投稿の判定)。
   // 現時点判定。chimo の system_admin 兼 school_admin アカウントが書いた投稿はここで true になる。
   isAiPost: boolean;
@@ -139,7 +146,8 @@ export class PublicTimelineRepository {
       isAiPost: false as boolean,
     }));
 
-    return attachReactions(tx, withTags, ctx);
+    const withReactions = await attachReactions(tx, withTags, ctx);
+    return attachComments(tx, withReactions);
   }
 
   /**

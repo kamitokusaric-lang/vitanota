@@ -4,7 +4,7 @@
 //
 // SP-U02-03: 所有者検証は API 層の明示 WHERE 句 + RLS の WITH CHECK で二重防御
 // R1 対策: 全メソッドがトランザクションを第一引数で受け取り、withTenantUser 内で呼ばれる前提
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import {
   journalEntries,
@@ -13,6 +13,9 @@ import {
   journalEntryKnowledgeTags,
   knowledgeTags,
   journalKnowledgeReactions,
+  journalComments,
+  users,
+  userTenantProfiles,
 } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type { JournalEntry, EmotionTag } from '@/db/schema';
@@ -143,6 +146,63 @@ export async function attachReactions<T extends { id: string }>(
     }
     return { ...e, reactions };
   });
+}
+
+// 職員室ノートのコメント (吹き出し)。entry ごとに時系列 asc で付与。
+// 著者表示はタイムライン本体と揃える (nickname ?? name)。RLS が tenant に絞る。
+export interface TimelineComment {
+  id: string;
+  userId: string | null;
+  authorName: string | null;
+  authorNickname: string | null;
+  body: string;
+  createdAt: Date;
+}
+
+export async function attachComments<T extends { id: string }>(
+  tx: DrizzleDb,
+  entries: T[],
+): Promise<Array<T & { comments: TimelineComment[] }>> {
+  if (entries.length === 0) return [];
+  const entryIds = entries.map((e) => e.id);
+
+  const rows = await tx
+    .select({
+      id: journalComments.id,
+      entryId: journalComments.journalEntryId,
+      userId: journalComments.userId,
+      body: journalComments.body,
+      createdAt: journalComments.createdAt,
+      authorName: users.name,
+      authorNickname: userTenantProfiles.nickname,
+    })
+    .from(journalComments)
+    .leftJoin(users, eq(users.id, journalComments.userId))
+    .leftJoin(
+      userTenantProfiles,
+      and(
+        eq(userTenantProfiles.userId, journalComments.userId),
+        eq(userTenantProfiles.tenantId, journalComments.tenantId),
+      ),
+    )
+    .where(inArray(journalComments.journalEntryId, entryIds))
+    .orderBy(asc(journalComments.createdAt));
+
+  const map = new Map<string, TimelineComment[]>();
+  for (const r of rows) {
+    const list = map.get(r.entryId) ?? [];
+    list.push({
+      id: r.id,
+      userId: r.userId,
+      authorName: r.authorName,
+      authorNickname: r.authorNickname,
+      body: r.body,
+      createdAt: r.createdAt,
+    });
+    map.set(r.entryId, list);
+  }
+
+  return entries.map((e) => ({ ...e, comments: map.get(e.id) ?? [] }));
 }
 
 async function attachTags(

@@ -13,6 +13,11 @@ import {
 } from '@/features/journal/schemas/journal';
 import { createTagSchema, tagIdParamSchema } from '@/features/journal/schemas/tag';
 import { reactionTypeQuerySchema } from '@/features/journal/schemas/journal';
+import { createJournalCommentSchema } from '@/features/journal/schemas/journalComment';
+import {
+  journalCommentsResponseSchema,
+  journalCommentResponseSchema,
+} from './journalCommentSchemas';
 import { knowledgeTagCreateSchema } from '@/features/journal/schemas/knowledgeTag';
 import { updateProfileSchema } from '@/features/profile/schemas/profile';
 import {
@@ -687,6 +692,66 @@ export function buildOpenApiDocument() {
     request: {
       params: z.object({ id: z.string().guid() }),
       query: reactionTypeQuerySchema,
+    },
+    responses: {
+      204: { description: '削除成功' },
+      ...errorResponses,
+    },
+  });
+
+  // 職員室ノートのコメント (公開エントリのみ・非公開は 403)
+  registry.registerPath({
+    method: 'get',
+    path: '/api/private/journal/entries/{id}/comments',
+    summary: 'エントリのコメント一覧取得',
+    tags: ['Journal (Private)'],
+    security: [sessionCookie],
+    request: { params: z.object({ id: z.string().guid() }) },
+    responses: {
+      200: {
+        description: 'コメント一覧',
+        content: {
+          'application/json': { schema: journalCommentsResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/private/journal/entries/{id}/comments',
+    summary: 'エントリにコメント追加',
+    tags: ['Journal (Private)'],
+    security: [sessionCookie],
+    request: {
+      params: z.object({ id: z.string().guid() }),
+      body: {
+        content: { 'application/json': { schema: createJournalCommentSchema } },
+      },
+    },
+    responses: {
+      201: {
+        description: '作成成功',
+        content: {
+          'application/json': { schema: journalCommentResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/private/journal/entries/{id}/comments/{commentId}',
+    summary: 'コメント削除（本人 or school_admin）',
+    tags: ['Journal (Private)'],
+    security: [sessionCookie],
+    request: {
+      params: z.object({
+        id: z.string().guid(),
+        commentId: z.string().guid(),
+      }),
     },
     responses: {
       204: { description: '削除成功' },

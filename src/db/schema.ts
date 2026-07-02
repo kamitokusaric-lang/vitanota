@@ -320,6 +320,34 @@ export const journalEntries = pgTable(
   })
 );
 
+// ── journal_comments (0056) ─────────────────────────────────────
+// 職員室ノート (公開 journal_entries) へのコメント。スレッドなし・時系列単線。
+// user_id は退会時 SET NULL で匿名化 (コメント自体は残す)。RLS は migration 0056。
+export const journalComments = pgTable(
+  'journal_comments',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id').notNull(),
+    journalEntryId: uuid('journal_entry_id').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    entryFk: foreignKey({
+      columns: [table.journalEntryId, table.tenantId],
+      foreignColumns: [journalEntries.id, journalEntries.tenantId],
+      name: 'journal_comments_entry_fk',
+    }).onDelete('cascade'),
+    entryCreatedIdx: index('journal_comments_entry_idx').on(
+      table.journalEntryId,
+      table.createdAt,
+    ),
+    tenantIdx: index('journal_comments_tenant_idx').on(table.tenantId),
+  })
+);
+
 // ── emotion_tags ───────────────────────────────────────────────
 // 0016 で tags → emotion_tags にリネーム。感情タグ専用 (category NOT NULL)。
 // context タグは task_categories (Unit-05) に役割移譲。
@@ -1156,6 +1184,8 @@ export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
 export type TaskComment = typeof taskComments.$inferSelect;
 export type NewTaskComment = typeof taskComments.$inferInsert;
+export type JournalComment = typeof journalComments.$inferSelect;
+export type NewJournalComment = typeof journalComments.$inferInsert;
 export type UserTenantProfile = typeof userTenantProfiles.$inferSelect;
 export type NewUserTenantProfile = typeof userTenantProfiles.$inferInsert;
 export type JournalWeeklySummary = typeof journalWeeklySummaries.$inferSelect;

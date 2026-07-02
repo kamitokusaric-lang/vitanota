@@ -25,6 +25,7 @@
 - 共有タイムライン (テナント内の公開エントリ) と マイ記録 (自分の公開+非公開) の 2 ビュー
 - 感情タグ (emotion_tags) の付与 (note は emotion_tags に一本化。旧 knowledge_tags は新規書き込みなし)
 - リアクション 3 種 (参考になった / お疲れ様です / すてきです) — 自分の投稿にも付けられる
+- **コメント** (chimo 2026-07-02): 職員室ノート (公開投稿) に同僚が乗っかる会話。投稿カードの**右の余白に吹き出し**で並ぶ (`JournalCommentThread`)。`journal_comments` テーブル (migration 0056)・`GET/POST/DELETE /api/private/journal/entries/{id}/comments`。公開投稿のみ (非公開は 403)、削除は本人 or school_admin、スレッド・コメントへのリアクションは持たない (踏み絵: 評価/採点にしない)。AI「そっと問いかけ」は Phase 2 (別途・踏み絵ゲート後)。
 
 ## 仕様の所在
 

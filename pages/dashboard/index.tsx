@@ -125,6 +125,7 @@ export default function DashboardPage({
           aiChatEnabled={aiChatEnabled}
           authorName={session.user.name}
           isAiAuthor={canUseSystemAdminFeatures(session.user.roles)}
+          canModerate={isAdmin}
         />
       ),
     },

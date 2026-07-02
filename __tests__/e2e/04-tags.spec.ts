@@ -78,6 +78,8 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
 
   test('タグの再クリックで選択解除される', async ({ page }) => {
     await page.goto('/dashboard?tab=my-notes');
+    // ふりかえりカードは折りたたみ既定。CTA で展開してからタグ操作 (retro-recommend UI)。
+    await page.getByTestId('reflection-open-cta').click();
     const emotionTag = page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' });
     await emotionTag.click();
     await expect(page.getByTestId('tag-filter-count')).toContainText('1 件選択中');

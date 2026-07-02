@@ -44,6 +44,8 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
 
   test('タグを選択してエントリ投稿し、マイノートに表示される', async ({ page }) => {
     await page.goto('/dashboard?tab=my-notes');
+    // ふりかえりカードは折りたたみ既定。CTA で展開してからモード切替 (retro-recommend UI)。
+    await page.getByTestId('reflection-open-cta').click();
     await page.getByTestId('diary-mode-free').click();
     await page.getByTestId('diary-content-input').fill('うれしいことがあった');
 
@@ -65,6 +67,8 @@ test.describe('タグ関連 (US-T-013 / US-T-021)', () => {
 
   test('複数タグを選択できる', async ({ page }) => {
     await page.goto('/dashboard?tab=my-notes');
+    // ふりかえりカードは折りたたみ既定。CTA で展開してからモード切替 (retro-recommend UI)。
+    await page.getByTestId('reflection-open-cta').click();
     await page.getByTestId('diary-mode-free').click();
     await page.getByTestId('diary-content-input').fill('複数タグ');
     await page.locator('button[data-testid^="tag-filter-"]').filter({ hasText: 'うれしい' }).click();

@@ -36,9 +36,8 @@ afterEach(() => {
 });
 
 describe('TodayCaptureBox', () => {
-  it('種別チップ・本文・公開バナーを描画し、空のとき書くボタンは disabled', () => {
+  it('種別チップ・本文を描画し、空のとき書くボタンは disabled', () => {
     wrap(<TodayCaptureBox />);
-    expect(screen.getByTestId('capture-public-note')).toBeInTheDocument();
     expect(screen.getByTestId('capture-kind-note')).toBeInTheDocument();
     expect(screen.getByTestId('capture-kind-help')).toBeInTheDocument();
     expect(screen.getByTestId('capture-submit')).toBeDisabled();

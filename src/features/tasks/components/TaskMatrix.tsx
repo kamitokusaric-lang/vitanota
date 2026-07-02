@@ -83,6 +83,20 @@ export function TaskMatrix({
     return counts;
   }, [tasks, rows, assignTaskToRows]);
 
+  // 列 (status) ごとの件数 (grid のセル長を全 row 分合算)。sticky ヘッダの「未着手 2」表示用。
+  const colCounts = useMemo(() => {
+    const counts = new Map<StatusId, number>();
+    for (const c of STATUS_COLS) counts.set(c.id, 0);
+    for (const r of rows) {
+      const colMap = grid.get(r.id);
+      if (!colMap) continue;
+      for (const c of STATUS_COLS) {
+        counts.set(c.id, (counts.get(c.id) ?? 0) + (colMap.get(c.id)?.length ?? 0));
+      }
+    }
+    return counts;
+  }, [grid, rows]);
+
   if (rows.length === 0) {
     return (
       <div className="rounded-vn border border-dashed border-vn-border bg-white py-12 text-center text-sm text-gray-500">
@@ -94,17 +108,20 @@ export function TaskMatrix({
   return (
     <div data-testid="task-matrix">
       {/* status ヘッダ (sticky で常に見える、nav h-[72px] の下にピン)
-          chimo 2026-05-20: カラム見出しは 16px / 800 / #1E293B、 下線 2px slate-800 */}
+          2026-07-02: 下線見出し → 淡いグレーの角丸バー (ラベル + 件数)。デザイン刷新。 */}
       <div
         className="sticky top-[72px] z-10 mb-3 hidden grid-cols-5 gap-5 bg-vn-bg/95 py-2 backdrop-blur lg:grid"
       >
         {STATUS_COLS.map((c) => (
           <div
             key={c.id}
-            className="border-b-2 border-slate-700/55 px-2 pb-3 text-center text-[15px] font-bold leading-[1.4] text-slate-700"
+            className="flex items-center justify-center gap-2 rounded-lg bg-slate-200 px-3 py-2 text-[15px] font-bold leading-[1.4] text-slate-700"
             data-testid={`matrix-col-${c.id}`}
           >
-            {c.label}
+            <span>{c.label}</span>
+            <span className="text-[13px] font-semibold text-slate-400">
+              {colCounts.get(c.id) ?? 0}
+            </span>
           </div>
         ))}
       </div>
@@ -135,14 +152,13 @@ export function TaskMatrix({
                   <div
                     key={c.id}
                     className={[
-                      // モバイルは縦積みのプレーンなセクション。 lg 以上で従来のカラム箱 (背景 55% 白)。
-                      'transition-colors lg:min-h-[260px] lg:rounded-xl lg:border lg:p-3',
+                      // モバイルは縦積みのプレーンなセクション。 lg 以上で従来のカラム箱。
+                      'transition-colors lg:min-h-[260px] lg:rounded-xl lg:p-3',
                       // 空セルはモバイルでは出さない (見出し + 空箱が縦に並ぶのを防ぐ)。
                       // desktop は drag の drop 先として空でも残す (chimo 2026-06-15)。
                       cellTasks.length === 0 ? 'hidden lg:block' : '',
-                      isDropTarget
-                        ? 'lg:border-vn-accent lg:bg-vn-muted-bg'
-                        : 'lg:border-vn-border lg:bg-white/55',
+                      // 平常時のレーン地は透明・枠なし (chimo 2026-07-02)。drop 中だけ枠 + 薄い地で drop 先を示す。
+                      isDropTarget ? 'lg:border lg:border-vn-accent lg:bg-vn-muted-bg' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -187,8 +203,11 @@ export function TaskMatrix({
                   >
                     {/* モバイル専用: 縦積み時にどのステータスかを示す見出し
                         (desktop は上部 sticky ヘッダが担うので lg:hidden)。 */}
-                    <div className="mb-2 border-b border-vn-border pb-1.5 text-[13px] font-bold leading-[1.4] text-slate-600 lg:hidden">
-                      {c.label}
+                    <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-slate-200 px-2.5 py-1.5 text-[13px] font-bold leading-[1.4] text-slate-600 lg:hidden">
+                      <span>{c.label}</span>
+                      <span className="text-[12px] font-semibold text-slate-400">
+                        {cellTasks.length}
+                      </span>
                     </div>
                     {cellTasks.length === 0 ? (
                       <div className="py-6"></div>

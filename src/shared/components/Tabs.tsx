@@ -28,6 +28,9 @@ interface TabsProps {
   onSelect?: (id: string) => void;
   // モバイル (xl 未満) では上部 tablist を隠す (下部タブナビで遷移・chimo 2026-06-25)。
   hideTabListOnMobile?: boolean;
+  // 上部 tablist を全サイズで描画しない (パネルのみ)。ナビを外側 (左サイドバー + 下部ナビ) が
+  // 担う /dashboard 用。?tab= 駆動は不変・chimo 2026-07-02。
+  hideTabList?: boolean;
 }
 
 export function Tabs({
@@ -38,6 +41,7 @@ export function Tabs({
   rightSlot,
   onSelect,
   hideTabListOnMobile = false,
+  hideTabList = false,
 }: TabsProps) {
   const router = useRouter();
   const queryValue = router.query[queryParam];
@@ -68,7 +72,7 @@ export function Tabs({
   // Linear 風 segmented control。 calendar の board / カレンダー切替で使用。
   const tablistClass =
     variant === 'pill'
-      ? 'mb-5 inline-flex items-center gap-1 rounded-lg bg-vn-muted-bg p-1'
+      ? 'mb-5 inline-flex items-center gap-1 rounded-lg bg-slate-200 p-1'
       : hideTabListOnMobile
         ? 'mb-5 hidden border-b border-vn-border xl:flex xl:justify-start xl:gap-8'
         : 'mb-5 flex justify-between gap-2 border-b border-vn-border lg:justify-start lg:gap-8';
@@ -79,6 +83,7 @@ export function Tabs({
 
   return (
     <div data-testid="tabs">
+      {!hideTabList && (
       <div className={wrapClass}>
       <div role="tablist" className={rightSlot ? tablistClass.replace('mb-5 ', '') : tablistClass}>
         {tabs.map((tab) => {
@@ -91,7 +96,9 @@ export function Tabs({
                   tab.disabled
                     ? 'cursor-not-allowed font-medium text-slate-300'
                     : isActive
-                      ? 'bg-vn-surface font-semibold text-slate-900 shadow-sm'
+                      ? // active は淡コーラル面 + コーラル枠 + コーラル文字 (ring で枠を描き layout ずれを防ぐ)、
+                        // 非アクティブはグレー文字 (chimo 2026-07-02)
+                        'bg-vn-accent-bg font-semibold text-vn-accent-text shadow-sm ring-1 ring-inset ring-vn-accent/40'
                       : 'font-medium text-slate-500 hover:text-slate-700',
                 ].join(' ')
               : [
@@ -129,6 +136,7 @@ export function Tabs({
       </div>
         {rightSlot && <div className="flex flex-wrap items-center gap-2.5">{rightSlot}</div>}
       </div>
+      )}
 
       {tabs.map((tab) => (
         <div

@@ -94,9 +94,11 @@ describe('StudentRow', () => {
     expect(onToggleReaction).toHaveBeenCalledWith('s1', 'positive');
   });
 
-  it('一言を入力して残すと onAddNote が呼ばれる', async () => {
+  it('「コメントを追加」で入力欄を開き、残すと onAddNote が呼ばれる', async () => {
     const onAddNote = vi.fn().mockResolvedValue(undefined);
     render(<StudentRow {...baseProps} onAddNote={onAddNote} />);
+    // 既定は畳まれている。まず入力欄を開く。
+    fireEvent.click(screen.getByRole('button', { name: /コメントを追加/ }));
     fireEvent.change(screen.getByPlaceholderText('ひとことを残す…'), { target: { value: '元気そう' } });
     fireEvent.click(screen.getByRole('button', { name: '残す' }));
     expect(onAddNote).toHaveBeenCalledWith('s1', '元気そう');

@@ -37,7 +37,17 @@ interface LatestUnreadReply {
   createdAt: string;
 }
 
-export function FeedbackFAB() {
+export function FeedbackFAB({
+  variant = 'fab',
+  aboveBottomNav = false,
+}: {
+  // 'fab': 右下固定の丸ボタン (Layout.tsx / モバイル)。
+  // 'sidebar': 左サイドバー下部・ユーザー名の上に置く小さいテキストリンク (chimo 2026-07-02)。
+  variant?: 'fab' | 'sidebar';
+  // ダッシュボードのモバイルは下部タブナビ (BottomTabNav) があり bottom-6 だと隠れるため、
+  // ナビ高さ + セーフエリア分だけ持ち上げる (chimo 2026-07-02)。
+  aboveBottomNav?: boolean;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [unreadAny, setUnreadAny] = useState(false);
   const [latestUnreadReply, setLatestUnreadReply] = useState<LatestUnreadReply | null>(null);
@@ -97,45 +107,76 @@ export function FeedbackFAB() {
     // モーダル内では「最初に開いた時の未読」を Modal 自体が保持し、閉じるまで表示続ける
   }, []);
 
+  const openModal = () => {
+    if (unreadAny && shouldShowUnreadHint) {
+      dismissUnreadHint('cta_click');
+    }
+    setOpen(true);
+  };
+
   return (
     <>
-      <div className="group fixed bottom-6 right-6 z-30">
+      {variant === 'sidebar' ? (
+        // 左サイドバー下部 (ダーク背景)・ユーザー名の上に置く小さいテキストリンク。
         <button
           type="button"
-          onClick={() => {
-            if (unreadAny && shouldShowUnreadHint) {
-              dismissUnreadHint('cta_click');
-            }
-            setOpen(true);
-          }}
-          className="relative flex h-14 w-14 items-center justify-center rounded-full border border-vn-border bg-vn-muted-bg text-gray-700 shadow-sm transition-colors hover:bg-vn-border focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+          onClick={openModal}
+          className="flex w-full items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-left text-[12px] font-medium text-slate-400 transition-colors hover:bg-vn-header-hover hover:text-white"
           aria-label="フィードバックを送る"
           data-testid="feedback-fab"
         >
-          <MessageSquare size={22} strokeWidth={1.75} aria-hidden />
+          <MessageSquare size={13} strokeWidth={1.75} aria-hidden />
+          <span>フィードバック</span>
           {unreadAny && (
             <span
-              className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-vn-accent"
+              className="ml-0.5 h-1.5 w-1.5 rounded-full bg-vn-accent"
               data-testid="feedback-fab-unread-dot"
               aria-label="未読の返信あり"
             />
           )}
         </button>
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute right-full top-1/2 z-10 mr-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-          data-testid="feedback-fab-tooltip"
+      ) : (
+        <div
+          className={`group fixed right-6 z-30 ${
+            aboveBottomNav
+              ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom))]'
+              : 'bottom-6'
+          }`}
         >
-          フィードバック待ってます
-        </span>
-      </div>
+          <button
+            type="button"
+            onClick={openModal}
+            className="relative flex h-14 w-14 items-center justify-center rounded-full border border-vn-border bg-vn-muted-bg text-gray-700 shadow-sm transition-colors hover:bg-vn-border focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+            aria-label="フィードバックを送る"
+            data-testid="feedback-fab"
+          >
+            <MessageSquare size={22} strokeWidth={1.75} aria-hidden />
+            {unreadAny && (
+              <span
+                className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-vn-accent"
+                data-testid="feedback-fab-unread-dot"
+                aria-label="未読の返信あり"
+              />
+            )}
+          </button>
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute right-full top-1/2 z-10 mr-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            data-testid="feedback-fab-tooltip"
+          >
+            フィードバック待ってます
+          </span>
+        </div>
+      )}
       <FeedbackModal
         open={open}
         onClose={() => setOpen(false)}
         onMarkRead={handleMarkRead}
         latestUnreadReply={latestUnreadReply}
       />
-      {unreadAny && shouldShowUnreadHint && (
+      {/* 未読ヒント (ぽわわーん) は 'fab' variant のみ。sidebar は hidden 要素を anchor に
+          しうるモバイルとの不整合を避け、右下 FAB (常時可視) に集約する。 */}
+      {variant === 'fab' && unreadAny && shouldShowUnreadHint && (
         <FeedbackUnreadHint
           anchorSelector='[data-testid="feedback-fab"]'
           onDismiss={(reason) => dismissUnreadHint(reason)}

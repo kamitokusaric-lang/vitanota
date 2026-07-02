@@ -61,7 +61,7 @@ export function ReactionButton({
         className={`relative inline-flex items-center ${popKey > 0 ? 'animate-reaction-pop' : ''}`}
         aria-hidden
       >
-        <Icon size={iconSize} strokeWidth={1.75} aria-hidden />
+        <Icon size={iconSize} strokeWidth={2.5} aria-hidden />
         {popKey > 0 &&
           SPARKLES.map((s, i) => (
             <span

@@ -169,18 +169,6 @@ export function PublicTimelineRail({
 
   const emptyMessage = 'まだ公開された投稿はありません';
 
-  // design1: ヘッダに今週の投稿件数を出す。週初は月曜 0:00 (JST 近似)。
-  const weeklyCount = (() => {
-    const jstNow = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }),
-    );
-    const diffToMonday = (jstNow.getDay() + 6) % 7;
-    const monday = new Date(jstNow);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(jstNow.getDate() - diffToMonday);
-    return visibleEntries.filter((e) => new Date(e.createdAt) >= monday).length;
-  })();
-
   // 削除成功時の楽観的更新: 該当エントリを職員室ノート cache から除去する
   // (server fetch を待つと体感ラグ + race で楽観的更新が古い結果に上書きされるため)。
   // 編集は TodayCaptureBox 内の refreshFeeds (mutate) に委ねる。
@@ -209,22 +197,7 @@ export function PublicTimelineRail({
       data-testid="public-timeline-rail"
       aria-label="職員室ノート"
     >
-      {/* chimo 2026-06-12: マイノートタブを撤去し職員室ノート単独に。 */}
-      <header className="flex items-baseline justify-between gap-2 border-b border-vn-border px-5">
-        <h2
-          className="pb-3.5 pt-5 text-[16px] font-bold leading-[1.4] text-slate-800"
-          data-testid="public-timeline-rail-title"
-        >
-          職員室ノート
-        </h2>
-        <span
-          className="text-[12px] font-medium text-vn-ink-sub"
-          data-testid="public-timeline-rail-weekly-count"
-        >
-          今週{weeklyCount}件
-        </span>
-      </header>
-
+      {/* chimo 2026-07-02: 「職員室ノート」見出しと「今週◯件」表示を撤去。 */}
       {/* design1 (chimo 2026-06-25): rail 上部に職員室ノート投稿フォームをインライン展開。
           side (PC 右レーン) と page (モバイル独立タブ) で表示。modal では出さない。
           chimo 2026-06-26: page は暗いページ背景に直置きで暗く見えたため、他タブ (ふりかえり) と
@@ -263,7 +236,7 @@ export function PublicTimelineRail({
           </p>
         )}
         {data && visibleEntries.length > 0 && (
-          <ul className="divide-y divide-slate-100">
+          <ul className="space-y-3 px-4 py-4">
             {visibleEntries.map((e) => (
               <RailItem
                 key={e.id}
@@ -320,6 +293,21 @@ export function PublicTimelineRail({
   );
 }
 
+// カード左の頭文字アバター (chimo 2026-07-02): 色は 1 色 (ニュートラルなグレー) に統一。
+// 主役アクセント (オレンジ) を目立たせるため、アバターは意味を持たない静かな地色にする。
+function AuthorAvatar({ name }: { name: string }) {
+  const trimmed = name?.trim() ?? '';
+  const initial = trimmed.charAt(0) || '?';
+  return (
+    <span
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[15px] font-bold text-slate-500"
+      aria-hidden
+    >
+      {initial}
+    </span>
+  );
+}
+
 function RailItem({
   entry,
   isMine,
@@ -369,49 +357,58 @@ function RailItem({
 
   return (
     <li
-      className="px-5 py-3.5"
+      className="rounded-[16px] border border-vn-border bg-vn-surface px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
       data-testid={`public-timeline-rail-item-${entry.id}`}
     >
-      {/* 1 行目: 投稿者 + 時刻 + kind + mood (左) / 3 点リーダー (右、 isMine のみ)
-          chimo 2026-05-20 font-tune: 投稿者 600/slate-600、 メタ (時刻) 400/slate-400 */}
-      <header className="flex items-start justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-          <span className="font-semibold text-slate-600">{author}</span>
-          <time
-            dateTime={new Date(entry.createdAt).toISOString()}
-            className="font-normal text-slate-400"
-          >
-            {formatRelativeTime(entry.createdAt)}
-          </time>
-          {MoodIcon && (
-            <MoodIcon
-              size={14}
-              className="text-slate-400"
-              aria-label={moodLabel ?? 'mood'}
-              data-testid={`public-timeline-rail-mood-${entry.id}`}
-            />
+      {/* 1 行目: アバター + 投稿者 / 時刻 + mood (左) / 3 点リーダー (右、 isMine のみ)
+          chimo 2026-07-02 デザイン刷新: 独立カード + 頭文字アバター + 名前上・時刻下の縦積み。 */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <AuthorAvatar name={author} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-[15px] font-semibold text-slate-800">
+                {author}
+              </span>
+              {MoodIcon && (
+                <MoodIcon
+                  size={14}
+                  className="shrink-0 text-slate-400"
+                  aria-label={moodLabel ?? 'mood'}
+                  data-testid={`public-timeline-rail-mood-${entry.id}`}
+                />
+              )}
+            </div>
+            <time
+              dateTime={new Date(entry.createdAt).toISOString()}
+              className="text-[12px] font-normal text-slate-400"
+            >
+              {formatRelativeTime(entry.createdAt)}
+            </time>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {isMine && (
+            <>
+              {entry.isPublic === false && (
+                <span
+                  className="text-[10px] text-slate-400"
+                  data-testid={`public-timeline-rail-private-${entry.id}`}
+                >
+                  自分のみ
+                </span>
+              )}
+              <RailItemMenu
+                entryId={entry.id}
+                onEdit={() => onEdit(entry)}
+                onDelete={() => onDelete(entry.id)}
+              />
+            </>
           )}
         </div>
-        {isMine && (
-          <div className="flex shrink-0 items-center gap-1.5">
-            {entry.isPublic === false && (
-              <span
-                className="text-[10px] text-slate-400"
-                data-testid={`public-timeline-rail-private-${entry.id}`}
-              >
-                自分のみ
-              </span>
-            )}
-            <RailItemMenu
-              entryId={entry.id}
-              onEdit={() => onEdit(entry)}
-              onDelete={() => onDelete(entry.id)}
-            />
-          </div>
-        )}
       </header>
       {/* 2 行目: content (chimo 2026-05-21: 字数制限を廃止して全文表示。 改行も尊重) */}
-      <p className="mt-1.5 whitespace-pre-wrap text-[13px] font-normal leading-[1.7] text-slate-700">
+      <p className="mt-3 whitespace-pre-wrap text-[14px] font-normal leading-[1.8] text-slate-700">
         {entry.content}
       </p>
       {/* 3 行目: tags + リアクション 3 ボタン (knowledge / appreciation / endorsement)
@@ -438,7 +435,7 @@ function RailItem({
           )}
         </div>
       )}
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-0.5 gap-y-1.5">
         {REACTION_TYPES_ORDER.map((type) => {
           const r = reactions[type];
           return (
@@ -450,8 +447,8 @@ function RailItem({
               onToggle={() => void onToggleReaction(entry.id, type, !r.mine)}
               testId={`public-timeline-rail-reaction-${type}-${entry.id}`}
               iconSize={16}
-              shapeClass="group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors"
-              notMineClass="border-slate-300 bg-slate-50 text-slate-500 hover:text-slate-700"
+              shapeClass="group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium transition-colors"
+              notMineClass="text-slate-500 hover:text-slate-700"
             />
           );
         })}
@@ -485,13 +482,13 @@ function AiPostRailItem({
   const reactions = entry.reactions ?? emptyReactions();
   return (
     <li
-      className="border-y border-vn-morning-border bg-vn-morning-bg px-5 py-3.5"
+      className="rounded-[16px] border border-vn-ai-border bg-vn-ai-bg px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)]"
       data-testid={`public-timeline-rail-item-${entry.id}`}
       data-ai-post="true"
     >
       <header className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-          <span className="font-semibold text-vn-morning-text">vitanota AI</span>
+          <span className="font-semibold text-vn-ai-text">vitanota AI</span>
           <time
             dateTime={new Date(entry.createdAt).toISOString()}
             className="font-normal text-vn-ink-sub"
@@ -499,7 +496,7 @@ function AiPostRailItem({
             {formatRelativeTime(entry.createdAt)}
           </time>
           <span
-            className="inline-flex items-center gap-1 rounded-full bg-vn-morning-border/50 px-2 py-0.5 text-[10px] font-medium text-vn-morning-text"
+            className="inline-flex items-center gap-1 rounded-full bg-vn-ai-border/50 px-2 py-0.5 text-[10px] font-medium text-vn-ai-text"
             data-testid={`public-timeline-rail-ai-badge-${entry.id}`}
           >
             <Sparkles size={10} strokeWidth={1.75} aria-hidden />
@@ -519,7 +516,7 @@ function AiPostRailItem({
       <p className="mt-2 whitespace-pre-wrap font-ai-card text-[14px] leading-[1.9] text-slate-800">
         {entry.content}
       </p>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-0.5 gap-y-1.5">
         {REACTION_TYPES_ORDER.map((type) => {
           const r = reactions[type];
           return (
@@ -531,8 +528,8 @@ function AiPostRailItem({
               onToggle={() => void onToggleReaction(entry.id, type, !r.mine)}
               testId={`public-timeline-rail-reaction-${type}-${entry.id}`}
               iconSize={16}
-              shapeClass="group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors"
-              notMineClass="border-vn-border bg-white/70 text-vn-morning-text hover:bg-white"
+              shapeClass="group/reaction relative inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium transition-colors"
+              notMineClass="text-vn-ai-text hover:text-vn-ink"
             />
           );
         })}

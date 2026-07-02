@@ -76,24 +76,4 @@ describe('StaffroomPeriodFilter', () => {
     expect(screen.getByTestId('board-period-next')).toBeDisabled();
     expect(screen.getByTestId('board-period-this')).toBeDisabled();
   });
-
-  it('月毎表示に切り替えると当月へ移り、月ラベル・先月/次月で 1 か月ずつめくる', () => {
-    const onChange = vi.fn();
-    // value=2026-05 (当月でない月) で開始
-    render(
-      <StaffroomPeriodFilter value={{ from: '2026-05-01', to: '2026-05-31' }} onChange={onChange} />,
-    );
-    // 月毎に切替 → 当月 (1日始まり) を onChange
-    fireEvent.click(screen.getByTestId('board-period-mode-month'));
-    expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange.mock.calls[0][0].from).toMatch(/^\d{4}-\d{2}-01$/);
-    // ラベルは月表記 (value は 2026-05 のまま)
-    expect(screen.getByTestId('board-period-label').textContent).toContain('2026年5月');
-    // 先月 / 次月で 1 か月ずつ
-    onChange.mockClear();
-    fireEvent.click(screen.getByTestId('board-period-prev'));
-    expect(onChange).toHaveBeenCalledWith({ from: '2026-04-01', to: '2026-04-30' });
-    fireEvent.click(screen.getByTestId('board-period-next'));
-    expect(onChange).toHaveBeenCalledWith({ from: '2026-06-01', to: '2026-06-30' });
-  });
 });

@@ -181,11 +181,18 @@ const EXAMPLE =
 export function RoughCaptureSection({
   selfUserId,
   headerRight,
+  initialInput = '',
+  autoExtract = false,
+  embedded = false,
 }: {
   selfUserId: string;
   headerRight?: ReactNode;
+  // モーダル起動時: コンパクトバーで打った文字を引き継ぐ / 即整理する / 外枠 (section chrome) を省く。
+  initialInput?: string;
+  autoExtract?: boolean;
+  embedded?: boolean;
 }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialInput);
   const [view, setView] = useState<View>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const inputStartedFiredRef = useRef(false);
@@ -278,6 +285,18 @@ export function RoughCaptureSection({
       setView({ kind: 'idle' });
     }
   };
+
+  // モーダル起動時 (autoExtract): コンパクトバーで打った文字を 1 度だけ即整理する。
+  const autoExtractFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoExtractFiredRef.current) return;
+    if (autoExtract && initialInput.trim().length > 0) {
+      autoExtractFiredRef.current = true;
+      void handleExtract();
+    }
+    // handleExtract は毎 render 新しい closure だが ref ガードで 1 回に固定するため deps に含めない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExtract, initialInput]);
 
   const updateRow = (
     index: number,
@@ -444,14 +463,25 @@ export function RoughCaptureSection({
   return (
     <section
       data-testid="rough-capture-section"
-      className="mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]"
+      className={
+        embedded
+          ? ''
+          : 'mb-5 rounded-[14px] border border-vn-border bg-white px-7 pb-4 pt-5 shadow-[0_4px_16px_rgba(15,23,42,0.04)]'
+      }
     >
-      <header className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
-          タスクを書き出す
-        </h2>
-        {headerRight}
-      </header>
+      {/* embedded (モーダル内) では見出しはモーダル側が担うので h2 を省く。headerRight (手動切替) は残す。 */}
+      {(!embedded || headerRight) && (
+        <header className="mb-2 flex items-center justify-between gap-3">
+          {embedded ? (
+            <span aria-hidden />
+          ) : (
+            <h2 className="text-[20px] font-bold leading-[1.4] text-slate-800">
+              タスクを書き出す
+            </h2>
+          )}
+          {headerRight}
+        </header>
+      )}
 
       {view.kind === 'idle' || view.kind === 'loading' ? (
         <InputView

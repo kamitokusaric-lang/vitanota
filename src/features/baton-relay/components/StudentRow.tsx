@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Smile, Eye, MoreVertical, Check, X } from 'lucide-react';
+import { Smile, Eye, MoreVertical, Check, X, Plus } from 'lucide-react';
 import type {
   StudentDto,
   BatonNoteDto,
@@ -53,6 +53,7 @@ export function StudentRow({
 }: StudentRowProps) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [composing, setComposing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -101,9 +102,15 @@ export function StudentRow({
     try {
       await onAddNote(student.id, trimmed);
       setDraft('');
+      // 続けて書けるよう入力欄は開いたまま (閉じるは「閉じる」で明示)。
     } finally {
       setBusy(false);
     }
+  };
+
+  const closeComposer = () => {
+    setComposing(false);
+    setDraft('');
   };
 
   return (
@@ -285,9 +292,9 @@ export function StudentRow({
         </div>
       </div>
 
-      {/* その日の一言 */}
+      {/* その日の一言 (吹き出し) */}
       {notes.length > 0 && (
-        <ul className="mt-2.5 border-t border-vn-border pt-1.5">
+        <ul className="mt-2.5 space-y-1">
           {notes.map((note) => (
             <BatonNoteItem
               key={note.id}
@@ -305,31 +312,55 @@ export function StudentRow({
         </ul>
       )}
 
-      {/* 一言を残す (append) */}
-      <div className="mt-2.5 flex items-center gap-2">
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void submitNote();
-            }
-          }}
-          placeholder="ひとことを残す…"
-          maxLength={500}
-          className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-base placeholder:text-gray-400 focus:border-vn-accent focus:outline-none"
-        />
+      {/* 一言を残す: 既定は「＋ コメントを追加」で畳み、押すと入力欄を開く (印だけで済むよう任意性を強調) */}
+      {composing ? (
+        <div className="mt-2.5 rounded-vn border border-vn-border bg-white p-2.5">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void submitNote();
+              } else if (e.key === 'Escape') {
+                closeComposer();
+              }
+            }}
+            placeholder="ひとことを残す…"
+            maxLength={500}
+            autoFocus
+            className="w-full min-w-0 px-1.5 py-1 text-base placeholder:text-gray-400 focus:outline-none"
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeComposer}
+              className="rounded-md px-3 py-1.5 text-sm text-gray-400 transition-colors hover:text-gray-600"
+            >
+              閉じる
+            </button>
+            <button
+              type="button"
+              onClick={submitNote}
+              disabled={busy || !draft.trim()}
+              className="rounded-md bg-vn-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-vn-accent-hover disabled:opacity-40"
+            >
+              残す
+            </button>
+          </div>
+        </div>
+      ) : (
         <button
           type="button"
-          onClick={submitNote}
-          disabled={busy || !draft.trim()}
-          className="flex-shrink-0 rounded-md border border-vn-accent bg-white px-3.5 py-2 text-sm font-medium text-vn-accent transition-colors hover:bg-vn-accent-bg disabled:opacity-40"
+          onClick={() => setComposing(true)}
+          className="mt-2.5 inline-flex items-center gap-1 rounded-md border border-dashed border-vn-border px-3 py-1.5 text-sm font-medium text-gray-400 transition-colors hover:border-vn-border-strong hover:text-gray-600"
+          data-testid={`student-add-note-${student.id}`}
         >
-          残す
+          <Plus size={15} aria-hidden />
+          コメントを追加
         </button>
-      </div>
+      )}
     </div>
   );
 }

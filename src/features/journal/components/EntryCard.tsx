@@ -155,7 +155,7 @@ export function EntryCard({
           const reactions = entry.reactions;
           return (
             <div
-              className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"
+              className="mt-2 flex flex-wrap items-center gap-x-0.5 gap-y-1"
               data-testid={`entry-card-tags-${entry.id}`}
             >
               {hasTags &&
@@ -179,8 +179,8 @@ export function EntryCard({
                       onToggle={() => onReactionToggle!(entry, type, !r.mine)}
                       testId={`entry-card-reaction-${type}-${entry.id}`}
                       iconSize={14}
-                      shapeClass="group/reaction relative inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium transition-colors"
-                      notMineClass="border-transparent bg-vn-muted-bg text-gray-500 hover:text-gray-700"
+                      shapeClass="group/reaction relative inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors"
+                      notMineClass="text-gray-500 hover:text-gray-700"
                     />
                   );
                 })}

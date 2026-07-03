@@ -163,7 +163,7 @@ export default function DashboardPage({
     {
       // タスク整理する: タスクボード。
       id: 'tasks',
-      label: 'タスク整理する',
+      label: 'タスクを整理する',
       icon: <ListChecks size={18} strokeWidth={1.75} aria-hidden />,
       content: (
         <TasksTabWithCalendar

@@ -69,7 +69,8 @@ export class FoundationStack extends cdk.Stack {
     // PRIVATE_ISOLATED Lambda（db-migrator）から Secrets Manager API に到達するため必須
     vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      // 1 AZ に集約（RDS 単一 AZ に可用性基準を揃え、Endpoint 課金を半減）
+      subnets: { subnets: [vpc.isolatedSubnets[0]] },
       securityGroups: [this.appSecurityGroup],
       privateDnsEnabled: true,
     });
@@ -79,7 +80,8 @@ export class FoundationStack extends cdk.Stack {
     // NAT 撤廃 (2026-04-22) 後は VPC Endpoint 経由のみで AWS API outbound できる。
     vpc.addInterfaceEndpoint('LambdaEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.LAMBDA,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      // 1 AZ に集約（RDS 単一 AZ に可用性基準を揃え、Endpoint 課金を半減）
+      subnets: { subnets: [vpc.isolatedSubnets[0]] },
       securityGroups: [this.appSecurityGroup],
       privateDnsEnabled: true,
     });
@@ -90,7 +92,8 @@ export class FoundationStack extends cdk.Stack {
     // 永久 hang → CloudFront 30s timeout で 504 になる (2026-05-15 観測)。
     vpc.addInterfaceEndpoint('CloudWatchMonitoringEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      // 1 AZ に集約（RDS 単一 AZ に可用性基準を揃え、Endpoint 課金を半減）
+      subnets: { subnets: [vpc.isolatedSubnets[0]] },
       securityGroups: [this.appSecurityGroup],
       privateDnsEnabled: true,
     });

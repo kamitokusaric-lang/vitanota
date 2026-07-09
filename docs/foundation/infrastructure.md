@@ -269,6 +269,26 @@ IAM (7 ロール):
 
 当初予算 ¥6,000-8,000/月に対して **+¥2,000-4,000 超過**。主因は Secrets Manager VPC Endpoint（$20/月）。
 
+> ⚠️ 上の「As-Built」節は 2026-04-19 時点のスナップショット。以降 NAT 撤廃（2026-04-22）・Endpoint 追加（〜2026-05-15）で実態が乖離している。**現状の正は下記「2026-07 更新」節と CDK（`infra/lib/foundation-stack.ts` / `data-core-stack.ts`）**。
+
+### 2026-07 更新: VPC Interface Endpoint を 1 AZ 化
+
+2026年6月請求で **VPC $64.08 が最大費目**（RDS $41.52 超）と判明。NAT 撤廃済み（`natGateways: 0`）のため、この $64 はほぼ全額が VPC Interface Endpoint 課金だった。
+
+**現状の Interface Endpoint（3 本、いずれも `PRIVATE_ISOLATED`・`privateDnsEnabled`）**:
+
+| Endpoint | サービス | 用途 |
+|---|---|---|
+| SecretsManagerEndpoint | `SECRETS_MANAGER` | db-migrator Lambda が Secrets Manager 到達 |
+| LambdaEndpoint | `LAMBDA` | AppRunner → AI チャット整理 Lambda を InvokeFunction |
+| CloudWatchMonitoringEndpoint | `CLOUDWATCH_MONITORING` | `/admin/access-distribution` の CloudWatch Metrics GetMetricData（無いと 504・2026-05-15 観測） |
+
+**変更**: 3 本の `subnets` を 2 AZ 全展開から **単一 AZ（`isolatedSubnets[0]`）** に絞った（ENI 6→3）。RDS が `multiAz: false` の単一 AZ で**可用性の基準線が既に単一 AZ**である以上、Endpoint だけ 2 AZ 冗長にする実益は無いという判断。時間課金が半減し **月 約$30 削減**（AZ 障害時はどのみち単一 AZ RDS が落ちアプリ停止するため実損なし）。別 AZ の消費側は残った 1 本の ENI へクロス AZ で到達（機能無変更・転送量は KB 単位で無視可）。
+
+| 項目 | 変更前 | 変更後 |
+|---|---|---|
+| Interface Endpoint 課金（3 本） | 2 AZ・~$61/月 | 1 AZ・~$30/月 |
+
 ### 稼働状況サマリ
 
 | フロー | 状態 |

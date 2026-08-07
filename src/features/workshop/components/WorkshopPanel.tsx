@@ -168,7 +168,7 @@ export function WorkshopPanel() {
                   className="rounded-full bg-vn-accent px-5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-vn-accent-hover disabled:opacity-40"
                   data-testid="workshop-checkin-submit"
                 >
-                  {myCheckin ? '書き直す' : '置いておく'}
+                  送信
                 </button>
               </div>
             </div>
@@ -260,7 +260,7 @@ export function WorkshopPanel() {
                   className="rounded-full bg-vn-accent px-5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-vn-accent-hover disabled:opacity-40"
                   data-testid="workshop-reflection-submit"
                 >
-                  残す
+                  送信
                 </button>
               </div>
             </div>
@@ -646,7 +646,7 @@ function TeamReflectionSection({
                 className="rounded-full bg-vn-accent px-5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-vn-accent-hover disabled:opacity-40"
                 data-testid="workshop-team-submit"
               >
-                {savedForTeam ? '書き直す' : '置いておく'}
+                送信
               </button>
             </div>
           </div>

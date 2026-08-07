@@ -49,16 +49,12 @@ import {
   updateNoteSchema,
   noteIdParamSchema,
   listNotesQuerySchema,
-  toggleReactionSchema,
-  listReactionsQuerySchema,
   classResponseSchema,
   classesListResponseSchema,
   studentResponseSchema,
   studentsListResponseSchema,
   batonNoteResponseSchema,
   notesListResponseSchema,
-  reactionsListResponseSchema,
-  toggleReactionResponseSchema,
   importRequestSchema,
   importResultResponseSchema,
 } from '@/features/baton-relay/schemas/batonRelay';
@@ -128,6 +124,20 @@ import {
   workshopCheckinResponseSchema,
   workshopTeamReflectionResponseSchema,
 } from './workshopSchemas';
+import {
+  gradeMeetingQuerySchema,
+  startGradeMeetingSchema,
+  addClassNoteSchema,
+  classNoteIdParamSchema,
+  createGradeTaskSchema,
+  unlinkGradeTaskSchema,
+} from '@/features/grade-meeting/schemas/gradeMeeting';
+import {
+  gradeMeetingBoardResponseSchema,
+  gradeMeetingStartResponseSchema,
+  classMeetingNoteResponseSchema,
+  gradeTaskResponseSchema,
+} from './gradeMeetingSchemas';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -1436,40 +1446,7 @@ export function buildOpenApiDocument() {
     },
   });
 
-  registry.registerPath({
-    method: 'get',
-    path: '/api/baton-relay/reactions',
-    summary: '生徒への印（ポジティブ/気になる）一覧取得（クラス指定）',
-    tags: ['Baton Relay'],
-    security: [sessionCookie],
-    request: { query: listReactionsQuerySchema },
-    responses: {
-      200: {
-        description: 'リアクション一覧',
-        content: { 'application/json': { schema: reactionsListResponseSchema } },
-      },
-      ...errorResponses,
-    },
-  });
 
-  registry.registerPath({
-    method: 'post',
-    path: '/api/baton-relay/reactions',
-    summary: '生徒への印をトグル（付与/解除）',
-    description: 'positive(ポジティブ)/concern(気になる)。複数教員が各自トグル。数値化・ランキングはしない。',
-    tags: ['Baton Relay'],
-    security: [sessionCookie],
-    request: {
-      body: { content: { 'application/json': { schema: toggleReactionSchema } } },
-    },
-    responses: {
-      200: {
-        description: 'トグル後の状態',
-        content: { 'application/json': { schema: toggleReactionResponseSchema } },
-      },
-      ...errorResponses,
-    },
-  });
 
   registry.registerPath({
     method: 'post',
@@ -1629,6 +1606,132 @@ export function buildOpenApiDocument() {
           'application/json': { schema: workshopTeamReflectionResponseSchema },
         },
       },
+      ...errorResponses,
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // /api/grade-meeting - 学年会 (クラス状況を持ち寄る同期 Orient の場)
+  // 卓上の行はすべて無記名で返す (author を含めない)。
+  // ─────────────────────────────────────────────────────────────
+  registry.registerPath({
+    method: 'get',
+    path: '/api/grade-meeting',
+    summary: '学年の卓上（クラス + 今回の会 + 観察/状況判断/次の一手 + 前回の一手）',
+    description:
+      'Cache-Control: private, no-store。学年が設定されたクラスだけを、クラス名順で返す（「活発な順」等のソートは提供しない）。会がまだ無ければ meeting=null（自動では作らない）。行に author は含めない（無記名）。',
+    tags: ['GradeMeeting'],
+    security: [sessionCookie],
+    request: { query: gradeMeetingQuerySchema },
+    responses: {
+      200: {
+        description: '学年の卓上',
+        content: {
+          'application/json': { schema: gradeMeetingBoardResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/grade-meeting',
+    summary: '学年会をはじめる（同学年・同日なら既存の会を返す）',
+    description:
+      '手で押したときだけ回を作る（自動生成しない）。二度押しで会は増えない。',
+    tags: ['GradeMeeting'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: startGradeMeetingSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '学年会',
+        content: {
+          'application/json': { schema: gradeMeetingStartResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/grade-meeting/notes',
+    summary: '卓上に1行置く（観察 / 状況判断 / 次の一手）',
+    description:
+      'observe・orient は何行でも積む（複数の見立てを1つに畳まない）。action は 1回×1クラスで1行なので upsert になる。レスポンスに author は含めない。',
+    tags: ['GradeMeeting'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: addClassNoteSchema } } },
+    },
+    responses: {
+      200: {
+        description: '置いた行',
+        content: {
+          'application/json': { schema: classMeetingNoteResponseSchema },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/grade-meeting/notes/{id}',
+    summary: '卓上から1行引っ込める',
+    description:
+      '観察・状況判断は本人のみ、次の一手はテナント内なら誰でも（RLS で判定）。消せない場合は、他人の行か存在しないかを区別せず 404 を返す（誰が書いたかを推測させない）。',
+    tags: ['GradeMeeting'],
+    security: [sessionCookie],
+    request: { params: classNoteIdParamSchema },
+    responses: {
+      204: { description: '引っ込めた' },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/grade-meeting/tasks',
+    summary: '学年の「やること」を1つ起こす（実体は既存 tasks）',
+    description:
+      'クラスに紐づかない仕事（行事の準備・学年通信・保護者対応など）。TODO の仕組みを学年会の中に二重に作らず、既存 tasks に作って中間テーブルで会に紐付ける。担当・期限・完了はタスク側の仕組みをそのまま使い、タスクタブにも出る。',
+    tags: ['GradeMeeting'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: createGradeTaskSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '起こしたやること',
+        content: { 'application/json': { schema: gradeTaskResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/grade-meeting/tasks',
+    summary: '会から「やること」を外す（タスク本体は残す）',
+    description:
+      '紐付けだけを外す。タスクタブで生きているものを学年会の画面から消させない。',
+    tags: ['GradeMeeting'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: unlinkGradeTaskSchema } },
+      },
+    },
+    responses: {
+      204: { description: '外した' },
       ...errorResponses,
     },
   });

@@ -6,15 +6,13 @@ import {
   classRepo,
   studentRepo,
   batonNoteRepo,
-  studentReactionRepo,
 } from './batonRelayRepository';
 import type {
   Class,
   Student,
   BatonNote,
-  StudentReaction,
 } from '@/db/schema';
-import type { StudentReactionTypeInput, ImportRow, ImportResult } from '../schemas/batonRelay';
+import type { ImportRow, ImportResult } from '../schemas/batonRelay';
 import { planRosterImport } from './rosterImportPlan';
 
 // ── DTO (response 形に整える) ──────────────────────────────────
@@ -23,6 +21,7 @@ export interface ClassDto {
   name: string;
   goalText: string | null;
   schoolYear: string | null;
+  grade: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,16 +40,10 @@ export interface BatonNoteDto {
   studentId: string;
   authorUserId: string | null;
   noteDate: string;
-  content: string;
+  sign: 'good' | 'concern' | null;
+  content: string | null;
   createdAt: string;
   updatedAt: string;
-}
-export interface StudentReactionDto {
-  id: string;
-  studentId: string;
-  userId: string;
-  reactionType: 'positive' | 'concern';
-  createdAt: string;
 }
 
 function toClassDto(c: Class): ClassDto {
@@ -59,6 +52,7 @@ function toClassDto(c: Class): ClassDto {
     name: c.name,
     goalText: c.goalText,
     schoolYear: c.schoolYear,
+    grade: c.grade,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -81,18 +75,10 @@ function toNoteDto(n: BatonNote): BatonNoteDto {
     studentId: n.studentId,
     authorUserId: n.authorUserId,
     noteDate: n.noteDate,
+    sign: n.sign,
     content: n.content,
     createdAt: n.createdAt.toISOString(),
     updatedAt: n.updatedAt.toISOString(),
-  };
-}
-function toReactionDto(r: StudentReaction): StudentReactionDto {
-  return {
-    id: r.id,
-    studentId: r.studentId,
-    userId: r.userId,
-    reactionType: r.reactionType,
-    createdAt: r.createdAt.toISOString(),
   };
 }
 
@@ -107,7 +93,7 @@ export class BatonRelayService {
 
   async createClass(
     ctx: AuthContext,
-    params: { name: string; goalText?: string; schoolYear?: string },
+    params: { name: string; goalText?: string; schoolYear?: string; grade?: number },
   ): Promise<ClassDto> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return toClassDto(await classRepo.create(tx, ctx, params));
@@ -117,7 +103,12 @@ export class BatonRelayService {
   async updateClass(
     ctx: AuthContext,
     id: string,
-    params: { name?: string; goalText?: string | null; schoolYear?: string | null },
+    params: {
+      name?: string;
+      goalText?: string | null;
+      schoolYear?: string | null;
+      grade?: number | null;
+    },
   ): Promise<ClassDto | null> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const row = await classRepo.update(tx, ctx, id, params);
@@ -183,7 +174,12 @@ export class BatonRelayService {
 
   async createNote(
     ctx: AuthContext,
-    params: { studentId: string; noteDate: string; content: string },
+    params: {
+      studentId: string;
+      noteDate: string;
+      sign?: 'good' | 'concern';
+      content?: string;
+    },
   ): Promise<BatonNoteDto> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       return toNoteDto(await batonNoteRepo.create(tx, ctx, params));
@@ -193,49 +189,15 @@ export class BatonRelayService {
   async updateNote(
     ctx: AuthContext,
     id: string,
-    content: string,
+    params: { sign?: 'good' | 'concern' | null; content?: string | null },
   ): Promise<BatonNoteDto | null> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      const row = await batonNoteRepo.update(tx, ctx, id, content);
+      const row = await batonNoteRepo.update(tx, ctx, id, params);
       return row ? toNoteDto(row) : null;
     });
   }
 
-  async deleteNote(ctx: AuthContext, id: string): Promise<boolean> {
-    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      return batonNoteRepo.delete(tx, ctx, id);
-    });
-  }
-
-  // ── student_reactions (トグル) ──
-  async listReactions(
-    ctx: AuthContext,
-    classId: string,
-  ): Promise<StudentReactionDto[]> {
-    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      const rows = await studentReactionRepo.findByClass(tx, ctx, classId);
-      return rows.map(toReactionDto);
-    });
-  }
-
-  // 付与/解除のトグル。付与後の状態 (active) を返す。
-  async toggleReaction(
-    ctx: AuthContext,
-    studentId: string,
-    reactionType: StudentReactionTypeInput,
-  ): Promise<{ active: boolean }> {
-    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
-      const existing = await studentReactionRepo.findOwn(tx, ctx, studentId, reactionType);
-      if (existing) {
-        await studentReactionRepo.deleteOwn(tx, ctx, studentId, reactionType);
-        return { active: false };
-      }
-      await studentReactionRepo.insert(tx, ctx, studentId, reactionType);
-      return { active: true };
-    });
-  }
-
-  // ロスター CSV インポート (冪等)。1 トランザクションで既存を読み → 差分計算 → 適用。
+  // ── 名簿 CSV 取込 ──
   async importRoster(ctx: AuthContext, rows: ImportRow[]): Promise<ImportResult> {
     return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
       const existingClasses = await classRepo.findAll(tx, ctx);
@@ -272,6 +234,13 @@ export class BatonRelayService {
       return plan.summary;
     });
   }
+
+  async deleteNote(ctx: AuthContext, id: string): Promise<boolean> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      return batonNoteRepo.delete(tx, ctx, id);
+    });
+  }
+
 }
 
 export const batonRelayService = new BatonRelayService();

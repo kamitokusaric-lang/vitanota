@@ -1,45 +1,12 @@
-// staffroom の props 駆動コンポーネント (BoardCard / StaffroomPeriodFilter) の単体テスト。
+// staffroom の props 駆動コンポーネントの単体テスト。
+// 2026-08-07: 情報共有セクション撤去に伴い BoardCard を削除したため、
+// 残るのは週ナビ (StaffroomPeriodFilter) のみ。
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BoardCard } from '@/features/staffroom/components/BoardCard';
 import {
   StaffroomPeriodFilter,
   getDefaultBoardPeriod,
 } from '@/features/staffroom/components/StaffroomPeriodFilter';
-import type { BoardDto } from '@/features/staffroom/types';
-
-function makeBoard(o: Partial<BoardDto> = {}): BoardDto {
-  return {
-    id: o.id ?? 'b1',
-    authorUserId: o.authorUserId ?? 'u1',
-    content: o.content ?? 'プリントのコツを共有します',
-    isPublic: o.isPublic ?? true,
-    ...o,
-  } as BoardDto;
-}
-
-describe('BoardCard', () => {
-  it('本文と投稿者名を表示する', () => {
-    render(<BoardCard board={makeBoard({ authorUserId: 'u1' })} nameById={new Map([['u1', '田中先生']])} />);
-    expect(screen.getByText(/プリントのコツを共有します/)).toBeInTheDocument();
-    expect(screen.getByText(/田中先生/)).toBeInTheDocument();
-  });
-
-  it('投稿者名が引けないときは「ほかの先生」', () => {
-    render(<BoardCard board={makeBoard({ authorUserId: 'unknown' })} nameById={new Map()} />);
-    expect(screen.getByText(/ほかの先生/)).toBeInTheDocument();
-  });
-
-  it('非公開なら「自分だけ」を出す', () => {
-    render(<BoardCard board={makeBoard({ isPublic: false })} nameById={new Map()} />);
-    expect(screen.getByText('自分だけ')).toBeInTheDocument();
-  });
-
-  it('公開なら「自分だけ」を出さない', () => {
-    render(<BoardCard board={makeBoard({ isPublic: true })} nameById={new Map()} />);
-    expect(screen.queryByText('自分だけ')).not.toBeInTheDocument();
-  });
-});
 
 describe('StaffroomPeriodFilter', () => {
   it('getDefaultBoardPeriod は今週 (from <= to) を返す', () => {

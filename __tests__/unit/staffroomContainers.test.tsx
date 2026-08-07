@@ -4,73 +4,57 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 vi.mock('@/features/staffroom/hooks/useStaffroom', () => ({
-  useBoards: vi.fn(),
-  useTeacherNames: vi.fn(),
   useStudentSupport: vi.fn(),
 }));
 
+// 2026-08-07: StaffroomBoard の先頭に学年会 (grade-meeting) が載った。
+// ここでの関心は職員室ボード側なので、学年会は「クラスなし」の静止状態に固定して
+// 描画に混ざらないようにする (学年会自体は gradeMeeting.test.tsx でカバー)。
+vi.mock('@/features/grade-meeting/hooks/useGradeMeeting', () => ({
+  useGradeMeeting: () => ({
+    board: {
+      grade: 1,
+      classes: [],
+      meeting: null,
+      impressions: [],
+      previousMeeting: null,
+      previousActions: [],
+    },
+    isLoading: false,
+    error: undefined,
+    mutate: vi.fn(),
+    startMeeting: vi.fn(),
+    addNote: vi.fn(),
+    deleteNote: vi.fn(),
+  }),
+}));
+
 import {
-  useBoards,
-  useTeacherNames,
   useStudentSupport,
   type SupportClass,
 } from '@/features/staffroom/hooks/useStaffroom';
 import { StaffroomBoard } from '@/features/staffroom/components/StaffroomBoard';
 import { StudentSupportSection } from '@/features/staffroom/components/StudentSupportSection';
-import type { BoardDto } from '@/features/staffroom/types';
 
-const mUseBoards = vi.mocked(useBoards);
-const mUseTeacherNames = vi.mocked(useTeacherNames);
 const mUseStudentSupport = vi.mocked(useStudentSupport);
 
-function board(o: Partial<BoardDto> = {}): BoardDto {
-  return {
-    id: o.id ?? 'b1',
-    authorUserId: o.authorUserId ?? 'u1',
-    content: o.content ?? '本文',
-    isPublic: o.isPublic ?? true,
-    boardKind: o.boardKind ?? 'help',
-    reactions: o.reactions ?? { knowledge: { count: 0, mine: false }, appreciation: { count: 0, mine: false }, endorsement: { count: 0, mine: false } },
-    ...o,
-  } as BoardDto;
-}
 
 beforeEach(() => {
-  mUseTeacherNames.mockReturnValue(new Map([['u1', '田中先生']]));
   mUseStudentSupport.mockReturnValue({ classes: [], isLoading: false, error: undefined, mutate: vi.fn() } as ReturnType<typeof useStudentSupport>);
-  mUseBoards.mockReturnValue({ boards: [], isLoading: false, error: undefined, mutate: vi.fn() } as ReturnType<typeof useBoards>);
 });
 
 describe('StaffroomBoard', () => {
-  it('2 セクション (生徒の様子 / 情報共有) を描画する', () => {
-    render(<StaffroomBoard />);
-    expect(screen.getByText('生徒の様子')).toBeInTheDocument();
-    expect(screen.getByText('情報共有')).toBeInTheDocument();
+  // 2026-08-07: 「生徒の様子」と「情報共有」を撤去し、週ナビ + 学年会だけにした。
+  it('週ナビと学年会だけを描画する', () => {
+    render(<StaffroomBoard todayDate="2026-08-20" />);
+    expect(screen.getByTestId('board-period-label')).toBeInTheDocument();
+    expect(screen.getByTestId('grade-meeting-panel')).toBeInTheDocument();
   });
 
-  it('boards を kind の箱に振り分け、knowledge リアクション付きはナレッジ箱にも集計する', () => {
-    mUseBoards.mockReturnValue({
-      boards: [
-        board({ id: 'b1', boardKind: 'help', content: '相談です' }),
-        board({ id: 'b2', boardKind: 'thanks', content: 'ありがとう', reactions: { knowledge: { count: 2, mine: false }, appreciation: { count: 0, mine: false }, endorsement: { count: 0, mine: false } } }),
-      ],
-      isLoading: false,
-      error: undefined,
-      mutate: vi.fn(),
-    } as ReturnType<typeof useBoards>);
-    render(<StaffroomBoard />);
-    expect(screen.getByText('相談です')).toBeInTheDocument();
-    // thanks 投稿は thanks 箱 + (なるほど集計で) ナレッジ箱の両方に出る → content が 2 回
-    expect(screen.getAllByText('ありがとう').length).toBe(2);
-  });
-
-  it('loading 中はスピナー、error 時はエラーメッセージ', () => {
-    mUseBoards.mockReturnValue({ boards: [], isLoading: true, error: undefined, mutate: vi.fn() } as ReturnType<typeof useBoards>);
-    const { rerender } = render(<StaffroomBoard />);
-    expect(screen.getByRole('status')).toBeInTheDocument();
-    mUseBoards.mockReturnValue({ boards: [], isLoading: false, error: new Error('x'), mutate: vi.fn() } as ReturnType<typeof useBoards>);
-    rerender(<StaffroomBoard />);
-    expect(screen.getByText('ボードの取得に失敗しました')).toBeInTheDocument();
+  it('撤去したセクションは出さない', () => {
+    render(<StaffroomBoard todayDate="2026-08-20" />);
+    expect(screen.queryByText('生徒の様子')).not.toBeInTheDocument();
+    expect(screen.queryByText('情報共有')).not.toBeInTheDocument();
   });
 });
 
@@ -93,7 +77,7 @@ describe('StudentSupportSection', () => {
         className: '2-A',
         schoolYear: null,
         students: [
-          { studentId: 's1', displayName: 'さくら', positiveCount: 2, concernCount: 1, notes: ['朝、元気そう'] },
+          { studentId: 's1', displayName: 'さくら', goodCount: 2, concernCount: 1, impressions: [{ sign: null, content: '朝、元気そう' }] },
         ],
       },
     ];

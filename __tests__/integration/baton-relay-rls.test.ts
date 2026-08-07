@@ -17,7 +17,7 @@ import {
   type TestDb,
 } from './helpers/testDb';
 import { seedTenant, seedUser } from './helpers/seed';
-import { classes, students, batonNotes, studentReactions } from '@/db/schema';
+import { classes, students, batonNotes } from '@/db/schema';
 
 type Tenant = Awaited<ReturnType<typeof seedTenant>>;
 type User = Awaited<ReturnType<typeof seedUser>>;
@@ -164,53 +164,72 @@ describe('baton-relay RLS 境界', () => {
     expect(rows.length).toBeGreaterThanOrEqual(2);
   });
 
-  // ── reaction トグル一意 ─────────────────────────────────────
-  it('同じ生徒・同じ教員・同じ種別のリアクション二重 INSERT は一意制約で弾かれる', async () => {
+  // ── その日の印象 (0062: 印テーブルを廃止し baton_notes に統合) ─────
+  it('サインだけの印象を残せる (コメント無し)', async () => {
     await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
-      tx.insert(studentReactions).values({
+      tx.insert(batonNotes).values({
         tenantId: tenantA.id,
         studentId: studentX.id,
-        userId: teacherA1.id,
-        reactionType: 'concern',
+        authorUserId: teacherA1.id,
+        noteDate: TODAY,
+        sign: 'good',
       }),
     );
+    const rows = await withTenantContext(db, tenantA.id, teacherA2.id, (tx) =>
+      tx.select().from(batonNotes).where(eq(batonNotes.sign, 'good')),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].content).toBeNull();
+  });
+
+  it('サインもコメントも無い行は CHECK で弾かれる', async () => {
     await expect(
       withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
-        tx.insert(studentReactions).values({
+        tx.insert(batonNotes).values({
           tenantId: tenantA.id,
           studentId: studentX.id,
-          userId: teacherA1.id,
-          reactionType: 'concern',
+          authorUserId: teacherA1.id,
+          noteDate: TODAY,
         }),
       ),
     ).rejects.toThrow();
   });
 
-  it('別の教員は同じ生徒に独立してリアクションを付けられる', async () => {
+  it('同じ教員が同じ日に何度でも印象を残せる (append-only)', async () => {
+    for (const sign of ['good', 'concern'] as const) {
+      await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+        tx.insert(batonNotes).values({
+          tenantId: tenantA.id,
+          studentId: studentX.id,
+          authorUserId: teacherA1.id,
+          noteDate: TODAY,
+          sign,
+        }),
+      );
+    }
+    // beforeEach のコメント1件 + サイン2件
+    const rows = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      tx.select().from(batonNotes).where(eq(batonNotes.studentId, studentX.id)),
+    );
+    expect(rows).toHaveLength(3);
+    expect(rows.filter((r) => r.sign !== null)).toHaveLength(2);
+  });
+
+  it('サインとコメントを同じ行に持てる (コメントに印象が紐づく)', async () => {
     await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
-      tx.insert(studentReactions).values({
+      tx.insert(batonNotes).values({
         tenantId: tenantA.id,
         studentId: studentX.id,
-        userId: teacherA1.id,
-        reactionType: 'positive',
+        authorUserId: teacherA1.id,
+        noteDate: TODAY,
+        sign: 'concern',
+        content: '休み時間ひとりでいた',
       }),
     );
-    await withTenantContext(db, tenantA.id, teacherA2.id, (tx) =>
-      tx.insert(studentReactions).values({
-        tenantId: tenantA.id,
-        studentId: studentX.id,
-        userId: teacherA2.id,
-        reactionType: 'positive',
-      }),
+    const [row] = await withTenantContext(db, tenantA.id, teacherA2.id, (tx) =>
+      tx.select().from(batonNotes).where(eq(batonNotes.sign, 'concern')),
     );
-    const rows = await withTenantContext(
-      db,
-      tenantA.id,
-      adminA.id,
-      (tx) =>
-        tx.select().from(studentReactions).where(eq(studentReactions.studentId, studentX.id)),
-      'school_admin',
-    );
-    expect(rows).toHaveLength(2);
+    expect(row.sign).toBe('concern');
+    expect(row.content).toBe('休み時間ひとりでいた');
   });
 });

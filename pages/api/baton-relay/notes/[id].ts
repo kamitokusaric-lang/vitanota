@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     try {
       // RLS で自分の行以外は 0 件更新 → NOT_FOUND
-      const updated = await batonRelayService.updateNote(ctx, id, parsed.data.content);
+      const updated = await batonRelayService.updateNote(ctx, id, parsed.data);
       if (!updated) {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'ノートが見つかりません' });
       }

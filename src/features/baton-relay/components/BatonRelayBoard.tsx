@@ -8,10 +8,9 @@ import {
   useStudents,
   useArchivedStudents,
   useNotes,
-  useReactions,
   useTeacherNames,
 } from '../hooks/useBatonRelay';
-import type { StudentReactionType, StudentReactionDto } from '../types';
+import type { ImpressionSign } from '../types';
 import { ClassGoalHeader } from './ClassGoalHeader';
 import { StudentRow } from './StudentRow';
 import { RosterAdd } from './RosterAdd';
@@ -84,7 +83,6 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
     showArchived,
   );
   const { notes, mutate: mutateNotes } = useNotes(selectedClassId, date);
-  const { reactions, mutate: mutateReactions } = useReactions(selectedClassId);
   const nameById = useTeacherNames();
 
   // クラスが読めたら先頭を選択 (uncontrolled・未選択時のみ)
@@ -107,15 +105,6 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
     return map;
   }, [notes]);
 
-  const reactionsByStudent = useMemo(() => {
-    const map = new Map<string, StudentReactionDto[]>();
-    for (const r of reactions) {
-      const arr = map.get(r.studentId) ?? [];
-      arr.push(r);
-      map.set(r.studentId, arr);
-    }
-    return map;
-  }, [reactions]);
 
   // 生徒の並びはクラスタブと同じ氏名の自然昇順 (「10」が「2」の後)。
   // 印の数では並べ替えない (踏み絵: 数値で採点しない)。
@@ -135,10 +124,15 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
   );
 
   // ── handlers ──
-  const handleCreateClass = async (name: string, goalText: string) => {
+  const handleCreateClass = async (
+    name: string,
+    goalText: string,
+    grade?: number,
+  ) => {
     const res = await postJson('/api/baton-relay/classes', {
       name,
       goalText: goalText || undefined,
+      grade,
     });
     if (!res.ok) {
       showToast('クラスの作成に失敗しました', 'error');
@@ -220,42 +214,30 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
     await mutateClasses();
   };
 
-  const handleToggleReaction = (studentId: string, type: StudentReactionType) => {
-    const existing = reactions.find(
-      (r) => r.studentId === studentId && r.userId === currentUserId && r.reactionType === type,
-    );
-    // 楽観的更新
-    void mutateReactions(
-      (cur) => {
-        const list = cur?.reactions ?? [];
-        if (existing) {
-          return { reactions: list.filter((r) => r.id !== existing.id) };
-        }
-        const optimistic: StudentReactionDto = {
-          id: `temp-${crypto.randomUUID()}`,
-          studentId,
-          userId: currentUserId,
-          reactionType: type,
-          createdAt: new Date().toISOString(),
-        };
-        return { reactions: [...list, optimistic] };
-      },
-      { revalidate: false },
-    );
-    void (async () => {
-      const res = await postJson('/api/baton-relay/reactions', {
-        studentId,
-        reactionType: type,
-      });
-      if (!res.ok) showToast('印の保存に失敗しました', 'error');
-      void mutateReactions(); // 確定値で再検証
-    })();
-  };
-
-  const handleAddNote = async (studentId: string, content: string) => {
+  // 「今日の印象」をサインだけで残す (気軽に押せる導線)。
+  // append-only なので、押すたびに その日の印象が1行積まれる。
+  const handleQuickSign = async (studentId: string, sign: ImpressionSign) => {
     const res = await postJson('/api/baton-relay/notes', {
       studentId,
       noteDate: date,
+      sign,
+    });
+    if (!res.ok) {
+      showToast('印象の保存に失敗しました', 'error');
+      return;
+    }
+    await mutateNotes();
+  };
+
+  const handleAddNote = async (
+    studentId: string,
+    content: string,
+    sign?: ImpressionSign,
+  ) => {
+    const res = await postJson('/api/baton-relay/notes', {
+      studentId,
+      noteDate: date,
+      sign,
       content,
     });
     if (!res.ok) {
@@ -400,11 +382,10 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
                 key={s.id}
                 student={s}
                 notes={notesByStudent.get(s.id) ?? []}
-                reactions={reactionsByStudent.get(s.id) ?? []}
                 currentUserId={currentUserId}
                 nameById={nameById}
                 classes={classes}
-                onToggleReaction={handleToggleReaction}
+                onQuickSign={handleQuickSign}
                 onMoveStudent={handleMoveStudent}
                 onRenameStudent={handleRenameStudent}
                 onArchiveStudent={handleArchiveStudent}

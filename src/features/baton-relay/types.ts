@@ -5,12 +5,10 @@ import type {
   classResponseSchema,
   studentResponseSchema,
   batonNoteResponseSchema,
-  reactionResponseSchema,
-  studentReactionTypeSchema,
+  impressionSignSchema,
 } from './schemas/batonRelay';
 
 export type ClassDto = z.infer<typeof classResponseSchema>;
 export type StudentDto = z.infer<typeof studentResponseSchema>;
 export type BatonNoteDto = z.infer<typeof batonNoteResponseSchema>;
-export type StudentReactionDto = z.infer<typeof reactionResponseSchema>;
-export type StudentReactionType = z.infer<typeof studentReactionTypeSchema>;
+export type ImpressionSign = z.infer<typeof impressionSignSchema>;

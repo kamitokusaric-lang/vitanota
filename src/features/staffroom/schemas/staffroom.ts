@@ -88,12 +88,17 @@ export const boardListResponseSchema = z
 
 // ── 生徒サポート (A→B seam: 朝バトンをクラス(学年)別に集約) ──
 // 印が付いた生徒を クラスごとに 名前 + 印件数 + 今週の一言 で返す。
+// 0062: サインとコメントは同じ行に載る (コメントに Good/気になるが紐づく)。
+const supportImpressionSchema = z.object({
+  sign: z.enum(['good', 'concern']).nullable(),
+  content: z.string().nullable(),
+});
 const supportStudentSchema = z.object({
   studentId: z.string().guid(),
   displayName: z.string(),
-  positiveCount: z.number().int(),
+  goodCount: z.number().int(),
   concernCount: z.number().int(),
-  notes: z.array(z.string()),
+  impressions: z.array(supportImpressionSchema),
 });
 const supportClassSchema = z.object({
   classId: z.string().guid(),

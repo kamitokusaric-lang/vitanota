@@ -6,16 +6,13 @@ import {
   classes,
   students,
   batonNotes,
-  studentReactions,
 } from '@/db/schema';
 import type * as schema from '@/db/schema';
 import type {
   Class,
   Student,
   BatonNote,
-  StudentReaction,
 } from '@/db/schema';
-import type { StudentReactionTypeInput } from '../schemas/batonRelay';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -37,7 +34,7 @@ export class ClassRepository {
   async create(
     tx: DrizzleDb,
     ctx: BatonContext,
-    params: { name: string; goalText?: string; schoolYear?: string },
+    params: { name: string; goalText?: string; schoolYear?: string; grade?: number },
   ): Promise<Class> {
     const [row] = await tx
       .insert(classes)
@@ -46,6 +43,7 @@ export class ClassRepository {
         name: params.name,
         goalText: params.goalText ?? null,
         schoolYear: params.schoolYear ?? null,
+        grade: params.grade ?? null,
       })
       .returning();
     return row;
@@ -55,12 +53,18 @@ export class ClassRepository {
     tx: DrizzleDb,
     ctx: BatonContext,
     id: string,
-    params: { name?: string; goalText?: string | null; schoolYear?: string | null },
+    params: {
+      name?: string;
+      goalText?: string | null;
+      schoolYear?: string | null;
+      grade?: number | null;
+    },
   ): Promise<Class | undefined> {
     const patch: Partial<typeof classes.$inferInsert> = { updatedAt: new Date() };
     if (params.name !== undefined) patch.name = params.name;
     if (params.goalText !== undefined) patch.goalText = params.goalText;
     if (params.schoolYear !== undefined) patch.schoolYear = params.schoolYear;
+    if (params.grade !== undefined) patch.grade = params.grade;
     const [row] = await tx
       .update(classes)
       .set(patch)
@@ -180,7 +184,12 @@ export class BatonNoteRepository {
   async create(
     tx: DrizzleDb,
     ctx: BatonContext,
-    params: { studentId: string; noteDate: string; content: string },
+    params: {
+      studentId: string;
+      noteDate: string;
+      sign?: 'good' | 'concern' | null;
+      content?: string | null;
+    },
   ): Promise<BatonNote> {
     const [row] = await tx
       .insert(batonNotes)
@@ -189,7 +198,8 @@ export class BatonNoteRepository {
         studentId: params.studentId,
         authorUserId: ctx.userId,
         noteDate: params.noteDate,
-        content: params.content,
+        sign: params.sign ?? null,
+        content: params.content ?? null,
       })
       .returning();
     return row;
@@ -199,11 +209,15 @@ export class BatonNoteRepository {
     tx: DrizzleDb,
     ctx: BatonContext,
     id: string,
-    content: string,
+    params: { sign?: 'good' | 'concern' | null; content?: string | null },
   ): Promise<BatonNote | undefined> {
     const [row] = await tx
       .update(batonNotes)
-      .set({ content, updatedAt: new Date() })
+      .set({
+        ...(params.sign !== undefined ? { sign: params.sign } : {}),
+        ...(params.content !== undefined ? { content: params.content } : {}),
+        updatedAt: new Date(),
+      })
       .where(and(eq(batonNotes.id, id), eq(batonNotes.tenantId, ctx.tenantId)))
       .returning();
     return row;
@@ -218,84 +232,6 @@ export class BatonNoteRepository {
   }
 }
 
-// ── student_reactions (印・トグル) ─────────────────────────────
-export class StudentReactionRepository {
-  async findByClass(
-    tx: DrizzleDb,
-    ctx: BatonContext,
-    classId: string,
-  ): Promise<StudentReaction[]> {
-    const rows = await tx
-      .select({ reaction: studentReactions })
-      .from(studentReactions)
-      .innerJoin(
-        students,
-        and(
-          eq(students.id, studentReactions.studentId),
-          eq(students.tenantId, studentReactions.tenantId),
-        ),
-      )
-      .where(
-        and(eq(studentReactions.tenantId, ctx.tenantId), eq(students.classId, classId)),
-      );
-    return rows.map((r) => r.reaction);
-  }
-
-  async findOwn(
-    tx: DrizzleDb,
-    ctx: BatonContext,
-    studentId: string,
-    reactionType: StudentReactionTypeInput,
-  ): Promise<StudentReaction | undefined> {
-    const [row] = await tx
-      .select()
-      .from(studentReactions)
-      .where(
-        and(
-          eq(studentReactions.tenantId, ctx.tenantId),
-          eq(studentReactions.studentId, studentId),
-          eq(studentReactions.userId, ctx.userId),
-          eq(studentReactions.reactionType, reactionType),
-        ),
-      )
-      .limit(1);
-    return row;
-  }
-
-  async insert(
-    tx: DrizzleDb,
-    ctx: BatonContext,
-    studentId: string,
-    reactionType: StudentReactionTypeInput,
-  ): Promise<void> {
-    await tx.insert(studentReactions).values({
-      tenantId: ctx.tenantId,
-      studentId,
-      userId: ctx.userId,
-      reactionType,
-    });
-  }
-
-  async deleteOwn(
-    tx: DrizzleDb,
-    ctx: BatonContext,
-    studentId: string,
-    reactionType: StudentReactionTypeInput,
-  ): Promise<void> {
-    await tx
-      .delete(studentReactions)
-      .where(
-        and(
-          eq(studentReactions.tenantId, ctx.tenantId),
-          eq(studentReactions.studentId, studentId),
-          eq(studentReactions.userId, ctx.userId),
-          eq(studentReactions.reactionType, reactionType),
-        ),
-      );
-  }
-}
-
 export const classRepo = new ClassRepository();
 export const studentRepo = new StudentRepository();
 export const batonNoteRepo = new BatonNoteRepository();
-export const studentReactionRepo = new StudentReactionRepository();

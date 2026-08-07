@@ -25,6 +25,7 @@ import { useToast } from '@/shared/components/Toast';
 import { postStaffroomBoard } from '@/features/staffroom/lib/postStaffroomBoard';
 import type { StaffroomBoardKind } from '@/features/staffroom/types';
 import type { SuggestKind } from '@/features/ai-chat/kindSuggest';
+import { JOURNAL_KIND_META } from '../kindMeta';
 
 // note = 一般の公開メモ (旧 tweet/knowledge を集約)。board 4 種は意図つきの共有。
 export type CaptureKind = 'note' | StaffroomBoardKind;
@@ -44,8 +45,10 @@ function isBoardKind(kind: CaptureKind): kind is StaffroomBoardKind {
 // 種別チップ (chimo 2026-07-02 スクショ準拠: テキストのみの pill・アバターがカテゴリ別に変化)。
 // keep/concern (生徒系) は生徒ノート由来なので職員室ノート投稿の選択肢からは外す (踏み絵)。
 // 気づき/ひとりごとは「つぶやき」(note) に統一 (chimo 2026-06-25)。
-// Icon = 選択時にアバターへ出すカテゴリアイコン。chipOn = 選択チップの配色 (カテゴリ別)。
-// avatar = 選択時のアバター丸の地色 (カテゴリ別・白アイコン)。非選択チップは CHIP_OFF (グレー)。
+//
+// ラベルとアイコンは JOURNAL_KIND_META (src/features/journal/kindMeta.ts) が単一正本。
+// タイムラインの種別表示と同じ定義を使う (別々に持つとズレる)。
+// chipOn = 選択チップの配色 / avatar = 選択時のアバター丸の地色。非選択は CHIP_OFF。
 const RAIL_CHIPS: {
   id: string;
   kind: CaptureKind;
@@ -55,10 +58,10 @@ const RAIL_CHIPS: {
   avatar: string;
   placeholder: string;
 }[] = [
-  { id: 'note',   kind: 'note',   label: 'つぶやき',   Icon: MessageCircle,  chipOn: 'border border-vn-blue bg-vn-blue-bg text-vn-blue-text',       avatar: 'bg-vn-blue',   placeholder: '今日の小さな気づき・なるほどは?' },
-  { id: 'thanks', kind: 'thanks', label: '感謝',       Icon: Flower2,        chipOn: 'border border-vn-pink bg-vn-pink-bg text-vn-pink-text',       avatar: 'bg-vn-pink',   placeholder: '「ありがとう」を伝えたい人や出来事は?' },
-  { id: 'help',   kind: 'help',   label: '相談・確認', Icon: MessagesSquare, chipOn: 'border border-vn-accent bg-vn-accent-bg text-vn-accent-text', avatar: 'bg-vn-accent', placeholder: 'ちょっと聞きたい・確認したいこと、ありますか? 雑でOK、まず投げてみましょう。' },
-  { id: 'knowledge', kind: 'knowledge', label: 'ナレッジ', Icon: Lightbulb,  chipOn: 'border border-vn-yellow bg-vn-yellow-bg text-vn-yellow-text', avatar: 'bg-vn-yellow', placeholder: '他の先生の役に立ちそうな工夫・やり方・手順は?' },
+  { id: 'note',   kind: 'note',   ...JOURNAL_KIND_META.note,      chipOn: 'border border-vn-blue bg-vn-blue-bg text-vn-blue-text',       avatar: 'bg-vn-blue',   placeholder: '今日の小さな気づき・なるほどは?' },
+  { id: 'thanks', kind: 'thanks', ...JOURNAL_KIND_META.thanks,    chipOn: 'border border-vn-pink bg-vn-pink-bg text-vn-pink-text',       avatar: 'bg-vn-pink',   placeholder: '「ありがとう」を伝えたい人や出来事は?' },
+  { id: 'help',   kind: 'help',   ...JOURNAL_KIND_META.help,      chipOn: 'border border-vn-accent bg-vn-accent-bg text-vn-accent-text', avatar: 'bg-vn-accent', placeholder: 'ちょっと聞きたい・確認したいこと、ありますか? 雑でOK、まず投げてみましょう。' },
+  { id: 'knowledge', kind: 'knowledge', ...JOURNAL_KIND_META.knowledge, chipOn: 'border border-vn-yellow bg-vn-yellow-bg text-vn-yellow-text', avatar: 'bg-vn-yellow', placeholder: '他の先生の役に立ちそうな工夫・やり方・手順は?' },
 ];
 
 // 非選択チップの配色 (グレー・スクショ準拠)。

@@ -1560,6 +1560,10 @@ components:
           type:
             - string
             - "null"
+        grade:
+          type:
+            - integer
+            - "null"
         createdAt:
           type: string
         updatedAt:
@@ -1569,6 +1573,7 @@ components:
         - name
         - goalText
         - schoolYear
+        - grade
         - createdAt
         - updatedAt
     CreateClassInput:
@@ -1584,6 +1589,10 @@ components:
         schoolYear:
           type: string
           maxLength: 16
+        grade:
+          type: integer
+          minimum: 1
+          maximum: 12
       required:
         - name
     UpdateClassInput:
@@ -1603,6 +1612,12 @@ components:
             - string
             - "null"
           maxLength: 16
+        grade:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 12
     StudentList:
       type: object
       properties:
@@ -1698,8 +1713,18 @@ components:
             - "null"
         noteDate:
           type: string
+        sign:
+          type:
+            - string
+            - "null"
+          enum:
+            - good
+            - concern
+            - null
         content:
-          type: string
+          type:
+            - string
+            - "null"
         createdAt:
           type: string
         updatedAt:
@@ -1709,6 +1734,7 @@ components:
         - studentId
         - authorUserId
         - noteDate
+        - sign
         - content
         - createdAt
         - updatedAt
@@ -1720,74 +1746,33 @@ components:
         noteDate:
           type: string
           pattern: ^\d{4}-\d{2}-\d{2}$
+        sign:
+          type: string
+          enum:
+            - good
+            - concern
         content:
           type: string
-          minLength: 1
           maxLength: 500
       required:
         - studentId
         - noteDate
-        - content
     UpdateBatonNoteInput:
       type: object
       properties:
+        sign:
+          type:
+            - string
+            - "null"
+          enum:
+            - good
+            - concern
+            - null
         content:
-          type: string
-          minLength: 1
+          type:
+            - string
+            - "null"
           maxLength: 500
-      required:
-        - content
-    StudentReactionList:
-      type: object
-      properties:
-        reactions:
-          type: array
-          items:
-            $ref: "#/components/schemas/StudentReaction"
-      required:
-        - reactions
-    StudentReaction:
-      type: object
-      properties:
-        id:
-          type: string
-        studentId:
-          type: string
-        userId:
-          type: string
-        reactionType:
-          type: string
-          enum:
-            - positive
-            - concern
-        createdAt:
-          type: string
-      required:
-        - id
-        - studentId
-        - userId
-        - reactionType
-        - createdAt
-    ToggleStudentReactionResult:
-      type: object
-      properties:
-        active:
-          type: boolean
-      required:
-        - active
-    ToggleStudentReactionInput:
-      type: object
-      properties:
-        studentId:
-          type: string
-        reactionType:
-          type: string
-          enum:
-            - positive
-            - concern
-      required:
-        - studentId
-        - reactionType
     RosterImportResult:
       type: object
       properties:
@@ -1970,20 +1955,36 @@ components:
                       type: string
                     displayName:
                       type: string
-                    positiveCount:
+                    goodCount:
                       type: integer
                     concernCount:
                       type: integer
-                    notes:
+                    impressions:
                       type: array
                       items:
-                        type: string
+                        type: object
+                        properties:
+                          sign:
+                            type:
+                              - string
+                              - "null"
+                            enum:
+                              - good
+                              - concern
+                              - null
+                          content:
+                            type:
+                              - string
+                              - "null"
+                        required:
+                          - sign
+                          - content
                   required:
                     - studentId
                     - displayName
-                    - positiveCount
+                    - goodCount
                     - concernCount
-                    - notes
+                    - impressions
             required:
               - classId
               - className
@@ -2256,6 +2257,221 @@ components:
           default: ""
       required:
         - teamKey
+    GradeMeetingBoardResponse:
+      type: object
+      properties:
+        grade:
+          type: integer
+        availableGrades:
+          type: array
+          items:
+            type: integer
+        classes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GradeClassView"
+        meeting:
+          $ref: "#/components/schemas/GradeMeetingSummary"
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClassMeetingNoteView"
+        previousMeeting:
+          $ref: "#/components/schemas/GradeMeetingSummary"
+        previousActions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClassMeetingNoteView"
+        gradeTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/GradeMeetingTaskView"
+      required:
+        - grade
+        - availableGrades
+        - classes
+        - meeting
+        - notes
+        - previousMeeting
+        - previousActions
+        - gradeTasks
+    GradeClassView:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: 1-A
+        goalText:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - name
+        - goalText
+    GradeMeetingSummary:
+      type:
+        - object
+        - "null"
+      properties:
+        id:
+          type: string
+        grade:
+          type: integer
+          example: 1
+        heldOn:
+          type: string
+          example: 2026-08-20
+      required:
+        - id
+        - grade
+        - heldOn
+    ClassMeetingNoteView:
+      type: object
+      properties:
+        id:
+          type: string
+        classId:
+          type: string
+        kind:
+          type: string
+          enum:
+            - observe
+            - orient
+            - action
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - classId
+        - kind
+        - content
+        - createdAt
+    GradeMeetingTaskView:
+      type: object
+      properties:
+        taskId:
+          type: string
+        title:
+          type: string
+        dueDate:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          example: backlog
+        categoryId:
+          type: string
+        assignees:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              name:
+                type:
+                  - string
+                  - "null"
+            required:
+              - userId
+              - name
+      required:
+        - taskId
+        - title
+        - dueDate
+        - status
+        - categoryId
+        - assignees
+    GradeMeetingStartResponse:
+      type: object
+      properties:
+        meeting:
+          $ref: "#/components/schemas/GradeMeetingSummary"
+      required:
+        - meeting
+    StartGradeMeetingInput:
+      type: object
+      properties:
+        grade:
+          type: integer
+          minimum: 1
+          maximum: 12
+        heldOn:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+      required:
+        - grade
+    ClassMeetingNoteResponse:
+      type: object
+      properties:
+        note:
+          $ref: "#/components/schemas/ClassMeetingNoteView"
+      required:
+        - note
+    AddClassMeetingNoteInput:
+      type: object
+      properties:
+        meetingId:
+          type: string
+        classId:
+          type: string
+        kind:
+          type: string
+          enum:
+            - observe
+            - orient
+            - action
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+        - meetingId
+        - classId
+        - kind
+        - content
+    GradeMeetingTaskResponse:
+      type: object
+      properties:
+        task:
+          $ref: "#/components/schemas/GradeMeetingTaskView"
+      required:
+        - task
+    CreateGradeMeetingTaskInput:
+      type: object
+      properties:
+        meetingId:
+          type: string
+        categoryId:
+          type: string
+        title:
+          type: string
+          minLength: 1
+          maxLength: 15
+        dueDate:
+          type: string
+          pattern: ^\d{4}-\d{2}-\d{2}$
+      required:
+        - meetingId
+        - categoryId
+        - title
+    UnlinkGradeMeetingTaskInput:
+      type: object
+      properties:
+        meetingId:
+          type: string
+        taskId:
+          type: string
+      required:
+        - meetingId
+        - taskId
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -5998,117 +6214,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/baton-relay/reactions:
-    get:
-      summary: 生徒への印（ポジティブ/気になる）一覧取得（クラス指定）
-      tags:
-        - Baton Relay
-      security:
-        - *a2
-      parameters:
-        - schema:
-            type: string
-          required: true
-          name: classId
-          in: query
-      responses:
-        "200":
-          description: リアクション一覧
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StudentReactionList"
-        "400":
-          description: バリデーションエラー
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: 未認証
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: 権限不足
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: リソースが見つからない
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "423":
-          description: テナント停止中
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: サーバーエラー
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    post:
-      summary: 生徒への印をトグル（付与/解除）
-      description: positive(ポジティブ)/concern(気になる)。複数教員が各自トグル。数値化・ランキングはしない。
-      tags:
-        - Baton Relay
-      security:
-        - *a2
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ToggleStudentReactionInput"
-      responses:
-        "200":
-          description: トグル後の状態
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ToggleStudentReactionResult"
-        "400":
-          description: バリデーションエラー
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: 未認証
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: 権限不足
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: リソースが見つからない
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "423":
-          description: テナント停止中
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: サーバーエラー
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/baton-relay/import:
     post:
       summary: ロスター CSV インポート（クラス・クラス目標・生徒を一括登録）
@@ -6555,6 +6660,350 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkshopTeamReflectionResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/grade-meeting:
+    get:
+      summary: 学年の卓上（クラス + 今回の会 + 観察/状況判断/次の一手 + 前回の一手）
+      description: "Cache-Control: private, no-store。学年が設定されたクラスだけを、クラス名順で返す（「活発な順」等のソートは提供しない）。会がまだ無ければ
+        meeting=null（自動では作らない）。行に author は含めない（無記名）。"
+      tags:
+        - GradeMeeting
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          required: true
+          name: grade
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: true
+          name: from
+          in: query
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          required: true
+          name: to
+          in: query
+      responses:
+        "200":
+          description: 学年の卓上
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GradeMeetingBoardResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: 学年会をはじめる（同学年・同日なら既存の会を返す）
+      description: 手で押したときだけ回を作る（自動生成しない）。二度押しで会は増えない。
+      tags:
+        - GradeMeeting
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartGradeMeetingInput"
+      responses:
+        "200":
+          description: 学年会
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GradeMeetingStartResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/grade-meeting/notes:
+    post:
+      summary: 卓上に1行置く（観察 / 状況判断 / 次の一手）
+      description: observe・orient は何行でも積む（複数の見立てを1つに畳まない）。action は 1回×1クラスで1行なので upsert になる。レスポンスに author は含めない。
+      tags:
+        - GradeMeeting
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddClassMeetingNoteInput"
+      responses:
+        "200":
+          description: 置いた行
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassMeetingNoteResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/grade-meeting/notes/{id}:
+    delete:
+      summary: 卓上から1行引っ込める
+      description: 観察・状況判断は本人のみ、次の一手はテナント内なら誰でも（RLS で判定）。消せない場合は、他人の行か存在しないかを区別せず 404 を返す（誰が書いたかを推測させない）。
+      tags:
+        - GradeMeeting
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: 引っ込めた
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/grade-meeting/tasks:
+    post:
+      summary: 学年の「やること」を1つ起こす（実体は既存 tasks）
+      description: クラスに紐づかない仕事（行事の準備・学年通信・保護者対応など）。TODO の仕組みを学年会の中に二重に作らず、既存 tasks
+        に作って中間テーブルで会に紐付ける。担当・期限・完了はタスク側の仕組みをそのまま使い、タスクタブにも出る。
+      tags:
+        - GradeMeeting
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGradeMeetingTaskInput"
+      responses:
+        "200":
+          description: 起こしたやること
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GradeMeetingTaskResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: 会から「やること」を外す（タスク本体は残す）
+      description: 紐付けだけを外す。タスクタブで生きているものを学年会の画面から消させない。
+      tags:
+        - GradeMeeting
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnlinkGradeMeetingTaskInput"
+      responses:
+        "204":
+          description: 外した
         "400":
           description: バリデーションエラー
           content:

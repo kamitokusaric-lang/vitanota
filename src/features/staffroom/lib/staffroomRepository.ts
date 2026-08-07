@@ -5,7 +5,6 @@ import { and, or, eq, gte, lt, desc, asc, inArray, type SQL } from 'drizzle-orm'
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import {
   journalEntries,
-  studentReactions,
   batonNotes,
   students,
   classes,
@@ -116,12 +115,18 @@ export class BoardRepository {
 // ── 生徒サポート (A→B seam: 朝バトンをクラス(学年)別に集約) ──
 // 印 (ポジティブ / 気になる) が付いた生徒を、クラスごとに 名前 + 印件数 + 今週の一言 で返す。
 // 名前を出す = baton 画面と同じ可視範囲 (相互関心層)。数値化・ランキングはしない。
+// 1行 = その日の印象 (サインだけ / コメントだけ / 両方)。
+export interface SupportImpression {
+  sign: 'good' | 'concern' | null;
+  content: string | null;
+}
 export interface SupportStudent {
   studentId: string;
   displayName: string;
-  positiveCount: number;
+  goodCount: number;
   concernCount: number;
-  notes: string[];
+  /** その週の印象。サインとコメントが同じ行に載る。 */
+  impressions: SupportImpression[];
 }
 export interface SupportClass {
   classId: string;
@@ -131,59 +136,53 @@ export interface SupportClass {
 }
 
 export class StudentSupportRepository {
-  // since/until: 印 (student_reactions) も一言 (baton_notes) も created_at で期間に絞る基準時刻。
-  // 期間内に印 or 一言があった生徒だけを返す (= その週の活動)。
+  // since/until: その日の印象 (baton_notes) を created_at で期間に絞る基準時刻。
+  // 期間内に印象が残された生徒だけを返す (= その週の活動)。
+  // 0062 で「印」テーブルは廃止され、サインとコメントは同じ1行に載る。
   async get(
     tx: DrizzleDb,
     ctx: StaffroomContext,
     since: Date,
     until?: Date,
   ): Promise<{ classes: SupportClass[] }> {
-    // その週の活動だけ出す (chimo 2026-06-16): 印・一言ともに created_at で期間に絞り、
-    // 期間内に「印が付いた or 一言が書かれた」生徒だけを対象にする。
+    // その週の活動だけ出す (chimo 2026-06-16)。0062 以降はサインもコメントも
+    // baton_notes の1行に載るので、1本のクエリで両方を取る。
 
-    // 1. 印 (positive/concern) を期間内 created_at で生徒ごとに集計
-    const reactionConds: SQL[] = [
-      eq(studentReactions.tenantId, ctx.tenantId),
-      gte(studentReactions.createdAt, since),
-    ];
-    if (until) reactionConds.push(lt(studentReactions.createdAt, until));
-    const reactionRows = await tx
-      .select({
-        studentId: studentReactions.studentId,
-        type: studentReactions.reactionType,
-      })
-      .from(studentReactions)
-      .where(and(...reactionConds));
-
-    const tally = new Map<string, { positive: number; concern: number }>();
-    for (const r of reactionRows) {
-      const t = tally.get(r.studentId) ?? { positive: 0, concern: 0 };
-      if (r.type === 'positive') t.positive += 1;
-      else t.concern += 1;
-      tally.set(r.studentId, t);
-    }
-
-    // 2. 期間内の一言 (created_at >= since, < until) を生徒ごとに
+    // 1. 期間内の印象 (サイン + 任意のコメント) を新しい順に
     const noteConds: SQL[] = [
       eq(batonNotes.tenantId, ctx.tenantId),
       gte(batonNotes.createdAt, since),
     ];
     if (until) noteConds.push(lt(batonNotes.createdAt, until));
     const noteRows = await tx
-      .select({ studentId: batonNotes.studentId, content: batonNotes.content })
+      .select({
+        studentId: batonNotes.studentId,
+        sign: batonNotes.sign,
+        content: batonNotes.content,
+      })
       .from(batonNotes)
       .where(and(...noteConds))
       .orderBy(desc(batonNotes.createdAt));
-    const notesByStudent = new Map<string, string[]>();
+
+    // 2. 生徒ごとに サインの数 と 印象の行 を組み立てる。
+    //    コメントは「どのサインの行に付いていたか」を保ったまま渡す
+    //    (Good なのか気になるのかが分かってこそ材料になる)。
+    const tally = new Map<string, { good: number; concern: number }>();
+    const impressionsByStudent = new Map<string, SupportImpression[]>();
     for (const n of noteRows) {
-      const arr = notesByStudent.get(n.studentId) ?? [];
-      arr.push(n.content);
-      notesByStudent.set(n.studentId, arr);
+      if (n.sign) {
+        const t = tally.get(n.studentId) ?? { good: 0, concern: 0 };
+        if (n.sign === 'good') t.good += 1;
+        else t.concern += 1;
+        tally.set(n.studentId, t);
+      }
+      const arr = impressionsByStudent.get(n.studentId) ?? [];
+      arr.push({ sign: n.sign, content: n.content });
+      impressionsByStudent.set(n.studentId, arr);
     }
 
-    // 3. 期間内に印 or 一言があった生徒の集合
-    const studentIds = [...new Set([...tally.keys(), ...notesByStudent.keys()])];
+    // 3. 期間内に印象が残された生徒の集合
+    const studentIds = [...impressionsByStudent.keys()];
     if (studentIds.length === 0) return { classes: [] };
 
     // 4. 該当生徒 (クラス・名前)
@@ -208,14 +207,14 @@ export class StudentSupportRepository {
     // 6. クラス → 生徒 で組み立て (期間内に活動があった生徒がいるクラスだけ)
     const studentsByClass = new Map<string, SupportStudent[]>();
     for (const s of studentRows) {
-      const t = tally.get(s.id) ?? { positive: 0, concern: 0 };
+      const t = tally.get(s.id) ?? { good: 0, concern: 0 };
       const arr = studentsByClass.get(s.classId) ?? [];
       arr.push({
         studentId: s.id,
         displayName: s.displayName,
-        positiveCount: t.positive,
+        goodCount: t.good,
         concernCount: t.concern,
-        notes: notesByStudent.get(s.id) ?? [],
+        impressions: impressionsByStudent.get(s.id) ?? [],
       });
       studentsByClass.set(s.classId, arr);
     }

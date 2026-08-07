@@ -43,10 +43,15 @@ export function StudentNotesByClass({ selfUserId, todayDate }: StudentNotesByCla
     }
   }, [sortedClasses, selectedClassId]);
 
-  const handleCreateClass = async (name: string, goalText: string) => {
+  const handleCreateClass = async (
+    name: string,
+    goalText: string,
+    grade?: number,
+  ) => {
     const res = await postJson('/api/baton-relay/classes', {
       name,
       goalText: goalText || undefined,
+      grade,
     });
     if (!res.ok) {
       showToast('クラスの作成に失敗しました', 'error');

@@ -10,8 +10,9 @@ const dateString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'YYYY-MM-DD 形式で入力してください' });
 
 export const studentStatusSchema = z.enum(['active', 'archived']);
-export const studentReactionTypeSchema = z.enum(['positive', 'concern']);
-export type StudentReactionTypeInput = z.infer<typeof studentReactionTypeSchema>;
+// その日の印象 (0062)。サインだけでも残せる。
+export const impressionSignSchema = z.enum(['good', 'concern']);
+export type ImpressionSignInput = z.infer<typeof impressionSignSchema>;
 
 // ── classes ────────────────────────────────────────────────────
 export const createClassSchema = z
@@ -19,6 +20,8 @@ export const createClassSchema = z
     name: z.string().trim().min(1, 'クラス名を入力してください').max(50),
     goalText: z.string().trim().max(200).optional(),
     schoolYear: z.string().trim().max(16).optional(),
+    // 学年 (0059)。学年会でクラスをまとめる軸。未設定なら学年会に出さない。
+    grade: z.number().int().min(1).max(12).optional(),
   })
   .openapi('CreateClassInput');
 export type CreateClassInput = z.infer<typeof createClassSchema>;
@@ -28,6 +31,7 @@ export const updateClassSchema = z
     name: z.string().trim().min(1).max(50).optional(),
     goalText: z.string().trim().max(200).nullable().optional(),
     schoolYear: z.string().trim().max(16).nullable().optional(),
+    grade: z.number().int().min(1).max(12).nullable().optional(),
   })
   .openapi('UpdateClassInput');
 export type UpdateClassInput = z.infer<typeof updateClassSchema>;
@@ -42,6 +46,7 @@ export const classResponseSchema = z
     name: z.string(),
     goalText: z.string().nullable(),
     schoolYear: z.string().nullable(),
+    grade: z.number().int().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -103,18 +108,25 @@ export const studentsListResponseSchema = z
   .openapi('StudentList');
 
 // ── baton_notes (append-only) ──────────────────────────────────
+// その日の印象を残す。サインだけでもよく、余裕があればコメントも書く。
+// どちらも空は弾く (DB の CHECK と同じ約束)。
 export const createNoteSchema = z
   .object({
     studentId: z.string().guid(),
     noteDate: dateString,
-    content: z.string().trim().min(1, '一言を入力してください').max(500),
+    sign: impressionSignSchema.optional(),
+    content: z.string().trim().max(500).optional(),
+  })
+  .refine((v) => Boolean(v.sign || v.content), {
+    message: 'Good か 気になる を選ぶか、ひとことを書いてください',
   })
   .openapi('CreateBatonNoteInput');
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
 
 export const updateNoteSchema = z
   .object({
-    content: z.string().trim().min(1).max(500),
+    sign: impressionSignSchema.nullable().optional(),
+    content: z.string().trim().max(500).nullable().optional(),
   })
   .openapi('UpdateBatonNoteInput');
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
@@ -134,7 +146,8 @@ export const batonNoteResponseSchema = z
     studentId: z.string().guid(),
     authorUserId: z.string().guid().nullable(),
     noteDate: z.string(),
-    content: z.string(),
+    sign: impressionSignSchema.nullable(),
+    content: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -143,37 +156,6 @@ export const batonNoteResponseSchema = z
 export const notesListResponseSchema = z
   .object({ notes: z.array(batonNoteResponseSchema) })
   .openapi('BatonNoteList');
-
-// ── student_reactions (印・トグル) ─────────────────────────────
-export const toggleReactionSchema = z
-  .object({
-    studentId: z.string().guid(),
-    reactionType: studentReactionTypeSchema,
-  })
-  .openapi('ToggleStudentReactionInput');
-export type ToggleReactionInput = z.infer<typeof toggleReactionSchema>;
-
-export const listReactionsQuerySchema = z.object({
-  classId: z.string().guid(),
-});
-
-export const reactionResponseSchema = z
-  .object({
-    id: z.string().guid(),
-    studentId: z.string().guid(),
-    userId: z.string().guid(),
-    reactionType: studentReactionTypeSchema,
-    createdAt: z.string(),
-  })
-  .openapi('StudentReaction');
-
-export const reactionsListResponseSchema = z
-  .object({ reactions: z.array(reactionResponseSchema) })
-  .openapi('StudentReactionList');
-
-export const toggleReactionResponseSchema = z
-  .object({ active: z.boolean() })
-  .openapi('ToggleStudentReactionResult');
 
 // ── ロスター CSV インポート ─────────────────────────────────────
 // CSV はクライアントでパースし、行 (className/classGoal/studentName) を JSON で送る。

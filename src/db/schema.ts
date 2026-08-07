@@ -107,11 +107,22 @@ export const journalReactionTypeEnum = pgEnum('journal_reaction_type', [
 // 猶予 1 年後の終端処理 (匿名化/purge) は後続スライス。
 export const studentStatusEnum = pgEnum('student_status', ['active', 'archived']);
 
-// 生徒への「印」リアクション。positive=ポジティブ / concern=気になる。
+// その日の生徒の印象 (migration 0062)。good=Good / concern=気になる。
+// 「1人の先生が、1人の生徒について、その日感じた印象」を表す。
+// サインだけでも残せ、余裕があればコメントも書く (content は任意)。
 // 数値化・スコア化・ランキングはしない (PHILOSOPHY 踏み絵ガード 2)。
-export const studentReactionTypeEnum = pgEnum('student_reaction_type', [
-  'positive',
+export const studentImpressionSignEnum = pgEnum('student_impression_sign', [
+  'good',
   'concern',
+]);
+
+// 学年会のクラス状況カードの段 (migration 0060)。
+// observe=事実 / orient=その事実が何を意味するか / action=次の一手。
+// observe・orient は複数行、action だけ 1回×1クラスで1行。
+export const classMeetingNoteKindEnum = pgEnum('class_meeting_note_kind', [
+  'observe',
+  'orient',
+  'action',
 ]);
 
 // ── tenants ────────────────────────────────────────────────────
@@ -525,6 +536,132 @@ export const workshopTeamReflections = pgTable(
     ),
     tenantIdx: index('workshop_team_reflections_tenant_idx').on(table.tenantId),
     workshopIdx: index('workshop_team_reflections_workshop_idx').on(table.workshopId),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────
+// 学年会 (grade-meeting): クラス状況を持ち寄る同期 Orient の場 (migration 0060)
+// 正本: docs/proposal/grade-meeting.md
+//
+// OODA の Orient (前提の問い直し) は構造的に1人でできない。学年団が集まった場で、
+// 1クラスずつ「事実 → 意味 → 次の一手」を出し合う。紙の OODA 記録シートをクラスに
+// 当てたもの。判断 (orient) を複数のまま持つのが設計の核 —
+// 同じ事実でも意味づけは人によって違い、1つに畳んだ瞬間に Orient は死ぬ。
+//
+// 無記名: author_user_id は持つが API では返さない (自分の行を消す・直す判定にのみ使う)。
+// 「誰がどの前提を出したか」を評価に使える形にした瞬間、次から本音が消える。
+// ─────────────────────────────────────────────────────────────
+
+// ── grade_meetings (学年会の1回) ───────────────────────────────
+// 手で「学年会をはじめる」を押したときだけ作る (自動生成しない)。
+// created_by は UI に出さない (会の持ち主を作らない)。
+export const gradeMeetings = pgTable(
+  'grade_meetings',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    grade: integer('grade').notNull(),
+    heldOn: date('held_on').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantGradeDateUnique: unique('grade_meetings_tenant_grade_date_unique').on(
+      table.tenantId,
+      table.grade,
+      table.heldOn
+    ),
+    idTenantUnique: unique('grade_meetings_id_tenant_unique').on(
+      table.id,
+      table.tenantId
+    ),
+    tenantGradeIdx: index('grade_meetings_tenant_grade_idx').on(
+      table.tenantId,
+      table.grade,
+      table.heldOn
+    ),
+  })
+);
+
+// ── class_meeting_notes (観察 / 判断 / 一手) ────────────────────
+// action だけ 1回×1クラスで1行 (部分 UNIQUE インデックスは migration 側で定義)。
+export const classMeetingNotes = pgTable(
+  'class_meeting_notes',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    meetingId: uuid('meeting_id').notNull(),
+    classId: uuid('class_id').notNull(),
+    kind: classMeetingNoteKindEnum('kind').notNull(),
+    content: text('content').notNull(),
+    // 無記名。API レスポンスには含めない。
+    authorUserId: uuid('author_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    meetingFk: foreignKey({
+      columns: [table.meetingId, table.tenantId],
+      foreignColumns: [gradeMeetings.id, gradeMeetings.tenantId],
+      name: 'class_meeting_notes_meeting_fk',
+    }).onDelete('cascade'),
+    classFk: foreignKey({
+      columns: [table.classId, table.tenantId],
+      foreignColumns: [classes.id, classes.tenantId],
+      name: 'class_meeting_notes_class_fk',
+    }).onDelete('cascade'),
+    meetingClassIdx: index('class_meeting_notes_meeting_class_idx').on(
+      table.meetingId,
+      table.classId,
+      table.kind,
+      table.createdAt
+    ),
+    tenantIdx: index('class_meeting_notes_tenant_idx').on(table.tenantId),
+  })
+);
+
+// ── grade_meeting_tasks (0061) ─────────────────────────────────
+// 学年会で決めた「やること」を既存 tasks に紐付ける中間テーブル。
+// クラスに紐づかない仕事 (行事の準備・学年通信・保護者対応) は学年単位で出る。
+// 実体は tasks に作り (担当・期限・完了の仕組みを二重に作らない)、
+// 「どの会で決まったか」だけをここが持つ。tasks は ALTER しない。
+// workshop_reflections (振り返りを journal_entries に溶かす) と同じ形。
+export const gradeMeetingTasks = pgTable(
+  'grade_meeting_tasks',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    meetingId: uuid('meeting_id').notNull(),
+    taskId: uuid('task_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    meetingFk: foreignKey({
+      columns: [table.meetingId, table.tenantId],
+      foreignColumns: [gradeMeetings.id, gradeMeetings.tenantId],
+      name: 'grade_meeting_tasks_meeting_fk',
+    }).onDelete('cascade'),
+    taskFk: foreignKey({
+      columns: [table.taskId, table.tenantId],
+      foreignColumns: [tasks.id, tasks.tenantId],
+      name: 'grade_meeting_tasks_task_fk',
+    }).onDelete('cascade'),
+    meetingTaskUnique: unique('grade_meeting_tasks_unique').on(
+      table.meetingId,
+      table.taskId
+    ),
+    tenantIdx: index('grade_meeting_tasks_tenant_idx').on(table.tenantId),
+    meetingIdx: index('grade_meeting_tasks_meeting_idx').on(table.meetingId),
   })
 );
 
@@ -1153,6 +1290,9 @@ export const classes = pgTable(
     name: text('name').notNull(),
     goalText: text('goal_text'),
     schoolYear: text('school_year'),
+    // 学年 (migration 0059)。学年会でクラスをまとめる軸。
+    // NULL 許容 = 既存クラスにバックフィルを強制しない。未設定は学年会に出さない。
+    grade: integer('grade'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -1160,6 +1300,7 @@ export const classes = pgTable(
     // SP-U02-04 Layer 8: 複合 FK の参照先として必要な UNIQUE 制約
     idTenantUnique: unique('classes_id_tenant_unique').on(table.id, table.tenantId),
     tenantIdx: index('classes_tenant_idx').on(table.tenantId),
+    tenantGradeIdx: index('classes_tenant_grade_idx').on(table.tenantId, table.grade),
   }),
 );
 
@@ -1194,9 +1335,15 @@ export const students = pgTable(
   }),
 );
 
-// ── baton_notes (生徒欄の一言・append-only ログ) ───────────────
-// 同じ著者が同じ生徒・同じ日に何度でも行追加できる (一意制約を張らない)。
-// 「誰が書いた変更か」は author_user_id + 行追加で表現 (引き継ぎ用・採点ではない)。
+// ── baton_notes (その日の生徒の印象・append-only ログ) ─────────
+// 1行 = 1人の先生が、1人の生徒について、その日感じた印象 (migration 0062)。
+//   sign    : Good / 気になる。**サインだけでも残せる**
+//   content : 余裕があれば書くコメント (任意)
+// どちらか一方は必ず入る (CHECK baton_notes_sign_or_content)。
+// 同じ著者が同じ生徒・同じ日に何度でも行追加できる (一意制約を張らない)
+// = 朝と放課後で印象が変わったことをそのまま残せる。
+// 「誰が書いたか」は author_user_id + 行追加で表現 (引き継ぎ用・採点ではない)。
+// テーブル名は baton_notes のまま (機能名 baton-relay を変えるスコープではない)。
 export const batonNotes = pgTable(
   'baton_notes',
   {
@@ -1209,12 +1356,16 @@ export const batonNotes = pgTable(
       onDelete: 'set null',
     }),
     noteDate: date('note_date').notNull(),
-    content: text('content').notNull(),
+    // その日の印象。既存行 (0062 以前) は NULL。新規は API/Zod で必須。
+    sign: studentImpressionSignEnum('sign'),
+    // 余裕があれば書くコメント。サインだけの行では NULL。
+    content: text('content'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     idTenantUnique: unique('baton_notes_id_tenant_unique').on(table.id, table.tenantId),
+    signIdx: index('baton_notes_sign_idx').on(table.tenantId, table.sign),
     studentFk: foreignKey({
       columns: [table.studentId, table.tenantId],
       foreignColumns: [students.id, students.tenantId],
@@ -1232,42 +1383,6 @@ export const batonNotes = pgTable(
   }),
 );
 
-// ── student_reactions (印 = ポジティブ/気になる・journal リアクション同型) ─
-// 1 教員 × 1 生徒 × 1 reaction_type で 1 行 (トグル)。複数教員が各自 1 行。
-// 数値化・ランキングしない (踏み絵ガード 2/3)。
-export const studentReactions = pgTable(
-  'student_reactions',
-  {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    studentId: uuid('student_id').notNull(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    reactionType: studentReactionTypeEnum('reaction_type').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    studentFk: foreignKey({
-      columns: [table.studentId, table.tenantId],
-      foreignColumns: [students.id, students.tenantId],
-      name: 'student_reactions_student_fk',
-    }).onDelete('cascade'),
-    // 1 教員 1 生徒 1 種で 1 行 (トグル整合)
-    uniq: unique('student_reactions_uniq').on(
-      table.tenantId,
-      table.studentId,
-      table.userId,
-      table.reactionType,
-    ),
-    tenantStudentIdx: index('student_reactions_tenant_student_idx').on(
-      table.tenantId,
-      table.studentId,
-    ),
-  }),
-);
 
 // ─────────────────────────────────────────────────────────────
 // H7-B 職員室ボード (staffroom) — 学校知の循環の出口 (migration 0051)
@@ -1294,6 +1409,12 @@ export type WorkshopCheckin = typeof workshopCheckins.$inferSelect;
 export type NewWorkshopCheckin = typeof workshopCheckins.$inferInsert;
 export type WorkshopReflection = typeof workshopReflections.$inferSelect;
 export type NewWorkshopReflection = typeof workshopReflections.$inferInsert;
+export type GradeMeetingTask = typeof gradeMeetingTasks.$inferSelect;
+export type NewGradeMeetingTask = typeof gradeMeetingTasks.$inferInsert;
+export type GradeMeeting = typeof gradeMeetings.$inferSelect;
+export type NewGradeMeeting = typeof gradeMeetings.$inferInsert;
+export type ClassMeetingNote = typeof classMeetingNotes.$inferSelect;
+export type NewClassMeetingNote = typeof classMeetingNotes.$inferInsert;
 export type WorkshopTeamReflection = typeof workshopTeamReflections.$inferSelect;
 export type NewWorkshopTeamReflection = typeof workshopTeamReflections.$inferInsert;
 export type UserTenantProfile = typeof userTenantProfiles.$inferSelect;
@@ -1330,5 +1451,3 @@ export type Student = typeof students.$inferSelect;
 export type NewStudent = typeof students.$inferInsert;
 export type BatonNote = typeof batonNotes.$inferSelect;
 export type NewBatonNote = typeof batonNotes.$inferInsert;
-export type StudentReaction = typeof studentReactions.$inferSelect;
-export type NewStudentReaction = typeof studentReactions.$inferInsert;

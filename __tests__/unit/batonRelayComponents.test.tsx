@@ -12,6 +12,7 @@ function makeClass(o: Partial<ClassDto> = {}): ClassDto {
     name: o.name ?? '2-A',
     goalText: o.goalText ?? null,
     schoolYear: o.schoolYear ?? null,
+    grade: o.grade ?? null,
     createdAt: o.createdAt ?? '2026-06-15T00:00:00.000Z',
     updatedAt: o.updatedAt ?? '2026-06-15T00:00:00.000Z',
   };
@@ -22,6 +23,7 @@ function makeNote(o: Partial<BatonNoteDto> = {}): BatonNoteDto {
     studentId: o.studentId ?? 's1',
     authorUserId: o.authorUserId ?? 'u1',
     noteDate: o.noteDate ?? '2026-06-15',
+    sign: o.sign ?? null,
     content: o.content ?? '朝、元気そうでした',
     createdAt: o.createdAt ?? '2026-06-15T00:00:00.000Z',
     updatedAt: o.updatedAt ?? '2026-06-15T00:00:00.000Z',
@@ -37,7 +39,21 @@ describe('RosterAdd', () => {
     fireEvent.change(screen.getByPlaceholderText(/クラス目標/), { target: { value: '元気にあいさつ' } });
     fireEvent.click(screen.getByRole('button', { name: '作る' }));
 
-    await waitFor(() => expect(onCreateClass).toHaveBeenCalledWith('3-B', '元気にあいさつ'));
+    // 学年 (0059) は任意。選ばなければ undefined で渡る
+    await waitFor(() =>
+      expect(onCreateClass).toHaveBeenCalledWith('3-B', '元気にあいさつ', undefined),
+    );
+  });
+
+  it('学年を選ぶと数値で渡る (学年会に出るのは学年付きのクラスだけ)', async () => {
+    const onCreateClass = vi.fn().mockResolvedValue(undefined);
+    render(<RosterAdd classes={[]} onCreateClass={onCreateClass} />);
+
+    fireEvent.change(screen.getByPlaceholderText(/クラス名/), { target: { value: '1-A' } });
+    fireEvent.change(screen.getByTestId('roster-grade-select'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: '作る' }));
+
+    await waitFor(() => expect(onCreateClass).toHaveBeenCalledWith('1-A', '', 1));
   });
 
   it('クラス名が空なら作成ボタンは disabled', () => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Trash2, Check, X } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Smile, Eye } from 'lucide-react';
 import type { BatonNoteDto } from '../types';
 import { formatRelativeTime } from '@/features/journal/lib/relativeTime';
 
@@ -11,7 +11,9 @@ interface BatonNoteItemProps {
   onDelete: (id: string) => Promise<void>;
 }
 
-// 生徒欄の一言 1 件。吹き出し風 (著者アバター + 本文 + 相対時刻)。
+// その日の印象 1 件。サイン (Good / 気になる) + 任意のコメント。
+// サインだけの行 (コメント無し) も出す — 気軽に残せることが狙いなので、
+// 「サインだけ」を一人前の記録として描く。
 // 自分の行だけ編集/削除できる (著者表示は引き継ぎの可読性のため。採点・貢献ランキング化はしない)。
 export function BatonNoteItem({
   note,
@@ -21,14 +23,14 @@ export function BatonNoteItem({
   onDelete,
 }: BatonNoteItemProps) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(note.content);
+  const [draft, setDraft] = useState(note.content ?? '');
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     const trimmed = draft.trim();
     if (!trimmed || trimmed === note.content) {
       setEditing(false);
-      setDraft(note.content);
+      setDraft(note.content ?? '');
       return;
     }
     setBusy(true);
@@ -75,7 +77,7 @@ export function BatonNoteItem({
                   void save();
                 } else if (e.key === 'Escape') {
                   setEditing(false);
-                  setDraft(note.content);
+                  setDraft(note.content ?? '');
                 }
               }}
               maxLength={500}
@@ -95,7 +97,7 @@ export function BatonNoteItem({
               type="button"
               onClick={() => {
                 setEditing(false);
-                setDraft(note.content);
+                setDraft(note.content ?? '');
               }}
               aria-label="キャンセル"
               className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100"
@@ -106,7 +108,29 @@ export function BatonNoteItem({
         ) : (
           <div className="flex items-start gap-2">
             <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-slate-700">
-              {note.content}
+              {note.sign && (
+                <span
+                  title={note.sign === 'good' ? 'Good' : '気になる'}
+                  aria-label={note.sign === 'good' ? 'Good' : '気になる'}
+                  className={`mr-1.5 inline-flex align-[-2px] ${
+                    note.sign === 'good'
+                      ? 'text-vn-green-text'
+                      : 'text-vn-warning-text'
+                  }`}
+                  data-testid={`baton-note-sign-${note.id}`}
+                >
+                  {note.sign === 'good' ? (
+                    <Smile size={14} strokeWidth={2} aria-hidden />
+                  ) : (
+                    <Eye size={14} strokeWidth={2} aria-hidden />
+                  )}
+                </span>
+              )}
+              {note.content ?? (
+                <span className="text-gray-400">
+                  {note.sign === 'good' ? 'Good' : '気になる'}
+                </span>
+              )}
             </span>
             <time className="mt-0.5 flex-shrink-0 text-xs text-gray-400">
               {formatRelativeTime(note.createdAt)}

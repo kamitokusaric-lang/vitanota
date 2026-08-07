@@ -82,6 +82,10 @@ export default defineConfig({
         'src/features/baton-relay/lib/batonRelayService.ts',
         'src/features/baton-relay/lib/batonRelayRepository.ts',
         'src/features/staffroom/lib/**',
+        // 学年会 (grade-meeting) の service/repository は DB 依存。
+        // __tests__/integration/grade-meeting-rls.test.ts (16 ケース) でカバー。
+        // UI (ClassStatusCard / GradeMeetingPanel) は unit test を整備してあるので除外しない。
+        'src/features/grade-meeting/lib/**',
         // 研修 (workshop) の service/repository は DB 依存。
         // __tests__/integration/workshop-rls.test.ts (13 ケース) でカバー。
         // UI (WorkshopPanel) は unit test を整備してあるので除外しない。

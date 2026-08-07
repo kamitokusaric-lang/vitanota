@@ -5,7 +5,6 @@ import type {
   ClassDto,
   StudentDto,
   BatonNoteDto,
-  StudentReactionDto,
 } from '../types';
 
 export function useClasses() {
@@ -49,13 +48,6 @@ export function useNotes(classId: string | null, date: string) {
   return { notes: data?.notes ?? [], error, isLoading, mutate };
 }
 
-export function useReactions(classId: string | null) {
-  const key = classId ? `/api/baton-relay/reactions?classId=${classId}` : null;
-  const { data, error, isLoading, mutate } = useSWR<{
-    reactions: StudentReactionDto[];
-  }>(key, jsonFetcher);
-  return { reactions: data?.reactions ?? [], error, isLoading, mutate };
-}
 
 // テナント教員一覧 (一言の著者名表示用)。既存 /api/tasks/assignees を再利用。
 export function useTeacherNames() {

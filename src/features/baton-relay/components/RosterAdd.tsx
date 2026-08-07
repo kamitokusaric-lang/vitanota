@@ -2,9 +2,17 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { ClassDto } from '../types';
 
+// 学年の選択肢 (小1〜高3を1〜12で表す。DB の CHECK と揃える)。
+// 学年を付けたクラスだけが学年会 (grade-meeting) に出る。
+export const GRADE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
 interface RosterAddProps {
   classes: ClassDto[];
-  onCreateClass: (name: string, goalText: string) => Promise<void>;
+  onCreateClass: (
+    name: string,
+    goalText: string,
+    grade?: number,
+  ) => Promise<void>;
   // 親 (生徒ノートの「＋」タブ等) が既に「クラス追加」を表現している場合は
   // 内側のトグルを出さず入力欄を直接展開する (二重トグル回避)。
   alwaysOpen?: boolean;
@@ -15,15 +23,21 @@ export function RosterAdd({ classes, onCreateClass, alwaysOpen = false }: Roster
   const [open, setOpen] = useState(alwaysOpen || classes.length === 0);
   const [className, setClassName] = useState('');
   const [classGoal, setClassGoal] = useState('');
+  const [grade, setGrade] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
   const createClass = async () => {
     if (!className.trim()) return;
     setBusy(true);
     try {
-      await onCreateClass(className.trim(), classGoal.trim());
+      await onCreateClass(
+        className.trim(),
+        classGoal.trim(),
+        grade ? Number(grade) : undefined,
+      );
       setClassName('');
       setClassGoal('');
+      setGrade('');
     } finally {
       setBusy(false);
     }
@@ -52,6 +66,20 @@ export function RosterAdd({ classes, onCreateClass, alwaysOpen = false }: Roster
             maxLength={50}
             className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-base focus:border-vn-accent focus:outline-none"
           />
+          <select
+            value={grade}
+            onChange={(e) => setGrade(e.target.value)}
+            aria-label="学年"
+            className="min-w-0 flex-shrink-0 rounded-md border border-gray-300 px-3 py-2 text-base focus:border-vn-accent focus:outline-none sm:w-28"
+            data-testid="roster-grade-select"
+          >
+            <option value="">学年なし</option>
+            {GRADE_OPTIONS.map((g) => (
+              <option key={g} value={g}>
+                {g}年
+              </option>
+            ))}
+          </select>
           <input
             type="text"
             value={classGoal}

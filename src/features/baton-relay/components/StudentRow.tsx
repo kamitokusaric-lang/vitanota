@@ -3,8 +3,7 @@ import { Smile, Eye, MoreVertical, Check, X, Plus } from 'lucide-react';
 import type {
   StudentDto,
   BatonNoteDto,
-  StudentReactionDto,
-  StudentReactionType,
+  ImpressionSign,
   ClassDto,
 } from '../types';
 import { BatonNoteItem } from './BatonNoteItem';
@@ -12,11 +11,10 @@ import { BatonNoteItem } from './BatonNoteItem';
 interface StudentRowProps {
   student: StudentDto;
   notes: BatonNoteDto[];
-  reactions: StudentReactionDto[];
   currentUserId: string;
   nameById: Map<string, string>;
   classes: ClassDto[];
-  onToggleReaction: (studentId: string, type: StudentReactionType) => void;
+  onQuickSign: (studentId: string, sign: ImpressionSign) => void;
   onMoveStudent: (studentId: string, newClassId: string) => Promise<void>;
   onRenameStudent: (studentId: string, displayName: string) => Promise<void>;
   onArchiveStudent: (studentId: string) => Promise<void>;
@@ -25,13 +23,13 @@ interface StudentRowProps {
   onDeleteNote: (id: string) => Promise<void>;
 }
 
-const REACTIONS: {
-  type: StudentReactionType;
+const IMPRESSIONS: {
+  sign: ImpressionSign;
   label: string;
   Icon: typeof Smile;
 }[] = [
-  { type: 'positive', label: 'Good', Icon: Smile },
-  { type: 'concern', label: '気になる', Icon: Eye },
+  { sign: 'good', label: 'Good', Icon: Smile },
+  { sign: 'concern', label: '気になる', Icon: Eye },
 ];
 
 // 1 生徒の欄。印 (2 種トグル) + その日の一言 + 一言追加。
@@ -39,11 +37,10 @@ const REACTIONS: {
 export function StudentRow({
   student,
   notes,
-  reactions,
   currentUserId,
   nameById,
   classes,
-  onToggleReaction,
+  onQuickSign,
   onMoveStudent,
   onRenameStudent,
   onArchiveStudent,
@@ -54,6 +51,30 @@ export function StudentRow({
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState(false);
+  // その日のサインは「押した回数」= 行数で数える。
+  // サインだけの行はリストに出さず、ここのカウントに寄せる。
+  const signCounts = {
+    good: notes.filter((n) => n.sign === 'good').length,
+    concern: notes.filter((n) => n.sign === 'concern').length,
+  };
+  // 誰が押したか (hover / フォーカスで出す)。同じ人が複数回押したら ×n を添えて
+  // カウントと数が合うようにする。引き継ぎの可読性のためで、採点ではない。
+  const signerLabels = (sign: ImpressionSign): string[] => {
+    const tally = new Map<string, number>();
+    for (const n of notes) {
+      if (n.sign !== sign) continue;
+      const name = !n.authorUserId
+        ? 'ほかの先生'
+        : n.authorUserId === currentUserId
+          ? '自分'
+          : nameById.get(n.authorUserId) ?? 'ほかの先生';
+      tally.set(name, (tally.get(name) ?? 0) + 1);
+    }
+    return [...tally].map(([name, n]) => (n > 1 ? `${name}×${n}` : name));
+  };
+  // コメントが書かれた行だけリストに出す (サインだけの行は数に寄せた)。
+  const commentNotes = notes.filter((n) => n.content);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -163,38 +184,43 @@ export function StudentRow({
         )}
         {!editingName && (
           <div className="ml-auto flex items-center gap-1.5">
-            {REACTIONS.map(({ type, label, Icon }) => {
-              const ofType = reactions.filter((r) => r.reactionType === type);
-              const mine = ofType.some((r) => r.userId === currentUserId);
-              const count = ofType.length;
-              // 誰が押したか (フォーカス/ホバーで tips 表示)。
-              const names = ofType.map((r) =>
-                r.userId === currentUserId ? '自分' : nameById.get(r.userId) ?? 'ほかの先生',
-              );
+            {IMPRESSIONS.map(({ sign, label, Icon }) => {
+              const signers = signerLabels(sign);
               return (
-                <div key={type} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => onToggleReaction(student.id, type)}
-                    aria-pressed={mine}
-                    className={`inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-sm font-medium transition-colors ${
-                      mine
-                        ? type === 'positive'
-                          ? 'border-vn-green/40 bg-vn-green-bg text-vn-green-text'
-                          : 'border-vn-warning-border bg-vn-warning-bg text-vn-warning-text'
-                        : 'border-vn-border bg-white text-gray-400 hover:text-gray-600'
-                    }`}
+                <div key={sign} className="group relative">
+              <button
+                type="button"
+                onClick={() => onQuickSign(student.id, sign)}
+                title={`今日の印象として「${label}」を残す`}
+                className={`inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-sm font-medium transition-colors ${
+                  sign === 'good'
+                    ? signCounts.good > 0
+                      ? 'border-vn-green/40 bg-vn-green-bg text-vn-green-text'
+                      : 'border-vn-border bg-white text-gray-400 hover:text-vn-green-text'
+                    : signCounts.concern > 0
+                      ? 'border-vn-warning-border bg-vn-warning-bg text-vn-warning-text'
+                      : 'border-vn-border bg-white text-gray-400 hover:text-vn-warning-text'
+                }`}
+                data-testid={`student-sign-${sign}-${student.id}`}
+              >
+                <Icon size={16} strokeWidth={1.75} aria-hidden />
+                <span>{label}</span>
+                {signCounts[sign] > 0 && (
+                  <span
+                    className="text-xs tabular-nums"
+                    data-testid={`student-sign-count-${sign}-${student.id}`}
                   >
-                    <Icon size={16} strokeWidth={1.75} aria-hidden />
-                    <span>{label}</span>
-                    {count > 0 && <span className="text-xs">{count}</span>}
-                  </button>
-                  {names.length > 0 && (
+                    {signCounts[sign]}
+                  </span>
+                )}
+              </button>
+                  {signers.length > 0 && (
                     <div
                       role="tooltip"
                       className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                      data-testid={`student-sign-signers-${sign}-${student.id}`}
                     >
-                      {names.join('、')}
+                      {signers.join('、')}
                     </div>
                   )}
                 </div>
@@ -292,10 +318,11 @@ export function StudentRow({
         </div>
       </div>
 
-      {/* その日の一言 (吹き出し) */}
-      {notes.length > 0 && (
+      {/* その日のコメント (吹き出し)。サインだけの行はここに出さず、
+          ボタン横のカウントに寄せる (押すたびに行が増えて見えないように)。 */}
+      {commentNotes.length > 0 && (
         <ul className="mt-2.5 space-y-1">
-          {notes.map((note) => (
+          {commentNotes.map((note) => (
             <BatonNoteItem
               key={note.id}
               note={note}

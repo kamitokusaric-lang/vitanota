@@ -10,10 +10,10 @@ function StudentRow({ student }: { student: SupportStudent }) {
     <div className="rounded-md border border-vn-border bg-vn-surface p-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-slate-800">{student.displayName}</span>
-        {student.positiveCount > 0 && (
+        {student.goodCount > 0 && (
           <span className="inline-flex items-center gap-0.5 rounded-full bg-vn-green-bg px-2 py-0.5 text-[11px] text-vn-green-text">
             <Smile size={13} strokeWidth={1.75} aria-hidden />
-            <span className="tabular-nums">{student.positiveCount}</span>
+            <span className="tabular-nums">{student.goodCount}</span>
           </span>
         )}
         {student.concernCount > 0 && (
@@ -23,11 +23,11 @@ function StudentRow({ student }: { student: SupportStudent }) {
           </span>
         )}
       </div>
-      {student.notes.length > 0 && (
+      {student.impressions.length > 0 && (
         <ul className="mt-1.5 space-y-1 border-t border-vn-border pt-1.5">
-          {student.notes.map((n, i) => (
+          {student.impressions.map((im, i) => (
             <li key={i} className="whitespace-pre-wrap break-words text-sm text-slate-700">
-              {n}
+              {im.content ?? (im.sign === 'good' ? 'Good' : '気になる')}
             </li>
           ))}
         </ul>
@@ -62,7 +62,7 @@ export function StudentSupportSection({
     <div className="space-y-2">
         {classes.map((c) => {
           const open = openIds.has(c.classId);
-          const positiveSum = c.students.reduce((a, s) => a + s.positiveCount, 0);
+          const positiveSum = c.students.reduce((a, s) => a + s.goodCount, 0);
           const concernSum = c.students.reduce((a, s) => a + s.concernCount, 0);
           return (
             <div key={c.classId} className="overflow-hidden rounded-lg border border-vn-border bg-vn-surface">

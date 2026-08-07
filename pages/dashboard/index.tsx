@@ -2,12 +2,12 @@
 // ナビは左サイドバー (DashboardSidebarLayout)、 モバイルは下部タブナビ (BottomTabNav)。
 // Tabs は hideTabList でパネルのみ描画し、 遷移は外側のナビが ?tab= で駆動する。
 // タブ (サイドバー並び順):
-//   1. 職員室でつぶやく    (staffroom-notes) = 職員室ノート。default。メインへ昇格 (旧・右レーン)。
-//   2. 会議で話す      (staffroom)       = 職員室ボード。
-//   ── 区切り ──
-//   3. 自分をふりかえる (my-notes)        = 今日のふりかえり + マイノート。
-//   4. 生徒を観察する   (student-notes)   = 生徒ノート (朝バトンを学年別)。
-//   5. タスク整理する   (tasks)           = タスクボード。
+//   1. 職員室で交流する (staffroom-notes) = 職員室ノート。default。
+//   2. 生徒を観察する   (student-notes)   = 生徒ノート (その日の印象を残す)。
+//   3. 会議で話す      (staffroom)       = 学年会 (クラス状況を持ち寄る同期 Orient の場)。
+//   ── 区切り ── (ここまで=みんなと / ここから=自分の作業場)
+//   4. タスクを整理する (tasks)           = タスクボード。
+//   5. 今日をふりかえる (my-notes)        = 今日のふりかえり + マイノート。
 //   ( 学校レポート (engagement) は school_admin のみ・showSchoolReport で現在非表示。 )
 import { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -89,7 +89,7 @@ function AiLearningNotice({ tenantName }: { tenantName: string }) {
 // 分析/評価/最適化は使わない。
 const TAB_DESCRIPTIONS: Record<string, string> = {
   'staffroom-notes': '職員室ノート ・ コミュニケーションの場',
-  staffroom: '職員室ボード ・ 会議で話したいことを持ち寄る',
+  staffroom: '学年会 ・ クラスの状況を持ち寄る',
   'my-notes': 'マイノート ・ 今日をふりかえる',
   'student-notes': '生徒ノート ・ 生徒たちの様子を書きとめる',
   tasks: 'タスクボード ・ やることを整える',
@@ -99,10 +99,10 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
 // モバイル下部タブナビの 5 タブ (chimo 2026-07-02 刷新: サイドバーと同順・短ラベル)。
 const MOBILE_TABS = [
   { id: 'staffroom-notes', label: '交流', icon: <Users size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'staffroom', label: '会議', icon: <CalendarCheck size={20} strokeWidth={1.75} aria-hidden /> },
-  { id: 'my-notes', label: 'ふりかえり', icon: <BookOpen size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'student-notes', label: '生徒', icon: <GraduationCap size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'staffroom', label: '会議', icon: <CalendarCheck size={20} strokeWidth={1.75} aria-hidden /> },
   { id: 'tasks', label: 'タスク', icon: <ListChecks size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: 'my-notes', label: 'ふりかえり', icon: <BookOpen size={20} strokeWidth={1.75} aria-hidden /> },
 ];
 
 export default function DashboardPage({
@@ -136,25 +136,6 @@ export default function DashboardPage({
       ),
     },
     {
-      // 会議で話す: 職員室ボード。
-      id: 'staffroom',
-      label: '会議で話す',
-      icon: <CalendarCheck size={18} strokeWidth={1.75} aria-hidden />,
-      content: <StaffroomBoard />,
-    },
-    {
-      // 自分をふりかえる: 今日のふりかえり + マイノートを kind 別に (個人の作業場)。
-      id: 'my-notes',
-      label: '今日をふりかえる',
-      icon: <BookOpen size={18} strokeWidth={1.75} aria-hidden />,
-      content: (
-        <div className="space-y-6">
-          <TodayReflectionCard />
-          <MyNotesByKind />
-        </div>
-      ),
-    },
-    {
       // 生徒を観察する: 生徒ノート (朝バトンのクラスを学年別に)。
       id: 'student-notes',
       label: '生徒を観察する',
@@ -167,6 +148,13 @@ export default function DashboardPage({
       ),
     },
     {
+      // 会議で話す: 職員室ボード。
+      id: 'staffroom',
+      label: '会議で話す',
+      icon: <CalendarCheck size={18} strokeWidth={1.75} aria-hidden />,
+      content: <StaffroomBoard todayDate={todayDate} />,
+    },
+    {
       // タスク整理する: タスクボード。
       id: 'tasks',
       label: 'タスクを整理する',
@@ -176,6 +164,18 @@ export default function DashboardPage({
           selfUserId={session.user.userId}
           aiChatEnabled={aiChatEnabled}
         />
+      ),
+    },
+    {
+      // 自分をふりかえる: 今日のふりかえり + マイノートを kind 別に (個人の作業場)。
+      id: 'my-notes',
+      label: '今日をふりかえる',
+      icon: <BookOpen size={18} strokeWidth={1.75} aria-hidden />,
+      content: (
+        <div className="space-y-6">
+          <TodayReflectionCard />
+          <MyNotesByKind />
+        </div>
       ),
     },
   ];
@@ -205,12 +205,13 @@ export default function DashboardPage({
   }
 
   // 左サイドバー用のナビ項目 (mainTabs と同じ並び)。グループ2 (自分をふりかえる〜) の前に区切り線。
-  // 研修タブがあるときは その直前 (タスクの後) にも区切り線を入れ、一過性イベントを日常タブと分ける。
+  // 研修タブがあるときは その直前 (日常タブの最後 = 今日をふりかえる の後) にも
+  // 区切り線を入れ、一過性イベントを日常タブと分ける。
   const navItems: SidebarNavItem[] = mainTabs.map((t) => ({
     id: t.id,
     label: t.label,
     icon: t.icon,
-    dividerAfter: t.id === 'staffroom' || (t.id === 'tasks' && workshopEnabled),
+    dividerAfter: t.id === 'staffroom' || (t.id === 'my-notes' && workshopEnabled),
   }));
 
   const activeLabel =

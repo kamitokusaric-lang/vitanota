@@ -28,6 +28,7 @@ import { REACTION_TYPES_ORDER } from '@/features/journal/components/reactionMeta
 import { ReactionButton } from '@/features/journal/components/ReactionButton';
 import type { Reactions } from '@/features/journal/lib/privateJournalRepository';
 import { formatRelativeTime } from '@/features/journal/lib/relativeTime';
+import { findJournalKindMeta } from '@/features/journal/kindMeta';
 import { getMoodIcon, getMoodLabel } from '@/features/journal/lib/mood-options';
 import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
@@ -453,10 +454,13 @@ function RailItem({
     );
   }
   const author = entry.authorNickname ?? entry.authorName ?? '';
-  // kind バッジは timeline では非表示 (踏み絵)。タグは emotion_tags を表示し、
+  // 投稿種別 (chimo 2026-08-07): 投稿欄で本人が選んだ種別を、小さなアイコン + hover の
+  // ラベルで添える。JOURNAL_KIND_META が投稿欄と共通の正本。旧 kind (diary/tweet) は null。
+  // mood は引き続き非表示 (情緒データは踏み絵)。タグは emotion_tags を表示し、
   // 既存 knowledge レコードの knowledge_tags も残っていれば併せて出す (legacy・新規 note では空)。
   const MoodIcon = getMoodIcon(entry.mood);
   const moodLabel = getMoodLabel(entry.mood);
+  const kindMeta = findJournalKindMeta(entry.kind);
   const tagList: Array<{ id: string; name: string }> = [
     ...(entry.tags ?? []),
     ...(entry.knowledgeTags ?? []),
@@ -493,12 +497,27 @@ function RailItem({
                 />
               )}
             </div>
-            <time
-              dateTime={new Date(entry.createdAt).toISOString()}
-              className="text-[12px] font-normal text-slate-400"
-            >
-              {formatRelativeTime(entry.createdAt)}
-            </time>
+            <div className="flex items-center gap-1.5">
+              <time
+                dateTime={new Date(entry.createdAt).toISOString()}
+                className="text-[12px] font-normal text-slate-400"
+              >
+                {formatRelativeTime(entry.createdAt)}
+              </time>
+              {/* 投稿種別。小さなアイコンだけ出し、ラベルは hover (title) で見せる。
+                  ラベルを常時並べると分類が主役になるので、あくまで添えるだけ。
+                  mood は引き続き出さない (踏み絵)。 */}
+              {kindMeta && (
+                <span
+                  title={kindMeta.label}
+                  aria-label={kindMeta.label}
+                  className={`inline-flex shrink-0 items-center ${kindMeta.iconClass}`}
+                  data-testid={`public-timeline-rail-kind-${entry.id}`}
+                >
+                  <kindMeta.Icon size={13} strokeWidth={2} aria-hidden />
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">

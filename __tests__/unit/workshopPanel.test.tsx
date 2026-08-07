@@ -121,7 +121,7 @@ describe('チェックイン', () => {
     expect(screen.getByTestId('workshop-checkin-submit')).toBeDisabled();
   });
 
-  it('回答ずみなら既存回答をプリフィルし、ボタンが「書き直す」になる', () => {
+  it('回答ずみなら既存回答をプリフィルする (ボタンは常に「送信」)', () => {
     mockBoard(
       board({
         myCheckin: { answer: '観覧車', updatedAt: '2026-08-17T00:00:00.000Z' },
@@ -129,7 +129,7 @@ describe('チェックイン', () => {
     );
     render(<WorkshopPanel />);
     expect(screen.getByTestId('workshop-checkin-input')).toHaveValue('観覧車');
-    expect(screen.getByTestId('workshop-checkin-submit')).toHaveTextContent('書き直す');
+    expect(screen.getByTestId('workshop-checkin-submit')).toHaveTextContent('送信');
   });
 });
 

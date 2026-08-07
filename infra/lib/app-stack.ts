@@ -41,6 +41,10 @@ export interface AppStackProps extends cdk.StackProps {
   aiChatRateLimitPerDay: string;
   /** ENABLE_RETRO_RECOMMEND env (ふりかえり→AIリコメンドの master flag。allowlist は AI チャットと共有) */
   retroRecommendEnable: string;
+  /** ENABLE_WORKSHOP env (研修機能の master flag。false で全テナント OFF) */
+  workshopEnable: string;
+  /** WORKSHOP_ALLOWLIST_TENANT_IDS env (CSV、空で全テナント ON、設定済で当該テナントのみ ON) */
+  workshopAllowlistTenantIds: string;
   /** JWKS リフレッシャ Lambda (kid 不一致時に AppRunner から on-demand invoke) */
   jwksRefresherFunction: lambda.IFunction;
   /** Google JWKS を保管した Secret (AppRunner が verifyGoogleIdToken で読む) */
@@ -165,6 +169,13 @@ export class AppStack extends cdk.Stack {
               { name: 'AI_CHAT_RATE_LIMIT_PER_DAY', value: props.aiChatRateLimitPerDay },
               // ふりかえり→AIリコメンド master flag (allowlist は AI チャットと共有)
               { name: 'ENABLE_RETRO_RECOMMEND', value: props.retroRecommendEnable },
+              // 研修 (workshop) master flag。false で全テナント OFF (route が 404)
+              { name: 'ENABLE_WORKSHOP', value: props.workshopEnable },
+              // 研修専用 allowlist (AI チャットとは共有しない)。空 = 全テナント ON
+              {
+                name: 'WORKSHOP_ALLOWLIST_TENANT_IDS',
+                value: props.workshopAllowlistTenantIds,
+              },
               // AppRunner から InvokeFunction で呼び出す Lambda の ARN
               { name: 'AI_CHAT_LAMBDA_ARN', value: props.aiChatExtractFunction.functionArn },
               // JWKS: 検証時に読む Secret と、kid 不一致時に叩くリフレッシャ Lambda

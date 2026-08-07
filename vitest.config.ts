@@ -82,6 +82,10 @@ export default defineConfig({
         'src/features/baton-relay/lib/batonRelayService.ts',
         'src/features/baton-relay/lib/batonRelayRepository.ts',
         'src/features/staffroom/lib/**',
+        // 研修 (workshop) の service/repository は DB 依存。
+        // __tests__/integration/workshop-rls.test.ts (13 ケース) でカバー。
+        // UI (WorkshopPanel) は unit test を整備してあるので除外しない。
+        'src/features/workshop/lib/**',
         // 共有 UI (Layout 系) は test 未整備、MVP 後追加予定
         'src/shared/components/AdminLayout.tsx',
         'src/shared/components/Tabs.tsx',

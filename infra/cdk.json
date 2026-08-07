@@ -9,6 +9,7 @@
     "githubRepo": "vitanota",
     "alertEmail": "kamitokusari.c@cozi73.com",
     "vpcCidr": "10.0.0.0/16",
-    "googleClientId": "624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com"
+    "googleClientId": "624139713607-el3sq55ninu8nsr394d8eiam7fjghraa.apps.googleusercontent.com",
+    "workshopAllowlistTenantIds": "c5e917a0-a90b-44ee-9f57-8508279a019a"
   }
 }

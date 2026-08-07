@@ -1991,6 +1991,271 @@ components:
               - students
       required:
         - classes
+    WorkshopBoardResponse:
+      type: object
+      properties:
+        workshop:
+          $ref: "#/components/schemas/WorkshopBox"
+        myCheckin:
+          type:
+            - object
+            - "null"
+          properties:
+            answer:
+              type: string
+            updatedAt:
+              type: string
+              format: date-time
+          required:
+            - answer
+            - updatedAt
+        checkins:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkshopCheckinView"
+        reflections:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkshopReflectionView"
+        teamReflections:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkshopTeamReflectionView"
+      required:
+        - workshop
+        - myCheckin
+        - checkins
+        - reflections
+        - teamReflections
+    WorkshopBox:
+      type: object
+      properties:
+        id:
+          type: string
+        schedule:
+          type: string
+          example: 2026/8/18 10:00-12:00 開催
+        title:
+          type: string
+          example: 正解がない課題にチームで向き合う
+        checkinQuestion:
+          type: string
+          example: 子どもの頃、動物園でいちばん好きだった場所はどこですか？
+      required:
+        - id
+        - title
+        - checkinQuestion
+    WorkshopCheckinView:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type:
+            - string
+            - "null"
+        userName:
+          type:
+            - string
+            - "null"
+        answer:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - userName
+        - answer
+        - createdAt
+        - updatedAt
+    WorkshopReflectionView:
+      type: object
+      properties:
+        journalEntryId:
+          type: string
+        userId:
+          type:
+            - string
+            - "null"
+        userName:
+          type:
+            - string
+            - "null"
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - journalEntryId
+        - userId
+        - userName
+        - content
+        - createdAt
+    WorkshopTeamReflectionView:
+      type: object
+      properties:
+        teamKey:
+          type: string
+          example: "1"
+        change:
+          type: string
+          description: ① 1周目と3周目を比べて何が変わったか
+        moment:
+          type: string
+          description: ② チームだから起きた瞬間
+        motto:
+          type: string
+          description: ③ 合言葉
+          example: まず全員で事実を言う
+        next:
+          type: string
+          description: ④ 仕事で活かせること
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - teamKey
+        - change
+        - moment
+        - motto
+        - next
+        - updatedAt
+    WorkshopCheckinResponse:
+      type: object
+      properties:
+        checkin:
+          $ref: "#/components/schemas/WorkshopCheckin"
+      required:
+        - checkin
+    WorkshopCheckin:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        workshopId:
+          type: string
+        userId:
+          type:
+            - string
+            - "null"
+        answer:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - tenantId
+        - workshopId
+        - userId
+        - answer
+        - createdAt
+        - updatedAt
+    SubmitWorkshopCheckinInput:
+      type: object
+      properties:
+        answer:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - answer
+    PostWorkshopReflectionInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required:
+        - content
+    WorkshopTeamReflectionResponse:
+      type: object
+      properties:
+        teamReflection:
+          $ref: "#/components/schemas/WorkshopTeamReflection"
+      required:
+        - teamReflection
+    WorkshopTeamReflection:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        workshopId:
+          type: string
+        teamKey:
+          type: string
+        teamChange:
+          type: string
+        teamMoment:
+          type: string
+        teamMotto:
+          type: string
+        teamNext:
+          type: string
+        updatedBy:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - tenantId
+        - workshopId
+        - teamKey
+        - teamChange
+        - teamMoment
+        - teamMotto
+        - teamNext
+        - updatedBy
+        - createdAt
+        - updatedAt
+    UpsertWorkshopTeamReflectionInput:
+      type: object
+      properties:
+        teamKey:
+          type: string
+          enum:
+            - "1"
+            - "2"
+            - "3"
+            - "4"
+        change:
+          type: string
+          maxLength: 2000
+          default: ""
+        moment:
+          type: string
+          maxLength: 2000
+          default: ""
+        motto:
+          type: string
+          maxLength: 2000
+          default: ""
+        next:
+          type: string
+          maxLength: 2000
+          default: ""
+      required:
+        - teamKey
   parameters: {}
 paths:
   /api/public/journal/entries:
@@ -6070,6 +6335,226 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StaffroomStudentSupport"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/workshop:
+    get:
+      summary: 研修の箱の中身（箱メタ + 自分のチェックイン + みんなのチェックイン）
+      description: "Cache-Control: private, no-store。研修が有効でないテナントには 404。チェックインは職員室には出ない（別テーブル）。"
+      tags:
+        - Workshop
+      security:
+        - *a2
+      responses:
+        "200":
+          description: 研修の箱
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopBoardResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/workshop/checkin:
+    post:
+      summary: チェックイン回答を投稿（upsert・1人1回答・上書き可）
+      description: 研修前チェックイン。回答は箱の中で参加者に見え、職員室には出ない。
+      tags:
+        - Workshop
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitWorkshopCheckinInput"
+      responses:
+        "200":
+          description: 投稿成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopCheckinResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/workshop/reflection:
+    post:
+      summary: 振り返りを投稿（公開 note を作成し箱に紐付け）
+      description: 研修後の振り返り。公開 note (kind=note, is_public=true) として作成され、箱の中にも職員室ノートにも流れる。
+      tags:
+        - Workshop
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostWorkshopReflectionInput"
+      responses:
+        "201":
+          description: 投稿成功（作成された公開 note）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntryResponse"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/workshop/team-reflection:
+    post:
+      summary: チーム振り返りを保存（upsert・1班1枚・上書き可）
+      description: ワーク最後の12分でチームごとに1枚を埋める（紙の「振り返り・発表シート」の4問）。チームの誰が書いても同じ1枚を更新する（入力係が交代できる）。箱の中に閉じ、職員室ノートには流れない。途中保存を許すため個々の欄は空でよいが、4問すべて空なら
+        400。
+      tags:
+        - Workshop
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertWorkshopTeamReflectionInput"
+      responses:
+        "200":
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopTeamReflectionResponse"
         "400":
           description: バリデーションエラー
           content:

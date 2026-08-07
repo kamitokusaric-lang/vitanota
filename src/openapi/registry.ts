@@ -118,6 +118,16 @@ import {
   journalRecommendPatchRequestSchema,
   journalRecommendStatusResponseSchema,
 } from './journalRecommendSchemas';
+import {
+  submitCheckinSchema,
+  postReflectionSchema,
+  upsertTeamReflectionSchema,
+} from '@/features/workshop/schemas/workshop';
+import {
+  workshopBoardResponseSchema,
+  workshopCheckinResponseSchema,
+  workshopTeamReflectionResponseSchema,
+} from './workshopSchemas';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -1534,6 +1544,90 @@ export function buildOpenApiDocument() {
       200: {
         description: '生徒サポート',
         content: { 'application/json': { schema: studentSupportResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // /api/workshop - 研修 (決め打ちワークショップの箱)
+  // 研修無効テナントには 404 (機能の存在を悟らせない・観測者原則)。
+  // ─────────────────────────────────────────────────────────────
+  registry.registerPath({
+    method: 'get',
+    path: '/api/workshop',
+    summary: '研修の箱の中身（箱メタ + 自分のチェックイン + みんなのチェックイン）',
+    description:
+      'Cache-Control: private, no-store。研修が有効でないテナントには 404。チェックインは職員室には出ない（別テーブル）。',
+    tags: ['Workshop'],
+    security: [sessionCookie],
+    responses: {
+      200: {
+        description: '研修の箱',
+        content: { 'application/json': { schema: workshopBoardResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/workshop/checkin',
+    summary: 'チェックイン回答を投稿（upsert・1人1回答・上書き可）',
+    description: '研修前チェックイン。回答は箱の中で参加者に見え、職員室には出ない。',
+    tags: ['Workshop'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: submitCheckinSchema } } },
+    },
+    responses: {
+      200: {
+        description: '投稿成功',
+        content: { 'application/json': { schema: workshopCheckinResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/workshop/reflection',
+    summary: '振り返りを投稿（公開 note を作成し箱に紐付け）',
+    description:
+      '研修後の振り返り。公開 note (kind=note, is_public=true) として作成され、箱の中にも職員室ノートにも流れる。',
+    tags: ['Workshop'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: postReflectionSchema } } },
+    },
+    responses: {
+      201: {
+        description: '投稿成功（作成された公開 note）',
+        content: { 'application/json': { schema: entryResponseSchema } },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/workshop/team-reflection',
+    summary: 'チーム振り返りを保存（upsert・1班1枚・上書き可）',
+    description:
+      'ワーク最後の12分でチームごとに1枚を埋める（紙の「振り返り・発表シート」の4問）。チームの誰が書いても同じ1枚を更新する（入力係が交代できる）。箱の中に閉じ、職員室ノートには流れない。途中保存を許すため個々の欄は空でよいが、4問すべて空なら 400。',
+    tags: ['Workshop'],
+    security: [sessionCookie],
+    request: {
+      body: {
+        content: { 'application/json': { schema: upsertTeamReflectionSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: '保存成功',
+        content: {
+          'application/json': { schema: workshopTeamReflectionResponseSchema },
+        },
       },
       ...errorResponses,
     },

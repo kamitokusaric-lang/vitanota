@@ -424,6 +424,110 @@ export const publicJournalEntries = pgView('public_journal_entries').as((qb) =>
     .where(eq(journalEntries.isPublic, true))
 );
 
+// ─────────────────────────────────────────────────────────────
+// 研修 (workshop): 決め打ちワークショップの箱 (chimo 2026-07-29)
+// 箱メタ (タイトル・チェックインの問い) はコード定数
+// (src/features/workshop/constants.ts)。DB は参加者の入力だけを持ち、
+// 箱本体テーブル・参加者テーブルは作らない (参加者 = テナント内の先生全員)。
+// チェックインは journal に一切乗せない別テーブル → 職員室/公開/AI に
+// 構造的に漏れない (踏み絵 B案)。振り返りは既存 journal_entries
+// (kind='note', is_public=true) に溶かし、workshop_reflections で箱に紐付ける
+// (journal_entries を ALTER しない)。RLS は migration 0057。
+// ─────────────────────────────────────────────────────────────
+
+// ── workshop_checkins (0057) ────────────────────────────────────
+// 研修前チェックインの回答。1人1回答・上書き可 (UNIQUE workshop_id×user_id)。
+// workshop_id は決め打ち定数 (workshops テーブルは作らない)。
+export const workshopCheckins = pgTable(
+  'workshop_checkins',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    workshopId: uuid('workshop_id').notNull(),
+    // 退会・転勤時は SET NULL で匿名化 (回答自体は箱に残す)
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    answer: text('answer').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // 1人1回答 (上書き)。user_id NULL (退会後) は Postgres 上で複数許容される
+    workshopUserUnique: unique('workshop_checkins_workshop_user_unique').on(
+      table.workshopId,
+      table.userId
+    ),
+    tenantIdx: index('workshop_checkins_tenant_idx').on(table.tenantId),
+    workshopIdx: index('workshop_checkins_workshop_idx').on(table.workshopId),
+  })
+);
+
+// ── workshop_reflections (0057) ─────────────────────────────────
+// 研修後の振り返り (既存 journal_entries) を箱に紐付ける中間テーブル。
+// journal_entries を ALTER せず紐付けだけ持つ。複合 FK でクロステナント物理防止。
+export const workshopReflections = pgTable(
+  'workshop_reflections',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id').notNull(),
+    workshopId: uuid('workshop_id').notNull(),
+    journalEntryId: uuid('journal_entry_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    entryFk: foreignKey({
+      columns: [table.journalEntryId, table.tenantId],
+      foreignColumns: [journalEntries.id, journalEntries.tenantId],
+      name: 'workshop_reflections_entry_fk',
+    }).onDelete('cascade'),
+    workshopEntryUnique: unique('workshop_reflections_workshop_entry_unique').on(
+      table.workshopId,
+      table.journalEntryId
+    ),
+    tenantIdx: index('workshop_reflections_tenant_idx').on(table.tenantId),
+    workshopIdx: index('workshop_reflections_workshop_idx').on(table.workshopId),
+  })
+);
+
+// ── workshop_team_reflections (0058) ────────────────────────────
+// チーム振り返り (紙の「振り返り・発表シート」の画面化)。1班1枚・上書き可。
+// 4問は紙と同じ (①変化 ②チームだから起きた瞬間 ③合言葉 ④仕事で活かせること)。
+// 12分かけて埋めるので途中保存を許し、各欄は空文字を許容する。
+// checkins との差: 書込は「本人のみ」ではなく「テナント内なら誰でも」
+// (チームで1枚を共同編集するため。入力係が交代できる必要がある)。
+// team_key は定数なので UNIQUE に tenant_id を含める (他テナントとの衝突防止)。
+export const workshopTeamReflections = pgTable(
+  'workshop_team_reflections',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    workshopId: uuid('workshop_id').notNull(),
+    teamKey: text('team_key').notNull(),
+    teamChange: text('team_change').notNull().default(''),
+    teamMoment: text('team_moment').notNull().default(''),
+    teamMotto: text('team_motto').notNull().default(''),
+    teamNext: text('team_next').notNull().default(''),
+    // 最後に書いた人 (RLS の WITH CHECK 用)。UI には出さない。
+    updatedBy: uuid('updated_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    teamUnique: unique('workshop_team_reflections_team_unique').on(
+      table.tenantId,
+      table.workshopId,
+      table.teamKey
+    ),
+    tenantIdx: index('workshop_team_reflections_tenant_idx').on(table.tenantId),
+    workshopIdx: index('workshop_team_reflections_workshop_idx').on(table.workshopId),
+  })
+);
+
 // alerts テーブル (旧 Unit-04 管理者アラート) は Phase 2 で哲学的観点から全面廃止。
 // migration 0018 で DROP 済み。稼働負荷の兆しは task ベースで可視化する方向に統合。
 
@@ -1186,6 +1290,12 @@ export type TaskComment = typeof taskComments.$inferSelect;
 export type NewTaskComment = typeof taskComments.$inferInsert;
 export type JournalComment = typeof journalComments.$inferSelect;
 export type NewJournalComment = typeof journalComments.$inferInsert;
+export type WorkshopCheckin = typeof workshopCheckins.$inferSelect;
+export type NewWorkshopCheckin = typeof workshopCheckins.$inferInsert;
+export type WorkshopReflection = typeof workshopReflections.$inferSelect;
+export type NewWorkshopReflection = typeof workshopReflections.$inferInsert;
+export type WorkshopTeamReflection = typeof workshopTeamReflections.$inferSelect;
+export type NewWorkshopTeamReflection = typeof workshopTeamReflections.$inferInsert;
 export type UserTenantProfile = typeof userTenantProfiles.$inferSelect;
 export type NewUserTenantProfile = typeof userTenantProfiles.$inferInsert;
 export type JournalWeeklySummary = typeof journalWeeklySummaries.$inferSelect;

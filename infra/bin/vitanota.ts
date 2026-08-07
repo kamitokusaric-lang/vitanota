@@ -90,6 +90,18 @@ const aiChatRateLimitPerDay =
 const retroRecommendEnable =
   ((app.node.tryGetContext('retroRecommendEnable') as string | undefined) ??
     (envName === 'prod' ? 'true' : 'false'));
+// 研修 (workshop) master flag。aiChatEnableExtraction と同型で prod は default 'true' に固定
+// (context 渡し忘れで本番 env が false 上書きされ、研修当日に機能が消える事故を防ぐ)。
+// OFF に戻すとき: -c workshopEnable=false
+const workshopEnable =
+  ((app.node.tryGetContext('workshopEnable') as string | undefined) ??
+    (envName === 'prod' ? 'true' : 'false'));
+// 研修専用 allowlist (AI チャットとは共有しない)。
+// 空文字だと「全テナント ON」の意味になり、研修が他校にも出てしまう。
+// そのためニセコ中の tenant_id は cdk.json context に固定してある (渡し忘れ防御)。
+const workshopAllowlistTenantIds =
+  (app.node.tryGetContext('workshopAllowlistTenantIds') as string | undefined) ??
+  '';
 
 const appStack = new AppStack(app, `${prefix}-app`, {
   env,
@@ -112,6 +124,8 @@ const appStack = new AppStack(app, `${prefix}-app`, {
   aiChatAllowlistTenantIds,
   aiChatRateLimitPerDay,
   retroRecommendEnable,
+  workshopEnable,
+  workshopAllowlistTenantIds,
   jwksRefresherFunction: jwksStack.refresherFunction,
   googleJwksSecret: jwksStack.jwksSecret,
 });

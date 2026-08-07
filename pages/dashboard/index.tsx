@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   BarChart3,
   Users,
+  Puzzle,
 } from 'lucide-react';
 import { BottomTabNav } from '@/shared/components/BottomTabNav';
 import { eq } from 'drizzle-orm';
@@ -40,12 +41,15 @@ import { TodayReflectionCard } from '@/features/journal/components/TodayReflecti
 import { PublicTimelineRail } from '@/features/dashboard/components/PublicTimelineRail';
 import { MyNotesByKind } from '@/features/dashboard/components/MyNotesByKind';
 import { StudentNotesByClass } from '@/features/dashboard/components/StudentNotesByClass';
+import { WorkshopPanel } from '@/features/workshop/components/WorkshopPanel';
+import { isWorkshopEnabledForTenant } from '@/features/workshop/featureFlag';
 import { canUseAdminFeatures, canUseSystemAdminFeatures } from '@/features/auth/lib/role-helpers';
 import type { VitanotaSession } from '@/shared/types/auth';
 
 interface DashboardPageProps {
   session: VitanotaSession;
   aiChatEnabled: boolean;
+  workshopEnabled: boolean; // 研修タブ (ニセコ中のみ・allowlist)
   tenantName: string;
   todayDate: string; // JST の今日 (YYYY-MM-DD・生徒ノートの朝バトン埋め込み用)
 }
@@ -89,6 +93,7 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
   'my-notes': 'マイノート ・ 今日をふりかえる',
   'student-notes': '生徒ノート ・ 生徒たちの様子を書きとめる',
   tasks: 'タスクボード ・ やることを整える',
+  workshop: '研修 ・ 視点を持ち寄る',
 };
 
 // モバイル下部タブナビの 5 タブ (chimo 2026-07-02 刷新: サイドバーと同順・短ラベル)。
@@ -103,6 +108,7 @@ const MOBILE_TABS = [
 export default function DashboardPage({
   session,
   aiChatEnabled,
+  workshopEnabled,
   tenantName,
   todayDate,
 }: DashboardPageProps) {
@@ -174,6 +180,17 @@ export default function DashboardPage({
     },
   ];
 
+  // 研修タブ (workshop)。ニセコ中のみ (allowlist)。始まりと終わりのあるイベントとして
+  // 日常タブの後ろに置く。無効テナントには出さない (存在を悟らせない)。
+  if (workshopEnabled) {
+    mainTabs.push({
+      id: 'workshop',
+      label: '研修',
+      icon: <Puzzle size={18} strokeWidth={1.75} aria-hidden />,
+      content: <WorkshopPanel />,
+    });
+  }
+
   // 学校レポート (学校エンゲージメント) タブは一旦非表示 (chimo 2026-06-16)。
   // school_admin 専用の組織状態ビュー。ルート (/api/school/*) とコンポーネントは残置し、
   // 再表示は showSchoolReport を true に戻すだけ。
@@ -188,16 +205,29 @@ export default function DashboardPage({
   }
 
   // 左サイドバー用のナビ項目 (mainTabs と同じ並び)。グループ2 (自分をふりかえる〜) の前に区切り線。
+  // 研修タブがあるときは その直前 (タスクの後) にも区切り線を入れ、一過性イベントを日常タブと分ける。
   const navItems: SidebarNavItem[] = mainTabs.map((t) => ({
     id: t.id,
     label: t.label,
     icon: t.icon,
-    dividerAfter: t.id === 'staffroom',
+    dividerAfter: t.id === 'staffroom' || (t.id === 'tasks' && workshopEnabled),
   }));
 
   const activeLabel =
     mainTabs.find((t) => t.id === activeTab)?.label ?? '職員室で交流する';
   const activeDesc = TAB_DESCRIPTIONS[activeTab];
+
+  // モバイル下部タブ。研修が有効なテナントだけ末尾に「研修」を足す。
+  const mobileTabs = workshopEnabled
+    ? [
+        ...MOBILE_TABS,
+        {
+          id: 'workshop',
+          label: '研修',
+          icon: <Puzzle size={20} strokeWidth={1.75} aria-hidden />,
+        },
+      ]
+    : MOBILE_TABS;
 
   return (
     <TenantGuard session={session}>
@@ -221,7 +251,7 @@ export default function DashboardPage({
             />
           </div>
 
-          <BottomTabNav tabs={MOBILE_TABS} activeId={activeTab} />
+          <BottomTabNav tabs={mobileTabs} activeId={activeTab} />
         </DashboardSidebarLayout>
       </RoleGuard>
     </TenantGuard>
@@ -230,6 +260,7 @@ export default function DashboardPage({
 
 export const getServerSideProps = withAuthSSR<{
   aiChatEnabled: boolean;
+  workshopEnabled: boolean;
   tenantName: string;
   todayDate: string;
 }>({
@@ -259,6 +290,7 @@ export const getServerSideProps = withAuthSSR<{
     return {
       props: {
         aiChatEnabled: isAiChatEnabledForTenant(tenantId),
+        workshopEnabled: isWorkshopEnabledForTenant(tenantId),
         tenantName,
         todayDate,
       },

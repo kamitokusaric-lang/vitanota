@@ -463,12 +463,14 @@ function MaterialPager() {
 // 「最後に書いた人」は出さない (入力係を可視化しない)。
 
 type TeamAnswers = {
+  vision: string;
   respect: string;
   autonomy: string;
   next: string;
 };
 
 const EMPTY_ANSWERS: TeamAnswers = {
+  vision: '',
   respect: '',
   autonomy: '',
   next: '',
@@ -478,7 +480,9 @@ const EMPTY_ANSWERS: TeamAnswers = {
 const TEAM_STORAGE_KEY = 'vitanota.workshop.teamKey';
 
 function hasAnyAnswer(a: TeamAnswers): boolean {
-  return Boolean(a.respect.trim() || a.autonomy.trim() || a.next.trim());
+  return Boolean(
+    a.vision.trim() || a.respect.trim() || a.autonomy.trim() || a.next.trim(),
+  );
 }
 
 function TeamReflectionSection({
@@ -509,6 +513,7 @@ function TeamReflectionSection({
     setDraft(
       saved
         ? {
+            vision: saved.vision,
             respect: saved.respect,
             autonomy: saved.autonomy,
             next: saved.next,

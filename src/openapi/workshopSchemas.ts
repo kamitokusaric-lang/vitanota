@@ -48,6 +48,9 @@ export const workshopReflectionViewSchema = z
 export const workshopTeamReflectionViewSchema = z
   .object({
     teamKey: z.string().openapi({ example: '1' }),
+    vision: z
+      .string()
+      .openapi({ description: 'お題をチームでどう定義したか (発表の入口)' }),
     respect: z
       .string()
       .openapi({ description: '価値観や前提を尊重する (ちがう観察や解釈をどう扱ったか)' }),
@@ -101,6 +104,7 @@ export const workshopTeamReflectionSchema = z
     tenantId: z.string().guid(),
     workshopId: z.string().guid(),
     teamKey: z.string(),
+    teamVision: z.string(),
     teamRespect: z.string(),
     teamAutonomy: z.string(),
     teamNext: z.string(),

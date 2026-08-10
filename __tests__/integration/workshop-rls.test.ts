@@ -244,6 +244,7 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
   //   - 箱の中に閉じる (journal に乗らない → 職員室に流れない)
   describe('チーム振り返り', () => {
     const answers = (over: Partial<Record<string, string>> = {}) => ({
+      vision: '子どもが「また行きたい」と言う園',
       respect: 'ちがう見方が出たとき、両方を残して作り分けた',
       autonomy: '経験に関わらず、気づいた人が手を動かした',
       next: '学年会で、まず全員が一言ずつ',

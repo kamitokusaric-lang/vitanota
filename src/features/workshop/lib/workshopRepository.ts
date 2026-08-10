@@ -48,6 +48,7 @@ export type WorkshopReflectionWithEntry = {
 // updatedBy は返さない: 「最後に書いた人」= 入力係を UI に可視化しないため。
 export type WorkshopTeamReflectionView = {
   teamKey: string;
+  vision: string;
   respect: string;
   autonomy: string;
   next: string;
@@ -57,6 +58,7 @@ export type WorkshopTeamReflectionView = {
 export interface UpsertTeamReflectionParams {
   workshopId: string;
   teamKey: string;
+  vision: string;
   respect: string;
   autonomy: string;
   next: string;
@@ -183,6 +185,7 @@ export class WorkshopRepository {
     const rows = await tx
       .select({
         teamKey: workshopTeamReflections.teamKey,
+        vision: workshopTeamReflections.teamVision,
         respect: workshopTeamReflections.teamRespect,
         autonomy: workshopTeamReflections.teamAutonomy,
         next: workshopTeamReflections.teamNext,
@@ -213,6 +216,7 @@ export class WorkshopRepository {
         tenantId: ctx.tenantId,
         workshopId: params.workshopId,
         teamKey: params.teamKey,
+        teamVision: params.vision,
         teamRespect: params.respect,
         teamAutonomy: params.autonomy,
         teamNext: params.next,
@@ -225,6 +229,7 @@ export class WorkshopRepository {
           workshopTeamReflections.teamKey,
         ],
         set: {
+          teamVision: params.vision,
           teamRespect: params.respect,
           teamAutonomy: params.autonomy,
           teamNext: params.next,

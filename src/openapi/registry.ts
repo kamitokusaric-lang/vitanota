@@ -44,6 +44,7 @@ import {
   createStudentSchema,
   updateStudentSchema,
   studentIdParamSchema,
+  bulkStudentsSchema,
   listStudentsQuerySchema,
   createNoteSchema,
   updateNoteSchema,
@@ -1375,6 +1376,45 @@ export function buildOpenApiDocument() {
         description: '更新成功',
         content: { 'application/json': { schema: z.object({ student: studentResponseSchema }) } },
       },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/baton-relay/students/bulk',
+    summary: '選んだ生徒をまとめて操作（削除 / アーカイブ / クラス移動）',
+    description:
+      '1トランザクションで処理するので、途中で失敗しても半端に消えたり動いたりしない。delete はその子の印象・コメントも cascade で消える（UI は合計件数を見せてから呼ぶこと）。他テナントの行は RLS が弾くので affected に数えられない。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: {
+      body: { content: { 'application/json': { schema: bulkStudentsSchema } } },
+    },
+    responses: {
+      200: {
+        description: '処理した件数',
+        content: {
+          'application/json': {
+            schema: z.object({ affected: z.number().int() }),
+          },
+        },
+      },
+      ...errorResponses,
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/baton-relay/students/{id}',
+    summary: '生徒の削除（誤登録の取り消し）',
+    description:
+      'アーカイブ（在籍終了）とは意味が違う。あちらは転校・卒業という「起きた出来事」、こちらは「そもそも無かったこと」。baton_notes は ON DELETE CASCADE なので、その子の印象・コメントも一緒に消える（UI は削除前に StudentDto.noteCount を見せること）。他テナントの行は RLS で 0 件 → 存在しないのと区別せず 404。',
+    tags: ['Baton Relay'],
+    security: [sessionCookie],
+    request: { params: studentIdParamSchema },
+    responses: {
+      204: { description: '削除した' },
       ...errorResponses,
     },
   });

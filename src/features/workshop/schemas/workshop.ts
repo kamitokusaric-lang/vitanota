@@ -42,13 +42,12 @@ export const upsertTeamReflectionSchema = z
     teamKey: z.enum(WORKSHOP_TEAM_KEYS as [string, ...string[]], {
       message: '班を選んでください',
     }),
-    change: teamAnswer,
-    moment: teamAnswer,
-    motto: teamAnswer,
+    respect: teamAnswer,
+    autonomy: teamAnswer,
     next: teamAnswer,
   })
   .refine(
-    (v) => Boolean(v.change || v.moment || v.motto || v.next),
+    (v) => Boolean(v.respect || v.autonomy || v.next),
     { message: '振り返りを入力してください' },
   )
   .openapi('UpsertWorkshopTeamReflectionInput');

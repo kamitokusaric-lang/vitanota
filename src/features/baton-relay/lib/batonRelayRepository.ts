@@ -1,6 +1,6 @@
 // baton-relay Repository: classes / students / baton_notes / student_reactions の CRUD
 // RLS と二重防御で全クエリを tenant_id で絞る。メソッドは (tx, ctx, ...) を受ける。
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, inArray, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/node-postgres';
 import {
   classes,
@@ -75,6 +75,9 @@ export class ClassRepository {
 }
 
 // ── students ───────────────────────────────────────────────────
+// 生徒 + その子に付いた印象の件数 (削除確認用)。
+export type StudentWithNoteCount = Student & { noteCount: number };
+
 export class StudentRepository {
   // status 省略時は active のみ (日々の記入リスト)。'archived' でアーカイブ済みのみ。
   async findByClass(
@@ -82,8 +85,8 @@ export class StudentRepository {
     ctx: BatonContext,
     classId: string,
     status: 'active' | 'archived' = 'active',
-  ): Promise<Student[]> {
-    return tx
+  ): Promise<StudentWithNoteCount[]> {
+    const rows = await tx
       .select()
       .from(students)
       .where(
@@ -94,6 +97,28 @@ export class StudentRepository {
         ),
       )
       .orderBy(desc(students.createdAt));
+    if (rows.length === 0) return [];
+
+    // 印象・コメントの件数。**削除確認でだけ使う** (一覧や学年会には出さない)。
+    // 生徒の活動量を可視化する意図はない (踏み絵)。
+    const counts = await tx
+      .select({
+        studentId: batonNotes.studentId,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(batonNotes)
+      .where(
+        and(
+          eq(batonNotes.tenantId, ctx.tenantId),
+          inArray(
+            batonNotes.studentId,
+            rows.map((r) => r.id),
+          ),
+        ),
+      )
+      .groupBy(batonNotes.studentId);
+    const byStudent = new Map(counts.map((c) => [c.studentId, c.n]));
+    return rows.map((r) => ({ ...r, noteCount: byStudent.get(r.id) ?? 0 }));
   }
 
   // テナント内の全生徒 (ロスターインポートの重複判定用)
@@ -148,6 +173,56 @@ export class StudentRepository {
       .where(and(eq(students.id, id), eq(students.tenantId, ctx.tenantId)))
       .returning();
     return row;
+  }
+
+  // 誤登録の取り消し。在籍終了 (archived) とは意味が違う —
+  // あちらは転校・卒業という「起きた出来事」、こちらは「そもそも無かったこと」。
+  // baton_notes は ON DELETE CASCADE なので、その子の印象・コメントも一緒に消える。
+  // 消えないとき (他テナント等) は 0 を返す → 呼び出し側で 404。
+  // 一括削除。1トランザクションで全部 or 何も (途中で半端に消えない)。
+  async deleteMany(
+    tx: DrizzleDb,
+    ctx: BatonContext,
+    ids: string[],
+  ): Promise<number> {
+    if (ids.length === 0) return 0;
+    const rows = await tx
+      .delete(students)
+      .where(and(inArray(students.id, ids), eq(students.tenantId, ctx.tenantId)))
+      .returning({ id: students.id });
+    return rows.length;
+  }
+
+  // 一括のクラス移動 / アーカイブ・復元。
+  async updateMany(
+    tx: DrizzleDb,
+    ctx: BatonContext,
+    ids: string[],
+    params: {
+      classId?: string;
+      status?: 'active' | 'archived';
+      leftAt?: string | null;
+    },
+  ): Promise<number> {
+    if (ids.length === 0) return 0;
+    const patch: Partial<typeof students.$inferInsert> = {};
+    if (params.classId !== undefined) patch.classId = params.classId;
+    if (params.status !== undefined) patch.status = params.status;
+    if (params.leftAt !== undefined) patch.leftAt = params.leftAt;
+    const rows = await tx
+      .update(students)
+      .set(patch)
+      .where(and(inArray(students.id, ids), eq(students.tenantId, ctx.tenantId)))
+      .returning({ id: students.id });
+    return rows.length;
+  }
+
+  async delete(tx: DrizzleDb, ctx: BatonContext, id: string): Promise<number> {
+    const rows = await tx
+      .delete(students)
+      .where(and(eq(students.id, id), eq(students.tenantId, ctx.tenantId)))
+      .returning({ id: students.id });
+    return rows.length;
   }
 }
 

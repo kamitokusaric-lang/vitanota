@@ -244,10 +244,9 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
   //   - 箱の中に閉じる (journal に乗らない → 職員室に流れない)
   describe('チーム振り返り', () => {
     const answers = (over: Partial<Record<string, string>> = {}) => ({
-      change: '最初はバラバラだったが、3周目には自然に役割が生まれた',
-      moment: 'A さんの「柵が高すぎない?」の一言で作り直した',
-      motto: 'まず全員で事実を言う',
-      next: '学年会で、まず1人1事実の観察から始める',
+      respect: 'ちがう見方が出たとき、両方を残して作り分けた',
+      autonomy: '経験に関わらず、気づいた人が手を動かした',
+      next: '学年会で、まず全員が一言ずつ',
       ...over,
     });
 
@@ -283,7 +282,7 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
           {
             workshopId: WORKSHOP.id,
             teamKey: '2',
-            ...answers({ motto: '決めてから作る、作ってから見る' }),
+            ...answers({ autonomy: '気づいた人が動いた' }),
           },
           { userId: teacherA2.id, tenantId: tenantA.id },
         ),
@@ -295,7 +294,7 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
         }),
       );
       expect(rows).toHaveLength(1);
-      expect(rows[0].motto).toBe('決めてから作る、作ってから見る');
+      expect(rows[0].autonomy).toBe('気づいた人が動いた');
       // 書いた人は updated_by に残るが、View には出さない (入力係を可視化しない)
       expect(rows[0]).not.toHaveProperty('updatedBy');
       const raw = await rawQueryAsSuperuser<{ updated_by: string }>(
@@ -306,7 +305,7 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
     });
 
     it('同じ班に2回書いても1行のまま (1班1枚)', async () => {
-      for (const motto of ['一周目の合言葉', '三周目の合言葉']) {
+      for (const motto of ['一周目', '三周目']) {
         await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
           workshopRepo.upsertTeamReflection(
             tx as unknown as RepoDb,
@@ -345,14 +344,14 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
       await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
         workshopRepo.upsertTeamReflection(
           tx as unknown as RepoDb,
-          { workshopId: WORKSHOP.id, teamKey: '1', ...answers({ motto: 'A の合言葉' }) },
+          { workshopId: WORKSHOP.id, teamKey: '1', ...answers({ autonomy: 'A の自律' }) },
           { userId: teacherA1.id, tenantId: tenantA.id },
         ),
       );
       await withTenantContext(db, tenantB.id, teacherB.id, (tx) =>
         workshopRepo.upsertTeamReflection(
           tx as unknown as RepoDb,
-          { workshopId: WORKSHOP.id, teamKey: '1', ...answers({ motto: 'B の合言葉' }) },
+          { workshopId: WORKSHOP.id, teamKey: '1', ...answers({ autonomy: 'B の自律' }) },
           { userId: teacherB.id, tenantId: tenantB.id },
         ),
       );
@@ -363,7 +362,7 @@ describe('workshop (研修チェックイン) RLS 境界', () => {
         }),
       );
       expect(rowsA).toHaveLength(1);
-      expect(rowsA[0].motto).toBe('A の合言葉');
+      expect(rowsA[0].autonomy).toBe('A の自律');
     });
   });
 });

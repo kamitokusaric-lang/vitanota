@@ -29,9 +29,8 @@ export interface WorkshopReflectionDto {
 // チーム振り返り (1班1枚)。「最後に書いた人」は返らない (入力係を可視化しない)。
 export interface WorkshopTeamReflectionDto {
   teamKey: string;
-  change: string;
-  moment: string;
-  motto: string;
+  respect: string;
+  autonomy: string;
   next: string;
   updatedAt: string;
 }
@@ -46,9 +45,8 @@ export interface WorkshopBoardDto {
 
 export interface UpsertTeamReflectionArgs {
   teamKey: string;
-  change: string;
-  moment: string;
-  motto: string;
+  respect: string;
+  autonomy: string;
   next: string;
 }
 

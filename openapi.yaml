@@ -1649,6 +1649,8 @@ components:
           type:
             - string
             - "null"
+        noteCount:
+          type: integer
         createdAt:
           type: string
         updatedAt:
@@ -1660,6 +1662,7 @@ components:
         - status
         - enrolledAt
         - leftAt
+        - noteCount
         - createdAt
         - updatedAt
     CreateStudentInput:
@@ -1691,6 +1694,26 @@ components:
           enum:
             - active
             - archived
+    BulkStudentsInput:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+            - delete
+            - archive
+            - move
+        studentIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 200
+        toClassId:
+          type: string
+      required:
+        - action
+        - studentIds
     BatonNoteList:
       type: object
       properties:
@@ -1784,11 +1807,26 @@ components:
           type: integer
         studentsSkipped:
           type: integer
+        sameNameInOtherClasses:
+          type: array
+          items:
+            type: object
+            properties:
+              displayName:
+                type: string
+              classNames:
+                type: array
+                items:
+                  type: string
+            required:
+              - displayName
+              - classNames
       required:
         - classesCreated
         - classesUpdated
         - studentsAdded
         - studentsSkipped
+        - sameNameInOtherClasses
     RosterImportInput:
       type: object
       properties:
@@ -2104,27 +2142,22 @@ components:
         teamKey:
           type: string
           example: "1"
-        change:
+        respect:
           type: string
-          description: ① 1周目と3周目を比べて何が変わったか
-        moment:
+          description: 価値観や前提を尊重する (ちがう観察や解釈をどう扱ったか)
+        autonomy:
           type: string
-          description: ② チームだから起きた瞬間
-        motto:
-          type: string
-          description: ③ 合言葉
-          example: まず全員で事実を言う
+          description: 一人一人が自律的に取り組む (役割や経験によらず動けたか)
         next:
           type: string
-          description: ④ 仕事で活かせること
+          description: 仕事で活かせること (ポスターの主役)
         updatedAt:
           type: string
           format: date-time
       required:
         - teamKey
-        - change
-        - moment
-        - motto
+        - respect
+        - autonomy
         - next
         - updatedAt
     WorkshopCheckinResponse:
@@ -2199,11 +2232,9 @@ components:
           type: string
         teamKey:
           type: string
-        teamChange:
+        teamRespect:
           type: string
-        teamMoment:
-          type: string
-        teamMotto:
+        teamAutonomy:
           type: string
         teamNext:
           type: string
@@ -2222,9 +2253,8 @@ components:
         - tenantId
         - workshopId
         - teamKey
-        - teamChange
-        - teamMoment
-        - teamMotto
+        - teamRespect
+        - teamAutonomy
         - teamNext
         - updatedBy
         - createdAt
@@ -2239,15 +2269,11 @@ components:
             - "2"
             - "3"
             - "4"
-        change:
+        respect:
           type: string
           maxLength: 2000
           default: ""
-        moment:
-          type: string
-          maxLength: 2000
-          default: ""
-        motto:
+        autonomy:
           type: string
           maxLength: 2000
           default: ""
@@ -5939,6 +5965,121 @@ paths:
                     $ref: "#/components/schemas/Student"
                 required:
                   - student
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: 生徒の削除（誤登録の取り消し）
+      description: アーカイブ（在籍終了）とは意味が違う。あちらは転校・卒業という「起きた出来事」、こちらは「そもそも無かったこと」。baton_notes は ON DELETE CASCADE
+        なので、その子の印象・コメントも一緒に消える（UI は削除前に StudentDto.noteCount を見せること）。他テナントの行は RLS で 0 件 → 存在しないのと区別せず 404。
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: 削除した
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: リソースが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "423":
+          description: テナント停止中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/baton-relay/students/bulk:
+    post:
+      summary: 選んだ生徒をまとめて操作（削除 / アーカイブ / クラス移動）
+      description: 1トランザクションで処理するので、途中で失敗しても半端に消えたり動いたりしない。delete はその子の印象・コメントも cascade で消える（UI は合計件数を見せてから呼ぶこと）。他テナントの行は RLS
+        が弾くので affected に数えられない。
+      tags:
+        - Baton Relay
+      security:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkStudentsInput"
+      responses:
+        "200":
+          description: 処理した件数
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  affected:
+                    type: integer
+                required:
+                  - affected
         "400":
           description: バリデーションエラー
           content:

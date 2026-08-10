@@ -30,6 +30,34 @@ function makeNote(o: Partial<BatonNoteDto> = {}): BatonNoteDto {
   };
 }
 
+describe('ClassGoalHeader の学年', () => {
+  it('学年を選ぶと onSaveGrade が数値で呼ばれる (学年会に出す軸)', () => {
+    const onSaveGrade = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ClassGoalHeader cls={makeClass({ id: 'c1' })} onSaveGoal={vi.fn()} onSaveGrade={onSaveGrade} />,
+    );
+    fireEvent.change(screen.getByTestId('class-grade-select-c1'), {
+      target: { value: '2' },
+    });
+    expect(onSaveGrade).toHaveBeenCalledWith(2);
+  });
+
+  it('「学年なし」を選ぶと null で呼ばれる (設定を外せる)', () => {
+    const onSaveGrade = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ClassGoalHeader
+        cls={makeClass({ id: 'c1', grade: 2 })}
+        onSaveGoal={vi.fn()}
+        onSaveGrade={onSaveGrade}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('class-grade-select-c1'), {
+      target: { value: '' },
+    });
+    expect(onSaveGrade).toHaveBeenCalledWith(null);
+  });
+});
+
 describe('RosterAdd', () => {
   it('クラスが無いとき開いた状態で、入力して作成すると onCreateClass が呼ばれる', async () => {
     const onCreateClass = vi.fn().mockResolvedValue(undefined);
@@ -74,7 +102,7 @@ describe('ClassGoalHeader', () => {
   it('目標を表示し、編集で onSaveGoal が呼ばれる', async () => {
     const onSaveGoal = vi.fn().mockResolvedValue(undefined);
     render(
-      <ClassGoalHeader
+      <ClassGoalHeader onSaveGrade={vi.fn()}
         cls={makeClass({ name: '2-A', goalText: '今日の目標' })}
         onSaveGoal={onSaveGoal}
       />,
@@ -88,7 +116,7 @@ describe('ClassGoalHeader', () => {
   });
 
   it('目標未設定なら誘導文言を出す', () => {
-    render(<ClassGoalHeader cls={makeClass({ goalText: null })} onSaveGoal={vi.fn()} />);
+    render(<ClassGoalHeader onSaveGrade={vi.fn()} cls={makeClass({ goalText: null })} onSaveGoal={vi.fn()} />);
     expect(screen.getByText('タップして目標を書く')).toBeInTheDocument();
   });
 });

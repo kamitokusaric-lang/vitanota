@@ -98,14 +98,25 @@ export function findWorkshopTeam(key: string): WorkshopTeam | undefined {
   return WORKSHOP_TEAMS.find((t) => t.key === key);
 }
 
-// 4問。文言は紙の p5 と一字一句そろえる (当日「紙と画面で言い方が違う」を作らない)。
-// formLabel は入力欄の見出し、posterLabel はポスター用の短い見出し。
-// ③ 合言葉はポスターの主役として大きく出すので posterLabel は表示されない。
-export type WorkshopTeamReflectionField =
-  | 'change'
-  | 'moment'
-  | 'motto'
-  | 'next';
+// チーム振り返りの4問 (chimo 2026-08-10)。
+//
+// 研修資料のスライド「正解がない複雑な課題にチームで向き合う」が示す**3条件**に紐づける。
+// それまでは OODA の周回 (変化 / チームだから起きた瞬間 / 合言葉) を軸にしていたが、
+// スライドの問いと軸がズレていた。
+//   ・共に働く人の価値観や前提を尊重する
+//   ・一人一人が自律的に取り組む
+// (スライドの「共に目指したいビジョン」は chimo 判断で外した・2026-08-10)
+// 最後の1問だけはスライドに無い「日常への着地」で、ポスターの主役に置く
+// (発表のクライマックスを「で、明日から何をするか」にするため)。
+//
+// 見出しに番号を振らない。1問外したときに番号が飛ぶのと、見出し自体が
+// 説明的なので番号が要らないため。
+//
+// formLabel は入力欄の問い、posterLabel はポスター用の短い見出し。
+// hint (プレースホルダー) には**例を載せない** (chimo 2026-08-10)。
+// 例を置くと、それをなぞった答えが並んでチームの言葉が出てこなくなるため。
+// ④ は主役として大きく出すので posterLabel は表示されない。
+export type WorkshopTeamReflectionField = 'respect' | 'autonomy' | 'next';
 
 export interface WorkshopTeamQuestion {
   field: WorkshopTeamReflectionField;
@@ -116,32 +127,27 @@ export interface WorkshopTeamQuestion {
 
 export const WORKSHOP_TEAM_QUESTIONS: WorkshopTeamQuestion[] = [
   {
-    field: 'change',
-    formLabel: '① 私たちのチームの変化 — 1周目と3周目を比べて、何が変わりましたか?',
-    posterLabel: 'チームの変化',
-    hint: '会話の量/決めるまでの速さ/役割の生まれ方/決めたことのやり切り…「最初は○○だったが、3周目には○○になっていた」の形で',
-  },
-  {
-    field: 'moment',
+    field: 'respect',
     formLabel:
-      '② チームだから起きた瞬間 — 「あれがなかったら、今の作品はなかった」という場面を1つ選んでください',
-    posterLabel: 'チームだから起きた瞬間',
-    hint: '誰の観察・誰の一言でしたか? それによって、チームの何が変わりましたか?',
+      '異なる観察や解釈を、ポジティブな力に変えるコツは見つかりましたか？',
+    posterLabel: 'ちがいの活かし方',
+    hint: '',
   },
   {
-    field: 'motto',
-    formLabel: '③ 私たちのチームの「コツ」 — 明日から使える合言葉にすると?',
-    posterLabel: 'チームのコツ',
-    hint: '例:「とりあえず作ってみる」「迷ったら口に出す」— チームで1フレーズ作ってください',
+    field: 'autonomy',
+    formLabel:
+      '役割や立場に関わらず、全員が自律的に主体的に関わるコツは見つかりましたか？',
+    posterLabel: '自律的な動き',
+    hint: '',
   },
   {
     field: 'next',
-    formLabel:
-      '④ 仕事で活かせること — このチームの動き方を、試せる場面はありますか?',
+    formLabel: '仕事で活かせること — このチームの動き方を、試せる場面はありますか?',
     posterLabel: '仕事で活かせること',
-    hint: '例:「学年会で、まず全員が一言ずつ」「行事の準備は、とりあえず形にしてから相談」',
+    hint: '',
   },
 ];
+
 
 // 研修資料 (スライド)。PDF を1ページずつ PNG 化して public/workshop/pages/ に置き、
 // 1枚ずつめくって見せる (pdftoppm で 2桁ゼロ埋め page-01.png…)。差し替えるときは

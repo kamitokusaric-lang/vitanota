@@ -107,4 +107,69 @@ describe('planRosterImport', () => {
       displayName: 'たろう',
     });
   });
+
+  // ── 取り違えの検知 (同じ子を2クラスに入れる事故) ──────────────
+  // 重複キーは (クラス + 氏名) なので、別クラスの同名は登録される。
+  // ブロックはせず「同じ名前の子が他クラスにもいる」と知らせるだけ。
+  it('別クラスに同名がいたら警告に出す (登録はブロックしない)', () => {
+    const existingClasses = [
+      { id: 'c-2a', name: '2-A', goalText: null },
+      { id: 'c-2b', name: '2-B', goalText: null },
+    ];
+    const existingStudents = [{ classId: 'c-2a', displayName: 'さくら' }];
+    const plan = planRosterImport(
+      [{ className: '2-B', studentName: 'さくら' }],
+      existingClasses,
+      existingStudents,
+    );
+    // 登録は通る
+    expect(plan.summary.studentsAdded).toBe(1);
+    expect(plan.summary.studentsSkipped).toBe(0);
+    // そのうえで警告に出る
+    expect(plan.sameNameInOtherClasses).toEqual([
+      { displayName: 'さくら', classNames: ['2-A'] },
+    ]);
+  });
+
+  it('同じクラスの重複は従来どおりスキップし、警告には出さない', () => {
+    const existingClasses = [{ id: 'c-2a', name: '2-A', goalText: null }];
+    const existingStudents = [{ classId: 'c-2a', displayName: 'さくら' }];
+    const plan = planRosterImport(
+      [{ className: '2-A', studentName: 'さくら' }],
+      existingClasses,
+      existingStudents,
+    );
+    expect(plan.summary.studentsAdded).toBe(0);
+    expect(plan.summary.studentsSkipped).toBe(1);
+    expect(plan.sameNameInOtherClasses).toEqual([]);
+  });
+
+  it('同名が複数の別クラスにいれば、まとめて挙げる', () => {
+    const existingClasses = [
+      { id: 'c-1a', name: '1-A', goalText: null },
+      { id: 'c-2a', name: '2-A', goalText: null },
+      { id: 'c-3a', name: '3-A', goalText: null },
+    ];
+    const existingStudents = [
+      { classId: 'c-1a', displayName: 'さくら' },
+      { classId: 'c-2a', displayName: 'さくら' },
+    ];
+    const plan = planRosterImport(
+      [{ className: '3-A', studentName: 'さくら' }],
+      existingClasses,
+      existingStudents,
+    );
+    expect(plan.sameNameInOtherClasses).toEqual([
+      { displayName: 'さくら', classNames: ['1-A', '2-A'] },
+    ]);
+  });
+
+  it('同名がいなければ警告は空', () => {
+    const plan = planRosterImport(
+      [{ className: '1-A', studentName: 'たろう' }],
+      [{ id: 'c-1a', name: '1-A', goalText: null }],
+      [],
+    );
+    expect(plan.sameNameInOtherClasses).toEqual([]);
+  });
 });

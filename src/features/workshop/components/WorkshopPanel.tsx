@@ -463,16 +463,14 @@ function MaterialPager() {
 // 「最後に書いた人」は出さない (入力係を可視化しない)。
 
 type TeamAnswers = {
-  change: string;
-  moment: string;
-  motto: string;
+  respect: string;
+  autonomy: string;
   next: string;
 };
 
 const EMPTY_ANSWERS: TeamAnswers = {
-  change: '',
-  moment: '',
-  motto: '',
+  respect: '',
+  autonomy: '',
   next: '',
 };
 
@@ -480,9 +478,7 @@ const EMPTY_ANSWERS: TeamAnswers = {
 const TEAM_STORAGE_KEY = 'vitanota.workshop.teamKey';
 
 function hasAnyAnswer(a: TeamAnswers): boolean {
-  return Boolean(
-    a.change.trim() || a.moment.trim() || a.motto.trim() || a.next.trim(),
-  );
+  return Boolean(a.respect.trim() || a.autonomy.trim() || a.next.trim());
 }
 
 function TeamReflectionSection({
@@ -513,9 +509,8 @@ function TeamReflectionSection({
     setDraft(
       saved
         ? {
-            change: saved.change,
-            moment: saved.moment,
-            motto: saved.motto,
+            respect: saved.respect,
+            autonomy: saved.autonomy,
             next: saved.next,
           }
         : EMPTY_ANSWERS,
@@ -584,11 +579,6 @@ function TeamReflectionSection({
 
       {open && (
         <div className="space-y-4">
-          <p className="rounded-xl border border-vn-accent/30 bg-vn-accent-bg px-4 py-3 text-[14px] font-bold text-vn-accent">
-            チームで1枚にまとめます。書くのは1人、話すのは全員。
-            書いたものは、そのまま発表できる形になります。
-          </p>
-
           {/* 班を選ぶ */}
           <div className="flex flex-wrap gap-2" data-testid="workshop-team-picker">
             {WORKSHOP_TEAMS.map((t) => (
@@ -625,9 +615,9 @@ function TeamReflectionSection({
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, [q.field]: e.target.value }))
                   }
-                  placeholder={q.hint}
+                  placeholder={q.hint || undefined}
                   maxLength={2000}
-                  rows={q.field === 'motto' ? 2 : 3}
+                  rows={q.field === 'next' ? 2 : 3}
                   className="mt-2 w-full resize-none rounded-xl border border-vn-border bg-white px-3.5 py-2.5 text-[14px] leading-[1.7] text-slate-900 placeholder:text-slate-400 focus:border-vn-accent focus:outline-none"
                   data-testid={`workshop-team-input-${q.field}`}
                 />
@@ -693,9 +683,9 @@ function TeamReflectionSection({
   );
 }
 
-// 合言葉 (③) はポスターの主役。文字数で段階的にサイズを落として、
+// 「仕事で活かせること」(④) はポスターの主役。文字数で段階的にサイズを落として、
 // 長く書かれても崩れないようにする。
-function mottoSizeClass(length: number, stage: boolean): string {
+function heroSizeClass(length: number, stage: boolean): string {
   if (stage) {
     if (length <= 12) return 'text-4xl sm:text-6xl';
     if (length <= 24) return 'text-3xl sm:text-5xl';
@@ -719,11 +709,9 @@ function TeamReflectionPoster({
   size?: 'card' | 'stage';
 }) {
   const stage = size === 'stage';
-  const motto = answers.motto.trim();
-  const next = answers.next.trim();
-  const bodyQuestions = WORKSHOP_TEAM_QUESTIONS.filter(
-    (q) => q.field === 'change' || q.field === 'moment',
-  );
+  // 主役 = ④ 仕事で活かせること。発表のクライマックスを「で、明日から何をするか」に置く。
+  const hero = answers.next.trim();
+  const bodyQuestions = WORKSHOP_TEAM_QUESTIONS.filter((q) => q.field !== 'next');
   const bodyFilled = bodyQuestions.some((q) => answers[q.field].trim());
   const empty = !hasAnyAnswer(answers);
 
@@ -734,7 +722,7 @@ function TeamReflectionPoster({
       }`}
       data-testid={`workshop-team-poster-${team.key}`}
     >
-      {motto ? (
+      {hero ? (
         <>
           <p
             className={`font-bold tracking-wide ${team.tone.text} ${
@@ -744,13 +732,13 @@ function TeamReflectionPoster({
             {team.label}
           </p>
           <p
-            className={`mt-2 text-balance break-words font-bold leading-[1.35] ${team.tone.text} ${mottoSizeClass(motto.length, stage)}`}
+            className={`mt-2 text-balance break-words font-bold leading-[1.35] ${team.tone.text} ${heroSizeClass(hero.length, stage)}`}
           >
-            「{motto}」
+            {hero}
           </p>
         </>
       ) : (
-        // 合言葉がまだなら班名を主役に昇格させ、主役の穴を空けない。
+        // 主役がまだなら班名を昇格させ、穴を空けない。
         <p
           className={`text-balance font-bold leading-[1.35] ${team.tone.text} ${
             stage ? 'text-4xl sm:text-6xl' : 'text-2xl'
@@ -789,26 +777,6 @@ function TeamReflectionPoster({
         );
       })}
 
-      {next && (
-        <div
-          className={`rounded-xl ${team.tone.band} ${
-            stage ? 'mt-8 px-6 py-5' : 'mt-5 px-4 py-3'
-          }`}
-        >
-          <p
-            className={`font-bold ${stage ? 'text-[15px] sm:text-lg' : 'text-[12px]'}`}
-          >
-            仕事で活かせること
-          </p>
-          <p
-            className={`mt-1 whitespace-pre-wrap break-words font-semibold leading-[1.7] ${
-              stage ? 'text-[17px] sm:text-2xl' : 'text-[13px]'
-            }`}
-          >
-            {next}
-          </p>
-        </div>
-      )}
 
       {empty && !stage && (
         <p className="mt-4 text-[12px] leading-[1.7] text-slate-400">

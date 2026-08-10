@@ -31,9 +31,8 @@ function teamReflection(
 ): WorkshopTeamReflectionDto {
   return {
     teamKey: o.teamKey ?? '1',
-    change: o.change ?? '最初はバラバラだったが、3周目には役割が生まれた',
-    moment: o.moment ?? 'A さんの一言で作り直した',
-    motto: o.motto ?? 'まず全員で事実を言う',
+    respect: o.respect ?? 'ちがう見方を両方残して作り分けた',
+    autonomy: o.autonomy ?? '気づいた人が手を動かした',
     next: o.next ?? '学年会で、まず全員が一言ずつ',
     updatedAt: o.updatedAt ?? '2026-08-18T02:00:00.000Z',
     ...o,
@@ -138,14 +137,14 @@ describe('チーム振り返り', () => {
     mockBoard(
       board({
         teamReflections: [
-          teamReflection({ teamKey: '2', motto: '迷ったら口に出す' }),
+          teamReflection({ teamKey: '2', autonomy: '迷ったら口に出す' }),
         ],
       }),
     );
     render(<WorkshopPanel />);
     openTeamSection();
     fireEvent.click(screen.getByTestId('workshop-team-pick-2'));
-    expect(screen.getByTestId('workshop-team-input-motto')).toHaveValue(
+    expect(screen.getByTestId('workshop-team-input-autonomy')).toHaveValue(
       '迷ったら口に出す',
     );
   });
@@ -159,15 +158,14 @@ describe('チーム振り返り', () => {
   it('1問でも書けば保存でき、班キーと4問が渡る', () => {
     render(<WorkshopPanel />);
     openTeamSection();
-    fireEvent.change(screen.getByTestId('workshop-team-input-motto'), {
+    fireEvent.change(screen.getByTestId('workshop-team-input-autonomy'), {
       target: { value: 'とりあえず作ってみる' },
     });
     fireEvent.click(screen.getByTestId('workshop-team-submit'));
     expect(upsertTeamReflection).toHaveBeenCalledWith({
       teamKey: '1',
-      change: '',
-      moment: '',
-      motto: 'とりあえず作ってみる',
+      respect: '',
+      autonomy: 'とりあえず作ってみる',
       next: '',
     });
   });
@@ -175,11 +173,11 @@ describe('チーム振り返り', () => {
   it('打つそばからポスターに反映される (保存前のドラフト)', () => {
     render(<WorkshopPanel />);
     openTeamSection();
-    fireEvent.change(screen.getByTestId('workshop-team-input-motto'), {
+    fireEvent.change(screen.getByTestId('workshop-team-input-next'), {
       target: { value: '先に決める' },
     });
     const poster = screen.getByTestId('workshop-team-poster-1');
-    expect(within(poster).getByText('「先に決める」')).toBeInTheDocument();
+    expect(within(poster).getByText('先に決める')).toBeInTheDocument();
   });
 
   it('選んだ班を localStorage に覚える', () => {
@@ -206,7 +204,7 @@ describe('チーム振り返り', () => {
     mockBoard(
       board({
         teamReflections: [
-          teamReflection({ teamKey: '2', change: '', moment: '', motto: '', next: '' }),
+          teamReflection({ teamKey: '2', respect: '', autonomy: '', next: '' }),
         ],
       }),
     );
@@ -221,23 +219,22 @@ describe('発表用ポスター', () => {
     mockBoard(
       board({
         teamReflections: [
-          teamReflection({ teamKey: '2', moment: '', next: '' }),
+          teamReflection({ teamKey: '2', respect: '', next: '' }),
         ],
       }),
     );
     render(<WorkshopPanel />);
     openTeamSection();
     const poster = screen.getByTestId('workshop-team-poster-2');
-    expect(within(poster).getByText('チームの変化')).toBeInTheDocument();
+    expect(within(poster).getByText('自律的な動き')).toBeInTheDocument();
     expect(
-      within(poster).queryByText('チームだから起きた瞬間'),
+      within(poster).queryByText('ちがいの活かし方'),
     ).not.toBeInTheDocument();
-    expect(within(poster).queryByText('仕事で活かせること')).not.toBeInTheDocument();
   });
 
-  it('合言葉が未記入なら班名を主役にする', () => {
+  it('主役 (仕事で活かせること) が未記入なら班名を主役にする', () => {
     mockBoard(
-      board({ teamReflections: [teamReflection({ teamKey: '2', motto: '' })] }),
+      board({ teamReflections: [teamReflection({ teamKey: '2', next: '' })] }),
     );
     render(<WorkshopPanel />);
     openTeamSection();
@@ -245,14 +242,13 @@ describe('発表用ポスター', () => {
     expect(within(poster).getByText('2班')).toBeInTheDocument();
   });
 
-  it('ポスターは4問と班名だけを出す (書いた人・更新時刻を足さない)', () => {
+  it('ポスターは3問と班名だけを出す (書いた人・更新時刻を足さない)', () => {
     // 本文そのものに人名が入ることはある (「A さんの一言で」など) ので、
-    // 語句の有無ではなく「4問と班名以外を描画していないこと」で固定する。
+    // 語句の有無ではなく「3問と班名以外を描画していないこと」で固定する。
     const r = teamReflection({
       teamKey: '2',
-      change: 'カワル',
-      moment: 'シュンカン',
-      motto: 'アイコトバ',
+      respect: 'シュンカン',
+      autonomy: 'アイコトバ',
       next: 'ツギ',
     });
     mockBoard(board({ teamReflections: [r] }));
@@ -262,13 +258,11 @@ describe('発表用ポスター', () => {
     expect(poster.textContent).toBe(
       [
         '2班',
-        '「アイコトバ」',
-        'チームの変化',
-        'カワル',
-        'チームだから起きた瞬間',
+        'ツギ', // 主役 = ④ 仕事で活かせること
+        'ちがいの活かし方',
         'シュンカン',
-        '仕事で活かせること',
-        'ツギ',
+        '自律的な動き',
+        'アイコトバ',
       ].join(''),
     );
   });
@@ -285,8 +279,8 @@ describe('発表モード', () => {
     mockBoard(
       board({
         teamReflections: [
-          teamReflection({ teamKey: '1', motto: '1班の合言葉' }),
-          teamReflection({ teamKey: '3', motto: '3班の合言葉' }),
+          teamReflection({ teamKey: '1', next: '1班の一手' }),
+          teamReflection({ teamKey: '3', next: '3班の一手' }),
         ],
       }),
     );
@@ -296,19 +290,19 @@ describe('発表モード', () => {
 
     const stage = screen.getByTestId('workshop-team-stage');
     expect(within(stage).getByText('1 / 2')).toBeInTheDocument();
-    expect(within(stage).getByText('「1班の合言葉」')).toBeInTheDocument();
+    expect(within(stage).getByText('1班の一手')).toBeInTheDocument();
 
     fireEvent.click(within(stage).getByLabelText('次の班'));
     expect(within(stage).getByText('2 / 2')).toBeInTheDocument();
-    expect(within(stage).getByText('「3班の合言葉」')).toBeInTheDocument();
+    expect(within(stage).getByText('3班の一手')).toBeInTheDocument();
   });
 
   it('矢印キーでめくれて、Esc で閉じる', () => {
     mockBoard(
       board({
         teamReflections: [
-          teamReflection({ teamKey: '1', motto: '1班の合言葉' }),
-          teamReflection({ teamKey: '2', motto: '2班の合言葉' }),
+          teamReflection({ teamKey: '1', next: '1班の一手' }),
+          teamReflection({ teamKey: '2', next: '2班の一手' }),
         ],
       }),
     );

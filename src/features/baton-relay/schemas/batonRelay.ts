@@ -80,6 +80,22 @@ export const updateStudentSchema = z
   .openapi('UpdateStudentInput');
 export type UpdateStudentInput = z.infer<typeof updateStudentSchema>;
 
+// 選んだ生徒の一括操作。move のときだけ移動先クラスが要る。
+export const bulkStudentsSchema = z
+  .object({
+    action: z.enum(['delete', 'archive', 'move']),
+    studentIds: z
+      .array(z.string().guid())
+      .min(1, '生徒を選んでください')
+      .max(200, '一度に操作できるのは 200 人までです'),
+    toClassId: z.string().guid().optional(),
+  })
+  .refine((v) => v.action !== 'move' || Boolean(v.toClassId), {
+    message: '移動先のクラスを選んでください',
+  })
+  .openapi('BulkStudentsInput');
+export type BulkStudentsInput = z.infer<typeof bulkStudentsSchema>;
+
 export const studentIdParamSchema = z
   .object({ id: z.string().guid('不正な生徒IDです') })
   .openapi('StudentIdParam');
@@ -98,6 +114,9 @@ export const studentResponseSchema = z
     status: studentStatusSchema,
     enrolledAt: z.string().nullable(),
     leftAt: z.string().nullable(),
+    // その子に付いた印象・コメントの件数。**削除確認でだけ使う**。
+    // 一覧や学年会に出さない (活動量の可視化にしない・踏み絵)。
+    noteCount: z.number().int(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -179,6 +198,14 @@ export const importResultResponseSchema = z
     classesUpdated: z.number().int(),
     studentsAdded: z.number().int(),
     studentsSkipped: z.number().int(),
+    // 追加した子のうち、同じ氏名が別クラスにも居るもの (取り違えの警告用)。
+    // 登録はブロックしない — 同姓同名は実在するので判断は人に委ねる。
+    sameNameInOtherClasses: z.array(
+      z.object({
+        displayName: z.string(),
+        classNames: z.array(z.string()),
+      }),
+    ),
   })
   .openapi('RosterImportResult');
 export type ImportResult = z.infer<typeof importResultResponseSchema>;

@@ -32,6 +32,9 @@ export interface StudentDto {
   status: 'active' | 'archived';
   enrolledAt: string | null;
   leftAt: string | null;
+  // その子に付いた印象・コメントの件数。**削除確認でだけ使う**。
+  // 一覧や学年会に出さない (活動量の可視化にしない・踏み絵)。
+  noteCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,7 +60,7 @@ function toClassDto(c: Class): ClassDto {
     updatedAt: c.updatedAt.toISOString(),
   };
 }
-function toStudentDto(s: Student): StudentDto {
+function toStudentDto(s: Student & { noteCount?: number }): StudentDto {
   return {
     id: s.id,
     classId: s.classId,
@@ -65,6 +68,7 @@ function toStudentDto(s: Student): StudentDto {
     status: s.status,
     enrolledAt: s.enrolledAt,
     leftAt: s.leftAt,
+    noteCount: s.noteCount ?? 0,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
   };
@@ -160,6 +164,41 @@ export class BatonRelayService {
     });
   }
 
+  // 誤登録の取り消し。在籍終了とは意味が違う (§ repository のコメント)。
+  // その子の印象・コメントも cascade で消えるので、UI は件数を見せてから呼ぶ。
+  async deleteStudent(ctx: AuthContext, id: string): Promise<boolean> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      const n = await studentRepo.delete(tx, ctx, id);
+      return n > 0;
+    });
+  }
+
+  // 選んだ生徒をまとめて操作する。1トランザクションなので、
+  // 途中で失敗しても半端に消えたり動いたりしない。
+  async bulkStudents(
+    ctx: AuthContext,
+    params:
+      | { action: 'delete'; studentIds: string[] }
+      | { action: 'archive'; studentIds: string[] }
+      | { action: 'move'; studentIds: string[]; toClassId: string },
+  ): Promise<number> {
+    return withTenantUser(ctx.tenantId, ctx.userId, pickDbRole(ctx), async (tx) => {
+      if (params.action === 'delete') {
+        return studentRepo.deleteMany(tx, ctx, params.studentIds);
+      }
+      if (params.action === 'archive') {
+        return studentRepo.updateMany(tx, ctx, params.studentIds, {
+          status: 'archived',
+          leftAt: new Date().toISOString().slice(0, 10),
+        });
+      }
+      // move: 複合 FK が別テナントの classId を物理的に弾く
+      return studentRepo.updateMany(tx, ctx, params.studentIds, {
+        classId: params.toClassId,
+      });
+    });
+  }
+
   // ── baton_notes ──
   async listNotes(
     ctx: AuthContext,
@@ -231,7 +270,10 @@ export class BatonRelayService {
         });
       }
 
-      return plan.summary;
+      return {
+        ...plan.summary,
+        sameNameInOtherClasses: plan.sameNameInOtherClasses,
+      };
     });
   }
 

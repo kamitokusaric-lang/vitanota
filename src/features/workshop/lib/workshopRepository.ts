@@ -48,9 +48,8 @@ export type WorkshopReflectionWithEntry = {
 // updatedBy は返さない: 「最後に書いた人」= 入力係を UI に可視化しないため。
 export type WorkshopTeamReflectionView = {
   teamKey: string;
-  change: string;
-  moment: string;
-  motto: string;
+  respect: string;
+  autonomy: string;
   next: string;
   updatedAt: Date;
 };
@@ -58,9 +57,8 @@ export type WorkshopTeamReflectionView = {
 export interface UpsertTeamReflectionParams {
   workshopId: string;
   teamKey: string;
-  change: string;
-  moment: string;
-  motto: string;
+  respect: string;
+  autonomy: string;
   next: string;
 }
 
@@ -185,9 +183,8 @@ export class WorkshopRepository {
     const rows = await tx
       .select({
         teamKey: workshopTeamReflections.teamKey,
-        change: workshopTeamReflections.teamChange,
-        moment: workshopTeamReflections.teamMoment,
-        motto: workshopTeamReflections.teamMotto,
+        respect: workshopTeamReflections.teamRespect,
+        autonomy: workshopTeamReflections.teamAutonomy,
         next: workshopTeamReflections.teamNext,
         updatedAt: workshopTeamReflections.updatedAt,
       })
@@ -216,9 +213,8 @@ export class WorkshopRepository {
         tenantId: ctx.tenantId,
         workshopId: params.workshopId,
         teamKey: params.teamKey,
-        teamChange: params.change,
-        teamMoment: params.moment,
-        teamMotto: params.motto,
+        teamRespect: params.respect,
+        teamAutonomy: params.autonomy,
         teamNext: params.next,
         updatedBy: ctx.userId,
       })
@@ -229,9 +225,8 @@ export class WorkshopRepository {
           workshopTeamReflections.teamKey,
         ],
         set: {
-          teamChange: params.change,
-          teamMoment: params.moment,
-          teamMotto: params.motto,
+          teamRespect: params.respect,
+          teamAutonomy: params.autonomy,
           teamNext: params.next,
           updatedBy: ctx.userId,
           updatedAt: sql`now()`,

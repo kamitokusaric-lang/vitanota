@@ -18,6 +18,10 @@ import {
 } from './helpers/testDb';
 import { seedTenant, seedUser } from './helpers/seed';
 import { classes, students, batonNotes } from '@/db/schema';
+import { studentRepo } from '@/features/baton-relay/lib/batonRelayRepository';
+
+// TestDb と repo が期待する DrizzleDb は構造同一だが型名が違うため吸収する。
+type RepoDb = Parameters<typeof studentRepo.delete>[0];
 
 type Tenant = Awaited<ReturnType<typeof seedTenant>>;
 type User = Awaited<ReturnType<typeof seedUser>>;
@@ -231,5 +235,81 @@ describe('baton-relay RLS 境界', () => {
     );
     expect(row.sign).toBe('concern');
     expect(row.content).toBe('休み時間ひとりでいた');
+  });
+  // ── 誤登録の取り消し (生徒の削除) ─────────────────────────
+  it('生徒を削除すると、その子の印象・コメントも消える (cascade)', async () => {
+    // 既に beforeEach でコメント1件が付いている
+    const before = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      tx.select().from(batonNotes).where(eq(batonNotes.studentId, studentX.id)),
+    );
+    expect(before.length).toBeGreaterThan(0);
+
+    const n = await withTenantContext(db, tenantA.id, teacherA2.id, (tx) =>
+      studentRepo.delete(tx as unknown as RepoDb, { userId: teacherA2.id, tenantId: tenantA.id }, studentX.id),
+    );
+    expect(n).toBe(1);
+
+    const after = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      tx.select().from(batonNotes).where(eq(batonNotes.studentId, studentX.id)),
+    );
+    expect(after).toHaveLength(0);
+  });
+
+  it('他テナントの生徒は削除できない (0 件 → 呼び出し側で 404)', async () => {
+    const n = await withTenantContext(db, tenantB.id, teacherB.id, (tx) =>
+      studentRepo.delete(tx as unknown as RepoDb, { userId: teacherB.id, tenantId: tenantB.id }, studentX.id),
+    );
+    expect(n).toBe(0);
+    // 元の生徒は残っている (自テナントの文脈で確認)
+    const rows = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      tx.select().from(students).where(eq(students.id, studentX.id)),
+    );
+    expect(rows).toHaveLength(1);
+  });
+  // ── 一括操作 ───────────────────────────────────────────
+  it('一括削除は1トランザクション。他テナントの分は数えられない', async () => {
+    const ctxA = { userId: teacherA1.id, tenantId: tenantA.id };
+    // tenantB の生徒 ID を混ぜても、RLS で弾かれて A の分だけ消える
+    const [classB] = await withTenantContext(db, tenantB.id, teacherB.id, (tx) =>
+      tx
+        .insert(classes)
+        .values({ tenantId: tenantB.id, name: 'B組' })
+        .returning({ id: classes.id }),
+    );
+    const [studentB] = await withTenantContext(db, tenantB.id, teacherB.id, (tx) =>
+      tx
+        .insert(students)
+        .values({ tenantId: tenantB.id, classId: classB.id, displayName: 'B の子' })
+        .returning({ id: students.id }),
+    );
+    const n = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      studentRepo.deleteMany(tx as unknown as RepoDb, ctxA, [studentX.id, studentB.id]),
+    );
+    expect(n).toBe(1);
+    // B の生徒は残っている
+    const remainB = await withTenantContext(db, tenantB.id, teacherB.id, (tx) =>
+      tx.select().from(students).where(eq(students.id, studentB.id)),
+    );
+    expect(remainB).toHaveLength(1);
+  });
+
+  it('一括クラス移動ができる', async () => {
+    const ctxA = { userId: teacherA1.id, tenantId: tenantA.id };
+    const [classA2] = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      tx
+        .insert(classes)
+        .values({ tenantId: tenantA.id, name: '2-B' })
+        .returning({ id: classes.id }),
+    );
+    const n = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      studentRepo.updateMany(tx as unknown as RepoDb, ctxA, [studentX.id], {
+        classId: classA2.id,
+      }),
+    );
+    expect(n).toBe(1);
+    const [moved] = await withTenantContext(db, tenantA.id, teacherA1.id, (tx) =>
+      tx.select().from(students).where(eq(students.id, studentX.id)),
+    );
+    expect(moved.classId).toBe(classA2.id);
   });
 });

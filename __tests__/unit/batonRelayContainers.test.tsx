@@ -31,6 +31,7 @@ const student: StudentDto = {
   status: 'active',
   enrolledAt: null,
   leftAt: null,
+  noteCount: 0,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z',
 };
@@ -70,7 +71,10 @@ describe('StudentRow', () => {
 
   it('メニューから「氏名を編集」でインライン入力し、保存で onRenameStudent が呼ばれる', async () => {
     const onRenameStudent = vi.fn().mockResolvedValue(undefined);
-    render(<StudentRow {...baseProps} onQuickSign={vi.fn()} onRenameStudent={onRenameStudent} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={vi.fn()} onRenameStudent={onRenameStudent} />);
     fireEvent.click(screen.getByTestId('student-menu-s1'));
     fireEvent.click(screen.getByTestId('student-rename-s1'));
     const input = screen.getByTestId('student-name-input-s1');
@@ -81,7 +85,10 @@ describe('StudentRow', () => {
 
   it('「アーカイブする」は 2 段確認の後に onArchiveStudent が呼ばれる', () => {
     const onArchiveStudent = vi.fn().mockResolvedValue(undefined);
-    render(<StudentRow {...baseProps} onQuickSign={vi.fn()} onArchiveStudent={onArchiveStudent} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={vi.fn()} onArchiveStudent={onArchiveStudent} />);
     fireEvent.click(screen.getByTestId('student-menu-s1'));
     fireEvent.click(screen.getByTestId('student-archive-s1'));
     // 1 段目では呼ばれない
@@ -91,15 +98,73 @@ describe('StudentRow', () => {
   });
 
   it('生徒名と 2 種の印ボタンを描画する', () => {
-    render(<StudentRow {...baseProps} onQuickSign={vi.fn()} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={vi.fn()} />);
     expect(screen.getByText('さくら')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Good/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /気になる/ })).toBeInTheDocument();
   });
 
+  // ── 誤登録の取り消し (削除) ────────────────────────────
+  it('削除は確認を挟む (メニューを押しただけでは消えない)', () => {
+    const onDeleteStudent = vi.fn();
+    render(
+      <StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()} {...baseProps} onQuickSign={vi.fn()} onDeleteStudent={onDeleteStudent} />,
+    );
+    fireEvent.click(screen.getByTestId('student-menu-s1'));
+    fireEvent.click(screen.getByTestId('student-delete-s1'));
+    // 確認が出るだけで、まだ呼ばれない
+    expect(onDeleteStudent).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('student-delete-confirm-s1'));
+    expect(onDeleteStudent).toHaveBeenCalledWith('s1');
+  });
+
+  it('印象が付いていれば件数を見せる (cascade で消えるため)', () => {
+    render(
+      <StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        {...baseProps}
+        onQuickSign={vi.fn()}
+        onDeleteStudent={vi.fn()}
+        student={{ ...student, noteCount: 3 }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('student-menu-s1'));
+    fireEvent.click(screen.getByTestId('student-delete-s1'));
+    expect(screen.getByTestId('student-delete-confirm-box-s1')).toHaveTextContent(
+      '印象・コメント 3 件も一緒に消えます',
+    );
+  });
+
+  it('印象が無ければ、その旨を出す (誤登録の典型)', () => {
+    render(
+      <StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        {...baseProps}
+        onQuickSign={vi.fn()}
+        onDeleteStudent={vi.fn()}
+        student={{ ...student, noteCount: 0 }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('student-menu-s1'));
+    fireEvent.click(screen.getByTestId('student-delete-s1'));
+    expect(screen.getByTestId('student-delete-confirm-box-s1')).toHaveTextContent(
+      'まだ何も書かれていません',
+    );
+  });
+
   it('サインは押した回数がカウントで出る (1行ずつ増やさない)', () => {
     render(
       <StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()}
         {...baseProps}
         onQuickSign={vi.fn()}
         notes={[
@@ -119,6 +184,9 @@ describe('StudentRow', () => {
   it('サインを押した人が hover 用の tips に出る (同じ人が複数回なら ×n)', () => {
     render(
       <StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()}
         {...baseProps}
         onQuickSign={vi.fn()}
         currentUserId="u1"
@@ -140,6 +208,9 @@ describe('StudentRow', () => {
   it('コメントには書いた人の名前が出る', () => {
     render(
       <StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()}
         {...baseProps}
         onQuickSign={vi.fn()}
         currentUserId="u1"
@@ -152,23 +223,32 @@ describe('StudentRow', () => {
 
   it('Good を押すと、その日の印象がサインだけで残る', () => {
     const onQuickSign = vi.fn();
-    render(<StudentRow {...baseProps} onQuickSign={onQuickSign} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={onQuickSign} />);
     fireEvent.click(screen.getByRole('button', { name: /Good/ }));
     expect(onQuickSign).toHaveBeenCalledWith('s1', 'good');
   });
 
-  it('「コメントを追加」で入力欄を開き、残すと onAddNote が呼ばれる', async () => {
+  it('コメントの導線から入力欄を開き、残すと onAddNote が呼ばれる', async () => {
     const onAddNote = vi.fn().mockResolvedValue(undefined);
-    render(<StudentRow {...baseProps} onQuickSign={vi.fn()} onAddNote={onAddNote} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={vi.fn()} onAddNote={onAddNote} />);
     // 既定は畳まれている。まず入力欄を開く。
-    fireEvent.click(screen.getByRole('button', { name: /コメントを追加/ }));
+    fireEvent.click(screen.getByTestId('student-add-note-s1'));
     fireEvent.change(screen.getByPlaceholderText('ひとことを残す…'), { target: { value: '元気そう' } });
     fireEvent.click(screen.getByRole('button', { name: '残す' }));
     expect(onAddNote).toHaveBeenCalledWith('s1', '元気そう');
   });
 
   it('メニューを開き、他クラスがなければ「他のクラスがありません」', () => {
-    render(<StudentRow {...baseProps} onQuickSign={vi.fn()} classes={[cls]} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={vi.fn()} classes={[cls]} />);
     fireEvent.click(screen.getByTestId('student-menu-s1'));
     expect(screen.getByText('他のクラスがありません')).toBeInTheDocument();
   });
@@ -176,7 +256,10 @@ describe('StudentRow', () => {
   it('他クラスがあれば移動ボタンを出し onMoveStudent が呼ばれる', () => {
     const onMoveStudent = vi.fn().mockResolvedValue(undefined);
     const other: ClassDto = { ...cls, id: 'c2', name: '2-B' };
-    render(<StudentRow {...baseProps} onQuickSign={vi.fn()} classes={[cls, other]} onMoveStudent={onMoveStudent} />);
+    render(<StudentRow
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onDeleteStudent={vi.fn()} {...baseProps} onQuickSign={vi.fn()} classes={[cls, other]} onMoveStudent={onMoveStudent} />);
     fireEvent.click(screen.getByTestId('student-menu-s1'));
     fireEvent.click(screen.getByTestId('student-move-s1-c2'));
     expect(onMoveStudent).toHaveBeenCalledWith('s1', 'c2');
@@ -209,5 +292,30 @@ describe('BatonRelayBoard (controlled・classId 指定)', () => {
     vi.mocked(useClasses).mockReturnValue({ classes: [], isLoading: true, error: undefined, mutate: vi.fn() } as ReturnType<typeof useClasses>);
     render(<BatonRelayBoard currentUserId="u1" todayDate="2026-06-15" classId="c1" />);
     expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  // ── 一括選択 ──────────────────────────────────────────
+
+  it('「すべて選択」で表示中のクラスの生徒を全部選ぶ', () => {
+    render(<BatonRelayBoard currentUserId="u1" todayDate="2026-06-15" classId="c1" />);
+    const all = screen.getByTestId('student-select-all') as HTMLInputElement;
+    expect(all.checked).toBe(false);
+    fireEvent.click(all);
+    expect(
+      (screen.getByTestId('student-select-s1') as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(screen.getByTestId('student-bulk-count')).toHaveTextContent('1人を選択中');
+  });
+
+  it('全選択の状態でもう一度押すと、すべて解除される', () => {
+    render(<BatonRelayBoard currentUserId="u1" todayDate="2026-06-15" classId="c1" />);
+    const all = screen.getByTestId('student-select-all');
+    fireEvent.click(all);
+    fireEvent.click(all);
+    expect(
+      (screen.getByTestId('student-select-s1') as HTMLInputElement).checked,
+    ).toBe(false);
+    // 選択がゼロなら一括バーは消える
+    expect(screen.queryByTestId('student-bulk-bar')).not.toBeInTheDocument();
   });
 });

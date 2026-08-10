@@ -22,6 +22,11 @@ export function RosterStudentBulkAdd({ selectedClass, onAdded }: RosterStudentBu
     .map((n) => n.trim())
     .filter((n) => n.length > 0);
 
+  // 別クラスに同名がいた子 (登録後に出す取り違え警告)。
+  const [sameNameWarnings, setSameNameWarnings] = useState<
+    { displayName: string; classNames: string[] }[]
+  >([]);
+
   const submit = async () => {
     if (!selectedClass || names.length === 0) return;
     setBusy(true);
@@ -47,6 +52,9 @@ export function RosterStudentBulkAdd({ selectedClass, onAdded }: RosterStudentBu
           (r.studentsSkipped > 0 ? `（${r.studentsSkipped} 人は登録済みでスキップ）` : ''),
         'success',
       );
+      // 同じ名前の子が別クラスにも居るときの取り違え警告。
+      // 登録はブロックしない (同姓同名は実在する) ので、気づけるようにするだけ。
+      setSameNameWarnings(r.sameNameInOtherClasses ?? []);
       setText('');
       setConfirming(false);
       await onAdded();
@@ -64,8 +72,24 @@ export function RosterStudentBulkAdd({ selectedClass, onAdded }: RosterStudentBu
         「{selectedClass.name}」に生徒をまとめて追加
       </div>
       <p className="mt-1 text-xs text-gray-500">
-        1 行に 1 人ずつ名前を入力してください。同じ名前は重複しません。
+        1 行に 1 人ずつ名前を入力してください。同じクラスの同じ名前は重複しません。
       </p>
+
+      {/* 取り違えの警告: 同じ名前の子が別クラスにも居る。
+          登録はブロックしない (同姓同名は実在する)。判断は人に委ねる。 */}
+      {sameNameWarnings.length > 0 && (
+        <div
+          className="mt-2 rounded-md border border-vn-warning-border bg-vn-warning-bg px-3 py-2 text-xs leading-[1.7] text-vn-warning-text"
+          data-testid="roster-same-name-warning"
+        >
+          {sameNameWarnings.map((w) => (
+            <p key={w.displayName}>
+              {w.displayName} さんは {w.classNames.join('・')} にも登録されています。
+              同じ子なら、どちらかを削除してください。
+            </p>
+          ))}
+        </div>
+      )}
 
       <textarea
         value={text}

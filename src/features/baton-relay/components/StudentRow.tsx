@@ -18,6 +18,11 @@ interface StudentRowProps {
   onMoveStudent: (studentId: string, newClassId: string) => Promise<void>;
   onRenameStudent: (studentId: string, displayName: string) => Promise<void>;
   onArchiveStudent: (studentId: string) => Promise<void>;
+  /** 誤登録の取り消し (在籍終了とは別物)。 */
+  onDeleteStudent: (studentId: string) => Promise<void>;
+  /** 一括操作の選択状態。 */
+  selected: boolean;
+  onToggleSelect: (studentId: string) => void;
   onAddNote: (studentId: string, content: string) => Promise<void>;
   onEditNote: (id: string, content: string) => Promise<void>;
   onDeleteNote: (id: string) => Promise<void>;
@@ -44,6 +49,9 @@ export function StudentRow({
   onMoveStudent,
   onRenameStudent,
   onArchiveStudent,
+  onDeleteStudent,
+  selected,
+  onToggleSelect,
   onAddNote,
   onEditNote,
   onDeleteNote,
@@ -79,6 +87,7 @@ export function StudentRow({
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // メニュー外クリックで閉じる (アーカイブ確認状態もリセット)
@@ -135,9 +144,21 @@ export function StudentRow({
   };
 
   return (
-    <div className="rounded-vn border border-vn-border bg-vn-surface p-3.5">
-      {/* 氏名 (編集中はインライン入力) + リアクション + 3 点リーダー を 1 行に */}
+    <div className="px-3 py-2.5 transition-colors hover:bg-vn-muted-bg/30">
+      {/* 選択 (一括操作用) + 氏名 + 印象ボタン + 3 点リーダー を 1 行に */}
       <div className="flex items-center gap-2">
+        {/* 見た目は小さく (12px)。ただし -m-1/p-1 で押せる範囲は広げておく
+            (スマホで指が当たらなくなるのを避ける)。 */}
+        <label className="-m-1 shrink-0 cursor-pointer p-1">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(student.id)}
+            aria-label={`${student.displayName} を選択`}
+            className="h-3 w-3 cursor-pointer accent-vn-accent"
+            data-testid={`student-select-${student.id}`}
+          />
+        </label>
         {editingName ? (
           <div className="flex flex-1 items-center gap-1.5">
             <input
@@ -178,12 +199,12 @@ export function StudentRow({
             </button>
           </div>
         ) : (
-          <span className="text-base font-semibold text-slate-800">
+          <span className="min-w-0 truncate text-base font-semibold text-slate-800">
             {student.displayName}
           </span>
         )}
         {!editingName && (
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
             {IMPRESSIONS.map(({ sign, label, Icon }) => {
               const signers = signerLabels(sign);
               return (
@@ -226,6 +247,20 @@ export function StudentRow({
                 </div>
               );
             })}
+            {/* コメントを書く導線。印象ボタンと同じ行に置いて、1生徒=1行に収める。
+                印だけで済ませられる任意性は、点線の枠と淡い色で表す。 */}
+            {!composing && (
+              <button
+                type="button"
+                onClick={() => setComposing(true)}
+                title="コメントを追加"
+                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-dashed border-vn-border px-2.5 text-sm font-medium text-gray-400 transition-colors hover:border-vn-border-strong hover:text-gray-600"
+                data-testid={`student-add-note-${student.id}`}
+              >
+                <Plus size={15} aria-hidden />
+                <span className="hidden sm:inline">コメントを追加</span>
+              </button>
+            )}
           </div>
         )}
         <div ref={menuRef} className="relative">
@@ -279,6 +314,8 @@ export function StudentRow({
               {archiveConfirm ? (
                 <div className="px-3 py-1.5">
                   <p className="mb-1.5 text-xs text-gray-500">
+                    転校・卒業などで在籍が終わったときに使います。
+                    <br />
                     日々のリストから外します。あとで復元できます。
                   </p>
                   <div className="flex gap-1.5">
@@ -313,6 +350,56 @@ export function StudentRow({
                   アーカイブする
                 </button>
               )}
+
+              {/* 誤登録の取り消し。アーカイブとは意味が違うので、文言で区別する。
+                  cascade で印象・コメントも消えるため、件数を見せてから確定させる。
+                  ブラウザ標準の confirm() は使わない (ダイアログでセッションが固まる事故を避ける)。 */}
+              <div className="my-1 border-t border-gray-100" />
+              {deleteConfirm ? (
+                <div className="px-3 py-1.5" data-testid={`student-delete-confirm-box-${student.id}`}>
+                  <p className="mb-1.5 text-xs leading-[1.7] text-gray-500">
+                    間違えて登録したときに使います。
+                    <br />
+                    {student.noteCount > 0 ? (
+                      <span className="font-semibold text-vn-danger-text">
+                        印象・コメント {student.noteCount} 件も一緒に消えます。取り消せません。
+                      </span>
+                    ) : (
+                      'まだ何も書かれていません。'
+                    )}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setDeleteConfirm(false);
+                        void onDeleteStudent(student.id);
+                      }}
+                      className="rounded-md bg-vn-red px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+                      data-testid={`student-delete-confirm-${student.id}`}
+                    >
+                      削除を確定
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirm(false)}
+                      className="rounded-md px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100"
+                    >
+                      やめる
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(true)}
+                  className="block w-full px-3 py-2 text-left text-sm text-vn-danger-text hover:bg-vn-danger-bg"
+                  data-testid={`student-delete-${student.id}`}
+                >
+                  この生徒を削除する
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -321,7 +408,7 @@ export function StudentRow({
       {/* その日のコメント (吹き出し)。サインだけの行はここに出さず、
           ボタン横のカウントに寄せる (押すたびに行が増えて見えないように)。 */}
       {commentNotes.length > 0 && (
-        <ul className="mt-2.5 space-y-1">
+        <ul className="mt-2 space-y-1 pl-6">
           {commentNotes.map((note) => (
             <BatonNoteItem
               key={note.id}
@@ -341,7 +428,7 @@ export function StudentRow({
 
       {/* 一言を残す: 既定は「＋ コメントを追加」で畳み、押すと入力欄を開く (印だけで済むよう任意性を強調) */}
       {composing ? (
-        <div className="mt-2.5 rounded-vn border border-vn-border bg-white p-2.5">
+        <div className="ml-6 mt-2 rounded-vn border border-vn-border bg-white p-2.5">
           <input
             type="text"
             value={draft}
@@ -377,17 +464,7 @@ export function StudentRow({
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setComposing(true)}
-          className="mt-2.5 inline-flex items-center gap-1 rounded-md border border-dashed border-vn-border px-3 py-1.5 text-sm font-medium text-gray-400 transition-colors hover:border-vn-border-strong hover:text-gray-600"
-          data-testid={`student-add-note-${student.id}`}
-        >
-          <Plus size={15} aria-hidden />
-          コメントを追加
-        </button>
-      )}
+      ) : null}
     </div>
   );
 }

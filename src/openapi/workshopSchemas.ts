@@ -48,14 +48,15 @@ export const workshopReflectionViewSchema = z
 export const workshopTeamReflectionViewSchema = z
   .object({
     teamKey: z.string().openapi({ example: '1' }),
-    change: z
+    respect: z
       .string()
-      .openapi({ description: '① 1周目と3周目を比べて何が変わったか' }),
-    moment: z.string().openapi({ description: '② チームだから起きた瞬間' }),
-    motto: z
+      .openapi({ description: '価値観や前提を尊重する (ちがう観察や解釈をどう扱ったか)' }),
+    autonomy: z
       .string()
-      .openapi({ description: '③ 合言葉', example: 'まず全員で事実を言う' }),
-    next: z.string().openapi({ description: '④ 仕事で活かせること' }),
+      .openapi({ description: '一人一人が自律的に取り組む (役割や経験によらず動けたか)' }),
+    next: z
+      .string()
+      .openapi({ description: '仕事で活かせること (ポスターの主役)' }),
     updatedAt: z.string().datetime(),
   })
   .openapi('WorkshopTeamReflectionView');
@@ -100,9 +101,8 @@ export const workshopTeamReflectionSchema = z
     tenantId: z.string().guid(),
     workshopId: z.string().guid(),
     teamKey: z.string(),
-    teamChange: z.string(),
-    teamMoment: z.string(),
-    teamMotto: z.string(),
+    teamRespect: z.string(),
+    teamAutonomy: z.string(),
     teamNext: z.string(),
     updatedBy: z.string().guid().nullable(),
     createdAt: z.string().datetime(),

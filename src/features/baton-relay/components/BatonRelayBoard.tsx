@@ -12,6 +12,7 @@ import {
 } from '../hooks/useBatonRelay';
 import type { ImpressionSign } from '../types';
 import { ClassGoalHeader } from './ClassGoalHeader';
+import { StudentBulkBar } from './StudentBulkBar';
 import { StudentRow } from './StudentRow';
 import { RosterAdd } from './RosterAdd';
 import { RosterStudentBulkAdd } from './RosterStudentBulkAdd';
@@ -186,6 +187,71 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
     showToast('アーカイブしました', 'success');
   };
 
+  // ── 一括操作 ──────────────────────────────────────────────
+  // 選択はクラス/日付を切り替えたら解除する (別クラスの選択が残ると事故る)。
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [selectedClassId]);
+
+  const toggleSelect = (studentId: string) =>
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+
+  // 削除確認で見せる「消える印象・コメント」の合計。
+  const selectedNoteTotal = students
+    .filter((s) => selectedIds.has(s.id))
+    .reduce((a, s) => a + s.noteCount, 0);
+
+  // 「すべて選択」の状態。対象は表示中のクラスの生徒だけ。
+  const allSelected =
+    sortedStudents.length > 0 &&
+    sortedStudents.every((s) => selectedIds.has(s.id));
+  const someSelected = sortedStudents.some((s) => selectedIds.has(s.id));
+
+  const runBulk = async (
+    body: Record<string, unknown>,
+    okMessage: string,
+    ngMessage: string,
+  ) => {
+    setBulkBusy(true);
+    try {
+      const res = await postJson('/api/baton-relay/students/bulk', {
+        studentIds: [...selectedIds],
+        ...body,
+      });
+      if (!res.ok) {
+        showToast(ngMessage, 'error');
+        return;
+      }
+      setSelectedIds(new Set());
+      await Promise.all([mutateStudents(), mutateArchived(), mutateNotes()]);
+      showToast(okMessage, 'success');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // 誤登録の取り消し。cascade でその子の印象・コメントも消える
+  // (確認は StudentRow 側で件数を見せてから)。
+  const handleDeleteStudent = async (studentId: string) => {
+    const res = await fetch(`/api/baton-relay/students/${studentId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      showToast('削除に失敗しました', 'error');
+      return;
+    }
+    await Promise.all([mutateStudents(), mutateArchived(), mutateNotes()]);
+    showToast('削除しました', 'success');
+  };
+
   const handleRestoreStudent = async (studentId: string) => {
     const res = await fetch(`/api/baton-relay/students/${studentId}`, {
       method: 'PATCH',
@@ -212,6 +278,23 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
       return;
     }
     await mutateClasses();
+  };
+
+  // 学年の設定。学年会 (grade-meeting) がクラスをまとめる軸なので、
+  // ここで付けると「会議で話す」の学年会にこのクラスが出てくる。
+  const handleSaveGrade = async (grade: number | null) => {
+    if (!selectedClassId) return;
+    const res = await fetch(`/api/baton-relay/classes/${selectedClassId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grade }),
+    });
+    if (!res.ok) {
+      showToast('学年の保存に失敗しました', 'error');
+      return;
+    }
+    await mutateClasses();
+    showToast(grade ? `${grade}年に設定しました` : '学年なしに戻しました', 'success');
   };
 
   // 「今日の印象」をサインだけで残す (気軽に押せる導線)。
@@ -280,7 +363,11 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
     <div className="space-y-4">
       {/* クラス目標ヘッダ (クラス単位・日付非依存なので日付ナビより上) */}
       {selectedClass && (
-        <ClassGoalHeader cls={selectedClass} onSaveGoal={handleSaveGoal} />
+        <ClassGoalHeader
+          cls={selectedClass}
+          onSaveGoal={handleSaveGoal}
+          onSaveGrade={handleSaveGrade}
+        />
       )}
 
       {/* クラス切替 (uncontrolled のみ) + 日付ナビ (前日 / 今日 / 次の日 + カレンダー) */}
@@ -376,7 +463,37 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
       {/* 生徒リスト (並びはロスター順固定・印の数で並べ替えない) */}
       {selectedClass &&
         (sortedStudents.length > 0 ? (
-          <div className="space-y-2.5">
+          // 表形式 (カードをやめ、罫線で区切る)。ゼブラは使わない (chimo 2026-06-13 の方針)。
+          <div className="overflow-hidden rounded-vn border border-vn-border bg-vn-surface">
+            {/* 見出し行。左端のチェックで「すべて選択 / 解除」。 */}
+            <div className="flex items-center gap-2 border-b border-vn-border bg-vn-muted-bg/40 px-3 py-2">
+              <label className="-m-1 shrink-0 cursor-pointer p-1">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  // 一部だけ選択中は中間状態にする (全選択と区別が付くように)
+                  if (el) el.indeterminate = someSelected && !allSelected;
+                }}
+                onChange={() =>
+                  setSelectedIds(
+                    allSelected ? new Set() : new Set(sortedStudents.map((s) => s.id)),
+                  )
+                }
+                aria-label={allSelected ? 'すべて解除' : 'すべて選択'}
+                className="h-3 w-3 cursor-pointer accent-vn-accent"
+                data-testid="student-select-all"
+              />
+              </label>
+              <span className="text-xs font-semibold text-slate-500">
+                {selectedIds.size > 0 ? `${selectedIds.size}人を選択中` : '生徒'}
+              </span>
+              <span className="ml-auto text-xs font-semibold text-slate-500">
+                今日の印象
+              </span>
+            </div>
+            <div className="divide-y divide-vn-border">
+
             {sortedStudents.map((s) => (
               <StudentRow
                 key={s.id}
@@ -389,11 +506,15 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
                 onMoveStudent={handleMoveStudent}
                 onRenameStudent={handleRenameStudent}
                 onArchiveStudent={handleArchiveStudent}
+                onDeleteStudent={handleDeleteStudent}
+                selected={selectedIds.has(s.id)}
+                onToggleSelect={toggleSelect}
                 onAddNote={handleAddNote}
                 onEditNote={handleEditNote}
                 onDeleteNote={handleDeleteNote}
               />
             ))}
+            </div>
           </div>
         ) : (
           <p className="flex items-center gap-2 px-1 py-6 text-sm text-gray-400">
@@ -401,6 +522,30 @@ export function BatonRelayBoard({ currentUserId, todayDate, classId }: BatonRela
             まだ生徒がいません。下から追加してください。
           </p>
         ))}
+
+      {/* 選んだ生徒の一括操作 (1人以上選んだときだけ出る)。
+          日々のリストの下に sticky で残し、スクロールしても押せるようにする。 */}
+      <StudentBulkBar
+        selectedCount={selectedIds.size}
+        noteCountTotal={selectedNoteTotal}
+        classes={classes}
+        currentClassId={selectedClassId}
+        busy={bulkBusy}
+        onClear={() => setSelectedIds(new Set())}
+        onMove={(toClassId) =>
+          runBulk(
+            { action: 'move', toClassId },
+            'クラスを移しました',
+            'クラス移動に失敗しました',
+          )
+        }
+        onArchive={() =>
+          runBulk({ action: 'archive' }, 'アーカイブしました', 'アーカイブに失敗しました')
+        }
+        onDelete={() =>
+          runBulk({ action: 'delete' }, '削除しました', '削除に失敗しました')
+        }
+      />
 
       {/* 透明性表示 (§5・school_admin=teacher と整合) */}
       {classes.length > 0 && (

@@ -503,7 +503,8 @@ export const workshopReflections = pgTable(
 
 // ── workshop_team_reflections (0058) ────────────────────────────
 // チーム振り返り (紙の「振り返り・発表シート」の画面化)。1班1枚・上書き可。
-// 4問は紙と同じ (①変化 ②チームだから起きた瞬間 ③合言葉 ④仕事で活かせること)。
+// 4問 = 研修資料の3条件 + 日常への着地 (migration 0063):
+//   ①ビジョン ②ちがいの活かし方 ③自律的な動き ④仕事で活かせること。
 // 12分かけて埋めるので途中保存を許し、各欄は空文字を許容する。
 // checkins との差: 書込は「本人のみ」ではなく「テナント内なら誰でも」
 // (チームで1枚を共同編集するため。入力係が交代できる必要がある)。
@@ -517,9 +518,13 @@ export const workshopTeamReflections = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     workshopId: uuid('workshop_id').notNull(),
     teamKey: text('team_key').notNull(),
-    teamChange: text('team_change').notNull().default(''),
-    teamMoment: text('team_moment').notNull().default(''),
-    teamMotto: text('team_motto').notNull().default(''),
+    // 「正解がない複雑な課題に向き合う条件」(migration 0063)
+    // team_vision は 2026-08-10 に設問から外した (chimo 判断)。
+    // 列は残してあるが API/UI からは書き込まれない。復活させるなら
+    // constants.ts の WORKSHOP_TEAM_QUESTIONS に戻すだけで済む。
+    teamVision: text('team_vision').notNull().default(''),
+    teamRespect: text('team_respect').notNull().default(''),
+    teamAutonomy: text('team_autonomy').notNull().default(''),
     teamNext: text('team_next').notNull().default(''),
     // 最後に書いた人 (RLS の WITH CHECK 用)。UI には出さない。
     updatedBy: uuid('updated_by').references(() => users.id, {

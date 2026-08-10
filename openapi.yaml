@@ -2142,6 +2142,9 @@ components:
         teamKey:
           type: string
           example: "1"
+        vision:
+          type: string
+          description: お題をチームでどう定義したか (発表の入口)
         respect:
           type: string
           description: 価値観や前提を尊重する (ちがう観察や解釈をどう扱ったか)
@@ -2156,6 +2159,7 @@ components:
           format: date-time
       required:
         - teamKey
+        - vision
         - respect
         - autonomy
         - next
@@ -2232,6 +2236,8 @@ components:
           type: string
         teamKey:
           type: string
+        teamVision:
+          type: string
         teamRespect:
           type: string
         teamAutonomy:
@@ -2253,6 +2259,7 @@ components:
         - tenantId
         - workshopId
         - teamKey
+        - teamVision
         - teamRespect
         - teamAutonomy
         - teamNext
@@ -2269,6 +2276,10 @@ components:
             - "2"
             - "3"
             - "4"
+        vision:
+          type: string
+          maxLength: 2000
+          default: ""
         respect:
           type: string
           maxLength: 2000

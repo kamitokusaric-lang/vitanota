@@ -103,9 +103,9 @@ export function findWorkshopTeam(key: string): WorkshopTeam | undefined {
 // 研修資料のスライド「正解がない複雑な課題にチームで向き合う」が示す**3条件**に紐づける。
 // それまでは OODA の周回 (変化 / チームだから起きた瞬間 / 合言葉) を軸にしていたが、
 // スライドの問いと軸がズレていた。
+//   ・共に目指したいビジョンが明確で、すり合っている
 //   ・共に働く人の価値観や前提を尊重する
 //   ・一人一人が自律的に取り組む
-// (スライドの「共に目指したいビジョン」は chimo 判断で外した・2026-08-10)
 // 最後の1問だけはスライドに無い「日常への着地」で、ポスターの主役に置く
 // (発表のクライマックスを「で、明日から何をするか」にするため)。
 //
@@ -116,7 +116,11 @@ export function findWorkshopTeam(key: string): WorkshopTeam | undefined {
 // hint (プレースホルダー) には**例を載せない** (chimo 2026-08-10)。
 // 例を置くと、それをなぞった答えが並んでチームの言葉が出てこなくなるため。
 // ④ は主役として大きく出すので posterLabel は表示されない。
-export type WorkshopTeamReflectionField = 'respect' | 'autonomy' | 'next';
+export type WorkshopTeamReflectionField =
+  | 'vision'
+  | 'respect'
+  | 'autonomy'
+  | 'next';
 
 export interface WorkshopTeamQuestion {
   field: WorkshopTeamReflectionField;
@@ -126,6 +130,18 @@ export interface WorkshopTeamQuestion {
 }
 
 export const WORKSHOP_TEAM_QUESTIONS: WorkshopTeamQuestion[] = [
+  {
+    // 発表の入口。同じお題でもチームごとに定義が違うことが、
+    // 「同じお題なのに、なぜ違うものができたのか?」の答えになる。
+    field: 'vision',
+    // お題の文言は研修資料のスライドと一字一句そろえる (chimo 2026-08-10)。
+    // 参加者は紙・スライド・画面を行き来するので、言い方がぶれると
+    // 「どれが本当のお題か」で迷わせる。
+    formLabel:
+      '「校外学習で多くの生徒が訪れる動物園」を、チームでどう定義しましたか？',
+    posterLabel: 'チームの定義',
+    hint: '',
+  },
   {
     field: 'respect',
     formLabel:

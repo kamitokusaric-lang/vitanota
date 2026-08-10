@@ -31,6 +31,7 @@ function teamReflection(
 ): WorkshopTeamReflectionDto {
   return {
     teamKey: o.teamKey ?? '1',
+    vision: o.vision ?? '子どもが「また行きたい」と言う園',
     respect: o.respect ?? 'ちがう見方を両方残して作り分けた',
     autonomy: o.autonomy ?? '気づいた人が手を動かした',
     next: o.next ?? '学年会で、まず全員が一言ずつ',
@@ -164,6 +165,7 @@ describe('チーム振り返り', () => {
     fireEvent.click(screen.getByTestId('workshop-team-submit'));
     expect(upsertTeamReflection).toHaveBeenCalledWith({
       teamKey: '1',
+      vision: '',
       respect: '',
       autonomy: 'とりあえず作ってみる',
       next: '',
@@ -204,7 +206,7 @@ describe('チーム振り返り', () => {
     mockBoard(
       board({
         teamReflections: [
-          teamReflection({ teamKey: '2', respect: '', autonomy: '', next: '' }),
+          teamReflection({ teamKey: '2', vision: '', respect: '', autonomy: '', next: '' }),
         ],
       }),
     );
@@ -242,11 +244,12 @@ describe('発表用ポスター', () => {
     expect(within(poster).getByText('2班')).toBeInTheDocument();
   });
 
-  it('ポスターは3問と班名だけを出す (書いた人・更新時刻を足さない)', () => {
+  it('ポスターは4問と班名だけを出す (書いた人・更新時刻を足さない)', () => {
     // 本文そのものに人名が入ることはある (「A さんの一言で」など) ので、
-    // 語句の有無ではなく「3問と班名以外を描画していないこと」で固定する。
+    // 語句の有無ではなく「4問と班名以外を描画していないこと」で固定する。
     const r = teamReflection({
       teamKey: '2',
+      vision: 'テイギ',
       respect: 'シュンカン',
       autonomy: 'アイコトバ',
       next: 'ツギ',
@@ -258,7 +261,9 @@ describe('発表用ポスター', () => {
     expect(poster.textContent).toBe(
       [
         '2班',
-        'ツギ', // 主役 = ④ 仕事で活かせること
+        'ツギ', // 主役 = 仕事で活かせること
+        'チームの定義',
+        'テイギ',
         'ちがいの活かし方',
         'シュンカン',
         '自律的な動き',

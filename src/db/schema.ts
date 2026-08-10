@@ -519,9 +519,6 @@ export const workshopTeamReflections = pgTable(
     workshopId: uuid('workshop_id').notNull(),
     teamKey: text('team_key').notNull(),
     // 「正解がない複雑な課題に向き合う条件」(migration 0063)
-    // team_vision は 2026-08-10 に設問から外した (chimo 判断)。
-    // 列は残してあるが API/UI からは書き込まれない。復活させるなら
-    // constants.ts の WORKSHOP_TEAM_QUESTIONS に戻すだけで済む。
     teamVision: text('team_vision').notNull().default(''),
     teamRespect: text('team_respect').notNull().default(''),
     teamAutonomy: text('team_autonomy').notNull().default(''),

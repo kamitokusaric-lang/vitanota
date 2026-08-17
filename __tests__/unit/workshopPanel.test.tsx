@@ -18,7 +18,14 @@ import {
   type WorkshopTeamReflectionDto,
 } from '@/features/workshop/hooks/useWorkshop';
 import { WorkshopPanel } from '@/features/workshop/components/WorkshopPanel';
-import { WORKSHOP } from '@/features/workshop/constants';
+import {
+  WORKSHOP,
+  WORKSHOP_TEAM_QUESTIONS,
+} from '@/features/workshop/constants';
+
+// ポスターの見出し = 設問文そのもの (chimo 2026-08-17)。文言は変わるので定数から引く。
+const posterLabel = (field: string) =>
+  WORKSHOP_TEAM_QUESTIONS.find((q) => q.field === field)!.posterLabel;
 
 const mUseWorkshop = vi.mocked(useWorkshop);
 
@@ -228,9 +235,11 @@ describe('発表用ポスター', () => {
     render(<WorkshopPanel />);
     openTeamSection();
     const poster = screen.getByTestId('workshop-team-poster-2');
-    expect(within(poster).getByText('自律的な動き')).toBeInTheDocument();
     expect(
-      within(poster).queryByText('ちがいの活かし方'),
+      within(poster).getByText(posterLabel('autonomy')),
+    ).toBeInTheDocument();
+    expect(
+      within(poster).queryByText(posterLabel('respect')),
     ).not.toBeInTheDocument();
   });
 
@@ -241,7 +250,7 @@ describe('発表用ポスター', () => {
     render(<WorkshopPanel />);
     openTeamSection();
     const poster = screen.getByTestId('workshop-team-poster-2');
-    expect(within(poster).getByText('2班')).toBeInTheDocument();
+    expect(within(poster).getByText('うさぎ')).toBeInTheDocument();
   });
 
   it('ポスターは4問と班名だけを出す (書いた人・更新時刻を足さない)', () => {
@@ -260,13 +269,13 @@ describe('発表用ポスター', () => {
     const poster = screen.getByTestId('workshop-team-poster-2');
     expect(poster.textContent).toBe(
       [
-        '2班',
-        'ツギ', // 主役 = 仕事で活かせること
-        'チームの定義',
+        'うさぎ',
+        'ツギ', // 主役 = ④ (見出しなし)
+        posterLabel('vision'),
         'テイギ',
-        'ちがいの活かし方',
+        posterLabel('respect'),
         'シュンカン',
-        '自律的な動き',
+        posterLabel('autonomy'),
         'アイコトバ',
       ].join(''),
     );
@@ -297,7 +306,7 @@ describe('発表モード', () => {
     expect(within(stage).getByText('1 / 2')).toBeInTheDocument();
     expect(within(stage).getByText('1班の一手')).toBeInTheDocument();
 
-    fireEvent.click(within(stage).getByLabelText('次の班'));
+    fireEvent.click(within(stage).getByLabelText('次のグループ'));
     expect(within(stage).getByText('2 / 2')).toBeInTheDocument();
     expect(within(stage).getByText('3班の一手')).toBeInTheDocument();
   });

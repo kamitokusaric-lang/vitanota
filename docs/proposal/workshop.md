@@ -151,8 +151,8 @@
 
 ## 12. 研修資料（実装済み・スライド pager）
 
-- PDF（`public/workshop/ワークショップ資料.pdf`・15ページ・16:9）を `pdftoppm` で1ページずつ PNG 化し `public/workshop/pages/page-01.png…` に配置。
-- Panel は `MaterialPager`（`WorkshopPanel.tsx`）で **1ページずつめくって表示**（前へ/次へ・`n / 15`）。iframe/PDF 埋め込みは `X-Frame-Options: DENY` で不可だったため画像 pager に切替。
+- PDF（`public/workshop/ワークショップ資料.pdf`・24ページ・16:9）を `pdftoppm` で1ページずつ PNG 化し `public/workshop/pages/page-01.png…` に配置。
+- Panel は `MaterialPager`（`WorkshopPanel.tsx`）で **1ページずつめくって表示**（前へ/次へ・`n / 24`）。iframe/PDF 埋め込みは `X-Frame-Options: DENY` で不可だったため画像 pager に切替。
 - 差し替え: PDF を再変換（`pdftoppm -png -scale-to-x 1600 …`）し `WORKSHOP_MATERIAL.pageCount`（`constants.ts`）を更新。資料は静的アセットなので API を通さずクライアントが直接読む。
 - **判断ずみ（chimo 2026-08-07）**: `public/workshop/` の静的資料は **認証・テナントゲートがかからない**（URL を知れば誰でも取得可）。研修 UI は 404 で絞るが、スライド画像/PDF は公開配信。**この公開配信を許容する**と決定。機微な資料に差し替えるときは、この判断を再確認すること。
 

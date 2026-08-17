@@ -568,7 +568,7 @@ function TeamReflectionSection({
         </span>
         {writtenTeams.length > 0 && !open && (
           <span className="shrink-0 text-[12px] text-slate-400">
-            {writtenTeams.length}班
+            {writtenTeams.length}グループ
           </span>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-vn-accent/30 bg-vn-accent-bg px-2.5 py-1 text-[12px] font-semibold text-vn-accent">
@@ -662,14 +662,14 @@ function TeamReflectionSection({
               data-testid="workshop-team-present"
             >
               <Presentation size={17} strokeWidth={2} aria-hidden />
-              発表する ({writtenTeams.length}班)
+              発表する ({writtenTeams.length}グループ)
             </button>
           )}
 
           {/* ほかの班のポスター (書かれた班だけ・発表後に読み返せる) */}
           {otherTeams.length > 0 && (
             <div className="space-y-3" data-testid="workshop-team-list">
-              <p className="px-1 text-[12px] text-slate-400">ほかの班のポスター</p>
+              <p className="px-1 text-[12px] text-slate-400">ほかのグループのポスター</p>
               {otherTeams.map(({ team: t, answers }) => (
                 <TeamReflectionPoster key={t.key} team={t} answers={answers} />
               ))}
@@ -866,7 +866,7 @@ function TeamReflectionStage({
           type="button"
           onClick={() => setIndex((i) => Math.max(0, i - 1))}
           disabled={index <= 0}
-          aria-label="前の班"
+          aria-label="前のグループ"
           className="flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-semibold text-slate-600 transition hover:bg-vn-muted-bg disabled:opacity-30"
         >
           <ChevronLeft size={18} strokeWidth={2} aria-hidden />
@@ -879,7 +879,7 @@ function TeamReflectionStage({
           type="button"
           onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
           disabled={index >= total - 1}
-          aria-label="次の班"
+          aria-label="次のグループ"
           className="flex items-center gap-1 rounded-full px-4 py-2 text-[14px] font-semibold text-slate-600 transition hover:bg-vn-muted-bg disabled:opacity-30"
         >
           次へ

@@ -40,7 +40,7 @@ const teamAnswer = z.string().trim().max(2000).default('');
 export const upsertTeamReflectionSchema = z
   .object({
     teamKey: z.enum(WORKSHOP_TEAM_KEYS as [string, ...string[]], {
-      message: '班を選んでください',
+      message: 'グループを選んでください',
     }),
     vision: teamAnswer,
     respect: teamAnswer,

@@ -52,7 +52,7 @@ export interface WorkshopTeam {
 export const WORKSHOP_TEAMS: WorkshopTeam[] = [
   {
     key: '1',
-    label: '1班',
+    label: 'カメ',
     tone: {
       surface: 'bg-vn-accent-bg/40',
       text: 'text-vn-accent-text',
@@ -62,7 +62,7 @@ export const WORKSHOP_TEAMS: WorkshopTeam[] = [
   },
   {
     key: '2',
-    label: '2班',
+    label: 'うさぎ',
     tone: {
       surface: 'bg-vn-blue-bg/50',
       text: 'text-vn-blue-text',
@@ -72,7 +72,7 @@ export const WORKSHOP_TEAMS: WorkshopTeam[] = [
   },
   {
     key: '3',
-    label: '3班',
+    label: 'りす',
     tone: {
       surface: 'bg-vn-green-bg/50',
       text: 'text-vn-green-text',
@@ -82,7 +82,7 @@ export const WORKSHOP_TEAMS: WorkshopTeam[] = [
   },
   {
     key: '4',
-    label: '4班',
+    label: 'あひる',
     tone: {
       surface: 'bg-vn-pink-bg/50',
       text: 'text-vn-pink-text',
@@ -139,27 +139,29 @@ export const WORKSHOP_TEAM_QUESTIONS: WorkshopTeamQuestion[] = [
     // 「どれが本当のお題か」で迷わせる。
     formLabel:
       '「校外学習で多くの生徒が訪れる動物園」を、チームでどう定義しましたか？',
-    posterLabel: 'チームの定義',
+    posterLabel:
+      '「校外学習で多くの生徒が訪れる動物園」を、チームでどう定義しましたか？',
     hint: '',
   },
   {
     field: 'respect',
     formLabel:
-      '異なる観察や解釈を、ポジティブな力に変えるコツは見つかりましたか？',
-    posterLabel: 'ちがいの活かし方',
+      '複数人の異なる観察や解釈を、ポジティブな力に変えるコツは見つかりましたか？',
+    posterLabel: '複数人の異なる観察や解釈を、ポジティブな力に変えるコツは見つかりましたか？',
     hint: '',
   },
   {
     field: 'autonomy',
     formLabel:
       '役割や立場に関わらず、全員が自律的に主体的に関わるコツは見つかりましたか？',
-    posterLabel: '自律的な動き',
+    posterLabel:
+      '役割や立場に関わらず、全員が自律的に主体的に関わるコツは見つかりましたか？',
     hint: '',
   },
   {
     field: 'next',
-    formLabel: '仕事で活かせること — このチームの動き方を、試せる場面はありますか?',
-    posterLabel: '仕事で活かせること',
+    formLabel: 'チームで複雑な課題に取り組む際のポイントを、ワンフレーズで伝えるとしたら何ですか？',
+    posterLabel: 'チームで複雑な課題に取り組む際のポイントを、ワンフレーズで伝えるとしたら何ですか？',
     hint: '',
   },
 ];

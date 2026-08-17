@@ -168,7 +168,7 @@ export const WORKSHOP_TEAM_QUESTIONS: WorkshopTeamQuestion[] = [
 // 研修資料 (スライド)。PDF を1ページずつ PNG 化して public/workshop/pages/ に置き、
 // 1枚ずつめくって見せる (pdftoppm で 2桁ゼロ埋め page-01.png…)。差し替えるときは
 // PDF を再変換し pageCount を更新する。静的アセットなので API を通さずクライアントが直接読む。
-const MATERIAL_PAGE_COUNT = 10;
+const MATERIAL_PAGE_COUNT = 24;
 const MATERIAL_PAD = String(MATERIAL_PAGE_COUNT).length;
 
 export const WORKSHOP_MATERIAL = {

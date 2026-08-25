@@ -76,7 +76,7 @@ jobs:
           corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
-        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -108,7 +108,7 @@ jobs:
           corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
-        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -174,7 +174,7 @@ jobs:
           corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
-        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -248,7 +248,7 @@ jobs:
           corepack prepare pnpm@10.33.0 --activate
 
       - name: Setup Node.js
-        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8  # v4.0.2
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -299,7 +299,7 @@ jobs:
 #
 # 現在固定中の SHA (2026-06-03 更新・要定期更新):
 # - actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 = v6.0.2
-# - actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 = v4.0.2
+# - actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e = v4.0.2
 # - pnpm: corepack で pnpm@10.33.0 を pin (Dockerfile と同一)。action-setup は v6 regression のため不使用
 # - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a = v7.0.1
 # - gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 = v2.3.7

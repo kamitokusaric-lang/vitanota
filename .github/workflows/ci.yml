@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0  # 履歴全体を gitleaks がスキャンするため
 
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.7
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v2.3.7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -302,7 +302,7 @@ jobs:
 # - actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 = v4.0.2
 # - pnpm: corepack で pnpm@10.33.0 を pin (Dockerfile と同一)。action-setup は v6 regression のため不使用
 # - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a = v7.0.1
-# - gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 = v2.3.7
+# - gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e = v2.3.7
 #
 # Dependabot 設定例 (.github/dependabot.yml で別途設定):
 #   updates:
